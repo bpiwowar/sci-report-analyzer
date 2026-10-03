@@ -55,10 +55,8 @@ def test_cleaning(case):
         return
     # The reference keeps spelled ordinals ("Thirty-sixth", "Première"): the language rules
     # drop them.
-    assert clean_venue(case["venue"]) == apply_rules(case["clean"], LANGUAGE_RULES)
-    assert clean_venue(case["venue"], strip_parens=False) == apply_rules(
-        case["cleanNoParens"], LANGUAGE_RULES
-    )
+    # Parenthesised text is kept (but acronyms): the reference's "cleanNoParens".
+    assert clean_venue(case["venue"]) == apply_rules(case["cleanNoParens"], LANGUAGE_RULES)
     assert normalize(case["venue"]) == case["norm"]
     assert tokenize(case["venue"]) == case["tokens"]
 
@@ -86,5 +84,20 @@ def test_rule_examples():
     for rid, after in expected.items():
         if rid == "ordinals":  # now in the English and French rules
             continue
+        if rid == "parentheses":  # dropped: it removed tracks ("(Demonstrations)")
+            continue
         assert rules[rid].apply(before[rid]) == after
         assert rules[rid].example == before[rid]
+
+
+def test_parenthesised_track_kept():
+    """A track in parentheses stays in the cleaned text (the venue's name, its variant), but
+    not in the text searched in the rankings."""
+    from sci_report_analyzer.ranking.service import for_rankings
+
+    text = "COLING (Demonstrations): International Conference on Computational Linguistics (COLING)"
+    cleaned = clean_venue(text)
+    assert (
+        cleaned == "COLING (Demonstrations) International Conference on Computational Linguistics"
+    )
+    assert for_rankings(cleaned) == "COLING International Conference on Computational Linguistics"

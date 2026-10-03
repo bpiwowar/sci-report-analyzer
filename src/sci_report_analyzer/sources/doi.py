@@ -149,8 +149,8 @@ _PROCEEDINGS = re.compile(
     rf"^\s*(?:companion\s+)?proceedings\s+of\s+(?:the\s+)?(?:{_ORDINAL}\s+)?", re.I
 )
 _LEADING_ORDINAL = re.compile(rf"^\s*(?:the\s+)?(?:(?:19|20)\d{{2}}\s+)?(?:{_ORDINAL}\s+)?", re.I)
-# A part of the proceedings, kept in parentheses (its track is still detected; the
-# parentheses rule drops it for matching): "...: Tutorial Abstracts" → "... (Tutorial Abstracts)".
+# A part of the proceedings, kept in parentheses (its track is detected):
+# "...: Tutorial Abstracts" → "... (Tutorial Abstracts)".
 _PART = re.compile(
     r"\s*:\s*((?:volume\s+\d+\s*[:,]\s*)?(?:long|short|tutorial|demo|system demonstration|student "
     r"research|industry|shared task|findings)[^:()]*)$",

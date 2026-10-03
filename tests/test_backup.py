@@ -143,3 +143,41 @@ def test_language_cleaning_rules_added_to_saved_rules(tmp_path):
     ids = [r["id"] for r in value["norm_rules"]]
     assert ids == ["ordinalsEn", "ordinalsFr", "custom1"]
     assert value["min_score"] == 0.7
+
+
+def test_parentheses_rule_dropped_from_saved_rules(tmp_path):
+    """The "Parentheses" rule (it removed tracks: "(Demonstrations)") leaves the saved rules
+    when not edited; an edited one stays."""
+    import json
+
+    db = tmp_path / "db.sqlite"
+    cfg = _cfg()
+    with create_engine(f"sqlite:///{db}").begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "a9c3e5f17d28")
+    old = {
+        "id": "parentheses",
+        "name": "Parentheses",
+        "description": "Remove parenthesised text (one level of nesting).",
+        "pattern": r"\((?:[^()]|\([^()]*\))*\)",
+        "replacement": " ",
+        "ignore_case": False,
+        "enabled": True,
+        "sources": [],
+        "example": "Neural Information Processing Systems (NeurIPS)",
+    }
+    acronym = {"id": "parenAcronym", "name": "Parenthesised acronym", "pattern": "x"}
+    for rules, kept in (
+        ([old, acronym], ["parenAcronym"]),
+        ([{**old, "enabled": False}], ["parentheses"]),
+    ):
+        with sqlite3.connect(db) as c:
+            c.execute(
+                "INSERT OR REPLACE INTO app_setting (key, value) VALUES ('matching', ?)",
+                (json.dumps({"norm_rules": rules}),),
+            )
+            c.execute("UPDATE alembic_version SET version_num = 'a9c3e5f17d28'")
+        _migrate(db)
+        with sqlite3.connect(db) as c:
+            value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
+        assert [r["id"] for r in value["norm_rules"]] == kept
