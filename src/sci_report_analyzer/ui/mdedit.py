@@ -1,0 +1,173 @@
+"""A Markdown editor (for notes and reports): CodeMirror with Markdown highlighting, a
+toolbar (bold, lists, links, LaTeX…), and a rendered preview (beside or instead)."""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Callable
+
+from nicegui import ui
+
+from .theme import NOTE_EXTRAS
+
+# (icon, tooltip, kind, args): kind "wrap" (before, after, placeholder) or "line" (prefix).
+TOOLS = [
+    ("format_bold", "Bold (⌘/Ctrl-B)", "wrap", ("**", "**", "bold")),
+    ("format_italic", "Italic (⌘/Ctrl-I)", "wrap", ("*", "*", "italic")),
+    ("title", "Heading", "line", ("### ",)),
+    ("format_list_bulleted", "List", "line", ("- ",)),
+    ("format_list_numbered", "Numbered list", "line", ("1. ",)),
+    ("format_quote", "Quote", "line", ("> ",)),
+    ("code", "Code", "wrap", ("`", "`", "code")),
+    ("link", "Link", "wrap", ("[", "](https://)", "text")),
+    ("functions", "LaTeX ($…$ inline, $$…$$ display)", "wrap", ("$", "$", "x^2")),
+]
+
+MODES = {"edit": "Edit", "split": "Split", "preview": "Preview"}
+
+
+class MarkdownEditor:
+    def __init__(
+        self,
+        value: str = "",
+        *,
+        on_change: Callable[[str], None] | None = None,
+        render: Callable[[str], str] | None = None,
+        mode: str = "edit",
+        mark: str | None = None,
+        height: str = "10rem",
+        keymap: dict | None = None,
+        toolbar: Callable[[], None] | None = None,
+        stacked: bool = False,
+        fill: bool = False,
+    ) -> None:
+        """``render``: the Markdown shown in the preview (e.g. with citations substituted);
+        ``toolbar``: more buttons, at the toolbar's right; ``stacked``: the preview below the
+        editor (else beside it); ``fill``: the height left in its (flex) column, rather than
+        ``height``."""
+        self._render = render or (lambda t: t)
+        self._on_change = on_change
+        if fill:
+            height = "100%"
+        with ui.column().classes("w-full gap-1" + (" grow min-h-0" if fill else "")) as self.box:
+            with ui.row().classes("w-full items-center gap-0"):
+                for icon, tip, kind, args in TOOLS:
+                    ui.button(
+                        icon=icon,
+                        on_click=lambda kind=kind, args=args: (
+                            self.wrap(*args) if kind == "wrap" else self.prefix_lines(*args)
+                        ),
+                    ).props("flat dense round size=sm").tooltip(tip)
+                ui.space()
+                if toolbar:
+                    toolbar()
+                self.mode = (
+                    ui.toggle(MODES, value=mode, on_change=lambda: self._layout())
+                    .props("dense flat no-caps size=sm")
+                    .tooltip("Edit, edit beside the preview, or the preview only")
+                )
+                if mark:
+                    self.mode.mark(f"{mark}-mode")
+            panes = ui.column().classes("w-full gap-2") if stacked else ui.row()
+            with panes.classes(
+                "w-full no-wrap gap-2 items-stretch" + (" grow min-h-0" if fill else "")
+            ):
+                keys = {
+                    "Mod-b": lambda: self.wrap("**", "**", "bold"),
+                    "Mod-i": lambda: self.wrap("*", "*", "italic"),
+                }
+                self.editor = (
+                    ui.codemirror(
+                        value or "",
+                        language="Markdown",
+                        line_wrapping=True,
+                        indent="  ",
+                        keymap={**keys, **(keymap or {})},
+                        on_change=lambda e: self._changed(e.value),
+                    )
+                    .classes("w-full border rounded")
+                    .style(f"height:{height}; font-size:0.875rem")
+                )
+                if mark:
+                    self.editor.mark(mark)
+                self.preview = (
+                    ui.markdown(extras=NOTE_EXTRAS)
+                    .classes("w-full vr-note overflow-auto border rounded px-3")
+                    .style(f"height:{height}")
+                )
+        self._layout()
+        self._sync_scroll()
+
+    def _sync_scroll(self) -> None:
+        """The preview follows the editor's scrolling (at the same proportion)."""
+        self.editor.client.run_javascript(
+            "(() => { let n = 0; const t = setInterval(() => {"
+            f" const v = getElement({self.editor.id})?.editor,"
+            f" p = getHtmlElement({self.preview.id});"
+            " if (++n > 50) clearInterval(t); if (!v || !p) return; clearInterval(t);"
+            " v.scrollDOM.addEventListener('scroll', () => {"
+            " const s = v.scrollDOM;"
+            " const f = s.scrollTop / Math.max(1, s.scrollHeight - s.clientHeight);"
+            " p.scrollTop = f * (p.scrollHeight - p.clientHeight); });"
+            " }, 100); })()"
+        )
+
+    @property
+    def value(self) -> str:
+        return self.editor.value or ""
+
+    @value.setter
+    def value(self, text: str) -> None:
+        self.editor.value = text
+
+    def _changed(self, text: str) -> None:
+        if self.mode.value != "edit":
+            self.refresh_preview()
+        if self._on_change:
+            self._on_change(text or "")
+
+    def refresh_preview(self) -> None:
+        self.preview.content = self._render(self.value)
+
+    def _layout(self) -> None:
+        mode = self.mode.value or "edit"
+        self.editor.set_visibility(mode != "preview")
+        self.preview.set_visibility(mode != "edit")
+        if mode != "edit":
+            self.refresh_preview()
+
+    # ---- Editing at the cursor (in the browser) ----
+
+    def _js(self, body: str) -> None:
+        self.editor.client.run_javascript(
+            f"(() => {{ const v = getElement({self.editor.id})?.editor; if (!v) return; "
+            f"{body}; v.focus(); }})()"
+        )
+
+    def insert(self, text: str) -> None:
+        """Insert ``text`` at the cursor (replacing the selection)."""
+        if self.mode.value == "preview":
+            self.mode.value = "split"
+        self._js(f"v.dispatch(v.state.replaceSelection({json.dumps(text)}))")
+
+    def wrap(self, before: str, after: str, placeholder: str = "") -> None:
+        """Put the selection (else ``placeholder``, selected) between ``before`` and ``after``."""
+        b, a, ph = (json.dumps(x) for x in (before, after, placeholder))
+        self._js(
+            "const s = v.state.selection.main; "
+            f"const t = v.state.sliceDoc(s.from, s.to) || {ph}; "
+            f"v.dispatch({{changes: {{from: s.from, to: s.to, insert: {b} + t + {a}}}, "
+            f"selection: {{anchor: s.from + {b}.length, head: s.from + {b}.length + t.length}}}})"
+        )
+
+    def prefix_lines(self, prefix: str) -> None:
+        """Start each line of the selection with ``prefix``."""
+        self._js(
+            "const s = v.state.selection.main, d = v.state.doc; const changes = []; "
+            "for (let l = d.lineAt(s.from).number; l <= d.lineAt(s.to).number; l++) "
+            f"changes.push({{from: d.line(l).from, insert: {json.dumps(prefix)}}}); "
+            "v.dispatch({changes})"
+        )
+
+    def focus(self) -> None:
+        self._js("")

@@ -1,0 +1,173 @@
+{
+ "indexed": {
+  "date-parts": [
+   [
+    2026,
+    8,
+    25
+   ]
+  ],
+  "date-time": "2026-08-25T07:17:03Z",
+  "timestamp": 1787642223402,
+  "version": "build-2736575974"
+ },
+ "publisher-location": "Stroudsburg, PA, USA",
+ "reference-count": 0,
+ "publisher": "Association for Computational Linguistics",
+ "content-domain": {
+  "domain": [],
+  "crossmark-restriction": false
+ },
+ "short-container-title": [],
+ "published-print": {
+  "date-parts": [
+   [
+    2025
+   ]
+  ]
+ },
+ "DOI": "10.18653/v1/2025.findings-naacl.398",
+ "type": "proceedings-article",
+ "created": {
+  "date-parts": [
+   [
+    2025,
+    6,
+    7
+   ]
+  ],
+  "date-time": "2025-06-07T08:33:56Z",
+  "timestamp": 1749285236000
+ },
+ "page": "7145-7159",
+ "source": "Crossref",
+ "is-referenced-by-count": 3,
+ "title": [
+  "\u201cWomen do not have heart attacks!\u201d Gender Biases in Automatically Generated Clinical Cases in French"
+ ],
+ "prefix": "10.18653",
+ "author": [
+  {
+   "given": "Fanny",
+   "family": "Ducel",
+   "sequence": "first",
+   "affiliation": [],
+   "role": [
+    {
+     "vocabulary": "crossref",
+     "role": "author"
+    }
+   ]
+  },
+  {
+   "given": "Nicolas",
+   "family": "Hiebel",
+   "sequence": "additional",
+   "affiliation": [],
+   "role": [
+    {
+     "vocabulary": "crossref",
+     "role": "author"
+    }
+   ]
+  },
+  {
+   "given": "Olivier",
+   "family": "Ferret",
+   "sequence": "additional",
+   "affiliation": [],
+   "role": [
+    {
+     "vocabulary": "crossref",
+     "role": "author"
+    }
+   ]
+  },
+  {
+   "given": "Kar\u00ebn",
+   "family": "Fort",
+   "sequence": "additional",
+   "affiliation": [],
+   "role": [
+    {
+     "vocabulary": "crossref",
+     "role": "author"
+    }
+   ]
+  },
+  {
+   "given": "Aur\u00e9lie",
+   "family": "N\u00e9v\u00e9ol",
+   "sequence": "additional",
+   "affiliation": [],
+   "role": [
+    {
+     "vocabulary": "crossref",
+     "role": "author"
+    }
+   ]
+  }
+ ],
+ "member": "1643",
+ "event": {
+  "name": "Findings of the Association for Computational Linguistics: NAACL 2025",
+  "location": "Albuquerque, New Mexico",
+  "start": {
+   "date-parts": [
+    [
+     2025,
+     4
+    ]
+   ]
+  },
+  "end": {
+   "date-parts": [
+    [
+     2025,
+     4
+    ]
+   ]
+  }
+ },
+ "container-title": [
+  "Findings of the Association for Computational Linguistics: NAACL 2025"
+ ],
+ "original-title": [],
+ "deposited": {
+  "date-parts": [
+   [
+    2025,
+    6,
+    7
+   ]
+  ],
+  "date-time": "2025-06-07T08:37:49Z",
+  "timestamp": 1749285469000
+ },
+ "score": 1,
+ "resource": {
+  "primary": {
+   "URL": "https://aclanthology.org/2025.findings-naacl.398"
+  }
+ },
+ "subtitle": [],
+ "short-title": [],
+ "issued": {
+  "date-parts": [
+   [
+    2025
+   ]
+  ]
+ },
+ "references-count": 0,
+ "URL": "https://doi.org/10.18653/v1/2025.findings-naacl.398",
+ "relation": {},
+ "subject": [],
+ "published": {
+  "date-parts": [
+   [
+    2025
+   ]
+  ]
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "type": "article",
+ "id": "https://doi.org/10.48550/arxiv.2101.00001",
+ "categories": [
+  "Machine Learning (cs.LG)",
+  "Artificial Intelligence (cs.AI)",
+  "FOS: Computer and information sciences",
+  "FOS: Computer and information sciences"
+ ],
+ "author": [
+  {
+   "family": "Bouneffouf",
+   "given": "Djallel"
+  }
+ ],
+ "issued": {
+  "date-parts": [
+   [
+    2021
+   ]
+  ]
+ },
+ "abstract": "The Multi-armed bandit offer the advantage to learn and exploit the already learnt knowledge at the same time. This capability allows this approach to be applied in different domains, going from clinical trials where the goal is investigating the effects of different experimental treatments while minimizing patient losses, to adaptive routing where the goal is to minimize the delays in a network. This article provides a review of the recent results on applying bandit to real-life scenario and summarize the state of the art for each of these fields. Different techniques has been proposed to solve this problem setting, like epsilon-greedy, Upper confident bound (UCB) and Thompson Sampling (TS). We are showing here how this algorithms were adapted to solve the different problems of exploration exploitation.",
+ "DOI": "10.48550/ARXIV.2101.00001",
+ "publisher": "arXiv",
+ "title": "Etat de l'art sur l'application des bandits multi-bras",
+ "URL": "https://arxiv.org/abs/2101.00001",
+ "copyright": "Creative Commons Attribution 4.0 International",
+ "version": "1"
+}
