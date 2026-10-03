@@ -124,7 +124,19 @@ async def test_period_filter(user: User) -> None:
 
 
 @pytest.mark.parametrize(
-    "tab", ["matching", "rules", "corrections", "levels", "lookup", "flags", "data", "keys", "io"]
+    "tab",
+    [
+        "sources",
+        "matching",
+        "rules",
+        "rules-en",
+        "rules-fr",
+        "kinds",
+        "flags",
+        "data",
+        "keys",
+        "io",
+    ],
 )
 async def test_settings_tabs(user: User, tab: str) -> None:
     await user.open(f"/settings?tab={tab}")
@@ -695,15 +707,37 @@ async def test_norm_rules_save(user: User) -> None:
     from sci_report_analyzer.ranking.service import load_settings
 
     await user.open("/settings?tab=rules")
-    await user.should_see("Normalization rules")
+    await user.should_see("Cleaning rules")
     user.find("norm-add").click()
     await user.should_see("Custom rule 1")
     (new,) = [e for e in user.find("norm-pattern-0").elements if not e.value]
     new.value = r"^Proc\. "
     user.find("norm-save").click()
-    await user.should_see("Normalization rules saved")
-    rules = load_settings().norm_rules
+    await user.should_see("Cleaning rules saved")
+    rules = [r for r in load_settings().norm_rules if r.language is None]
     assert rules[0].pattern == r"^Proc\. " and rules[0].id == "custom1"
+
+
+async def test_language_cleaning_rules(user: User) -> None:
+    """A language's rules are edited on their own; the general ones are left as they were."""
+    from sci_report_analyzer.ranking.service import load_settings
+
+    general = [r.id for r in load_settings().norm_rules if r.language is None]
+    await user.open("/settings?tab=rules-en")
+    await user.should_see("Cleaning rules · English")
+    user.find("norm-en-add").click()
+    await user.should_see("Custom rule 1")
+    (new,) = [e for e in user.find("norm-en-pattern-0").elements if not e.value]
+    new.value = r"\bannual\b"
+    user.find("norm-en-save").click()
+    await user.should_see("Cleaning rules saved")
+    rules = load_settings().norm_rules
+    assert [(r.id, r.language) for r in rules[:3]] == [
+        ("custom1en", "en"),
+        ("ordinalWordsEn", "en"),
+        ("ordinalWordsFr", "fr"),
+    ]
+    assert [r.id for r in rules if r.language is None] == general
 
 
 async def test_name_variants_are_in_the_sources_tab(user: User) -> None:
@@ -1144,7 +1178,7 @@ async def test_doi_by_hand_and_sources_tab(user: User) -> None:
 async def test_publication_sources_setting(user: User) -> None:
     from sci_report_analyzer import source_settings
 
-    await user.open("/settings?tab=matching")
+    await user.open("/settings?tab=sources")
     await user.should_see("Publication sources")
     user.find("use-source-scholar").elements.pop().value = False
     user.find("use-sources-save").click()

@@ -14,6 +14,7 @@ from .. import (
     config,
     contribution,
     datadir,
+    i18n,
     keys,
     pdfs,
     reports,
@@ -23,7 +24,7 @@ from .. import (
 )
 from ..db.models import JcrRecord
 from ..db.session import session_scope
-from ..i18n import _, ngettext
+from ..i18n import N_, _, ngettext
 from ..ranking import datasets
 from ..ranking.badge import SOURCE_LABELS, TOGGLABLE_SOURCES, TRACK_LABEL
 from ..ranking.kinds import KINDS
@@ -33,47 +34,81 @@ from ..sources import ADAPTERS
 from . import scimago_years
 from .theme import badge_details, fmt_dt, frame, level_hint, level_options, rank_chip
 
+# The settings, in groups: (group, [(tab, label, depth)]); a tab of None is a heading
+# (e.g. "Language-specific" above the languages' cleaning rules).
+NAV = (
+    (
+        N_("Sources"),
+        (("sources", N_("Publication sources"), 0), ("keys", N_("API keys"), 0)),
+    ),
+    (
+        N_("Venues"),
+        (
+            ("matching", N_("Ranking sources"), 0),
+            (None, N_("Cleaning rules"), 0),
+            ("rules", N_("General"), 1),
+            (None, N_("Language-specific"), 1),
+            *((f"rules-{lang}", name, 2) for lang, name in i18n.LANGUAGES.items()),
+            ("kinds", N_("Venue kinds"), 0),
+        ),
+    ),
+    (N_("Annotations"), (("flags", N_("Flags, tags & categories"), 0),)),
+    (
+        N_("Reports"),
+        (
+            ("contribution", N_("Contribution roles"), 0),
+            ("reports", N_("Report templates"), 0),
+        ),
+    ),
+    (N_("Data"), (("data", N_("Data & cache"), 0), ("io", N_("Import / export"), 0))),
+)
+PANELS = {
+    "sources": lambda: _publication_sources(),
+    "keys": lambda: keys_tab(),
+    "matching": lambda: matching_tab(),
+    "rules": lambda: rules_tab(),
+    **{f"rules-{lang}": (lambda lang=lang: rules_tab(lang)) for lang in i18n.LANGUAGES},
+    "kinds": lambda: kinds_tab(),
+    "flags": lambda: flags_tab(),
+    "contribution": lambda: contribution_tab(),
+    "reports": lambda: report_templates_tab(),
+    "data": lambda: data_tab(),
+    "io": lambda: io_tab(),
+}
+NAV_CSS = """
+.vr-settings-nav .q-tab { justify-content:flex-start; min-height:32px; text-transform:none; }
+.vr-settings-nav .q-tab__content { align-items:flex-start; }
+"""
+
 
 def register() -> None:
     @ui.page("/settings")
-    def settings_page(tab: str = "matching") -> None:
+    def settings_page(tab: str = "sources") -> None:
+        if tab not in PANELS:
+            tab = "sources"
         with frame(_("Settings")):
+            ui.add_css(NAV_CSS)
             ui.label(_("Settings")).classes("text-2xl")
-            with ui.tabs(value=tab).classes("w-full") as tabs:
-                for name, label in (
-                    ("matching", _("Matching")),
-                    ("rules", _("Normalization rules")),
-                    ("kinds", _("Venue kinds")),
-                    ("flags", _("Flags, tags & categories")),
-                    ("contribution", _("Contribution roles")),
-                    ("reports", _("Report templates")),
-                    ("data", _("Data & cache")),
-                    ("keys", _("API keys")),
-                    ("io", _("Import / export")),
+            with ui.row().classes("w-full no-wrap items-start gap-4"):
+                with (
+                    ui.tabs(value=tab)
+                    .props("vertical dense")
+                    .classes("vr-settings-nav shrink-0 w-56") as tabs
                 ):
-                    ui.tab(name, label)
-            with ui.tab_panels(tabs, value=tab).classes("w-full"):
-                with ui.tab_panel("matching"):
-                    matching_tab()
-                with ui.tab_panel("rules"):
-                    rules_tab()
-                with ui.tab_panel("kinds"):
-                    kinds_tab()
-                with ui.tab_panel("flags"):
-                    flags_tab()
-                with ui.tab_panel("contribution"):
-                    contribution_tab()
-                with ui.tab_panel("reports"):
-                    report_templates_tab()
-                with ui.tab_panel("data"):
-                    data_tab()
-                with ui.tab_panel("keys"):
-                    keys_tab()
-                with ui.tab_panel("io"):
-                    io_tab()
-
-
-# ---- contribution roles --------------------------------------------------------------------
+                    for group, entries in NAV:
+                        ui.label(_(group)).classes(
+                            "text-xs text-grey-7 uppercase font-bold mt-3 mb-1 px-2"
+                        )
+                        for name, label, depth in entries:
+                            pad = f"pl-{2 + 4 * depth}"
+                            if name is None:
+                                ui.label(_(label)).classes(f"text-sm text-grey-8 py-1 {pad}")
+                            else:
+                                ui.tab(name, _(label)).classes(pad).mark(f"settings-{name}")
+                with ui.tab_panels(tabs, value=tab).props("vertical").classes("grow min-w-0"):
+                    for name, panel in PANELS.items():
+                        with ui.tab_panel(name):
+                            panel()
 
 
 def contribution_tab() -> None:
@@ -364,8 +399,7 @@ def _publication_sources() -> None:
 
 def matching_tab() -> None:
     st = load_settings()
-    _publication_sources()
-    ui.label(_("Ranking sources")).classes("text-lg mt-6")
+    ui.label(_("Ranking sources")).classes("text-lg")
     boxes = {}
     for src in TOGGLABLE_SOURCES:
         boxes[src] = ui.checkbox(SOURCE_LABELS[src], value=st.source_on(src))
@@ -390,29 +424,52 @@ def matching_tab() -> None:
     ui.button(_("Save"), icon="save", on_click=save).classes("mt-2")
 
 
-def rules_tab() -> None:
-    ui.label(_("Normalization rules")).classes("text-lg")
-    ui.label(
-        _(
-            "Python regular expressions applied, in order, to the venue texts of the sources "
-            "(\\1, \\2… or \\g<name> in the replacement; \\b, \\d, \\w are ASCII). The "
-            "cleaned text, lowercased and without accents or punctuation, is the key matching the "
-            "venues' variants; it is also what the rankings are searched with. Which venue a text "
-            "belongs to is then set on the venues (variants and venue rules, on the Venues page "
-            "or from a paper's details)."
-        )
-    ).classes("text-grey text-sm")
-    rules = [r.model_copy() for r in load_settings().norm_rules]
+def _merged(edited: list[NormRule], language: str | None) -> list[NormRule]:
+    """The saved rules with those of ``language`` (none: the general ones) as edited: the
+    language rules first (by language), then the general ones."""
+    others = [r for r in load_settings().norm_rules if r.language != language]
+    order = list(i18n.LANGUAGES)
+    return sorted(
+        others + edited,
+        key=lambda r: order.index(r.language) if r.language in order else len(order),
+    )
+
+
+def rules_tab(language: str | None = None) -> None:
+    if language is None:
+        ui.label(_("Cleaning rules")).classes("text-lg")
+        ui.label(
+            _(
+                "Python regular expressions applied, in order, to the venue texts of the sources "
+                "(\\1, \\2… or \\g<name> in the replacement; \\b, \\d, \\w are ASCII). "
+                "The cleaned text, lowercased and without accents or punctuation, is the key "
+                "matching the venues' variants; it is also what the rankings are searched with. "
+                "Which venue a text belongs to is then set on the venues (variants and venue "
+                "rules, on the Venues page or from a paper's details)."
+            )
+        ).classes("text-grey text-sm")
+    else:
+        ui.label(
+            _("Cleaning rules · {language}").format(language=i18n.LANGUAGES[language])
+        ).classes("text-lg")
+        ui.label(
+            _(
+                "Rules removing words of a language (e.g. spelled ordinals): applied to every "
+                "venue text, before the general rules."
+            )
+        ).classes("text-grey text-sm")
+    rules = [r.model_copy() for r in load_settings().norm_rules if r.language == language]
+    m = f"norm-{language}" if language else "norm"  # the markers
     sources = {k: a.label for k, a in ADAPTERS.items()}
 
     @ui.refreshable
     def listing() -> None:
         for i, r in enumerate(rules):
-            with ui.column().classes("w-full gap-1 border rounded p-2").mark(f"norm-rule-{i}"):
+            with ui.column().classes("w-full gap-1 border rounded p-2").mark(f"{m}-rule-{i}"):
                 with ui.row().classes("items-center gap-2 w-full no-wrap"):
                     ui.checkbox(value=r.enabled).bind_value(r, "enabled").tooltip(
                         _("enabled")
-                    ).mark(f"norm-enabled-{i}")
+                    ).mark(f"{m}-enabled-{i}")
                     ui.input(_("name"), value=r.name).bind_value(r, "name").props(
                         "dense outlined"
                     ).classes("w-56")
@@ -420,7 +477,7 @@ def rules_tab() -> None:
                         _("pattern"), value=r.pattern, on_change=lambda e: preview(e)
                     ).bind_value(r, "pattern").props("dense outlined").classes(
                         "grow font-mono"
-                    ).mark(f"norm-pattern-{i}")
+                    ).mark(f"{m}-pattern-{i}")
                     ui.icon("arrow_forward")
                     ui.input(
                         _("replacement"), value=r.replacement, on_change=lambda e: preview(e)
@@ -463,17 +520,23 @@ def rules_tab() -> None:
     def add() -> None:
         n = 1 + sum(r.id.startswith("custom") for r in rules)
         rules.insert(
-            0, NormRule(id=f"custom{n}", name=_("Custom rule {n}").format(n=n), pattern="")
+            0,
+            NormRule(
+                id=f"custom{n}{language or ''}",
+                name=_("Custom rule {n}").format(n=n),
+                pattern="",
+                language=language,
+            ),
         )
         listing.refresh()
 
     def reset() -> None:
-        rules[:] = default_rules()
+        rules[:] = [r for r in default_rules() if r.language == language]
         listing.refresh()
         preview()
 
     with ui.row().classes("items-center gap-2"):
-        ui.button(_("Add a rule (first)"), icon="add", on_click=add).props("flat").mark("norm-add")
+        ui.button(_("Add a rule (first)"), icon="add", on_click=add).props("flat").mark(f"{m}-add")
         ui.button(_("Reset to the defaults"), icon="restart_alt", on_click=reset).props("flat")
 
     # Live preview with the rules as edited (saved or not).
@@ -489,7 +552,7 @@ def rules_tab() -> None:
             .classes("w-40")
         )
     out = ui.column().classes("gap-0")
-    changes = ui.column().classes("gap-0 w-full").mark("norm-changes")
+    changes = ui.column().classes("gap-0 w-full").mark(f"{m}-changes")
 
     def valid() -> bool:
         bad = [r.name for r in rules if r.pattern and r.compiled() is None]
@@ -504,11 +567,12 @@ def rules_tab() -> None:
         if text:
             with out:
                 v = text
-                for r in rules:
-                    if r.pattern and r.applies_to(src) and (after := r.apply(v)) != v:
+                every = _merged([r for r in rules if r.pattern], language)
+                for r in every:
+                    if r.applies_to(src) and (after := r.apply(v)) != v:
                         ui.label(f"{r.name}: “{after.strip()}”").classes("font-mono text-xs")
                         v = after
-                cleaned = apply_rules(text, [r for r in rules if r.pattern], src)
+                cleaned = apply_rules(text, every, src)
                 ui.label(
                     _("cleaned: “{cleaned}” · key: “{key}”").format(
                         cleaned=cleaned, key=normalize(cleaned)
@@ -520,7 +584,7 @@ def rules_tab() -> None:
         changes.clear()
         if not valid():
             return
-        edited = [r for r in rules if r.pattern]
+        edited = _merged([r for r in rules if r.pattern], language)
         diff = []
         for m in venue_match.matches().values():
             new = normalize(apply_rules(m.raw, edited, m.source))
@@ -538,19 +602,19 @@ def rules_tab() -> None:
         if not valid():
             return
         new = load_settings()
-        new.norm_rules = [r for r in rules if r.pattern]
+        new.norm_rules = _merged([r for r in rules if r.pattern], language)
         save_settings(new)
         n = venue_match.refresh()
         ui.notify(
-            _("Normalization rules saved — {n} venue text(s) re-matched").format(n=n),
+            _("Cleaning rules saved — {n} venue text(s) re-matched").format(n=n),
             type="positive",
         )
 
     with ui.row().classes("gap-2"):
         ui.button(_("Check the effect on the venue texts"), icon="rule", on_click=impact).props(
             "flat"
-        ).mark("norm-impact")
-        ui.button(_("Save the rules"), icon="save", on_click=save).mark("norm-save")
+        ).mark(f"{m}-impact")
+        ui.button(_("Save the rules"), icon="save", on_click=save).mark(f"{m}-save")
 
 
 # ---- corrections & levels ------------------------------------------------------------------
