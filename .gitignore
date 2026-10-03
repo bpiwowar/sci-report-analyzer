@@ -8,3 +8,4 @@ __pycache__/
 *.sqlite
 *.db
 .codegraph/
+src/sci_report_analyzer/locales/messages.pot

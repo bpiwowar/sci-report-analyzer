@@ -10,6 +10,8 @@ from html import escape
 import markdown2
 from nicegui import ui
 
+from .. import i18n
+from ..i18n import _
 from ..ranking.badge import LEVEL_HELP, Badge, category_of, text_colour
 
 SOURCE_SHORT = {
@@ -86,11 +88,12 @@ def frame(title: str) -> Iterator[None]:
     with ui.header().classes("items-center justify-between py-1"):
         with ui.row().classes("items-center gap-4"):
             ui.link("SciReport Analyzer", "/").classes("text-white text-lg font-bold no-underline")
-            ui.link("People", "/").classes("text-white no-underline")
-            ui.link("Venues", "/venues").classes("text-white no-underline")
-            ui.link("Settings", "/settings").classes("text-white no-underline")
-            ui.link("Help", "/help").classes("text-white no-underline")
+            ui.link(_("People"), "/").classes("text-white no-underline")
+            ui.link(_("Venues"), "/venues").classes("text-white no-underline")
+            ui.link(_("Settings"), "/settings").classes("text-white no-underline")
+            ui.link(_("Help"), "/help").classes("text-white no-underline")
         with ui.row().classes("items-center gap-1"):
+            language_menu()
             dark = ui.dark_mode()
             ui.button(icon="dark_mode", on_click=dark.toggle).props("flat round color=white dense")
             from ..stop import quit_button
@@ -108,10 +111,28 @@ def frame(title: str) -> Iterator[None]:
             ):
                 ui.icon("mail")
                 ui.label(
-                    "Set your email before fetching anything: it identifies you to the sources."
+                    _("Set your email before fetching anything: it identifies you to the sources.")
                 )
-                ui.link("Settings → API keys", "/settings?tab=keys")
+                ui.link(_("Settings → API keys"), "/settings?tab=keys")
         yield
+
+
+def language_menu() -> None:
+    """The header's language button: the whole app switches (the page reloads)."""
+
+    def choose(lang: str) -> None:
+        i18n.save_language(lang)
+        ui.navigate.reload()
+
+    with (
+        ui.button(i18n.language().upper())
+        .props("flat color=white dense")
+        .tooltip(_("Language"))
+        .mark("language"),
+        ui.menu(),
+    ):
+        for lang, name in i18n.LANGUAGES.items():
+            ui.menu_item(name, on_click=lambda lang=lang: choose(lang)).mark(f"language-{lang}")
 
 
 class _NewlineBreaks(markdown2.Breaks):

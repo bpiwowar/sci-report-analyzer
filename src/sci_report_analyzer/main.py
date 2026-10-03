@@ -9,7 +9,7 @@ from pathlib import Path
 
 from nicegui import app, background_tasks, ui
 
-from . import config, livereload, stop, venue_match
+from . import config, i18n, livereload, stop, venue_match
 from .annotations import seed_flags
 from .db import backup
 from .db.session import init_engine
@@ -39,6 +39,7 @@ def setup() -> None:
     if db := backup.db_file(init_engine()):
         backup.daily(db)
     reset_running_states()
+    i18n.load_language()
     seed_flags()
     venue_match.refresh()
     persons.register()

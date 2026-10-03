@@ -1,0 +1,342 @@
+# French translations of SciReport Analyzer (scripts/i18n.sh merges the new
+# strings).
+msgid ""
+msgstr ""
+"Project-Id-Version: SciReport Analyzer\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-10-03 13:51+0200\n"
+"PO-Revision-Date: 2026-10-03 13:47+0200\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: fr\n"
+"Language-Team: fr <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+msgid " · in the document"
+msgstr ""
+
+msgid ""
+"A journal gets its quartile of a paper's year: download the years missing"
+" from scimagojr.com (it blocks the app) and drop their CSVs here, the "
+"year read from the file name (“scimagojr 2021.csv”). Also brings back the"
+" journals no longer listed."
+msgstr ""
+
+msgid ""
+"A paper takes the quartile of its year (else of the closest year before);"
+" years missing: Settings › Data & cache, “Scimago, past years”"
+msgstr ""
+
+msgid ""
+"A paper the primary source doesn't list for a person is not counted "
+"(stats, reports, summary): e.g. HAL, where CNRS researchers must deposit "
+"their papers. The other sources still help find its venue. Applies to "
+"people with a validated profile on that source; a folder can use another "
+"one."
+msgstr ""
+
+msgid "Add a venue not in the list, as a conference of this one"
+msgstr ""
+
+msgid "Add a venue not in the list, as its main conference"
+msgstr ""
+
+msgid "Add it to the text"
+msgstr ""
+
+#, python-format
+msgid "As cited in the copied excerpts: %% Application, p. 4 %%"
+msgstr ""
+
+msgid "As selected"
+msgstr ""
+
+msgid ""
+"At publication time, a paper gets the rank of the CORE edition in force "
+"that year (2008, 2010, 2013, 2014, 2017, 2018, 2020, 2021, 2023, 2026; "
+"papers older than the first edition get its rank), and its journal's "
+"Scimago quartile that year (else the closest year before, else the first "
+"one: import the years missing in Data & cache)."
+msgstr ""
+
+msgid "Back to it (as selected)"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Choose where to move them"
+msgstr ""
+
+msgid "Cite a paper"
+msgstr ""
+
+msgid "Cite a paper ([@key], numbered when copied)"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "Copied (with the references)"
+msgstr ""
+
+msgid "Copy the note, its citations numbered and the papers cited listed"
+msgstr ""
+
+#, python-brace-format
+msgid "Default ({source})"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+#, python-brace-format
+msgid "Delete “{name}” and its subcategories?"
+msgstr ""
+
+#, python-brace-format
+msgid "Delete “{name}”?"
+msgstr ""
+
+#, python-brace-format
+msgid "Download Scimago {year}"
+msgstr ""
+
+msgid "Downloading the Scimago journals and the predatory list…"
+msgstr ""
+
+#, python-brace-format
+msgid "Edited: {text}"
+msgstr ""
+
+msgid "Excerpt"
+msgstr ""
+
+msgid "Excerpts were filed there meanwhile"
+msgstr ""
+
+msgid "Find an excerpt (its words, its PDF)"
+msgstr ""
+
+msgid "Help"
+msgstr ""
+
+msgid "Import"
+msgstr ""
+
+msgid ""
+"Its quotes, joined; edited, it is the text of the group (its excerpts: "
+"their places only). Blank: its quotes again."
+msgstr ""
+
+msgid "Keep both texts (two quotes)"
+msgstr ""
+
+msgid "Keep its text"
+msgstr ""
+
+msgid "Keep only the place of the first one (a reference)"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "Merge with an excerpt"
+msgstr ""
+
+msgid "Merge with it (in its category)"
+msgstr ""
+
+msgid "Merged excerpts"
+msgstr ""
+
+msgid "Merged with the excerpt"
+msgstr ""
+
+msgid ""
+"Merged, the passage is quoted too, or only its page is cited (as a "
+"reference)"
+msgstr ""
+
+#, python-brace-format
+msgid "Might be already an excerpt ({n}): merge with it?"
+msgstr ""
+
+msgid "Move them to"
+msgstr ""
+
+msgid "Move, then delete"
+msgstr ""
+
+msgid "Name the documents (as cited in the copied excerpts)"
+msgstr ""
+
+msgid "Names of the documents"
+msgstr ""
+
+msgid "New venue"
+msgstr ""
+
+msgid "No excerpt from a document yet"
+msgstr ""
+
+msgid "No excerpt has these words"
+msgstr ""
+
+msgid "No other category: create one first"
+msgstr ""
+
+msgid "No year in the file name (e.g. “scimagojr 2021.csv”)"
+msgstr ""
+
+msgid "None"
+msgstr ""
+
+msgid "Not loaded: download it"
+msgstr ""
+
+msgid "Only cite its place (a reference)"
+msgstr ""
+
+msgid "Only its place"
+msgstr ""
+
+msgid "Only its place is cited (merged as a reference)"
+msgstr ""
+
+msgid "Papers the primary source doesn't list: not counted (add them there)"
+msgstr ""
+
+msgid "Papers this source doesn't list for a person are not counted"
+msgstr ""
+
+msgid "People"
+msgstr ""
+
+msgid "Primary source"
+msgstr ""
+
+msgid "Quote its text too"
+msgstr ""
+
+msgid "Ranking datasets updated"
+msgstr ""
+
+msgid "Ranks over time"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Saved"
+msgstr ""
+
+msgid "Scimago CSV"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Scimago can't be downloaded by the app: open its {year} ranking, then "
+"drop the downloaded CSV below (kept: past years don't change)."
+msgstr ""
+
+#, python-brace-format
+msgid "Scimago journals: downloaded {when}."
+msgstr ""
+
+#, python-brace-format
+msgid "Scimago journals: read from the source tree ({path})."
+msgstr ""
+
+#, python-brace-format
+msgid "Scimago {year}"
+msgstr ""
+
+#, python-brace-format
+msgid "Scimago {year} CSV"
+msgstr ""
+
+#, python-brace-format
+msgid "Scimago {year} not loaded (quartile from another year)"
+msgstr ""
+
+#, python-brace-format
+msgid "Scimago {year}: {n} journals imported"
+msgstr ""
+
+msgid "Scimago, past years"
+msgstr ""
+
+msgid ""
+"Select an area of a page: draw a rectangle, its text is the selection (A;"
+" also Alt+drag; Escape to leave)"
+msgstr ""
+
+msgid "Select the text to file (or an area with text, or click a highlight) first"
+msgstr ""
+
+msgid "Set your email before fetching anything: it identifies you to the sources."
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Settings → API keys"
+msgstr ""
+
+msgid "Text"
+msgstr ""
+
+msgid "Text of the group"
+msgstr ""
+
+msgid "The excerpts, as selected"
+msgstr ""
+
+msgid "The text of the group (edit it with its pencil)"
+msgstr ""
+
+msgid ""
+"They are on one item (in the order of their PDFs), with the second one's "
+"category, years, influence, colour and text (its pencil edits the text of"
+" the group)."
+msgstr ""
+
+msgid "Title (type to search)"
+msgstr ""
+
+msgid "Type to find an excerpt"
+msgstr ""
+
+#, python-brace-format
+msgid "Update failed: {error}"
+msgstr ""
+
+msgid "Venues"
+msgstr ""
+
+msgid "cited by its place only"
+msgstr ""
+
+msgid "none"
+msgstr ""
+
+#, python-brace-format
+msgid "only those not in {source} ({n})"
+msgstr ""
+
+msgid "rank at the paper's publication time"
+msgstr ""
+
+msgid "rank in the latest edition / year"
+msgstr ""
+
+#, python-brace-format
+msgid "“{name}” has an excerpt (with its subcategories): move it first."
+msgid_plural "“{name}” has {n} excerpts (with its subcategories): move them first."
+msgstr[0] ""
+msgstr[1] ""
+

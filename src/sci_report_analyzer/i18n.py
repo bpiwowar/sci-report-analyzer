@@ -1,25 +1,80 @@
-"""Translations (on the way to i18n): ``_("…")`` marks a user-facing string, translated by
-the catalog of the language set (``SCI_REPORT_ANALYZER_LANG``, e.g. "fr"; none: English), if
-there is one: ``locales/<lang>/LC_MESSAGES/messages.mo`` (gettext; the strings are
-extracted with ``xgettext -k_ -kngettext:1,2``)."""
+"""Translations: ``_("…")`` marks a user-facing string, translated into the language set
+(Settings → the header's language menu; ``SCI_REPORT_ANALYZER_LANG`` overrides it) by its
+catalog ``locales/<lang>/LC_MESSAGES/messages.po`` (none: English, the source language).
+
+Strings are extracted with ``scripts/i18n.sh`` (pybabel: ``_``, ``ngettext`` and ``N_``,
+which marks a string translated later, e.g. a label table built at import time: its
+entries are shown through ``_()``).
+"""
 
 from __future__ import annotations
 
 import gettext
+import io
 import os
 from pathlib import Path
 
 LOCALES = Path(__file__).parent / "locales"
+LANGUAGES = {"en": "English", "fr": "Français"}
+SETTING_KEY = "language"  # an AppSetting: {"lang": "fr"}
+ENV = "SCI_REPORT_ANALYZER_LANG"
 
 _translation: gettext.NullTranslations = gettext.NullTranslations()
+_lang = "en"
+_catalogs: dict[str, gettext.NullTranslations] = {}
+
+
+def catalog(lang: str | None) -> gettext.NullTranslations:
+    """The translations into ``lang`` (English, or no catalog: the strings themselves)."""
+    lang = lang or "en"
+    if lang not in _catalogs:
+        po = LOCALES / lang / "LC_MESSAGES" / "messages.po"
+        if lang == "en" or not po.exists():
+            _catalogs[lang] = gettext.NullTranslations()
+        else:
+            from babel.messages.mofile import write_mo
+            from babel.messages.pofile import read_po
+
+            with po.open("rb") as f:
+                cat = read_po(f, locale=lang)
+            buf = io.BytesIO()
+            write_mo(buf, cat)
+            buf.seek(0)
+            _catalogs[lang] = gettext.GNUTranslations(buf)
+    return _catalogs[lang]
 
 
 def set_language(lang: str | None) -> None:
-    """Translate into ``lang`` (none, or no catalog for it: English)."""
-    global _translation
-    _translation = gettext.translation(
-        "messages", LOCALES, languages=[lang] if lang else [], fallback=True
-    )
+    """Translate into ``lang`` (none, or an unknown one: English)."""
+    global _translation, _lang
+    _lang = lang if lang in LANGUAGES else "en"
+    _translation = catalog(_lang)
+
+
+def language() -> str:
+    return _lang
+
+
+def load_language() -> None:
+    """The language of the settings (the environment's, if set)."""
+    from .db.models import AppSetting
+    from .db.session import session_scope
+
+    lang = os.environ.get(ENV)
+    if not lang:
+        with session_scope() as s:
+            row = s.get(AppSetting, SETTING_KEY)
+            lang = (row.value or {}).get("lang") if row else None
+    set_language(lang)
+
+
+def save_language(lang: str) -> None:
+    from .db.models import AppSetting
+    from .db.session import session_scope
+
+    with session_scope() as s:
+        s.merge(AppSetting(key=SETTING_KEY, value={"lang": lang}))
+    set_language(lang)
 
 
 def _(text: str) -> str:
@@ -30,4 +85,38 @@ def ngettext(singular: str, plural: str, n: int) -> str:
     return _translation.ngettext(singular, plural, n)
 
 
-set_language(os.environ.get("SCI_REPORT_ANALYZER_LANG"))
+def N_(text: str) -> str:
+    """Marks ``text`` for extraction only: it is translated where shown, with ``_()``."""
+    return text
+
+
+class Labels(dict):
+    """A label table built at import time (its strings marked with ``N_``): its values are
+    translated when read, into the language of the moment."""
+
+    def __getitem__(self, key):
+        return _(super().__getitem__(key))
+
+    def get(self, key, default=None):
+        return _(v) if (v := super().get(key)) is not None else default
+
+    def values(self):
+        return [self[k] for k in self]
+
+    def items(self):
+        return [(k, self[k]) for k in self]
+
+    def __iter__(self):
+        return super().__iter__()
+
+    def copy(self):
+        return Labels(super().items())
+
+    def __or__(self, other):
+        return {**dict(self.items()), **other}
+
+    def __ror__(self, other):
+        return {**other, **dict(self.items())}
+
+
+set_language(os.environ.get(ENV))
