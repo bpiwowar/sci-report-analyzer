@@ -720,7 +720,8 @@ def periods_view(person_id: int, on_change) -> None:
 
         ui.button(_("Add period"), icon="add", on_click=add)
 
-    folders_section(person_id, on_change)
+    # (taken out of a folder, a person may keep their period there as one of their own)
+    folders_section(person_id, lambda: (listing.refresh(), on_change()))
 
 
 def folders_section(person_id: int, on_change) -> None:
@@ -774,17 +775,19 @@ def folders_section(person_id: int, on_change) -> None:
                     ui.notify(_("Period saved"))
                     on_change()
 
-                def leave(fid=p.folder_id) -> None:
-                    folders.remove_person(fid, person_id)
+                def left() -> None:
                     listing.refresh()
                     on_change()
 
                 ui.button(icon="save", on_click=save).props("flat round dense")
-                ui.button(icon="folder_off", on_click=leave).props(
-                    "flat round dense color=negative"
-                ).tooltip(
-                    _("Remove from this folder (its stars, tags and notes on papers are lost)")
-                )
+                ui.button(
+                    icon="folder_off",
+                    on_click=lambda fid=p.folder_id: remove_from_folder_dialog(
+                        fid, person_id, left
+                    ),
+                ).props("flat round dense color=negative").tooltip(
+                    _("Remove from this folder")
+                ).mark(f"leave-{p.folder_id}")
         joined = {p.folder_id for p in mine}
         others = {f.id: f.name for f in folders.folders() if f.id not in joined}
         if others:
@@ -804,6 +807,32 @@ def folders_section(person_id: int, on_change) -> None:
                 ui.button(_("Add"), icon="create_new_folder", on_click=join).props("dense")
 
     listing()
+
+
+def remove_from_folder_dialog(folder_id: int, person_id: int, done) -> None:
+    """Take a person out of a folder, keeping their data there (as one of their own periods)
+    or deleting it."""
+
+    def remove(keep: bool) -> None:
+        folders.remove_person(folder_id, person_id, keep=keep)
+        dlg.close()
+        done()
+
+    with ui.dialog() as dlg, ui.card().classes("w-[32rem]"):
+        ui.label(
+            _(
+                "Remove from the folder: keep the person's stars, tags, notes, documents and "
+                "report there as one of their own periods (Periods tab), or delete them?"
+            )
+        )
+        with ui.row().classes("justify-end w-full"):
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Delete the data"), color="negative", on_click=lambda: remove(False)).props(
+                "flat"
+            ).mark("remove-delete")
+            ui.button(_("Keep as a period"), on_click=lambda: remove(True)).mark("remove-keep")
+    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
+    dlg.open()
 
 
 def _int(v) -> int | None:
