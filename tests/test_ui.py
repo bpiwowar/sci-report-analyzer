@@ -1052,6 +1052,45 @@ async def test_venue_suggestion_as_a_track(user: User) -> None:
         assert {k.track for k in s.query(VenueKey).filter_by(venue_id=va)} == {None, "findings"}
 
 
+async def test_propose_merges_with_a_relation(user: User) -> None:
+    pid = make_person("Jane Doe")
+    add_source(
+        pid,
+        "hal",
+        "jd",
+        [
+            pub("a", "Paper A", 2023, "Conference on Things and Stuff", authors=["Jane Doe"]),
+            pub("b", "Paper B", 2022, "Conference on Things and Stuff", authors=["Jane Doe"]),
+            pub(
+                "c",
+                "Paper C",
+                2023,
+                "Findings of the Conference on Things and Stuff",
+                authors=["Jane Doe"],
+            ),
+        ],
+    )
+    await user.open(f"/person/{pid}")
+    await user.should_see("Paper A")
+    await user.open("/venues")
+    await user.should_see(marker="venue-propose-merges")
+    user.find("venue-propose-merges").click()
+    await user.should_see("Proposal 1 of 1")
+    (select,) = user.find("proposal-relation").elements
+    assert select.value == "track:findings"  # guessed: no merge fields, what it does instead
+    await user.should_see(marker="proposal-relation-effect")
+    await user.should_not_see(marker="proposal-name")
+    user.find("proposal-merge").click()
+    await user.should_see("No merge to propose.")
+    from sci_report_analyzer.db.models import Publication, VenueKey
+    from sci_report_analyzer.db.session import session_scope
+
+    with session_scope() as s:
+        va = s.get(Publication, _pub_id("Paper A")).venue_id
+        assert s.get(Publication, _pub_id("Paper C")).venue_id == va
+        assert {k.track for k in s.query(VenueKey).filter_by(venue_id=va)} == {None, "findings"}
+
+
 async def test_resolve_conflicts_one_at_a_time(user: User) -> None:
     from sci_report_analyzer import venues
     from sci_report_analyzer.ranking.service import VenuePattern

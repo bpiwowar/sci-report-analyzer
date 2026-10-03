@@ -342,7 +342,9 @@ def _conflict_dialog(view: _View) -> None:
 
 
 def _proposals_dialog(view: _View) -> None:
-    """Venues that look alike, one pair at a time: merge (either way), or not the same."""
+    """Venues that look alike, one pair at a time, with their guessed relation (to change):
+    merge them (either way), record the relation (a track, a joint conference, a workshop),
+    or say they are not the same."""
     proposals = venues.merge_proposals(view.rows)
     state = {"i": 0, "changed": False}
     with view.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
@@ -363,20 +365,34 @@ def _proposals_dialog(view: _View) -> None:
         proposals[:] = [p for p in proposals if other not in p[:2]]
         show()
 
+    def relate(row: venues.VenueRow, other: venues.VenueRow, relation: str) -> None:
+        kept = venues.relate_venues(row.id, [other.id], relation)
+        state["changed"] = True
+        ui.notify(_("Relation recorded"), type="positive")
+        # A track is merged into its venue: the proposals of the merged venue go too.
+        gone = {row.id, other.id} - {kept} if relation.lstrip("~").startswith("track") else set()
+        proposals[:] = [
+            p for i, p in enumerate(proposals) if i != state["i"] and not gone & {p[0].id, p[1].id}
+        ]
+        show()
+
     def not_same(a: venues.VenueRow, b: venues.VenueRow) -> None:
         venues.set_not_same(a.id, b.id)
         proposals.pop(state["i"])
         show()
 
-    def card(r: venues.VenueRow, kept: bool, on_keep) -> None:
+    def card(r: venues.VenueRow, kept: bool, on_keep, merging: bool) -> None:
+        """A venue of the pair; ``merging``: they are merged, ``kept`` the one kept."""
         with (
             ui.card()
             .props("flat bordered")
             .classes("grow basis-0 gap-1")
-            .style("border-color: var(--q-primary); border-width: 2px" if kept else "")
+            .style("border-color: var(--q-primary); border-width: 2px" if kept and merging else "")
         ):
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                if kept:
+                if not merging:
+                    ui.badge(_("first") if kept else _("second"), color="grey")
+                elif kept:
                     ui.badge(_("kept"), color="primary").mark(f"proposal-kept-{r.id}")
                 else:
                     ui.badge(_("merged into the other"), color="grey")
@@ -384,7 +400,7 @@ def _proposals_dialog(view: _View) -> None:
                     f"proposal-kind-{r.id}"
                 )
                 ui.space()
-                if not kept:
+                if merging and not kept:
                     ui.button(_("Keep this one"), icon="push_pin", on_click=on_keep).props(
                         "dense flat no-caps"
                     ).mark(f"proposal-keep-{r.id}")
@@ -428,30 +444,59 @@ def _proposals_dialog(view: _View) -> None:
                 "text-xs text-grey"
             )
             cards = ui.row().classes("w-full no-wrap items-stretch")
-            ui.label(
-                _(
-                    "Merging moves the texts, rules, ISSNs and papers of the other venue into the "
-                    "kept one; the kept venue's decisions win, the other's fill what it lacks."
+            rel = (
+                ui.select({}, label=_("The second venue is, for the first one"))
+                .props("dense outlined options-dense")
+                .classes("w-full")
+                .mark("proposal-relation")
+            )
+            with ui.column().classes("w-full gap-2") as merging:
+                ui.label(
+                    _(
+                        "Merging moves the texts, rules, ISSNs and papers of the other venue "
+                        "into the kept one; the kept venue's decisions win, the other's fill "
+                        "what it lacks."
+                    )
+                ).classes("text-xs text-grey")
+                names = _MergeNames(pair, "proposal")
+            relating = ui.label().classes("text-sm").mark("proposal-relation-effect")
+
+            def guess() -> None:
+                g = venues.guess_relation(*pair)
+                rel.set_options(
+                    {k: _relation_label(k) for k in venues.relation_choices(g)}, value=g
                 )
-            ).classes("text-xs text-grey")
-            names = _MergeNames(pair, "proposal")
 
             def swap() -> None:
                 pair.reverse()
                 names.set_target(pair[0])
+                guess()
                 show_cards()
 
             def show_cards() -> None:
+                same = rel.value == "same"
+                merging.set_visibility(same)
+                relating.set_visibility(not same)
+                if not same:
+                    relating.set_text(_relation_sentence(pair[0], pair[1:], rel.value))
                 cards.clear()
                 with cards:
                     for n, r in enumerate(pair):
-                        card(r, n == 0, swap)
+                        card(r, n == 0, swap, same)
 
+            def apply() -> None:
+                if rel.value == "same":
+                    merge(*pair, names)
+                else:
+                    relate(*pair, rel.value)
+
+            rel.on_value_change(lambda: show_cards())
+            guess()
             show_cards()
             with ui.row().classes("w-full items-center gap-2"):
-                ui.button(_("Merge"), icon="merge", on_click=lambda: merge(*pair, names)).props(
-                    "dense"
-                ).mark("proposal-merge")
+                ui.button(_("Apply"), icon="check", on_click=apply).props("dense").mark(
+                    "proposal-merge"
+                )
                 ui.button(
                     _("Not the same"), icon="call_split", on_click=lambda: not_same(*pair)
                 ).props("dense flat no-caps color=negative").tooltip(
