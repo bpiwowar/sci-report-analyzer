@@ -734,8 +734,8 @@ async def test_language_cleaning_rules(user: User) -> None:
     rules = load_settings().norm_rules
     assert [(r.id, r.language) for r in rules[:3]] == [
         ("custom1en", "en"),
-        ("ordinalWordsEn", "en"),
-        ("ordinalWordsFr", "fr"),
+        ("ordinalsEn", "en"),
+        ("ordinalsFr", "fr"),
     ]
     assert [r.id for r in rules if r.language is None] == general
 

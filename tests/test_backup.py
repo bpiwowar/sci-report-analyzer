@@ -120,15 +120,26 @@ def test_language_cleaning_rules_added_to_saved_rules(tmp_path):
         cfg.attributes["connection"] = conn
         command.upgrade(cfg, "b7e2f4a91c03")
     mine = {"id": "custom1", "name": "Mine", "pattern": "^Proc\\. "}
+    old = {  # the general rule they replace, unchanged: dropped
+        "id": "ordinals",
+        "name": "Ordinals",
+        "description": "Remove ordinal numbers such as 45th, 1st, 17e, 22èmes.",
+        "pattern": r"\b\d+(?:st|nd|rd|th|e|er|eme|ème)s?\b",
+        "replacement": " ",
+        "ignore_case": True,
+        "enabled": True,
+        "sources": [],
+        "example": "45th Annual Meeting",
+    }
     with sqlite3.connect(db) as c:
         c.execute(
             "INSERT INTO app_setting (key, value) VALUES ('matching', ?)",
-            (json.dumps({"min_score": 0.7, "norm_rules": [mine]}),),
+            (json.dumps({"min_score": 0.7, "norm_rules": [mine, old]}),),
         )
     _migrate(db)
     _migrate(db)
     with sqlite3.connect(db) as c:
         value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
     ids = [r["id"] for r in value["norm_rules"]]
-    assert ids == ["ordinalWordsEn", "ordinalWordsFr", "custom1"]
+    assert ids == ["ordinalsEn", "ordinalsFr", "custom1"]
     assert value["min_score"] == 0.7
