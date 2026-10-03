@@ -146,6 +146,9 @@ class NormRule(BaseModel):
     enabled: bool = True
     # Sources whose venue texts the rule applies to (empty: every source).
     sources: list[str] = Field(default_factory=list)
+    # The language whose words the rule removes (Settings → Cleaning rules, by language);
+    # none: a general rule.
+    language: str | None = None
     example: str | None = None
 
     def compiled(self) -> re.Pattern[str] | None:
@@ -167,7 +170,44 @@ class NormRule(BaseModel):
 # Word boundaries around digits (ASCII, as in JavaScript).
 _B0, _B1 = r"(?<![A-Za-z0-9_])", r"(?![A-Za-z0-9_])"
 
+# Spelled ordinals, by their ending: "…th" (fourth, fourteenth, twentieth, hundredth;
+# not "North", "Health": the stems are those of numbers), first / second / third.
+ORDINAL_WORDS_EN = (
+    r"(?:[a-z]+-)?(?:first|second|third|"
+    r"(?:four|fif|six|seven|eigh|nin|ten|eleven|twelf|[a-z]+teen|[a-z]+ie|hundred)th)"
+)
+# "…ième" (deuxième, quatorzième, vingt-et-unième), premier / première.
+ORDINAL_WORDS_FR = r"(?:[a-z-]+i[eè]me|premi(?:er|[eè]re))s?"
+# An event word after an ordinal: "First Workshop on…", not the "Second Language" of a title.
+_EVENT_EN = (
+    r"(?=\s+(?:annual|international|national|european|asian|joint|acm|ieee|conference|"
+    r"workshop|symposium|meeting|congress|colloquium|edition|forum|summit)\b)"
+)
+
+LANGUAGE_RULES: tuple[NormRule, ...] = (
+    NormRule(
+        id="ordinalWordsEn",
+        name="Spelled ordinals",
+        description="Remove ordinals in words (…th, first, second, third) before an event "
+        "word (Annual, Conference, Workshop…).",
+        pattern=rf"\b{ORDINAL_WORDS_EN}\b{_EVENT_EN}",
+        ignore_case=True,
+        language="en",
+        example="Fourteenth ACM Conference on Recommender Systems",
+    ),
+    NormRule(
+        id="ordinalWordsFr",
+        name="Spelled ordinals",
+        description="Remove ordinals in words (…ième, premier, première).",
+        pattern=rf"(?<![a-zà-ÿ]){ORDINAL_WORDS_FR}(?![a-zà-ÿ])",
+        ignore_case=True,
+        language="fr",
+        example="Quatorzième conférence en recherche d'information",
+    ),
+)
+
 DEFAULT_NORM_RULES: tuple[NormRule, ...] = (
+    *LANGUAGE_RULES,
     NormRule(
         id="parentheses",
         name="Parentheses",

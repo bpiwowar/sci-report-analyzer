@@ -9,6 +9,8 @@ import pytest
 from sci_report_analyzer.ranking.matcher import Matcher
 from sci_report_analyzer.ranking.normalize import (
     DEFAULT_NORM_RULES,
+    LANGUAGE_RULES,
+    apply_rules,
     clean_venue,
     normalize,
     tokenize,
@@ -51,8 +53,12 @@ def test_cleaning(case):
     if case["venue"] in DIVERGES:
         assert clean_venue(case["venue"]).startswith("Journées")
         return
-    assert clean_venue(case["venue"]) == case["clean"]
-    assert clean_venue(case["venue"], strip_parens=False) == case["cleanNoParens"]
+    # The reference keeps spelled ordinals ("Thirty-sixth", "Première"): the language rules
+    # drop them.
+    assert clean_venue(case["venue"]) == apply_rules(case["clean"], LANGUAGE_RULES)
+    assert clean_venue(case["venue"], strip_parens=False) == apply_rules(
+        case["cleanNoParens"], LANGUAGE_RULES
+    )
     assert normalize(case["venue"]) == case["norm"]
     assert tokenize(case["venue"]) == case["tokens"]
 

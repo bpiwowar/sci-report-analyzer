@@ -24,6 +24,7 @@ from sqlalchemy import select
 from ..db.models import DoiRecord, utcnow
 from ..db.session import session_scope
 from ..i18n import _
+from ..ranking.normalize import ORDINAL_WORDS_EN
 from .base import (
     FetchedPub,
     FetchResult,
@@ -142,12 +143,7 @@ _JOURNAL_TYPES = {"journal-article", "article-journal"}
 _CHAPTER_TYPES = {"book-chapter", "chapter"}
 _PREPRINT_PUBLISHERS = re.compile(r"\b(arxiv|biorxiv|medrxiv|ssrn|zenodo|preprints?)\b", re.I)
 
-_SPELLED = (
-    r"first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|"
-    r"thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|"
-    r"thirtieth|fortieth|fiftieth|sixtieth"
-)
-_ORDINAL = rf"(?:\d+(?:st|nd|rd|th)|(?:(?:twenty|thirty|forty|fifty|sixty)-)?(?:{_SPELLED}))"
+_ORDINAL = rf"(?:\d+(?:st|nd|rd|th)|{ORDINAL_WORDS_EN})"
 # "Proceedings of the 60th Annual Meeting ...", "Proceedings of the Third Conference ...".
 _PROCEEDINGS = re.compile(
     rf"^\s*(?:companion\s+)?proceedings\s+of\s+(?:the\s+)?(?:{_ORDINAL}\s+)?", re.I

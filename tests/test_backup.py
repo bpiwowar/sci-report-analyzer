@@ -108,3 +108,27 @@ def test_daily_rotation(tmp_path):
     assert backup.daily(db, start + timedelta(days=9)) is None  # once a day
     days = sorted(p.name for p in (tmp_path / "backups").glob("daily-*.sqlite"))
     assert days == [f"daily-2026-01-{d:02}.sqlite" for d in range(4, 11)]
+
+
+def test_language_cleaning_rules_added_to_saved_rules(tmp_path):
+    """Saved cleaning rules get the spelled-ordinal ones (once; not the default settings)."""
+    import json
+
+    db = tmp_path / "db.sqlite"
+    cfg = _cfg()
+    with create_engine(f"sqlite:///{db}").begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "b7e2f4a91c03")
+    mine = {"id": "custom1", "name": "Mine", "pattern": "^Proc\\. "}
+    with sqlite3.connect(db) as c:
+        c.execute(
+            "INSERT INTO app_setting (key, value) VALUES ('matching', ?)",
+            (json.dumps({"min_score": 0.7, "norm_rules": [mine]}),),
+        )
+    _migrate(db)
+    _migrate(db)
+    with sqlite3.connect(db) as c:
+        value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
+    ids = [r["id"] for r in value["norm_rules"]]
+    assert ids == ["ordinalWordsEn", "ordinalWordsFr", "custom1"]
+    assert value["min_score"] == 0.7
