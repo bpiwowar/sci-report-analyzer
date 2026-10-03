@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from . import contribution, pdfs, venue_match
+from . import contribution, i18n, pdfs, venue_match
 from .authors import fold_name, same_author
 from .db.models import (
     AppSetting,
@@ -27,6 +27,7 @@ from .db.models import (
     Venue,
 )
 from .db.session import session_scope
+from .i18n import N_, Labels, _, language
 from .merge import main_members
 from .ranking.badge import (
     BASE_CATEGORIES,
@@ -34,6 +35,7 @@ from .ranking.badge import (
     Badge,
     Category,
     badge_from_level,
+    category_label,
     category_of,
     category_order,
     detect_track,
@@ -179,12 +181,12 @@ class PubStat:
         if self.author_pos_manual:
             pass  # the person's position is set by hand: the list does not matter
         elif not self.authors:
-            out.append("no author list in the sources")
+            out.append(_("no author list in the sources"))
         elif "owner" not in self.author_marks:
             if "owner?" in self.author_marks:
                 out.append(self.author_notes[self.author_marks.index("owner?")][0])
             else:
-                out.append("the person's name is not found among the authors — add an alias")
+                out.append(_("the person's name is not found among the authors — add an alias"))
         for i, m in enumerate(self.author_marks):
             if m == "student?":
                 out.append(self.author_notes[i][0])
@@ -194,15 +196,15 @@ class PubStat:
             and self.kind
             not in ("book", "chapter", "proceedings", "software", "dataset", "thesis", "other")
         ):
-            out.append("no venue")
+            out.append(_("no venue"))
         if self.year is None:
-            out.append("no year")
+            out.append(_("no year"))
         if self.disagree and not self.overridden:
-            out.append("sources give different venues — pick one in the details")
+            out.append(_("sources give different venues — pick one in the details"))
         if self.track_conflict:
-            out.append("sources give different tracks — pick one in the details or flag it")
+            out.append(_("sources give different tracks — pick one in the details or flag it"))
         if self.missing:
-            out.append("no longer in any source")
+            out.append(_("no longer in any source"))
         return out
 
 
@@ -354,17 +356,17 @@ def pick_reason(best: MemberView, views: list[MemberView]) -> str:
     ranked = bool(b and (b.quartile or b.coreRank))
     if any(v.minor for v in views) and not best.minor:
         names = ", ".join(dict.fromkeys(v.venue_name or "?" for v in views if v.minor))
-        return f"the workshop rather than its main conference ({names})"
+        return _("the workshop rather than its main conference ({names})").format(names=names)
     if best.source == "doi":
-        return "the DOI record (registered by the publisher) is the main source"
+        return _("the DOI record (registered by the publisher) is the main source")
     if b and b.manual:
-        why = "its venue has a rank set by hand"
+        why = _("its venue has a rank set by hand")
     elif ranked and b.exact:
-        why = "its venue matches a ranking record exactly"
+        why = _("its venue matches a ranking record exactly")
     elif ranked:
-        why = f"its venue has the best ranked match ({round(b.score * 100)}%)"
+        why = _("its venue has the best ranked match ({score}%)").format(score=round(b.score * 100))
     else:
-        why = "no source venue is ranked"
+        why = _("no source venue is ranked")
     # Ties that matter: equally good records with another venue text.
     ties = [
         v
@@ -379,15 +381,15 @@ def pick_reason(best: MemberView, views: list[MemberView]) -> str:
         ADAPTERS[s].label for s in PRIORITY if any(v.source == s for v in candidates)
     )
     if (ties or not ranked) and len({v.source for v in candidates}) > 1:
-        why += f"; ties are broken by source priority ({order})"
+        why += _("; ties are broken by source priority ({order})").format(order=order)
     skipped = [v for v in views if v not in candidates]
     if any(v.source == "doi" and not v.archival and not v.venue_reliable for v in skipped):
-        why += (
+        why += _(
             "; the DOI record is not used: a book chapter without an event (e.g. in a volume "
             "of a series such as LNCS) names no real venue"
         )
     if any(v.archival or v.source in UNRELIABLE_VENUE for v in skipped):
-        why += "; preprints and ORCID venues are only used when nothing else is available"
+        why += _("; preprints and ORCID venues are only used when nothing else is available")
     return why
 
 
@@ -558,7 +560,9 @@ class StudentNames:
 
 
 def _ordinal(n: int) -> str:
-    """1st, 2nd, 3rd, 4th… 11th, 12th, 13th, 21st…"""
+    """1st, 2nd, 3rd, 4th… 11th, 12th, 13th, 21st… (in French: 1er, 2e, 3e…)"""
+    if language() == "fr":
+        return f"{n}er" if n == 1 else f"{n}e"
     suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
     return f"{n}{suffix}"
 
@@ -597,14 +601,14 @@ class PeopleIndex:
         for t in rows:
             for name in (t.student or "").split(", "):
                 if name and name not in students:
-                    when = (t.defence_date or "")[:4] or "in progress"
+                    when = (t.defence_date or "")[:4] or _("in progress")
                     names = [name, *aliases.get(name, [])]
                     students[name] = StudentNames(
                         name,
                         {fold_name(n) for n in names},
                         names,
                         {fold_name(n) for n in rejects.get(name, [])},
-                        f"PhD student {name} ({when})",
+                        _("PhD student {name} ({when})").format(name=name, when=when),
                         to_year(t.defence_date),
                     )
         owner = [person.name, *(person.aliases or [])]
@@ -641,23 +645,38 @@ class PeopleIndex:
             similar = any(same_author(a, n) for n in self.owner_variants)
             if not owner_found and f not in self.owner_rejects and (pos == i + 1 or similar):
                 marks.append("owner?")
-                name = self.owner_variants[0] if self.owner_variants else "this person"
-                why = "similar name" if similar else f"{_ordinal(i + 1)} author for a source"
-                notes[i] = (f"Is the author “{a}” {name}? ({why})", None)
+                name = self.owner_variants[0] if self.owner_variants else _("this person")
+                why = (
+                    _("similar name")
+                    if similar
+                    else _("{ordinal} author for a source").format(ordinal=_ordinal(i + 1))
+                )
+                notes[i] = (
+                    _("Is the author “{author}” {name}? ({why})").format(
+                        author=a, name=name, why=why
+                    ),
+                    None,
+                )
                 owner_found = True
                 continue
             mark = None
             for st in self.students:
                 if f in st.exact:
                     if year and st.defence_year and year - st.defence_year > FORMER_AFTER:
-                        mark, notes[i] = "former", (f"former {st.note}", st.name)
+                        former = _("former {note}").format(note=st.note)
+                        mark, notes[i] = "former", (former, st.name)
                     else:
                         mark, notes[i] = "student", (st.note, st.name)
                     break
                 if f not in st.rejects and any(same_author(a, n) for n in st.variants):
                     mark, notes[i] = (
                         "student?",
-                        (f"Is “{a}” the PhD student {st.name}? (similar name)", st.name),
+                        (
+                            _("Is “{author}” the PhD student {name}? (similar name)").format(
+                                author=a, name=st.name
+                            ),
+                            st.name,
+                        ),
                     )
             if mark is None:
                 for cid, cname, members in self.categories:
@@ -996,7 +1015,7 @@ def _fr_category(cat: Category, kind: str | None, n: int) -> str:
     elif base in ("other", "unranked"):
         label = "autre" if base == "other" else unranked
     else:  # Q1, CORE A*: the same
-        label = next((lab for k, lab, _ in BASE_CATEGORIES if k == base), base)
+        label = next((lab for k, lab, _c in BASE_CATEGORIES if k == base), base)
         if cat.workshop and kind in WORKSHOP_KINDS:  # (ranked by its main conference)
             label = f"dans une conf. {label}"
     if cat.workshop and kind not in WORKSHOP_KINDS:
@@ -1021,7 +1040,9 @@ def save_summary_settings(value: dict) -> None:
 
 # How much a category says in the summary: off (only counted in its kind), its count, its
 # venues, its venues with their years.
-SUMMARY_DETAILS = {"off": "Off", "count": "Count", "list": "List", "years": "List + years"}
+SUMMARY_DETAILS = Labels(
+    {"off": N_("Off"), "count": N_("Count"), "list": N_("List"), "years": N_("List + years")}
+)
 
 
 def summary_lines(
@@ -1046,7 +1067,7 @@ def summary_lines(
     counted in their kind. ``lang``: one of ``SUMMARY_LANGUAGES``; ``markdown``: a
     Markdown list (one item per line)."""
     fr = lang == "fr"
-    no_venue = "sans lieu" if fr else "no venue"
+    no_venue = "sans canal" if fr else "no venue"
     hidden = set(hidden)
     details = details or {}
 
@@ -1081,11 +1102,15 @@ def summary_lines(
             if level == "off":
                 continue
             members = [r for r in papers if r.category.key == cat.key]
-            label = cat.label
             if fr:
                 label = _fr_category(cat, kind, len(members))
-            elif kind is not None:  # within its kind: "unranked", "A*" for a workshop
-                label = "unranked" if cat.key == f"k_{kind}" else label.removeprefix("Workshop ")
+            else:
+                with i18n.using("en"):  # (the categories are labelled in the app's language)
+                    label = category_label(cat)
+                if kind is not None:  # within its kind: "unranked", "A*" for a workshop
+                    label = (
+                        "unranked" if cat.key == f"k_{kind}" else label.removeprefix("Workshop ")
+                    )
             if level == "count":
                 out.append(f"{len(members)} {label}")
                 continue
@@ -1113,8 +1138,11 @@ def summary_lines(
         papers = [r for r in rows if (r.kind if r.kind in KIND_ORDER else None) == kind]
         if not papers:
             continue
-        kinds = _FR_KINDS if fr else KIND_SHORT
-        label = kinds.get(kind or "other", "Other")
+        if fr:
+            label = _FR_KINDS.get(kind or "other", "Other")
+        else:
+            with i18n.using("en"):
+                label = KIND_SHORT.get(kind or "other", "Other")
         items = category_items(papers, kind)
         unranked = ("non classé" + ("s" if len(papers) > 1 else "")) if fr else "unranked"
         only = f"{len(papers)} {unranked}"

@@ -16,6 +16,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from ..authors import author_position
+from ..i18n import _
 from .base import (
     AuthorCandidate,
     FetchedPub,
@@ -107,8 +108,10 @@ class ScholarAdapter(SourceAdapter):
         )
         if blocked:
             raise SourceError(
-                "Google Scholar blocked automated access — save the profile page (after "
-                "clicking “Show more” until the end) and upload it instead."
+                _(
+                    "Google Scholar blocked automated access — save the profile page (after "
+                    "clicking “Show more” until the end) and upload it instead."
+                )
             )
         res.raise_for_status()
         return res.text
@@ -167,5 +170,5 @@ class ScholarAdapter(SourceAdapter):
                     break
                 await asyncio.sleep(random.uniform(2.0, 5.0))
         if not result.publications and result.display_name is None:
-            raise SourceError(f"Scholar profile {external_id} not found")
+            raise SourceError(_("Scholar profile {id} not found").format(id=external_id))
         return result

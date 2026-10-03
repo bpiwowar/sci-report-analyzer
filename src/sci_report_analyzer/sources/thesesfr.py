@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from ..i18n import N_, Labels
 from .base import AuthorCandidate, FetchedThesis, FetchResult, SourceAdapter, get_json
 
 API = "https://theses.fr/api/v1"
@@ -17,14 +18,16 @@ ROLES = {
     "Membre du jury": "examiner",
     "Auteur / Autrice": "author",
 }
-ROLE_LABELS = {
-    "director": "Supervised",
-    "rapporteur": "Reviewer (rapporteur)",
-    "examiner": "Examiner",
-    "president": "Jury president",
-    "author": "Own thesis",
-    "other": "Other",
-}
+ROLE_LABELS = Labels(
+    {
+        "director": N_("Supervised"),
+        "rapporteur": N_("Reviewer (rapporteur)"),
+        "examiner": N_("Examiner"),
+        "president": N_("Jury president"),
+        "author": N_("Own thesis"),
+        "other": N_("Other"),
+    }
+)
 
 
 def _person(p: dict[str, Any]) -> str:

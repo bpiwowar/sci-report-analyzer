@@ -12,6 +12,7 @@ from sqlalchemy import func, select
 
 from .db.models import Category, Excerpt, PeriodDocument, Publication
 from .db.session import session_scope
+from .i18n import _
 
 
 def years_label(a: int | None, b: int | None) -> str:
@@ -19,8 +20,8 @@ def years_label(a: int | None, b: int | None) -> str:
     if a and b:
         return f"{a}–{b}" if a != b else str(a)
     if a:
-        return f"since {a}"
-    return f"until {b}" if b else ""
+        return _("since {year}").format(year=a)
+    return _("until {year}").format(year=b) if b else ""
 
 
 @dataclass
@@ -324,7 +325,7 @@ def similar_excerpts(
         elif score >= threshold and mine:
             scored.append((score, e))
     scored.sort(key=lambda p: -p[0])
-    return [e for _, e in scored]
+    return [e for _s, e in scored]
 
 
 def add_excerpt(
@@ -530,11 +531,11 @@ def merge_excerpts(source_id: int, target_id: int, *, ref_only: bool = False) ->
     with session_scope() as s:
         a, b = s.get(Excerpt, source_id), s.get(Excerpt, target_id)
         if a is None or b is None:
-            return "Nothing to merge"
+            return _("Nothing to merge")
         lead = s.get(Excerpt, b.group_id) if b.group_id else b
         source = s.get(Excerpt, a.group_id) if a.group_id else a
         if source.id == lead.id:
-            return "Already together"
+            return _("Already together")
         source.group_text = None
         for x in [source, *_members(s, source.id)]:
             x.group_id, x.category_id = lead.id, lead.category_id

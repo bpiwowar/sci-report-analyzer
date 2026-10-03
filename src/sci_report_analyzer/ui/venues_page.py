@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 from .. import venue_match, venues
 from ..db.models import Venue
 from ..db.session import session_scope
-from ..i18n import _
+from ..i18n import N_, _, ngettext
 from ..ranking.badge import TRACK_LABEL, category_of, core_periods, sjr_periods, text_colour
 from ..ranking.kinds import KIND_SHORT, KINDS, VENUE_KINDS, WORKSHOP_KINDS
 from ..ranking.service import service
@@ -30,21 +30,25 @@ from .theme import (
 )
 
 TABS = {
-    "conferences": ("Conferences", venues.CONFERENCE_KINDS),
-    "workshops": ("Workshops", WORKSHOP_KINDS),
-    "journals": ("Journals", venues.JOURNAL_KINDS),
-    "other": ("Other & preprints", ("preprint", "other")),
+    "conferences": (N_("Conferences"), venues.CONFERENCE_KINDS),
+    "workshops": (N_("Workshops"), WORKSHOP_KINDS),
+    "journals": (N_("Journals"), venues.JOURNAL_KINDS),
+    "other": (N_("Other & preprints"), ("preprint", "other")),
 }
 LEVELS = ["A*", "A", "B", "C", "Q1", "Q2", "Q3", "Q4"]
 
 
+def _papers(n: int) -> str:
+    return ngettext("{n} paper", "{n} papers", n).format(n=n)
+
+
 def _chip_html(row: venues.VenueRow) -> str:
     cat = category_of(row.badge, None, row.kind)
-    label = cat.label if row.badge or cat.base_key.startswith("k_") else "not ranked"
+    label = cat.label if row.badge or cat.base_key.startswith("k_") else _("not ranked")
     colour = cat.colour
     style = f"background:{colour};color:{text_colour(colour)}"
     return f'<span class="vr-chip" style="{style}">{escape(label)}</span>' + (
-        ' <span title="manual decision">✎</span>' if row.manual else ""
+        f' <span title="{escape(_("manual decision"))}">✎</span>' if row.manual else ""
     )
 
 
@@ -57,11 +61,13 @@ def _core_history(badge, host: str | None = None) -> None:
         for i, (a, b, rank) in enumerate(core_periods(badge.coreHistory)):
             if i:
                 ui.icon("arrow_forward", size="xs", color="grey")
-            ui.label(rank or "unranked").classes("font-medium")
+            ui.label(rank or _("unranked")).classes("font-medium")
             ui.label(f"({a}–{b})" if a != b else f"({a})").classes("text-grey")
         ui.icon("info", size="xs", color="grey").tooltip(
-            "A paper takes the rank of the CORE edition in force in its year (Settings: or "
-            "the latest one)"
+            _(
+                "A paper takes the rank of the CORE edition in force in its year (Settings: or "
+                "the latest one)"
+            )
         )
 
 
@@ -87,24 +93,26 @@ def _sjr_history(badge) -> None:
 def register() -> None:
     @ui.page("/venues")
     async def venues_page(tab: str = "conferences", focus: int | None = None) -> None:
-        with frame("Venues"):
-            ui.label("Venues").classes("text-2xl")
+        with frame(_("Venues")):
+            ui.label(_("Venues")).classes("text-2xl")
             ui.label(
-                "Every venue seen in the validated sources. A source's venue text belongs "
-                "to a venue by its variants (same cleaned text), its rules (regex) or its "
-                "ISSN. Click a venue to set its kind or rank by hand, or to change what it "
-                "matches; manual decisions are kept on re-sync and shared when exporting "
-                "the settings."
+                _(
+                    "Every venue seen in the validated sources. A source's venue text belongs "
+                    "to a venue by its variants (same cleaned text), its rules (regex) or its "
+                    "ISSN. Click a venue to set its kind or rank by hand, or to change what it "
+                    "matches; manual decisions are kept on re-sync and shared when exporting "
+                    "the settings."
+                )
             ).classes("text-grey text-sm")
             _lookup()
             with ui.row().classes("gap-2"):
                 ui.button(
-                    "Add a venue", icon="add", on_click=lambda: _add_venue_dialog(view)
+                    _("Add a venue"), icon="add", on_click=lambda: _add_venue_dialog(view)
                 ).props("dense outline").mark("venue-add")
                 ui.button(
-                    "Propose merges…", icon="merge", on_click=lambda: _proposals_dialog(view)
+                    _("Propose merges…"), icon="merge", on_click=lambda: _proposals_dialog(view)
                 ).props("dense outline").tooltip(
-                    "Venues that look alike, one pair at a time: merge them or say they differ"
+                    _("Venues that look alike, one pair at a time: merge them or say they differ")
                 ).mark("venue-propose-merges")
             conflicts_box = ui.column().classes("w-full")
             container = ui.column().classes("w-full")
@@ -139,7 +147,7 @@ def register() -> None:
 
 
 def _lookup() -> None:
-    with ui.expansion("Test a venue string", icon="search").classes("w-full"):
+    with ui.expansion(_("Test a venue string"), icon="search").classes("w-full"):
         out = ui.column().classes("w-full gap-0")
 
         async def run(e) -> None:
@@ -148,14 +156,16 @@ def _lookup() -> None:
                 return
             badge = await service.resolve(e.value)
             with out:
-                ui.label(f"cleaned as: “{service.clean(e.value)}”").classes(
+                ui.label(_("cleaned as: “{text}”").format(text=service.clean(e.value))).classes(
                     "text-sm text-grey font-mono"
                 )
                 with ui.row().classes("items-center gap-2"):
                     rank_chip(badge)
-                    ui.label(badge_details(badge).replace("\n", " · ") if badge else "not ranked")
+                    ui.label(
+                        badge_details(badge).replace("\n", " · ") if badge else _("not ranked")
+                    )
 
-        ui.input("Venue text", on_change=run).props("debounce=500 clearable").classes(
+        ui.input(_("Venue text"), on_change=run).props("debounce=500 clearable").classes(
             "w-full"
         ).move(target_index=0)
 
@@ -177,37 +187,41 @@ def _add_venue_dialog(view: _View) -> None:
 def _new_venue_dialog(on_added: Callable[[int, bool], None], kind: str = "intl_conference") -> None:
     """Add a venue by hand; ``on_added(venue id, created)`` (False: one has this name)."""
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-        ui.label("Add a venue").classes("text-lg font-medium")
-        name = ui.input("Name").classes("w-full").mark("venue-add-name")
+        ui.label(_("Add a venue")).classes("text-lg font-medium")
+        name = ui.input(_("Name")).classes("w-full").mark("venue-add-name")
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
-            short = ui.input("Short name (acronym)").classes("w-48").mark("venue-add-short")
+            short = ui.input(_("Short name (acronym)")).classes("w-48").mark("venue-add-short")
             kind_select = (
-                ui.select(VENUE_KINDS, value=kind, label="Kind")
+                ui.select(VENUE_KINDS, value=kind, label=_("Kind"))
                 .props("dense outlined")
                 .classes("grow")
                 .mark("venue-add-kind")
             )
-        url = ui.input("Website", placeholder="https://…").classes("w-full").mark("venue-add-url")
+        url = (
+            ui.input(_("Website"), placeholder="https://…").classes("w-full").mark("venue-add-url")
+        )
         ui.label(
-            "The sources' texts with this name belong to it; add variants or rules in the "
-            "venue to match other texts."
+            _(
+                "The sources' texts with this name belong to it; add variants or rules in the "
+                "venue to match other texts."
+            )
         ).classes("text-xs text-grey")
 
         def ok() -> None:
             text = (name.value or "").strip()
             if not text:
-                ui.notify("Give the venue a name", type="warning")
+                ui.notify(_("Give the venue a name"), type="warning")
                 return
             vid, created = venues.add_venue(
                 text, kind_select.value, (short.value or "").strip(), url.value
             )
-            ui.notify("Venue added" if created else "A venue already has this name")
+            ui.notify(_("Venue added") if created else _("A venue already has this name"))
             dlg.close()
             on_added(vid, created)
 
         with ui.row().classes("w-full justify-end"):
-            ui.button("Cancel", on_click=dlg.close).props("flat")
-            ui.button("Add", icon="add", on_click=ok).mark("venue-add-confirm")
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Add"), icon="add", on_click=ok).mark("venue-add-confirm")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()
 
@@ -219,8 +233,14 @@ def _conflicts(view: _View) -> None:
         return
     with ui.row().classes("w-full items-center gap-2 bg-orange-1 rounded p-2"):
         ui.icon("warning", color="orange-8")
-        ui.label(f"{len(found)} venue text(s) are matched by several venues.").classes("grow")
-        ui.button("Resolve…", icon="rule", on_click=lambda: _conflict_dialog(view)).props(
+        ui.label(
+            ngettext(
+                "{n} venue text is matched by several venues.",
+                "{n} venue texts are matched by several venues.",
+                len(found),
+            ).format(n=len(found))
+        ).classes("grow")
+        ui.button(_("Resolve…"), icon="rule", on_click=lambda: _conflict_dialog(view)).props(
             "dense"
         ).mark("venue-conflicts")
 
@@ -247,61 +267,71 @@ def _conflict_dialog(view: _View) -> None:
         body.clear()
         with body:
             with ui.row().classes("w-full items-center no-wrap"):
-                ui.label("Venues matching the same text").classes("text-lg font-medium grow")
+                ui.label(_("Venues matching the same text")).classes("text-lg font-medium grow")
                 ui.button(icon="close", on_click=close).props("flat round dense")
             if not found:
-                ui.label("No conflict left.").classes("text-positive")
-                ui.button("Close", on_click=close).mark("conflicts-done")
+                ui.label(_("No conflict left.")).classes("text-positive")
+                ui.button(_("Close"), on_click=close).mark("conflicts-done")
                 return
             state["i"] %= len(found)
             source, raw, ids = found[state["i"]]
             names = venues.venue_names()
-            ui.label(f"Problem {state['i'] + 1} of {len(found)}").classes("text-xs text-grey")
+            ui.label(_("Problem {i} of {n}").format(i=state["i"] + 1, n=len(found))).classes(
+                "text-xs text-grey"
+            )
             with ui.row().classes("items-center gap-2"):
                 source_tag(source)
                 ui.label(f"“{raw}”").classes("font-mono")
-            ui.label("It is matched by:").classes("text-sm")
+            ui.label(_("It is matched by:")).classes("text-sm")
             for n, vid in enumerate(ids):
                 rules = [r.pattern for r in venues.venue_patterns(vid) if r.applies(source, raw)]
                 with ui.row().classes("items-center gap-2 no-wrap pl-2"):
                     ui.label(names.get(vid, "?")).classes("font-medium")
                     ui.label(
-                        ("belongs to it now" if n == 0 else "also matches")
-                        + (f" — rule {', '.join(rules)}" if rules else " — same cleaned text")
+                        (_("belongs to it now") if n == 0 else _("also matches"))
+                        + (
+                            _(" — rule {rules}").format(rules=", ".join(rules))
+                            if rules
+                            else _(" — same cleaned text")
+                        )
                     ).classes("text-xs text-grey")
                     with ui.link(target=f"/venues?focus={vid}", new_tab=True):
-                        ui.icon("visibility", size="xs").tooltip("Open the venue")
-            ui.label("Solutions").classes("font-medium mt-2")
+                        ui.icon("visibility", size="xs").tooltip(_("Open the venue"))
+            ui.label(_("Solutions")).classes("font-medium mt-2")
             for vid in ids:
                 name = names.get(vid, "?")
                 with ui.row().classes("items-center gap-2 w-full no-wrap"):
                     ui.button(
-                        f"Merge all into “{name}”",
+                        _("Merge all into “{name}”").format(name=name),
                         icon="merge",
                         on_click=lambda v=vid, n=name: act(
                             lambda: venues.merge_venues(v, [o for o in ids if o != v]),
-                            f"Merged into “{n}”",
+                            _("Merged into “{name}”").format(name=n),
                         ),
                     ).props("dense outline no-caps").mark(f"conflict-merge-{vid}")
                     ui.button(
-                        f"Only in “{name}”",
+                        _("Only in “{name}”").format(name=name),
                         icon="push_pin",
                         on_click=lambda v=vid, n=name: act(
                             lambda: venues.add_variant(v, raw, source),
-                            f"“{raw}” now belongs to “{n}” (a variant set by hand)",
+                            _("“{text}” now belongs to “{name}” (a variant set by hand)").format(
+                                text=raw, name=n
+                            ),
                         ),
                     ).props("dense flat no-caps").tooltip(
-                        "Keep the venues apart: this text becomes a variant of this venue, "
-                        "which wins over the other venues' rules"
+                        _(
+                            "Keep the venues apart: this text becomes a variant of this venue, "
+                            "which wins over the other venues' rules"
+                        )
                     ).mark(f"conflict-keep-{vid}")
             with ui.row().classes("w-full justify-between mt-2"):
                 ui.button(
-                    "Previous",
+                    _("Previous"),
                     icon="chevron_left",
                     on_click=lambda: (state.update(i=state["i"] - 1), show()),
                 ).props("flat dense")
                 ui.button(
-                    "Skip",
+                    _("Skip"),
                     icon="chevron_right",
                     on_click=lambda: (state.update(i=state["i"] + 1), show()),
                 ).props("flat dense").mark("conflict-skip")
@@ -327,7 +357,7 @@ def _proposals_dialog(view: _View) -> None:
         name, short, kind = names.values(keep)
         venues.merge_venues(keep.id, [other.id], name, short, kind)
         state["changed"] = True
-        ui.notify(f"Merged into “{name or keep.name}”", type="positive")
+        ui.notify(_("Merged into “{name}”").format(name=name or keep.name), type="positive")
         # The merged venue is gone: its other proposals too (the list is recomputed when
         # the dialog is opened again).
         proposals[:] = [p for p in proposals if other not in p[:2]]
@@ -347,48 +377,62 @@ def _proposals_dialog(view: _View) -> None:
         ):
             with ui.row().classes("w-full items-center gap-2 no-wrap"):
                 if kept:
-                    ui.badge("kept", color="primary").mark(f"proposal-kept-{r.id}")
+                    ui.badge(_("kept"), color="primary").mark(f"proposal-kept-{r.id}")
                 else:
-                    ui.badge("merged into the other", color="grey")
+                    ui.badge(_("merged into the other"), color="grey")
                 ui.badge(KINDS[r.kind], color="blue-grey").props("outline").mark(
                     f"proposal-kind-{r.id}"
                 )
                 ui.space()
                 if not kept:
-                    ui.button("Keep this one", icon="push_pin", on_click=on_keep).props(
+                    ui.button(_("Keep this one"), icon="push_pin", on_click=on_keep).props(
                         "dense flat no-caps"
                     ).mark(f"proposal-keep-{r.id}")
             with ui.row().classes("items-center gap-2 no-wrap"):
                 span(_chip_html(r))
                 ui.label(r.name).classes("font-medium")
                 with ui.link(target=f"/venues?focus={r.id}", new_tab=True):
-                    ui.icon("open_in_new", size="xs").tooltip("Open the venue")
+                    ui.icon("open_in_new", size="xs").tooltip(_("Open the venue"))
             ui.label(
-                f"{r.short_name or '—'} · {r.publications} paper(s) · {len(r.people)} person(s)"
+                " · ".join(
+                    (
+                        r.short_name or "—",
+                        _papers(r.publications),
+                        ngettext("{n} person", "{n} people", len(r.people)).format(n=len(r.people)),
+                    )
+                )
             ).classes("text-xs text-grey")
             texts = sorted(r.variants, key=lambda v: -v[2])
-            for _, example, n, *_ in texts[:4]:
+            for _key, example, n, *_rest in texts[:4]:
                 ui.label(f"“{example}” ({n})").classes("text-xs font-mono")
             if len(texts) > 4:
-                ui.label(f"… {len(texts) - 4} more variant(s)").classes("text-xs text-grey")
+                ui.label(
+                    ngettext("… {n} more variant", "… {n} more variants", len(texts) - 4).format(
+                        n=len(texts) - 4
+                    )
+                ).classes("text-xs text-grey")
 
     def show() -> None:
         body.clear()
         with body:
             with ui.row().classes("w-full items-center no-wrap"):
-                ui.label("Venues that look alike").classes("text-lg font-medium grow")
+                ui.label(_("Venues that look alike")).classes("text-lg font-medium grow")
                 ui.button(icon="close", on_click=close).props("flat round dense")
             if not proposals:
-                ui.label("No merge to propose.").classes("text-positive")
-                ui.button("Close", on_click=close).mark("proposals-done")
+                ui.label(_("No merge to propose.")).classes("text-positive")
+                ui.button(_("Close"), on_click=close).mark("proposals-done")
                 return
             state["i"] %= len(proposals)
             pair = list(proposals[state["i"]][:2])  # the kept venue first
-            ui.label(f"Proposal {state['i'] + 1} of {len(proposals)}").classes("text-xs text-grey")
+            ui.label(_("Proposal {i} of {n}").format(i=state["i"] + 1, n=len(proposals))).classes(
+                "text-xs text-grey"
+            )
             cards = ui.row().classes("w-full no-wrap items-stretch")
             ui.label(
-                "Merging moves the texts, rules, ISSNs and papers of the other venue into the "
-                "kept one; the kept venue's decisions win, the other's fill what it lacks."
+                _(
+                    "Merging moves the texts, rules, ISSNs and papers of the other venue into the "
+                    "kept one; the kept venue's decisions win, the other's fill what it lacks."
+                )
             ).classes("text-xs text-grey")
             names = _MergeNames(pair, "proposal")
 
@@ -405,22 +449,22 @@ def _proposals_dialog(view: _View) -> None:
 
             show_cards()
             with ui.row().classes("w-full items-center gap-2"):
-                ui.button("Merge", icon="merge", on_click=lambda: merge(*pair, names)).props(
+                ui.button(_("Merge"), icon="merge", on_click=lambda: merge(*pair, names)).props(
                     "dense"
                 ).mark("proposal-merge")
                 ui.button(
-                    "Not the same", icon="call_split", on_click=lambda: not_same(*pair)
+                    _("Not the same"), icon="call_split", on_click=lambda: not_same(*pair)
                 ).props("dense flat no-caps color=negative").tooltip(
-                    "Never propose this pair again"
+                    _("Never propose this pair again")
                 ).mark("proposal-not-same")
             with ui.row().classes("w-full justify-between mt-2"):
                 ui.button(
-                    "Previous",
+                    _("Previous"),
                     icon="chevron_left",
                     on_click=lambda: (state.update(i=state["i"] - 1), show()),
                 ).props("flat dense")
                 ui.button(
-                    "Skip",
+                    _("Skip"),
                     icon="chevron_right",
                     on_click=lambda: (state.update(i=state["i"] + 1), show()),
                 ).props("flat dense").mark("proposal-skip")
@@ -446,7 +490,7 @@ def _tabs(rows: list[venues.VenueRow], view: _View, focus: int | None = None) ->
     if focus is not None:
         focused = next((r for r in rows if r.id == focus), None)
         if focused:
-            tab = next((t for t, (_, kinds) in TABS.items() if focused.kind in kinds), tab)
+            tab = next((t for t, (_label, kinds) in TABS.items() if focused.kind in kinds), tab)
     view.tab = tab
     undecided = [r for r in rows if _undecided_joint(r)]
     if tab == "joint" and not undecided:
@@ -456,13 +500,13 @@ def _tabs(rows: list[venues.VenueRow], view: _View, focus: int | None = None) ->
     ) as tabs:
         for name, (label, kinds) in TABS.items():
             n = sum(r.kind in kinds for r in rows)
-            ui.tab(name, f"{label} ({n})")
+            ui.tab(name, f"{_(label)} ({n})")
         if undecided:
-            ui.tab("joint", f"Multiple conferences ({len(undecided)})").classes(
+            ui.tab("joint", _("Multiple conferences ({n})").format(n=len(undecided))).classes(
                 "text-orange-9"
             ).mark("venue-tab-joint")
     with ui.tab_panels(tabs, value=tab).classes("w-full"):
-        for name, (_, kinds) in TABS.items():
+        for name, (_label, kinds) in TABS.items():
             with ui.tab_panel(name):
                 _table([r for r in rows if r.kind in kinds], rows, view)
         if undecided:
@@ -483,14 +527,19 @@ def _undecided_joint(r: venues.VenueRow) -> bool:
 def _joint_list(rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], view: _View) -> None:
     """Joint venues whose parts have different levels: which level to use."""
     ui.label(
-        "These venues are joint conferences (their texts name several conferences) whose "
-        "conferences have different levels. Until you choose, their papers take the lowest "
-        "one. You can also set a level by hand in the venue."
+        _(
+            "These venues are joint conferences (their texts name several conferences) whose "
+            "conferences have different levels. Until you choose, their papers take the lowest "
+            "one. You can also set a level by hand in the venue."
+        )
     ).classes("text-sm text-grey")
 
     def use(row: venues.VenueRow, part_id: int, name: str) -> None:
         venues.set_joint_use(row.id, part_id)
-        ui.notify(f"“{row.name}” takes the level of “{name}”", type="positive")
+        ui.notify(
+            _("“{venue}” takes the level of “{name}”").format(venue=row.name, name=name),
+            type="positive",
+        )
         view.reload()
 
     def edit(row: venues.VenueRow) -> None:
@@ -501,8 +550,8 @@ def _joint_list(rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], vi
         with ui.card().classes("w-full q-pa-sm").mark(f"joint-{row.id}"):
             with ui.row().classes("items-center gap-2 w-full no-wrap"):
                 ui.label(row.name).classes("font-medium grow")
-                ui.label(f"{row.publications} paper(s)").classes("text-xs text-grey")
-                ui.button("Open", icon="edit", on_click=lambda r=row: edit(r)).props(
+                ui.label(_papers(row.publications)).classes("text-xs text-grey")
+                ui.button(_("Open"), icon="edit", on_click=lambda r=row: edit(r)).props(
                     "dense flat size=sm"
                 ).mark(f"joint-open-{row.id}")
             for pid, name, badge in row.parts:
@@ -510,7 +559,7 @@ def _joint_list(rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], vi
                     rank_chip(badge)
                     ui.label(name).classes("text-sm")
                     ui.button(
-                        "Use this level",
+                        _("Use this level"),
                         icon="check",
                         on_click=lambda r=row, p=pid, n=name: use(r, p, n),
                     ).props("dense flat size=sm no-caps color=primary").mark(
@@ -546,17 +595,19 @@ def _venue_select(options: dict[int, str], value: int | None, on_change) -> ui.s
 def _joint_editor(row: venues.VenueRow, finish, go) -> None:
     """A joint venue's parts (found automatically or set by hand), and the level it takes."""
     options = {vid: name for vid, name in venues.venue_choices().items() if vid != row.id}
-    parts = [pid for pid, *_ in row.parts]
-    ui.label("Joint venue").classes("font-medium mt-2")
+    parts = [pid for pid, *_rest in row.parts]
+    ui.label(_("Joint venue")).classes("font-medium mt-2")
     ui.label(
-        "A venue made of several conferences (e.g. CORIA-TALN), found from the acronyms "
-        "of its texts. Its papers take the level its conferences share; when they "
-        "differ, the one you choose (else the lowest). A level set by hand below wins."
+        _(
+            "A venue made of several conferences (e.g. CORIA-TALN), found from the acronyms "
+            "of its texts. Its papers take the level its conferences share; when they "
+            "differ, the one you choose (else the lowest). A level set by hand below wins."
+        )
     ).classes("text-xs text-grey")
 
     def use(part_id: int | None) -> None:
         venues.set_joint_use(row.id, part_id)
-        ui.notify("Level saved", type="positive")
+        ui.notify(_("Level saved"), type="positive")
         finish()
 
     for pid, name, badge in row.parts:
@@ -565,15 +616,17 @@ def _joint_editor(row: venues.VenueRow, finish, go) -> None:
             ui.label(name).classes("text-sm")
             _open_button(go, pid, f"venue-part-open-{pid}")
             if row.joint_use == pid:
-                ui.badge("its level is used", color="positive")
-                ui.button("Undo", on_click=lambda: use(None)).props("dense flat size=sm")
+                ui.badge(_("its level is used"), color="positive")
+                ui.button(_("Undo"), on_click=lambda: use(None)).props("dense flat size=sm")
             elif row.joint_differ or row.joint_use is not None:
-                ui.button("Use this level", icon="check", on_click=lambda p=pid: use(p)).props(
+                ui.button(_("Use this level"), icon="check", on_click=lambda p=pid: use(p)).props(
                     "dense flat size=sm no-caps color=primary"
                 ).mark(f"venue-part-use-{pid}")
 
     with (
-        ui.expansion("Change the conferences" if parts else "Make it a joint venue", icon="edit")
+        ui.expansion(
+            _("Change the conferences") if parts else _("Make it a joint venue"), icon="edit"
+        )
         .classes("w-full")
         .mark("venue-parts-edit")
     ):
@@ -593,12 +646,12 @@ def _joint_editor(row: venues.VenueRow, finish, go) -> None:
 
         def save(value: list[int] | None) -> None:
             venues.set_joint_parts(row.id, value)
-            ui.notify("Conferences saved", type="positive")
+            ui.notify(_("Conferences saved"), type="positive")
             finish()
 
         with ui.row().classes("items-center gap-2"):
             ui.button(
-                "Add a conference",
+                _("Add a conference"),
                 icon="add",
                 on_click=lambda: (parts.append(None), lines.refresh()),
             ).props("dense flat size=sm").mark("venue-part-add")
@@ -613,24 +666,24 @@ def _joint_editor(row: venues.VenueRow, finish, go) -> None:
             ).props("dense flat size=sm").tooltip(
                 _("Add a venue not in the list, as a conference of this one")
             ).mark("venue-part-new")
-            ui.button("Save", icon="save", on_click=lambda: save([p for p in parts if p])).props(
+            ui.button(_("Save"), icon="save", on_click=lambda: save([p for p in parts if p])).props(
                 "dense unelevated size=sm color=primary"
             ).mark("venue-parts-save")
             if row.parts_manual:
-                ui.button("Automatic", on_click=lambda: save(None)).props(
+                ui.button(_("Automatic"), on_click=lambda: save(None)).props(
                     "dense flat size=sm"
-                ).tooltip("Use the conferences found in its texts").mark("venue-parts-auto")
+                ).tooltip(_("Use the conferences found in its texts")).mark("venue-parts-auto")
 
 
 def _table(rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], view: _View) -> None:
     columns = [
-        {"name": "short", "label": "Short", "field": "short", "align": "left", "sortable": True},
-        {"name": "name", "label": "Venue", "field": "name", "align": "left", "sortable": True},
-        {"name": "kind", "label": "Kind", "field": "kind", "sortable": True},
-        {"name": "rank", "label": "Rank", "field": "rank"},
-        {"name": "pubs", "label": "Papers", "field": "pubs", "sortable": True},
-        {"name": "people", "label": "People", "field": "people", "sortable": True},
-        {"name": "variants", "label": "Variants", "field": "variants", "sortable": True},
+        {"name": "short", "label": _("Short"), "field": "short", "align": "left", "sortable": True},
+        {"name": "name", "label": _("Venue"), "field": "name", "align": "left", "sortable": True},
+        {"name": "kind", "label": _("Kind"), "field": "kind", "sortable": True},
+        {"name": "rank", "label": _("Rank"), "field": "rank"},
+        {"name": "pubs", "label": _("Papers"), "field": "pubs", "sortable": True},
+        {"name": "people", "label": _("People"), "field": "people", "sortable": True},
+        {"name": "variants", "label": _("Variants"), "field": "variants", "sortable": True},
     ]
     data = [
         {
@@ -656,14 +709,14 @@ def _table(rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], view: _
     # people counts open the list of papers.
     table.add_slot("body", _ROW_SLOT)
     filt = (
-        ui.input(placeholder="filter venues", value=view.filter)
+        ui.input(placeholder=_("filter venues"), value=view.filter)
         .props("dense outlined clearable")
         .classes("w-64")
     )
     filt.bind_value(table, "filter")
     filt.on_value_change(lambda e: setattr(view, "filter", e.value or ""))
     filt.move(target_index=0)
-    ui.label("Drag a venue onto another one to merge it into that one.").classes(
+    ui.label(_("Drag a venue onto another one to merge it into that one.")).classes(
         "text-xs text-grey"
     ).move(target_index=1)
 
@@ -679,7 +732,7 @@ def _table(rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], view: _
         src, dst = by_id.get(e.args.get("src")), by_id.get(e.args.get("dst"))
         if src is not None and dst is not None and src.id != dst.id:
             with view.dialogs:
-                _confirm_merge(dst, [src], lambda _: view.reload(), swappable=True)
+                _confirm_merge(dst, [src], lambda _vid: view.reload(), swappable=True)
 
     table.on("venue_drop", dropped)
 
@@ -713,22 +766,26 @@ def _hosts_editor(row: venues.VenueRow, finish, go) -> None:
     """A workshop's main conferences (with years), which give its papers their rank."""
     options = {vid: name for vid, name in venues.venue_choices().items() if vid != row.id}
     hosts = [{"venue_id": h[0], "from": h[2], "to": h[3]} for h in row.hosts]
-    ui.label("Main conference").classes("font-medium mt-2")
+    ui.label(_("Main conference")).classes("font-medium mt-2")
     ui.label(
-        "Papers of this workshop take the rank of its main conference in their year "
-        "(a workshop can move: give the years of each one)."
+        _(
+            "Papers of this workshop take the rank of its main conference in their year "
+            "(a workshop can move: give the years of each one)."
+        )
     ).classes("text-xs text-grey")
 
     @ui.refreshable
     def lines() -> None:
         if not hosts:
-            ui.label("No main conference: its papers are not ranked.").classes("text-sm text-grey")
+            ui.label(_("No main conference: its papers are not ranked.")).classes(
+                "text-sm text-grey"
+            )
         for i, h in enumerate(hosts):
             with ui.row().classes("items-center gap-2 no-wrap w-full").mark(f"venue-host-{i}"):
                 _venue_select(
                     options, h["venue_id"], lambda e, h=h: h.update(venue_id=e.value)
                 ).classes("grow").mark(f"venue-host-select-{i}")
-                for end, label in (("from", "from"), ("to", "to")):
+                for end, label in (("from", _("from")), ("to", _("to"))):
                     ui.number(
                         label,
                         value=h[end],
@@ -750,7 +807,7 @@ def _hosts_editor(row: venues.VenueRow, finish, go) -> None:
             hosts.append({"venue_id": vid, "from": None, "to": None})
             lines.refresh()
 
-        ui.button("Add a main conference", icon="add", on_click=lambda: add()).props(
+        ui.button(_("Add a main conference"), icon="add", on_click=lambda: add()).props(
             "dense flat size=sm"
         ).mark("venue-host-add")
         ui.button(
@@ -763,16 +820,20 @@ def _hosts_editor(row: venues.VenueRow, finish, go) -> None:
             _("Add a venue not in the list, as its main conference")
         ).mark("venue-host-new")
         if not hosts and (sugg := venues.host_suggestion(row.id)):
-            ui.button(f"Use {sugg[1]}", icon="auto_fix_high", on_click=lambda: add(sugg[0])).props(
-                "dense flat size=sm color=primary"
-            ).tooltip("Found in the workshop's venue texts").mark("venue-host-suggest")
+            ui.button(
+                _("Use {venue}").format(venue=sugg[1]),
+                icon="auto_fix_high",
+                on_click=lambda: add(sugg[0]),
+            ).props("dense flat size=sm color=primary").tooltip(
+                _("Found in the workshop's venue texts")
+            ).mark("venue-host-suggest")
 
         def save() -> None:
             venues.save_hosts(row.id, [h for h in hosts if h["venue_id"]])
-            ui.notify("Main conferences saved", type="positive")
+            ui.notify(_("Main conferences saved"), type="positive")
             finish()
 
-        ui.button("Save main conferences", icon="save", on_click=save).props(
+        ui.button(_("Save main conferences"), icon="save", on_click=save).props(
             "dense unelevated size=sm color=primary"
         ).mark("venue-hosts-save")
 
@@ -782,7 +843,7 @@ def _open_button(go, venue_id: int, mark: str) -> None:
     current one, which its Back button reopens."""
     ui.button(icon="visibility", on_click=lambda: go(venue_id)).props(
         "flat round dense size=sm"
-    ).tooltip("Open this venue (changes not saved here are lost)").mark(mark)
+    ).tooltip(_("Open this venue (changes not saved here are lost)")).mark(mark)
 
 
 def papers_dialog(row: venues.VenueRow, *, people: bool = False) -> None:
@@ -796,26 +857,30 @@ def papers_dialog(row: venues.VenueRow, *, people: bool = False) -> None:
         ui.card().classes("w-full max-w-3xl").style("max-height: 90vh; overflow-y: auto"),
     ):
         with ui.row().classes("w-full items-center justify-between no-wrap"):
-            what = f"{len(by_person)} people" if people else f"{len(papers)} paper(s)"
+            what = (
+                ngettext("{n} person", "{n} people", len(by_person)).format(n=len(by_person))
+                if people
+                else _papers(len(papers))
+            )
             ui.label(f"{row.name}: {what}").classes("text-lg")
             ui.button(icon="close", on_click=dlg.close).props("flat round")
         if not papers:
-            ui.label("No paper.").classes("text-grey")
+            ui.label(_("No paper.")).classes("text-grey")
         for pid, items in by_person.items():
             with ui.column().classes("w-full gap-0").mark(f"venue-person-{pid}"):
                 ui.link(
                     f"{items[0].person} ({len(items)})", f"/person/{pid}?venue={row.id}"
-                ).classes("font-medium").tooltip("Their papers at this venue")
+                ).classes("font-medium").tooltip(_("Their papers at this venue"))
                 if people:
                     continue
                 for p in items:
                     with ui.row().classes("gap-2 no-wrap items-baseline pl-4 text-sm"):
                         ui.label(str(p.year or "—")).classes("w-10 shrink-0 text-grey")
-                        ui.link(p.title or "(untitled)", f"/person/{pid}?pub={p.id}").classes(
+                        ui.link(p.title or _("(untitled)"), f"/person/{pid}?pub={p.id}").classes(
                             "text-grey-8" if p.hidden else ""
                         ).mark(f"venue-paper-{p.id}")
                         if p.hidden:
-                            ui.label("hidden").classes("text-xs text-grey")
+                            ui.label(_("hidden")).classes("text-xs text-grey")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()
 
@@ -832,7 +897,7 @@ async def open_venue(
     rows = await venues.venue_rows(only={venue_id})
     row = next((r for r in rows if r.id == venue_id), None)
     if row is None:
-        ui.notify("This venue has no paper any more", type="warning")
+        ui.notify(_("This venue has no paper any more"), type="warning")
         return
     venue_dialog(row, rows, done, back, tab)
 
@@ -910,28 +975,32 @@ def venue_dialog(
             background_tasks.create(update())
 
         if back is not None:
-            ui.button("Back", icon="arrow_back", on_click=go_back).props("flat dense no-caps").mark(
-                "venue-back"
-            )
+            ui.button(_("Back"), icon="arrow_back", on_click=go_back).props(
+                "flat dense no-caps"
+            ).mark("venue-back")
         with ui.row().classes("w-full items-center justify-between no-wrap"):
-            name = ui.input("Name", value=state["name"]).classes("grow").mark("venue-name")
+            name = ui.input(_("Name"), value=state["name"]).classes("grow").mark("venue-name")
             short = (
                 ui.input(
-                    "Short name",
+                    _("Short name"),
                     value=state["short_name"],
-                    placeholder=(row.short_name or "e.g. ICLR") if not row.short_manual else "",
+                    placeholder=(row.short_name or _("e.g. ICLR")) if not row.short_manual else "",
                 )
                 .classes("w-40")
-                .tooltip("Empty: found automatically (ranking record acronym, venue texts)")
+                .tooltip(_("Empty: found automatically (ranking record acronym, venue texts)"))
                 .mark("venue-short")
             )
             ui.button(icon="close", on_click=dlg.close).props("flat round")
-        ui.label(f"Renamed: “{row.name}” stays a variant, so its texts keep matching.").classes(
-            "text-xs text-grey"
-        ).bind_visibility_from(name, "value", lambda v: (v or "").strip() not in ("", row.name))
+        ui.label(
+            _("Renamed: “{name}” stays a variant, so its texts keep matching.").format(
+                name=row.name
+            )
+        ).classes("text-xs text-grey").bind_visibility_from(
+            name, "value", lambda v: (v or "").strip() not in ("", row.name)
+        )
         with ui.row().classes("w-full items-center gap-1 no-wrap"):
             url = (
-                ui.input("Website", value=state["url"], placeholder="https://…")
+                ui.input(_("Website"), value=state["url"], placeholder="https://…")
                 .props("dense")
                 .classes("grow")
                 .mark("venue-url")
@@ -939,17 +1008,19 @@ def venue_dialog(
             ui.button(
                 icon="open_in_new",
                 on_click=lambda: ui.navigate.to(venues.normalize_url(url.value), new_tab=True),
-            ).props("flat round dense").tooltip("Open the website").bind_visibility_from(
+            ).props("flat round dense").tooltip(_("Open the website")).bind_visibility_from(
                 url, "value", lambda v: bool((v or "").strip())
             )
         with ui.row().classes("items-center gap-2"):
             span(_chip_html(row))
-            ui.label(f"{row.publications} paper(s) · {len(row.people)} person(s)").classes(
-                "text-sm text-grey"
-            )
+            ui.label(
+                _papers(row.publications)
+                + " · "
+                + ngettext("{n} person", "{n} people", len(row.people)).format(n=len(row.people))
+            ).classes("text-sm text-grey")
         _core_history(row.badge)
         _sjr_history(row.badge)
-        for vid, host, *_ in row.hosts:  # (a workshop: its main conferences' ranks)
+        for vid, host, *_rest in row.hosts:  # (a workshop: its main conferences' ranks)
             r = next((r for r in all_rows if r.id == vid), None)
             _core_history(r.badge if r else None, host)
         if suggestions := venues.similar_venues(row, all_rows, limit=4):
@@ -959,27 +1030,27 @@ def venue_dialog(
                 .mark("venue-suggestions")
             ):
                 ui.icon("merge", color="primary")
-                ui.label("Possibly the same venue:").classes("text-sm")
-                for i, (r, _) in enumerate(suggestions):
+                ui.label(_("Possibly the same venue:")).classes("text-sm")
+                for i, (r, _score) in enumerate(suggestions):
                     with ui.row().classes("items-center gap-0 no-wrap"):
                         ui.label(f"{r.name} ({r.publications})").classes("text-sm")
                         ui.button(
                             icon="call_merge",
                             on_click=lambda r=r: _confirm_merge(row, [r], merged),
                         ).props("flat round dense size=sm").tooltip(
-                            f"Merge “{r.name}” into this venue"
+                            _("Merge “{name}” into this venue").format(name=r.name)
                         ).mark(f"venue-suggest-merge-{i}")
 
         with ui.tabs().classes("w-full").props("align=left dense") as tabs:
-            t_rank = ui.tab("Name and ranking").mark("venue-tab-ranking")
-            ui.tab("Matching (rules and variants)").mark("venue-tab-matching")
-            ui.tab("Merge with other venues").mark("venue-tab-merge")
+            t_rank = ui.tab("ranking", _("Name and ranking")).mark("venue-tab-ranking")
+            ui.tab("matching", _("Matching (rules and variants)")).mark("venue-tab-matching")
+            ui.tab("merge", _("Merge with other venues")).mark("venue-tab-merge")
         with ui.tab_panels(tabs, value=tab or t_rank).classes("w-full"):
-            with ui.tab_panel("Name and ranking").classes("q-px-none"):
-                ui.label("Kind").classes("font-medium")
+            with ui.tab_panel("ranking").classes("q-px-none"):
+                ui.label(_("Kind")).classes("font-medium")
                 kind = (
                     ui.select(
-                        {"": f"Automatic ({KINDS[row.kind]})", **VENUE_KINDS},
+                        {"": _("Automatic ({kind})").format(kind=KINDS[row.kind]), **VENUE_KINDS},
                         value=state["kind"] if state["kind"] in VENUE_KINDS else "",
                     )
                     .props("dense outlined")
@@ -1002,15 +1073,15 @@ def venue_dialog(
                     lambda k: k not in WORKSHOP_KINDS and (k or row.kind not in WORKSHOP_KINDS),
                 )
 
-                ui.label("Level (by hand)").classes("font-medium mt-2")
+                ui.label(_("Level (by hand)")).classes("font-medium mt-2")
                 with ui.row().classes("items-center gap-2"):
                     ltype = ui.select(
-                        {"conference": "Conference (CORE)", "journal": "Journal (quartile)"},
+                        {"conference": _("Conference (CORE)"), "journal": _("Journal (quartile)")},
                         value=state["level_type"],
                     ).props("dense outlined")
                     lrank = (
                         ui.select(
-                            {"": "— automatic", **level_options(LEVELS)},
+                            {"": _("— automatic"), **level_options(LEVELS)},
                             value=state["level_rank"],
                             new_value_mode="add-unique",
                         )
@@ -1019,7 +1090,7 @@ def venue_dialog(
                     )
                 level_hint(lrank).bind_visibility_from(lrank, "value")
 
-                ui.label("Ranking record (by hand)").classes("font-medium mt-2")
+                ui.label(_("Ranking record (by hand)")).classes("font-medium mt-2")
                 chosen = {"key": state["record_key"]}
 
                 @ui.refreshable
@@ -1033,30 +1104,27 @@ def venue_dialog(
                         else:
                             if row.badge:
                                 rank_chip(row.badge)
-                            ui.label(
-                                "Automatic matching"
-                                + (
-                                    f" (currently: {row.badge.name}"
-                                    + (
-                                        ""
-                                        if row.badge.exact or row.badge.manual
-                                        else f", fuzzy match {round(row.badge.score * 100)}%"
-                                    )
-                                    + ")"
-                                    if row.badge
-                                    else ": no ranking record found"
+                            if not row.badge:
+                                text = _("Automatic matching: no ranking record found")
+                            elif row.badge.exact or row.badge.manual:
+                                text = _("Automatic matching (currently: {name})").format(
+                                    name=row.badge.name
                                 )
-                            ).classes("text-grey")
+                            else:
+                                text = _(
+                                    "Automatic matching (currently: {name}, fuzzy match {score}%)"
+                                ).format(name=row.badge.name, score=round(row.badge.score * 100))
+                            ui.label(text).classes("text-grey")
                         ui.space()
                         ui.button(
-                            "Search for a ranking",
+                            _("Search for a ranking"),
                             icon="search",
                             on_click=lambda: open_search(True),
                         ).props("dense flat").mark("venue-search-open")
                         if chosen["key"]:
-                            ui.button("Automatic", on_click=lambda: pick(None)).props(
+                            ui.button(_("Automatic"), on_click=lambda: pick(None)).props(
                                 "dense flat"
-                            ).tooltip("Forget the chosen record: match automatically")
+                            ).tooltip(_("Forget the chosen record: match automatically"))
 
                 def pick(key: str | None) -> None:
                     chosen["key"] = key
@@ -1070,7 +1138,9 @@ def venue_dialog(
                     with ui.row().classes("items-center gap-2 w-full no-wrap"):
                         query = (
                             ui.input(
-                                "Ranking record name", value=row.name, on_change=lambda: search()
+                                _("Ranking record name"),
+                                value=row.name,
+                                on_change=lambda: search(),
                             )
                             .props("dense outlined debounce=300 autofocus")
                             .classes("grow")
@@ -1086,11 +1156,11 @@ def venue_dialog(
                     text = (query.value or "").strip()
                     with results:
                         if len(text) < 3:
-                            ui.label("Type at least 3 characters.").classes("text-xs text-grey")
+                            ui.label(_("Type at least 3 characters.")).classes("text-xs text-grey")
                             return
                         found = service.search(text, 10)
                         if not found:
-                            ui.label("No ranking record found.").classes("text-xs text-grey")
+                            ui.label(_("No ranking record found.")).classes("text-xs text-grey")
                         for i, b in enumerate(found):
                             with ui.row().classes("items-center gap-2 no-wrap w-full"):
                                 rank_chip(b)
@@ -1098,7 +1168,7 @@ def venue_dialog(
                                 ui.label(f"{b.source} · {round(b.score * 100)}%").classes(
                                     "text-xs text-grey"
                                 )
-                                ui.button("Use", on_click=lambda k=b.recordKey: pick(k)).props(
+                                ui.button(_("Use"), on_click=lambda k=b.recordKey: pick(k)).props(
                                     "dense unelevated color=primary"
                                 ).mark(f"venue-use-{i}")
 
@@ -1107,28 +1177,32 @@ def venue_dialog(
                     if on:
                         search()
 
-            with ui.tab_panel("Matching (rules and variants)").classes("q-px-none"):
+            with ui.tab_panel("matching").classes("q-px-none"):
                 match = (
                     ui.input(
-                        "Search rankings as (empty: the venue's texts)",
+                        _("Search rankings as (empty: the venue's texts)"),
                         value=state["match_text"],
                     )
                     .classes("w-full")
                     .tooltip(
-                        "Text the automatic ranking lookup searches for, instead of the "
-                        "venue's texts (it does not change which texts belong to the venue)"
+                        _(
+                            "Text the automatic ranking lookup searches for, instead of the "
+                            "venue's texts (it does not change which texts belong to the venue)"
+                        )
                     )
                 )
                 issns = (
-                    ui.input("ISSNs (comma-separated)", value=state["issns"])
+                    ui.input(_("ISSNs (comma-separated)"), value=state["issns"])
                     .classes("w-full")
-                    .tooltip("Records with one of these ISSNs belong to this venue, whatever text")
+                    .tooltip(
+                        _("Records with one of these ISSNs belong to this venue, whatever text")
+                    )
                     .mark("venue-issns")
                 )
-                ui.label("Variants (raw texts, matched by their cleaned text)").classes(
+                ui.label(_("Variants (raw texts, matched by their cleaned text)")).classes(
                     "font-medium mt-2"
                 )
-                tracks = {"": "no track", **TRACK_LABEL}
+                tracks = {"": _("no track"), **TRACK_LABEL}
                 workshop_keys = dict(venues.workshop_variants(row.id))
                 if workshop_keys:
                     with (
@@ -1138,40 +1212,55 @@ def venue_dialog(
                     ):
                         ui.icon("group_work", color="orange-9")
                         ui.label(
-                            f"{len(workshop_keys)} variant(s) look like workshops of this venue. "
-                            "A workshop is its own venue, ranked as its main conference."
+                            ngettext(
+                                "{n} variant looks like a workshop of this venue. "
+                                "A workshop is its own venue, ranked as its main conference.",
+                                "{n} variants look like workshops of this venue. "
+                                "A workshop is its own venue, ranked as its main conference.",
+                                len(workshop_keys),
+                            ).format(n=len(workshop_keys))
                         ).classes("text-sm grow")
 
                         def split_all() -> None:
                             for k in workshop_keys:
                                 venues.split_as_workshop(k)
-                            ui.notify(f"{len(workshop_keys)} workshop venue(s) created")
+                            ui.notify(
+                                ngettext(
+                                    "{n} workshop venue created",
+                                    "{n} workshop venues created",
+                                    len(workshop_keys),
+                                ).format(n=len(workshop_keys))
+                            )
                             finish()
 
-                        ui.button("Split each into a workshop", on_click=split_all).props(
+                        ui.button(_("Split each into a workshop"), on_click=split_all).props(
                             "dense flat color=primary"
                         ).mark("venue-split-workshops")
                 for key, example, count, manual, track in row.variants:
                     with ui.row().classes("items-center gap-2 no-wrap w-full"):
                         ui.label(example or key).classes("text-sm")
                         ui.label(
-                            f"“{key}” · {count} record(s)" + (" · set by hand" if manual else "")
+                            f"“{key}” · "
+                            + ngettext("{n} record", "{n} records", count).format(n=count)
+                            + (" · " + _("set by hand") if manual else "")
                         ).classes("text-xs text-grey grow")
                         ui.select(
                             tracks,
                             value=track or "",
                             on_change=lambda e, k=key: (
                                 venues.set_variant_track(k, e.value or None),
-                                ui.notify("Track saved"),
+                                ui.notify(_("Track saved")),
                             ),
                         ).props("dense borderless").classes("w-28").tooltip(
-                            "Track of the papers with this variant"
+                            _("Track of the papers with this variant")
                         )
                         if len(row.variants) > 1:
                             ui.button(
                                 icon="call_split",
                                 on_click=lambda k=key: (venues.split_key(k), finish()),
-                            ).props("flat round dense size=sm").tooltip("Split into its own venue")
+                            ).props("flat round dense size=sm").tooltip(
+                                _("Split into its own venue")
+                            )
                         if row.kind not in WORKSHOP_KINDS:
                             ui.button(
                                 icon="group_work",
@@ -1180,23 +1269,23 @@ def venue_dialog(
                                 "flat round dense size=sm color="
                                 + ("orange-9" if key in workshop_keys else "grey")
                             ).tooltip(
-                                "Split into a workshop venue whose main conference is this one"
+                                _("Split into a workshop venue whose main conference is this one")
                             ).mark(f"venue-split-workshop-{key}")
                 with ui.row().classes("items-center gap-2 w-full no-wrap"):
                     new_raw = (
-                        ui.input("Add a variant (a raw venue text)")
+                        ui.input(_("Add a variant (a raw venue text)"))
                         .props("dense outlined")
                         .classes("grow")
                         .mark("venue-variant-new")
                     )
                     new_src = (
                         ui.select(
-                            {"": "any source", **{k: a.label for k, a in ADAPTERS.items()}},
+                            {"": _("any source"), **{k: a.label for k, a in ADAPTERS.items()}},
                             value="",
                         )
                         .props("dense outlined")
                         .classes("w-40")
-                        .tooltip("The source's normalization rules apply to the text")
+                        .tooltip(_("The source's normalization rules apply to the text"))
                     )
 
                     def add_variant() -> None:
@@ -1214,19 +1303,24 @@ def venue_dialog(
                         venue_rule_dialog(rule_saved, venue_id=row.id, index=index)
 
                 def rule_saved(message: str) -> None:
-                    ui.notify(f"{message} (applied everywhere)", type="positive")
+                    ui.notify(
+                        _("{message} (applied everywhere)").format(message=message), type="positive"
+                    )
                     rules_view.refresh()
 
                 @ui.refreshable
                 def rules_view() -> None:
                     uses = venues.pattern_uses(row.id)
                     with ui.row().classes("items-center gap-2 mt-2"):
-                        ui.label("Venue rules (regex)").classes("font-medium")
-                        ui.button("Add a rule", icon="add", on_click=lambda: edit_rule()).props(
+                        ui.label(_("Venue rules (regex)")).classes("font-medium")
+                        ui.button(_("Add a rule"), icon="add", on_click=lambda: edit_rule()).props(
                             "dense flat size=sm"
                         ).mark("venue-rule-add")
                     ui.label(
-                        "Source venue texts matching a rule belong to this venue (saved at once)."
+                        _(
+                            "Source venue texts matching a rule belong to this venue "
+                            "(saved at once)."
+                        )
                     ).classes("text-xs text-grey")
                     for use in uses:
                         r = use.rule
@@ -1234,7 +1328,9 @@ def venue_dialog(
                             with ui.row().classes("items-center gap-2 no-wrap"):
                                 ui.label(r.pattern).classes("font-mono text-sm")
                                 ui.label(
-                                    ("only " + ", ".join(r.sources)) if r.sources else "all sources"
+                                    _("only {sources}").format(sources=", ".join(r.sources))
+                                    if r.sources
+                                    else _("all sources")
                                 ).classes("text-xs text-grey")
                                 if r.track:
                                     ui.label(f"→ {TRACK_LABEL.get(r.track, r.track)}").classes(
@@ -1248,7 +1344,7 @@ def venue_dialog(
                                     f"venue-rule-edit-{use.index}"
                                 )
                             if not use.examples:
-                                ui.label("captures no venue text").classes(
+                                ui.label(_("captures no venue text")).classes(
                                     "text-xs text-orange-9 pl-4"
                                 )
                             for source, raw, n in use.examples[:5]:
@@ -1256,22 +1352,26 @@ def venue_dialog(
                                     source_tag(source)
                                     ui.label(f"{raw} ({n})").classes("text-xs text-grey")
                             if len(use.examples) > 5:
-                                ui.label(f"… and {len(use.examples) - 5} more").classes(
-                                    "text-xs text-grey pl-4"
-                                )
+                                ui.label(
+                                    _("… and {n} more").format(n=len(use.examples) - 5)
+                                ).classes("text-xs text-grey pl-4")
                             for source, raw, other in use.lost[:5]:
                                 with ui.row().classes("items-center gap-2 no-wrap pl-4"):
                                     source_tag(source)
-                                    ui.label(f"{raw}: matched, but in “{other}”").classes(
-                                        "text-xs text-orange-9"
-                                    ).tooltip("A manual variant or a more specific rule wins")
+                                    ui.label(
+                                        _("{text}: matched, but in “{venue}”").format(
+                                            text=raw, venue=other
+                                        )
+                                    ).classes("text-xs text-orange-9").tooltip(
+                                        _("A manual variant or a more specific rule wins")
+                                    )
 
                 rules_view()
                 texts = venue_match.texts_of([row.id]).get(row.id, [])
                 if texts:
                     counts = row.source_texts
                     with (
-                        ui.expansion(f"Source texts ({len(texts)})")
+                        ui.expansion(_("Source texts ({n})").format(n=len(texts)))
                         .classes("w-full")
                         .mark("venue-texts")
                     ):
@@ -1284,10 +1384,10 @@ def venue_dialog(
                                 ui.label(VIA_LABEL.get(t.via, t.via)).classes("text-xs text-grey")
                                 if t.conflicts:
                                     ui.icon("warning", size="xs", color="orange-8").tooltip(
-                                        "Other venues' rules match this text too"
+                                        _("Other venues' rules match this text too")
                                     )
 
-            with ui.tab_panel("Merge with other venues").classes("q-px-none"):
+            with ui.tab_panel("merge").classes("q-px-none"):
                 _merge_tab(row, all_rows, merged)
 
         def save() -> None:
@@ -1308,11 +1408,11 @@ def venue_dialog(
 
         with ui.row().classes("justify-end w-full"):
             ui.button(
-                "Clear manual decisions",
+                _("Clear manual decisions"),
                 on_click=lambda: (venues.clear_manual(row.id), finish()),
             ).props("flat color=negative")
-            ui.button("Cancel", on_click=dlg.close).props("flat")
-            ui.button("Save", on_click=save).mark("venue-save")
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Save"), on_click=save).mark("venue-save")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()
 
@@ -1330,10 +1430,10 @@ def _confirm_merge(
 
     def label(r: venues.VenueRow) -> str:
         short = f" [{r.short_name}]" if r.short_name else ""
-        return f"{r.name}{short} — {KINDS[r.kind]} ({r.publications} paper(s))"
+        return f"{r.name}{short} — {KINDS[r.kind]} ({_papers(r.publications)})"
 
     with ui.dialog() as dlg, ui.card().classes("min-w-96"):
-        ui.label("Merge venues").classes("text-lg font-medium")
+        ui.label(_("Merge venues")).classes("text-lg font-medium")
         view = ui.column().classes("w-full")
 
         def show() -> None:
@@ -1341,8 +1441,10 @@ def _confirm_merge(
             with view:
                 merge_direction(label(state["target"]), [label(r) for r in state["others"]])
                 ui.label(
-                    f"Their texts, rules, ISSNs and papers move to “{state['target'].name}”; "
-                    "its own decisions win, the others' fill what it lacks."
+                    _(
+                        "Their texts, rules, ISSNs and papers move to “{name}”; "
+                        "its own decisions win, the others' fill what it lacks."
+                    ).format(name=state["target"].name)
                 ).classes("text-xs text-grey")
 
         names = _MergeNames([row, *others], "venue-merge")
@@ -1363,12 +1465,12 @@ def _confirm_merge(
         show()
         with ui.row().classes("w-full justify-end"):
             if swappable and len(others) == 1:
-                ui.button("The other way round", icon="swap_vert", on_click=swap).props(
+                ui.button(_("The other way round"), icon="swap_vert", on_click=swap).props(
                     "flat no-caps"
                 ).mark("venue-merge-swap")
             ui.space()
-            ui.button("Cancel", on_click=dlg.close).props("flat")
-            ui.button("Merge", icon="merge", on_click=ok).mark("venue-merge-confirm")
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Merge"), icon="merge", on_click=ok).mark("venue-merge-confirm")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()
 
@@ -1381,24 +1483,24 @@ class _MergeNames:
         self.target = rows[0]
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
             self.name = (
-                ui.input("Name of the merged venue", value=self.target.name)
+                ui.input(_("Name of the merged venue"), value=self.target.name)
                 .props("dense")
                 .classes("grow")
-                .tooltip("The former names stay variants, so their texts keep matching")
+                .tooltip(_("The former names stay variants, so their texts keep matching"))
                 .mark(f"{mark}-name")
             )
             self.short = (
-                ui.input("Short name", value=self._short(rows), placeholder="e.g. ICLR")
+                ui.input(_("Short name"), value=self._short(rows), placeholder=_("e.g. ICLR"))
                 .props("dense clearable")
                 .classes("w-40")
-                .tooltip("Empty: found automatically (ranking record acronym, venue texts)")
+                .tooltip(_("Empty: found automatically (ranking record acronym, venue texts)"))
                 .mark(f"{mark}-short")
             )
             self.kind = (
                 ui.select(
                     VENUE_KINDS,
                     value=self.target.kind if self.target.kind in VENUE_KINDS else None,
-                    label="Kind",
+                    label=_("Kind"),
                 )
                 .props("dense")
                 .classes("w-52")
@@ -1408,14 +1510,16 @@ class _MergeNames:
             with ui.row().classes("w-full items-center gap-2 bg-orange-1 rounded p-1 no-wrap"):
                 ui.icon("warning", color="orange-8")
                 ui.label(
-                    f"Not the same type ({' / '.join(kinds)}): check the merged venue's kind."
+                    _("Not the same type ({kinds}): check the merged venue's kind.").format(
+                        kinds=" / ".join(kinds)
+                    )
                 ).classes("text-sm").mark(f"{mark}-kinds-differ")
         with ui.row().classes("items-center gap-1"):
-            ui.label("Copy a name:").classes("text-xs text-grey")
+            ui.label(_("Copy a name:")).classes("text-xs text-grey")
             for i, r in enumerate(rows):
                 ui.chip(r.name, on_click=lambda r=r: self.name.set_value(r.name)).props(
                     "dense clickable outline no-caps"
-                ).classes("text-xs").tooltip("Use this name (and edit it)").mark(
+                ).classes("text-xs").tooltip(_("Use this name (and edit it)")).mark(
                     f"{mark}-use-name-{i}"
                 )
         self.rows = rows
@@ -1449,22 +1553,26 @@ class _MergeNames:
 def _merge_tab(row: venues.VenueRow, all_rows: list[venues.VenueRow], merged) -> None:
     """Search other venues (similar ones suggested) and merge them into this one."""
     ui.label(
-        "Merged venues become variants of this one: their texts, rules, ISSNs and papers move "
-        "here; this venue's decisions win, the others' fill what it lacks."
+        _(
+            "Merged venues become variants of this one: their texts, rules, ISSNs and papers "
+            "move here; this venue's decisions win, the others' fill what it lacks."
+        )
     ).classes("text-xs text-grey")
     picked: set[int] = set()
     query = (
-        ui.input("Search venues (name, acronym, source text)")
+        ui.input(_("Search venues (name, acronym, source text)"))
         .props("dense outlined clearable debounce=300")
         .classes("w-full")
         .mark("venue-merge-search")
     )
     results = ui.column().classes("w-full gap-0")
-    merge_btn = ui.button("Merge the selected venues into this one", icon="merge")
+    merge_btn = ui.button(_("Merge the selected venues into this one"), icon="merge")
     merge_btn.mark("venue-merge-selected").props("dense")
 
     def update_btn() -> None:
-        merge_btn.text = f"Merge {len(picked)} venue(s) into this one"
+        merge_btn.text = ngettext(
+            "Merge {n} venue into this one", "Merge {n} venues into this one", len(picked)
+        ).format(n=len(picked))
         merge_btn.set_enabled(bool(picked))
 
     def toggle(vid: int, on: bool) -> None:
@@ -1477,11 +1585,11 @@ def _merge_tab(row: venues.VenueRow, all_rows: list[venues.VenueRow], merged) ->
         with results:
             if not found:
                 ui.label(
-                    "No venue found." if query.value else "No similar venue: search one."
+                    _("No venue found.") if query.value else _("No similar venue: search one.")
                 ).classes("text-xs text-grey")
             elif not query.value:
-                ui.label("Similar venues").classes("text-xs text-grey")
-            for i, (r, _) in enumerate(found):
+                ui.label(_("Similar venues")).classes("text-xs text-grey")
+            for i, (r, _score) in enumerate(found):
                 with ui.row().classes("items-center gap-2 no-wrap w-full"):
                     ui.checkbox(
                         value=r.id in picked, on_change=lambda e, v=r.id: toggle(v, e.value)
@@ -1489,15 +1597,15 @@ def _merge_tab(row: venues.VenueRow, all_rows: list[venues.VenueRow], merged) ->
                     span(_chip_html(r))
                     ui.label(r.name).classes("text-sm grow")
                     ui.label(
-                        f"{r.short_name or ''} · {KIND_SHORT[r.kind]} · {r.publications} paper(s)"
+                        f"{r.short_name or ''} · {KIND_SHORT[r.kind]} · {_papers(r.publications)}"
                     ).classes("text-xs text-grey")
-                    ui.link("open", f"/venues?focus={r.id}", new_tab=True).classes("text-xs")
+                    ui.link(_("open"), f"/venues?focus={r.id}", new_tab=True).classes("text-xs")
 
     def confirm() -> None:
         by_id = {r.id: r for r in all_rows}
         _confirm_merge(row, [by_id[v] for v in sorted(picked) if v in by_id], merged)
 
     merge_btn.on_click(confirm)
-    query.on_value_change(lambda _: show())
+    query.on_value_change(lambda _e: show())
     show()
     update_btn()

@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import app, ui
 
 from .. import annotations, documents, pdfs, reports
-from ..i18n import _
+from ..i18n import N_, Labels, _
 from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
 from .viewer_side import Side, bookmarks_section, categories_section
@@ -23,6 +23,7 @@ _DOC_SCRIPT = """
 <script>
 Object.assign(window.vrDoc, {
   id: %(id)s, needText: %(need)s,
+  texts: %(texts)s,
   async extract() {
     const d = vrPdf.app().pdfDocument, out = [];
     const round = (r) => r.map(v => Math.round(v * 10) / 10);
@@ -59,7 +60,7 @@ Object.assign(window.vrDoc, {
   },
   async sendText() {
     this.needText = false;
-    vrPdf.status('Looking for the papers…');
+    vrPdf.status(this.texts.looking);
     try {
       const res = await fetch('/doc-text/' + this.id, {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -68,18 +69,20 @@ Object.assign(window.vrDoc, {
       if (!res.ok) throw new Error(await res.text());
       vrPdf.status('');
       emitEvent('vr-doc-text');
-    } catch (e) { vrPdf.status('Papers not looked for: ' + e.message); }
+    } catch (e) { vrPdf.status(this.texts.failed.replace('{error}', e.message)); }
   },
 });
 </script>
 """
 
-KINDS = {
-    "title": "its title",
-    "id": "its DOI / HAL id",
-    "cite": "a citation",
-    "manual": "linked by hand",
-}
+KINDS = Labels(
+    {
+        "title": N_("its title"),
+        "id": N_("its DOI / HAL id"),
+        "cite": N_("a citation"),
+        "manual": N_("linked by hand"),
+    }
+)
 
 
 def page_url_of(doc_id: int) -> str:
@@ -114,10 +117,10 @@ def register() -> None:
     @ui.page("/doc/{doc_id}")
     def doc_page(doc_id: int, page: int | None = None) -> None:
         d = documents.info(doc_id)
-        ui.page_title(f"{d.name if d else 'Document'} · SciReport Analyzer")
+        ui.page_title(f"{d.name if d else _('Document')} · SciReport Analyzer")
         ui.query(".nicegui-content").classes("p-0 gap-0")
         if d is None or documents.file_of(doc_id) is None:
-            ui.label("No such document").classes("p-4")
+            ui.label(_("No such document")).classes("p-4")
             return
         if not pdfs.has_viewer():
             _install()
@@ -158,15 +161,25 @@ class DocumentPage:
             int(file.stat().st_mtime) if file else 0,
             self.side,
             ("doc", d.id),
-            _DOC_SCRIPT % {"id": d.id, "need": json.dumps(not d.has_lines)},
+            _DOC_SCRIPT
+            % {
+                "id": d.id,
+                "need": json.dumps(not d.has_lines),
+                "texts": json.dumps(
+                    {
+                        "looking": _("Looking for the papers…"),
+                        "failed": _("Papers not looked for: {error}"),
+                    }
+                ),
+            },
             page=page,
         )
         self.side.attach(box)
-        with self.side.section("categories", "category", "Excerpts, by category"):
+        with self.side.section("categories", "category", _("Excerpts, by category")):
             self.side.categories = categories_section(self.side)
-        with self.side.section("notes", "sticky_note_2", "Notes on the document"):
+        with self.side.section("notes", "sticky_note_2", _("Notes on the document")):
             self.note = note_editor(
-                "Note (on the document)",
+                _("Note (on the document)"),
                 d.note,
                 lambda text: documents.set_note(d.id, text),
                 mark="doc-note",
@@ -176,13 +189,15 @@ class DocumentPage:
                 render=lambda text: reports.render(text, self._note_context()).text,
                 toolbar=self._note_tools,
             )
-        with self.side.section("bookmarks", "bookmarks", "Bookmarks"):
+        with self.side.section("bookmarks", "bookmarks", _("Bookmarks")):
             self.side.bookmarks = bookmarks_section("doc", d.id)
-        with self.side.section("papers", "article", "Papers in this document"):
+        with self.side.section("papers", "article", _("Papers in this document")):
             ui.label(f"{d.person} · {d.period}").classes("text-sm text-grey")
-            ui.label("Papers in this document").classes("font-medium")
+            ui.label(_("Papers in this document")).classes("font-medium")
             self.search = (
-                ui.input(placeholder="Search (title, authors, venue, year)", on_change=self._filter)
+                ui.input(
+                    placeholder=_("Search (title, authors, venue, year)"), on_change=self._filter
+                )
                 .props("dense clearable")
                 .classes("w-full")
                 .mark("doc-papers-search")
@@ -227,8 +242,9 @@ class DocumentPage:
         keys = reports.citation_keys(self.side.stats)
         here = {m.pub_id for m in self.mentions}
         stats.sort(key=lambda s: (s.id not in here, -(s.year or 0), (s.title or "").lower()))
+        untitled = _("(untitled)")
         options = {
-            keys[s.id]: f"{s.title or '(untitled)'} ({s.year or '?'})"
+            keys[s.id]: f"{s.title or untitled} ({s.year or '?'})"
             + (_(" · in the document") if s.id in here else "")
             for s in stats
         }
@@ -256,11 +272,12 @@ class DocumentPage:
         if lines is None:
             with self.papers, ui.row().classes("items-center gap-2"):
                 ui.spinner(size="sm")
-                ui.label("Looking for the papers…").classes("text-sm text-grey")
+                ui.label(_("Looking for the papers…")).classes("text-sm text-grey")
             return
         rows = [s for s in self.side.stats if not s.hidden]
         by_id = {s.id: s for s in rows}
         self.mentions = documents.find_papers(lines, rows, documents.links_of(self.d.id))
+        untitled = _("(untitled)")
         links = [
             {
                 "i": i,
@@ -268,7 +285,7 @@ class DocumentPage:
                 "rects": m.rects,
                 "kind": m.kind,
                 "pdf": bool(by_id[m.pub_id].pdf),
-                "title": by_id[m.pub_id].title or "(untitled)",
+                "title": by_id[m.pub_id].title or untitled,
                 "colour": "#cf222e" if by_id[m.pub_id].pdf else "#0969da",
             }
             for i, m in enumerate(self.mentions)
@@ -280,10 +297,14 @@ class DocumentPage:
     def _listing(self, by_id: dict[int, Any]) -> None:
         if not self.mentions:
             ui.label(
-                "None found. Select a reference (or a title) and ‘find’ in the header to link it."
+                _(
+                    "None found. Select a reference (or a title) and ‘find’ in the header to "
+                    "link it."
+                )
             ).classes("text-sm text-grey")
             return
         self.rows = []
+        untitled = _("(untitled)")
         order: dict[int, list[int]] = {}
         for i, m in enumerate(self.mentions):
             order.setdefault(m.pub_id, []).append(i)
@@ -300,14 +321,14 @@ class DocumentPage:
                     color="red-8" if s.pdf else "primary",
                 ).classes("mt-1")
                 with ui.column().classes("gap-0 grow min-w-0"):
-                    ui.label(f"{s.title or '(untitled)'} ({s.year or '?'})").classes(
+                    ui.label(f"{s.title or untitled} ({s.year or '?'})").classes(
                         "cursor-pointer text-sm text-primary hover:underline"
                     ).on("click", lambda i=idx[0]: self.show(i)).mark(f"doc-show-{pub_id}")
                     with ui.row().classes("gap-2"):
                         self._places([self.mentions[i] for i in idx])
             text = " ".join([s.title or "", *s.authors, s.venue or "", str(s.year or "")])
             self.rows.append((row, text.lower()))
-        self.none = ui.label("No paper matches").classes("text-sm text-grey")
+        self.none = ui.label(_("No paper matches")).classes("text-sm text-grey")
         self._filter()
 
     def _filter(self) -> None:
@@ -331,7 +352,7 @@ class DocumentPage:
             top = max((r[3] for r in m.rects), default=None)
             y = json.dumps(top + 20 if top is not None else None)
             if kind != "cite":
-                text = f"p. {m.page}"
+                text = _("p. {page}").format(page=m.page)
             else:  # "[11]", or "Lyu et al., 2023b"
                 text = m.label if " " in (m.label or "") else f"[{m.label}]"
             if len(ms) > 1:
@@ -339,7 +360,7 @@ class DocumentPage:
             pages = ", ".join(str(p) for p in dict.fromkeys(x.page for x in ms))
             ui.label(text).classes("text-xs text-primary cursor-pointer").on(
                 "click", js_handler=f"() => vrPdf.go({m.page}, {y})"
-            ).tooltip(f"{KINDS[kind].capitalize()}, page {pages}")
+            ).tooltip(_("{kind}, page {pages}").format(kind=KINDS[kind].capitalize(), pages=pages))
 
     def clicked(self, e) -> None:
         args = e.args
@@ -355,14 +376,14 @@ class DocumentPage:
 
         def header() -> None:
             with ui.row().classes("w-full items-center gap-1 text-sm text-grey"):
-                ui.label(f"Page {m.page}, {KINDS[m.kind]}")
+                ui.label(_("Page {page}, {kind}").format(page=m.page, kind=KINDS[m.kind]))
                 ui.space()
                 ui.button(
-                    "Not this paper" if m.kind != "manual" else "Unlink",
+                    _("Not this paper") if m.kind != "manual" else _("Unlink"),
                     icon="link_off",
                     on_click=lambda: self.reject(m),
                 ).props("flat dense size=sm color=grey").tooltip(
-                    "Wrongly found here: forget it"
+                    _("Wrongly found here: forget it")
                 ).mark("doc-reject")
 
         self.side.show_paper(m.pub_id, header)
@@ -374,11 +395,11 @@ class DocumentPage:
 
     def link(self, pub_id: int, page: int, rects: list, text: str) -> None:
         if not rects:
-            ui.notify("The selection's place is unknown", type="warning")
+            ui.notify(_("The selection's place is unknown"), type="warning")
             return
         documents.add_link(self.d.id, pub_id, page, rects, text)
         self.update()
-        ui.notify("Linked")
+        ui.notify(_("Linked"))
 
 
 # ---- The Documents tab of a person ----------------------------------------------------------
@@ -387,8 +408,10 @@ class DocumentPage:
 def documents_view(person_id: int) -> None:
     """The person's documents, by period / folder: open, upload, rename, delete."""
     ui.label(
-        "Documents of the person within a folder or a period (an application, a CV…): read "
-        "and annotated like the papers' PDFs, the papers they mention found and linked."
+        _(
+            "Documents of the person within a folder or a period (an application, a CV…): "
+            "read and annotated like the papers' PDFs, the papers they mention found and linked."
+        )
     ).classes("text-sm text-grey")
 
     @ui.refreshable
@@ -397,7 +420,7 @@ def documents_view(person_id: int) -> None:
         docs = documents.of_person(person_id)
         if not periods:
             ui.label(
-                "Put the person in a folder, or add a period (Periods tab), to add documents."
+                _("Put the person in a folder, or add a period (Periods tab), to add documents.")
             ).classes("text-grey").mark("documents-no-period")
             return
         for p in sorted(periods, key=lambda p: p.folder_id is None):
@@ -406,11 +429,11 @@ def documents_view(person_id: int) -> None:
                     ui.icon("folder" if p.folder else "date_range", color="amber-8")
                     ui.label(p.name).classes("font-medium")
                     if p.folder and p.folder.hidden:
-                        ui.badge("hidden", color="grey")
+                        ui.badge(_("hidden"), color="grey")
                 for d in docs.get(p.id, []):
                     _doc_row(d, listing.refresh)
                 if not docs.get(p.id):
-                    ui.label("No document").classes("text-sm text-grey")
+                    ui.label(_("No document")).classes("text-sm text-grey")
 
                 async def upload(e, pid=p.id) -> None:
                     try:
@@ -421,7 +444,7 @@ def documents_view(person_id: int) -> None:
                     listing.refresh()
 
                 ui.upload(
-                    label="Add PDFs", multiple=True, auto_upload=True, on_upload=upload
+                    label=_("Add PDFs"), multiple=True, auto_upload=True, on_upload=upload
                 ).props('accept=".pdf,application/pdf" flat bordered').classes("w-80").mark(
                     f"documents-upload-{p.id}"
                 )
@@ -441,11 +464,11 @@ def _doc_row(d: documents.DocView, refresh) -> None:
             ui.icon("sticky_note_2", size="xs", color="amber-9").tooltip(d.note)
         ui.label(f"{d.added_at:%Y-%m-%d}").classes("text-xs text-grey")
         with ui.link(target=f"/doc-file/{d.id}?download=1"):
-            ui.button(icon="download").props("flat dense round size=sm").tooltip("Download")
+            ui.button(icon="download").props("flat dense round size=sm").tooltip(_("Download"))
 
         def rename() -> None:
             with ui.dialog() as dlg, ui.card().classes("w-96"):
-                name = ui.input("Name", value=d.name).classes("w-full").mark("document-name")
+                name = ui.input(_("Name"), value=d.name).classes("w-full").mark("document-name")
 
                 def ok() -> None:
                     documents.rename(d.id, name.value)
@@ -454,14 +477,14 @@ def _doc_row(d: documents.DocView, refresh) -> None:
 
                 name.on("keydown.enter", ok)
                 with ui.row().classes("w-full justify-end"):
-                    ui.button("Cancel", on_click=dlg.close).props("flat")
-                    ui.button("Rename", on_click=ok).mark("document-rename-ok")
+                    ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+                    ui.button(_("Rename"), on_click=ok).mark("document-rename-ok")
             dlg.on_value_change(lambda e: None if e.value else dlg.delete())
             dlg.open()
 
         def delete() -> None:
             with ui.dialog() as dlg, ui.card():
-                ui.label(f"Delete “{d.name}”, with its annotations and notes?")
+                ui.label(_("Delete “{name}”, with its annotations and notes?").format(name=d.name))
 
                 def ok() -> None:
                     documents.remove(d.id)
@@ -469,8 +492,8 @@ def _doc_row(d: documents.DocView, refresh) -> None:
                     refresh()
 
                 with ui.row().classes("w-full justify-end"):
-                    ui.button("Cancel", on_click=dlg.close).props("flat")
-                    ui.button("Delete", color="negative", on_click=ok).mark("document-delete-ok")
+                    ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+                    ui.button(_("Delete"), color="negative", on_click=ok).mark("document-delete-ok")
             dlg.on_value_change(lambda e: None if e.value else dlg.delete())
             dlg.open()
 

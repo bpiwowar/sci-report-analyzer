@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 from datetime import date
+from html import escape
 
 from nicegui import background_tasks, ui
 from sqlalchemy import func, select
@@ -12,7 +13,7 @@ from sqlalchemy.orm import selectinload
 from .. import annotations, folders, manual, pubview, source_settings
 from ..db.models import Person, Publication
 from ..db.session import session_scope
-from ..i18n import _
+from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
 from ..sync import discover, is_syncing, start_sync
 from .categories_editor import categories_dialog
@@ -43,13 +44,18 @@ async def _create(name: str, affiliation: str, folder_id: int | None = None) -> 
         pid = person.id
     if folder_id:
         folders.add_person(folder_id, pid)
-    ui.notify(f"Searching sources for {name}…")
+    ui.notify(_("Searching sources for {name}…").format(name=name))
 
     async def run() -> None:
         errors = await discover(pid)
-        msg = "Candidate profiles found — validate them in the Sources tab."
-        if errors:
-            msg += " Some sources failed: " + ", ".join(errors)
+        msg = (
+            _(
+                "Candidate profiles found — validate them in the Sources tab. "
+                "Some sources failed: {sources}"
+            ).format(sources=", ".join(errors))
+            if errors
+            else _("Candidate profiles found — validate them in the Sources tab.")
+        )
         with contextlib.suppress(RuntimeError):  # the page may have been left
             ui.notify(msg, type="warning" if errors else "positive", multi_line=True)
 
@@ -71,7 +77,7 @@ def register() -> None:
             folder = ALL
         annotations.save_ui_state(LAST_FOLDER, folder)
         current = known.get(folder)
-        title = current.name if current else "All people"
+        title = current.name if current else _("All people")
         with frame(title):
             _header(current, known)
             if current is None:
@@ -93,59 +99,61 @@ def _goto(folder_id: int) -> None:
 def _header(current: folders.FolderView | None, known: dict[int, folders.FolderView]) -> None:
     with ui.row().classes("w-full items-center gap-2"):
         ui.icon("folder" if current else "groups", size="md", color="amber-8" if current else "")
-        ui.label(current.name if current else "All people").classes("text-2xl").mark("people-title")
+        ui.label(current.name if current else _("All people")).classes("text-2xl").mark(
+            "people-title"
+        )
         if current and current.date:
             ui.label(current.date.isoformat()).classes("text-grey")
         if current and current.hidden:
-            ui.badge("hidden", color="grey")
+            ui.badge(_("hidden"), color="grey")
         options = {
-            f.id: f.name + (" (hidden)" if f.hidden else "")
+            f.id: _("{name} (hidden)").format(name=f.name) if f.hidden else f.name
             for f in sorted(known.values(), key=lambda f: f.hidden)
         }
         ui.select(
-            {**options, ALL: "All people (cleanup)"},
+            {**options, ALL: _("All people (cleanup)")},
             value=current.id if current else ALL,
-            label="folder",
+            label=_("folder"),
             on_change=lambda e: _goto(e.value),
         ).props("dense outlined options-dense").classes("w-64").mark("folder-select")
         if current:
             refresh = ui.navigate.reload
             ui.button(icon="edit", on_click=lambda: folder_dialog(current)).props(
                 "flat round dense"
-            ).tooltip("Edit the folder")
+            ).tooltip(_("Edit the folder"))
             ui.button(icon="category", on_click=lambda: categories_dialog(current.id)).props(
                 "flat round dense"
-            ).tooltip("Categories (where excerpts of the people's documents are filed)").mark(
+            ).tooltip(_("Categories (where excerpts of the people's documents are filed)")).mark(
                 "folder-categories"
             )
             ui.button(
                 icon="visibility" if current.hidden else "visibility_off",
                 on_click=lambda: (folders.set_hidden(current.id, not current.hidden), refresh()),
-            ).props("flat round dense").tooltip("Show" if current.hidden else "Hide").mark(
+            ).props("flat round dense").tooltip(_("Show") if current.hidden else _("Hide")).mark(
                 f"hide-folder-{current.id}"
             )
             ui.button(
                 icon="delete_sweep",
                 on_click=lambda: purge_dialog(
                     [m.person_id for m in current.members],
-                    f"everyone in “{current.name}”",
+                    _("everyone in “{folder}”").format(folder=current.name),
                     refresh,
                 ),
             ).props("flat round dense color=negative").tooltip(
-                "Purge: remove all papers of the folder's people and re-sync"
+                _("Purge: remove all papers of the folder's people and re-sync")
             ).mark("purge-folder")
         ui.space()
         ui.button(
-            "New folder",
+            _("New folder"),
             icon="create_new_folder",
             on_click=lambda: folder_dialog(None),
         ).props("flat")
         ui.button(
-            "Sync out-of-date",
+            _("Sync out-of-date"),
             icon="sync",
             on_click=lambda: _sync([m.person_id for m in current.members] if current else None),
         ).props("flat")
-        ui.button("Add person", icon="person_add", on_click=lambda: _add_dialog(current)).mark(
+        ui.button(_("Add person"), icon="person_add", on_click=lambda: _add_dialog(current)).mark(
             "add-person"
         )
 
@@ -157,14 +165,22 @@ def _sync(person_ids: list[int] | None) -> None:
             continue
         if any(ln.is_stale or ln.sync_state == "error" for ln in person.links):
             started += start_sync(person.id, only_stale=True)
-    ui.notify(f"Started {started} sync(s)" if started else "Everything is up to date")
+    ui.notify(
+        ngettext("Started {n} sync(s)", "Started {n} sync(s)", started).format(n=started)
+        if started
+        else _("Everything is up to date")
+    )
 
 
 def _add_dialog(current: folders.FolderView | None) -> None:
     with ui.dialog() as dialog, ui.card().classes("w-96"):
-        ui.label("Add a person" + (f" to “{current.name}”" if current else "")).classes("text-lg")
-        name = ui.input("Full name").classes("w-full").props("autofocus")
-        aff = ui.input("Affiliation (optional, helps matching)").classes("w-full")
+        ui.label(
+            _("Add a person to “{folder}”").format(folder=current.name)
+            if current
+            else _("Add a person")
+        ).classes("text-lg")
+        name = ui.input(_("Full name")).classes("w-full").props("autofocus")
+        aff = ui.input(_("Affiliation (optional, helps matching)")).classes("w-full")
 
         async def ok() -> None:
             if not name.value.strip():
@@ -175,8 +191,8 @@ def _add_dialog(current: folders.FolderView | None) -> None:
 
         name.on("keydown.enter", ok)
         with ui.row().classes("justify-end w-full"):
-            ui.button("Cancel", on_click=dialog.close).props("flat")
-            ui.button("Add & search sources", on_click=ok)
+            ui.button(_("Cancel"), on_click=dialog.close).props("flat")
+            ui.button(_("Add & search sources"), on_click=ok)
     dialog.on_value_change(lambda e: None if e.value else dialog.delete())
     dialog.open()
 
@@ -193,7 +209,7 @@ def _folder_view(f: folders.FolderView) -> None:
     if others:
         with ui.row().classes("items-center gap-2"):
             pick = (
-                ui.select(others, multiple=True, with_input=True, label="Add people")
+                ui.select(others, multiple=True, with_input=True, label=_("Add people"))
                 .props("dense outlined use-chips")
                 .classes("w-80")
                 .mark(f"folder-add-{f.id}")
@@ -204,11 +220,11 @@ def _folder_view(f: folders.FolderView) -> None:
                     folders.add_person(f.id, pid)
                 ui.navigate.reload()
 
-            ui.button("Add", icon="person_add", on_click=add).props("dense").mark(
+            ui.button(_("Add"), icon="person_add", on_click=add).props("dense").mark(
                 f"folder-add-btn-{f.id}"
             )
     ui.label(
-        "Each person has their own period in the folder (set it in their Periods tab)."
+        _("Each person has their own period in the folder (set it in their Periods tab).")
     ).classes("text-xs text-grey")
 
 
@@ -219,7 +235,7 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
     if f is None:
         return
     if not f.members:
-        ui.label("No one in this folder yet.").classes("text-grey")
+        ui.label(_("No one in this folder yet.")).classes("text-grey")
         return
     tags = folders.tags_of(f)
     only = tuple(t for t in only if t in tags)
@@ -228,7 +244,7 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
             tags,
             value=list(only),
             multiple=True,
-            label="Only people tagged",
+            label=_("Only people tagged"),
             on_change=lambda e: _folder_cards.refresh(folder_id, tuple(e.value or ())),
         ).props("dense outlined use-chips clearable").classes("w-80").mark(
             f"folder-tag-filter-{folder_id}"
@@ -241,9 +257,13 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
         if m.person_id in years
     }
     if total := sum(problems.values()):
-        ui.label(f"{total} paper(s) with problems in the people's periods").classes(
-            "text-sm text-orange-9"
-        ).tooltip(_PROBLEMS_TIP).mark("folder-problems")
+        ui.label(
+            ngettext(
+                "{n} paper(s) with problems in the people's periods",
+                "{n} paper(s) with problems in the people's periods",
+                total,
+            ).format(n=total)
+        ).classes("text-sm text-orange-9").tooltip(_(_PROBLEMS_TIP)).mark("folder-problems")
     with ui.grid(columns="repeat(auto-fill, minmax(340px, 1fr))").classes("w-full"):
         for m in f.members:
             if m.person_id in people and set(only) <= set(m.tags):
@@ -256,7 +276,7 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
                 )
 
 
-_PROBLEMS_TIP = (
+_PROBLEMS_TIP = N_(
     "Papers needing a look (warning icon in the list), as of the last time the person's "
     "papers were shown"
 )
@@ -265,27 +285,27 @@ _PROBLEMS_TIP = (
 def _period_editor(member: folders.Member) -> None:
     """The member's period in the folder; click to edit it in place."""
     text = (
-        f"period {member.start_year or '…'}–{member.end_year or '…'}"
+        _("period {start}–{end}").format(start=member.start_year or "…", end=member.end_year or "…")
         if member.start_year or member.end_year
-        else "no period set"
+        else _("no period set")
     )
     with (
         ui.label(text)
         .classes("text-sm text-primary cursor-pointer border-b border-dashed")
         .on("click.stop", lambda: None)
-        .tooltip("Click to set the period")
+        .tooltip(_("Click to set the period"))
         .mark(f"period-{member.period_id}"),
         ui.menu() as menu,
         ui.row().classes("items-center gap-2 p-2 no-wrap"),
     ):
         start = (
-            ui.number("from", value=member.start_year, format="%d")
+            ui.number(_("from"), value=member.start_year, format="%d")
             .props("dense outlined")
             .classes("w-24")
             .mark(f"period-start-{member.period_id}")
         )
         end = (
-            ui.number("to", value=member.end_year, format="%d")
+            ui.number(_("to"), value=member.end_year, format="%d")
             .props("dense outlined")
             .classes("w-24")
             .mark(f"period-end-{member.period_id}")
@@ -312,17 +332,19 @@ def _period_editor(member: folders.Member) -> None:
 
 def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
     ui.label(
-        "Every person, with the folders they are in: select people to delete them or to put "
-        "them in a folder. Pick a folder above to work with it."
+        _(
+            "Every person, with the folders they are in: select people to delete them or to put "
+            "them in a folder. Pick a folder above to work with it."
+        )
     ).classes("text-sm text-grey")
     rows = folders.people_rows()
     columns = [
-        {"name": "name", "label": "Name", "field": "name", "align": "left", "sortable": True},
-        {"name": "affiliation", "label": "Affiliation", "field": "affiliation", "align": "left"},
-        {"name": "n_folders", "label": "Folders", "field": "n_folders", "sortable": True},
-        {"name": "folders", "label": "In", "field": "folders", "align": "left"},
-        {"name": "pubs", "label": "Papers", "field": "pubs", "sortable": True},
-        {"name": "sources", "label": "Sources", "field": "sources", "sortable": True},
+        {"name": "name", "label": _("Name"), "field": "name", "align": "left", "sortable": True},
+        {"name": "affiliation", "label": _("Affiliation"), "field": "affiliation", "align": "left"},
+        {"name": "n_folders", "label": _("Folders"), "field": "n_folders", "sortable": True},
+        {"name": "folders", "label": _("In"), "field": "folders", "align": "left"},
+        {"name": "pubs", "label": _("Papers"), "field": "pubs", "sortable": True},
+        {"name": "sources", "label": _("Sources"), "field": "sources", "sortable": True},
     ]
     data = [
         {
@@ -337,16 +359,16 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
         for r in rows
     ]
     with ui.row().classes("items-center gap-2 w-full"):
-        filt = ui.input(placeholder="filter").props("dense outlined clearable").classes("w-64")
-        only_orphans = ui.switch("in no folder only").mark("orphans-only")
+        filt = ui.input(placeholder=_("filter")).props("dense outlined clearable").classes("w-64")
+        only_orphans = ui.switch(_("in no folder only")).mark("orphans-only")
         ui.space()
         target = (
-            ui.select({f.id: f.name for f in known.values()}, label="folder")
+            ui.select({f.id: f.name for f in known.values()}, label=_("folder"))
             .props("dense outlined")
             .classes("w-56")
         )
-        add_btn = ui.button("Add to folder", icon="drive_file_move").props("dense flat")
-        del_btn = ui.button("Delete", icon="delete").props("dense flat color=negative")
+        add_btn = ui.button(_("Add to folder"), icon="drive_file_move").props("dense flat")
+        del_btn = ui.button(_("Delete"), icon="delete").props("dense flat color=negative")
         del_btn.mark("delete-people")
     table = (
         ui.table(columns=columns, rows=data, row_key="id", selection="multiple", pagination=50)
@@ -370,7 +392,7 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
 
     def add() -> None:
         if not target.value or not selected():
-            ui.notify("Select people and a folder", type="warning")
+            ui.notify(_("Select people and a folder"), type="warning")
             return
         for pid in selected():
             folders.add_person(target.value, pid)
@@ -379,22 +401,27 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
     def delete() -> None:
         ids = selected()
         if not ids:
-            ui.notify("Select people first", type="warning")
+            ui.notify(_("Select people first"), type="warning")
             return
         with ui.dialog() as dlg, ui.card():
             ui.label(
-                f"Delete {len(ids)} person(s) and all their data (sources, publications, "
-                "flags, stars, periods)?"
+                ngettext(
+                    "Delete {n} person(s) and all their data (sources, publications, "
+                    "flags, stars, periods)?",
+                    "Delete {n} person(s) and all their data (sources, publications, "
+                    "flags, stars, periods)?",
+                    len(ids),
+                ).format(n=len(ids))
             )
             with ui.row().classes("justify-end w-full"):
-                ui.button("Cancel", on_click=dlg.close).props("flat")
+                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
 
                 def confirm() -> None:
                     folders.delete_people(ids)
                     ui.navigate.reload()
                     dlg.close()
 
-                ui.button("Delete", color="negative", on_click=confirm).mark("confirm-delete")
+                ui.button(_("Delete"), color="negative", on_click=confirm).mark("confirm-delete")
         dlg.on_value_change(lambda e: None if e.value else dlg.delete())
         dlg.open()
 
@@ -432,7 +459,9 @@ def _card(
     ):
         with ui.row().classes("items-center justify-between w-full"):
             ui.label(person.name).classes("text-lg font-medium")
-            ui.label(f"{n_pubs} publications").classes("text-grey text-sm")
+            ui.label(
+                ngettext("{n} publications", "{n} publications", n_pubs).format(n=n_pubs)
+            ).classes("text-grey text-sm")
         if person.affiliation:
             ui.label(person.affiliation).classes("text-sm text-grey -mt-2")
         with ui.row().classes("gap-1 items-center"):
@@ -441,24 +470,42 @@ def _card(
                     ln.source, url=ln.url or ADAPTERS[ln.source].profile_url(ln.external_id)
                 ):
                     ui.tooltip(
-                        f"{ln.display_name or ln.external_id} — {ln.status_label} "
-                        f"(last sync {fmt_dt(ln.last_synced_at)})"
+                        _("{name} — {status} (last sync {when})").format(
+                            name=ln.display_name or ln.external_id,
+                            status=_(ln.status_label),
+                            when=fmt_dt(ln.last_synced_at),
+                        )
                     )
                 colour = STATUS_COLOUR.get(ln.status_label, "grey")
                 ui.icon("circle", size="8px", color=colour).classes("-ml-1 mr-1")
             if not validated:
-                ui.label("no validated source").classes("text-sm text-grey")
+                ui.label(_("no validated source")).classes("text-sm text-grey")
         with ui.row().classes("gap-2"):
             if pending:
-                ui.badge(f"{len(pending)} candidate(s) to review", color="orange")
+                ui.badge(
+                    ngettext(
+                        "{n} candidate(s) to review", "{n} candidate(s) to review", len(pending)
+                    ).format(n=len(pending)),
+                    color="orange",
+                )
             if stale:
-                ui.badge(f"{len(stale)} source(s) not up to date", color="warning")
+                ui.badge(
+                    ngettext(
+                        "{n} source(s) not up to date", "{n} source(s) not up to date", len(stale)
+                    ).format(n=len(stale)),
+                    color="warning",
+                )
             if is_syncing(person.id):
-                ui.badge("syncing…", color="info")
+                ui.badge(_("syncing…"), color="info")
             if problems:
-                ui.badge(f"{problems} problem(s)", color="orange-8").classes("cursor-pointer").on(
+                ui.badge(
+                    ngettext("{n} problem(s)", "{n} problem(s)", problems).format(n=problems),
+                    color="orange-8",
+                ).classes("cursor-pointer").on(
                     "click.stop", lambda: ui.navigate.to(f"{url}?problems=1")
-                ).tooltip(_PROBLEMS_TIP + " — click to list them").mark(f"problems-{person.id}")
+                ).tooltip(_("{tip} — click to list them").format(tip=_(_PROBLEMS_TIP))).mark(
+                    f"problems-{person.id}"
+                )
         if member is not None:
             with ui.row().classes("items-center gap-2 w-full"):
                 _period_editor(member)
@@ -472,7 +519,7 @@ def _card(
 
                 ui.button(icon="close", on_click=remove).props("flat round dense size=sm").on(
                     "click.stop", lambda: None
-                ).tooltip("Remove from the folder").mark(f"remove-{person.id}")
+                ).tooltip(_("Remove from the folder")).mark(f"remove-{person.id}")
             _tags_editor(member, folder_tags or [])
 
 
@@ -490,11 +537,12 @@ def _tags_editor(member: folders.Member, options: list[str]) -> None:
         new_value_mode="add-unique",
         with_input=True,
         on_change=save,
-    ).props('dense borderless use-chips placeholder="+ tag" hide-dropdown-icon').classes(
-        "w-full -mt-2"
-    ).on("click.stop", lambda: None).tooltip("Tags of the person in this folder").mark(
-        f"tags-{member.period_id}"
-    )
+    ).props(
+        f'dense borderless use-chips placeholder="{escape(_("+ tag"), quote=True)}" '
+        "hide-dropdown-icon"
+    ).classes("w-full -mt-2").on("click.stop", lambda: None).tooltip(
+        _("Tags of the person in this folder")
+    ).mark(f"tags-{member.period_id}")
 
 
 # ---- folders -------------------------------------------------------------------------------
@@ -502,16 +550,16 @@ def _tags_editor(member: folders.Member, options: list[str]) -> None:
 
 def folder_dialog(f: folders.FolderView | None) -> None:
     with ui.dialog() as dlg, ui.card().classes("w-96"):
-        ui.label("New folder" if f is None else "Edit folder").classes("text-lg")
-        name = ui.input("Name", value=f.name if f else "").classes("w-full").mark("folder-name")
-        with ui.input("Date", value=f.date.isoformat() if f and f.date else "").classes(
+        ui.label(_("New folder") if f is None else _("Edit folder")).classes("text-lg")
+        name = ui.input(_("Name"), value=f.name if f else "").classes("w-full").mark("folder-name")
+        with ui.input(_("Date"), value=f.date.isoformat() if f and f.date else "").classes(
             "w-full"
         ) as day:
             with ui.menu().props("no-parent-event") as menu, ui.date().bind_value(day):
-                ui.button("Close", on_click=menu.close).props("flat")
+                ui.button(_("Close"), on_click=menu.close).props("flat")
             with day.add_slot("append"):
                 ui.icon("edit_calendar").on("click", menu.open).classes("cursor-pointer")
-        notes = ui.textarea("Notes", value=f.notes if f else "").classes("w-full")
+        notes = ui.textarea(_("Notes"), value=f.notes if f else "").classes("w-full")
         default = source_settings.default_primary()
         primary = (
             ui.select(
@@ -533,7 +581,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
             .tooltip(_("Papers this source doesn't list for a person are not counted"))
             .mark("folder-primary")
         )
-        hidden = ui.checkbox("Hidden", value=f.hidden if f else False)
+        hidden = ui.checkbox(_("Hidden"), value=f.hidden if f else False)
 
         def save() -> None:
             if not name.value.strip():
@@ -541,7 +589,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
             try:
                 d = date.fromisoformat(day.value) if day.value else None
             except ValueError:
-                ui.notify("Invalid date (YYYY-MM-DD)", type="warning")
+                ui.notify(_("Invalid date (YYYY-MM-DD)"), type="warning")
                 return
             fid = folders.save_folder(
                 f.id if f else None,
@@ -561,10 +609,10 @@ def folder_dialog(f: folders.FolderView | None) -> None:
 
         with ui.row().classes("justify-end w-full"):
             if f is not None:
-                ui.button("Delete", on_click=delete).props("flat color=negative").tooltip(
-                    "Deletes the folder and its periods (people are kept)"
+                ui.button(_("Delete"), on_click=delete).props("flat color=negative").tooltip(
+                    _("Deletes the folder and its periods (people are kept)")
                 )
-            ui.button("Cancel", on_click=dlg.close).props("flat")
-            ui.button("Save", on_click=save).mark("folder-save")
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Save"), on_click=save).mark("folder-save")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()

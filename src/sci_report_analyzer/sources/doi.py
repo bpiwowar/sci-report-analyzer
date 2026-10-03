@@ -23,6 +23,7 @@ from sqlalchemy import select
 
 from ..db.models import DoiRecord, utcnow
 from ..db.session import session_scope
+from ..i18n import _
 from .base import (
     FetchedPub,
     FetchResult,
@@ -84,14 +85,16 @@ async def _get(url: str, *, throttle: _Throttle | None = None, **kw: Any) -> htt
                 res = await client().get(url, **kw)
             except httpx.TransportError as e:
                 if attempt == RETRIES:
-                    raise SourceError(f"network error: {e}") from e
+                    raise SourceError(_("network error: {error}").format(error=e)) from e
                 res = None
         if res is not None:
             if res.status_code in (404, 410):
                 return None
             if res.status_code == 429 or res.status_code >= 500:
                 if attempt == RETRIES:
-                    raise SourceError(f"HTTP {res.status_code} from {url}")
+                    raise SourceError(
+                        _("HTTP {status} from {url}").format(status=res.status_code, url=url)
+                    )
                 wait = float(res.headers.get("Retry-After") or delay)
                 (throttle or _throttle).pause(min(wait, 60))
                 logger.info("HTTP %s from %s, retrying in %.1fs", res.status_code, url, wait)
@@ -100,7 +103,7 @@ async def _get(url: str, *, throttle: _Throttle | None = None, **kw: Any) -> htt
                 return res
         await asyncio.sleep(delay)
         delay *= 2
-    raise SourceError(f"giving up on {url}")
+    raise SourceError(_("giving up on {url}").format(url=url))
 
 
 # ---- parsing -------------------------------------------------------------------------------
@@ -474,7 +477,7 @@ class DoiAdapter(SourceAdapter):
         return []
 
     async def fetch(self, external_id: str, owner_names: list[str]) -> FetchResult:
-        raise SourceError("DOI records are fetched from the person's publications")
+        raise SourceError(_("DOI records are fetched from the person's publications"))
 
     def profile_url(self, external_id: str) -> str | None:
         return None

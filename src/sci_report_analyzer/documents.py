@@ -18,6 +18,7 @@ from sqlalchemy import select
 
 from .db.models import Period, PeriodDocument, utcnow
 from .db.session import session_scope
+from .i18n import _
 from .pdfs import PdfError, _slug, is_pdf, pdf_dir
 from .ranking.normalize import normalize
 
@@ -38,12 +39,12 @@ class DocView:
 def add(period_id: int, name: str, data: bytes) -> int:
     """Store ``data`` as a new document of a period; returns its id."""
     if not is_pdf(data):
-        raise PdfError("not a PDF file")
+        raise PdfError(_("not a PDF file"))
     name = Path(name or "document").stem.strip() or "document"
     with session_scope() as s:
         period = s.get(Period, period_id)
         if period is None:
-            raise PdfError("no such period")
+            raise PdfError(_("no such period"))
         doc = PeriodDocument(period_id=period_id, name=name, path="")
         s.add(doc)
         s.flush()
@@ -62,11 +63,11 @@ def _write(path: Path, data: bytes) -> None:
 def save(doc_id: int, data: bytes) -> None:
     """Replace the file of a document by its annotated version (from the viewer)."""
     if not is_pdf(data):
-        raise PdfError("not a PDF file")
+        raise PdfError(_("not a PDF file"))
     with session_scope() as s:
         doc = s.get(PeriodDocument, doc_id)
         if doc is None:
-            raise PdfError("no such document")
+            raise PdfError(_("no such document"))
         _write(pdf_dir() / doc.path, data)
         doc.edited_at = utcnow()
 
@@ -340,7 +341,7 @@ def _cited(heads: list[int], line: int) -> int:
 def _closest(found: set[tuple[int, int]], section: int) -> set[int]:
     """The papers of (paper, list) found, those of the list cited if any is."""
     there = {p for p, s in found if s == section}
-    return there or {p for p, _ in found}
+    return there or {p for p, _x in found}
 
 
 def _labels(
@@ -503,7 +504,7 @@ def _author_year_citations(
     heads: list[int],
 ) -> list[Mention]:
     loose: dict[tuple[str, int], set[tuple[int, int]]] = {}  # (a citation without the suffix)
-    for (name, year, _), pids in keys.items():
+    for (name, year, _x), pids in keys.items():
         loose.setdefault((name, year), set()).update(pids)
     out = []
     for i, ln in enumerate(lines):

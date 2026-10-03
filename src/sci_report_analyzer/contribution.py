@@ -28,6 +28,7 @@ from lark.exceptions import (
 
 from .db.models import AppSetting
 from .db.session import session_scope
+from .i18n import _
 
 if TYPE_CHECKING:
     from .pubview import PubStat
@@ -132,7 +133,7 @@ class _Tree(Transformer):
     def not_(self, items):
         return ("not", *items)
 
-    def phd(self, _):
+    def phd(self, _items):
         return ("phd",)
 
     def var(self, items):
@@ -147,7 +148,7 @@ class _Tree(Transformer):
     def cmp(self, items):
         left, op, right = items
         if ("%" in (left[0], right[0])) and ("var", "p") not in (left, right):
-            raise ConditionError("A percentage is compared with p")
+            raise ConditionError(_("A percentage is compared with p"))
         return ("cmp", str(op), left, right)
 
 
@@ -162,13 +163,17 @@ def parse_condition(text: str) -> Any:
     try:
         return _parser.parse(text)
     except UnexpectedEOF:
-        raise ConditionError("Incomplete condition") from None
+        raise ConditionError(_("Incomplete condition")) from None
     except UnexpectedToken as e:
         if e.token.type == "$END":
-            raise ConditionError("Incomplete condition") from None
-        raise ConditionError(f"Unexpected {str(e.token)!r} at {e.column}") from None
+            raise ConditionError(_("Incomplete condition")) from None
+        raise ConditionError(
+            _("Unexpected {token} at {column}").format(token=repr(str(e.token)), column=e.column)
+        ) from None
     except UnexpectedCharacters as e:
-        raise ConditionError(f"Unexpected {e.char!r} at {e.column}") from None
+        raise ConditionError(
+            _("Unexpected {token} at {column}").format(token=repr(e.char), column=e.column)
+        ) from None
     except VisitError as e:
         if isinstance(e.orig_exc, ConditionError):
             raise e.orig_exc from None
@@ -215,7 +220,7 @@ def _eval(tree, p: int, n: int | None, phd: bool) -> bool | None:
         if kind == "and":
             return False if False in (a, b) else None if None in (a, b) else True
         return True if True in (a, b) else None if None in (a, b) else False
-    _, op, left, right = tree
+    _kind, op, left, right = tree
     a, b = _value(left, right, p, n), _value(right, left, p, n)
     return None if a is None or b is None else _OPS[op](a, b)
 
@@ -261,20 +266,20 @@ def load_config() -> Config:
 def validate(cfg: Config) -> None:
     """ValueError when the configuration cannot be used."""
     if not cfg.roles:
-        raise ValueError("At least one role is needed")
+        raise ValueError(_("At least one role is needed"))
     labels = [r.label.strip() for r in cfg.roles]
     if not all(labels):
-        raise ValueError("A role has no name")
+        raise ValueError(_("A role has no name"))
     if len(set(labels)) < len(labels):
-        raise ValueError("Two roles have the same name")
+        raise ValueError(_("Two roles have the same name"))
     keys = {r.key for r in cfg.roles}
     if cfg.fallback not in keys:
-        raise ValueError("The catch-all role is unknown")
+        raise ValueError(_("The catch-all role is unknown"))
     for i, r in enumerate(cfg.rules, 1):
         if r.role not in keys:
-            raise ValueError(f"Rule {i}: unknown role")
+            raise ValueError(_("Rule {n}: unknown role").format(n=i))
         if error := check_condition(r.condition):
-            raise ValueError(f"Rule {i}: {error}")
+            raise ValueError(_("Rule {n}: {error}").format(n=i, error=error))
 
 
 def save_config(cfg: Config) -> None:

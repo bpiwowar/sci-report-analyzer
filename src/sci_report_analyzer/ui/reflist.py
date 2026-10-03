@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from nicegui import ui
 
 from .. import annotations, manual, reflist
+from ..i18n import _, ngettext
 from ..reflist import Match
 from ..sources.base import SourceError
 
@@ -29,15 +30,19 @@ def tag_from_list(panel: PublicationsPanel) -> None:
 
     with panel.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-5xl"):
         with ui.row().classes("w-full items-center justify-between"):
-            ui.label("Tag from a list").classes("text-lg font-medium")
+            ui.label(_("Tag from a list")).classes("text-lg font-medium")
             ui.button(icon="close", on_click=dlg.close).props("flat round")
         ui.label(
-            "Paste a list of publications (e.g. numbered, copied from a PDF): each item is "
-            "matched with the papers by its HAL id or DOI, else by its title. Check the matches, "
-            "then put a tag on the papers, with their numbers in the list."
+            _(
+                "Paste a list of publications (e.g. numbered, copied from a PDF): each item is "
+                "matched with the papers by its HAL id or DOI, else by its title. Check the "
+                "matches, then put a tag on the papers, with their numbers in the list."
+            )
         ).classes("text-sm text-grey")
         text = (
-            ui.textarea(placeholder="1- Title. Authors. Venue, 2023. Lien : https://hal.science/…")
+            ui.textarea(
+                placeholder=_("1- Title. Authors. Venue, 2023. Lien : https://hal.science/…")
+            )
             .props("outlined")
             .classes("w-full font-mono text-sm")
             .mark("reflist-text")
@@ -48,7 +53,7 @@ def tag_from_list(panel: PublicationsPanel) -> None:
                 ui.select(
                     tags,
                     value=default,
-                    label="Tag to put",
+                    label=_("Tag to put"),
                     new_value_mode="add-unique",
                     with_input=True,
                 )
@@ -57,11 +62,11 @@ def tag_from_list(panel: PublicationsPanel) -> None:
                 .mark("reflist-tag")
             )
             if period is None:
-                ui.label("(choose a period for a tag within a period, e.g. starred)").classes(
+                ui.label(_("(choose a period for a tag within a period, e.g. starred)")).classes(
                     "text-sm text-grey"
                 )
             ui.space()
-            ui.button("Find the papers", icon="search", on_click=lambda: find()).mark(
+            ui.button(_("Find the papers"), icon="search", on_click=lambda: find()).mark(
                 "reflist-find"
             )
 
@@ -71,9 +76,9 @@ def tag_from_list(panel: PublicationsPanel) -> None:
             if not matches:
                 return
             n = sum(1 for i in range(len(matches)) if state["chosen"].get(i, NONE) != NONE)
-            ui.label(f"{n} of {len(matches)} items matched").classes("font-medium mt-2").mark(
-                "reflist-count"
-            )
+            ui.label(_("{n} of {total} items matched").format(n=n, total=len(matches))).classes(
+                "font-medium mt-2"
+            ).mark("reflist-count")
             with ui.column().classes("w-full gap-1"):
                 for i, m in enumerate(matches):
                     _item_row(i, m)
@@ -90,9 +95,9 @@ def tag_from_list(panel: PublicationsPanel) -> None:
                     if m.item.url:
                         ui.link(m.item.url, m.item.url, new_tab=True).classes("text-xs")
                 with ui.column().classes("gap-1 w-1/2 min-w-0"):
-                    options = {NONE: "— none"}
+                    options = {NONE: _("— none")}
                     for c in m.candidates:
-                        how = "by id" if c.by_id else f"{round(100 * c.score)}%"
+                        how = _("by id") if c.by_id else f"{round(100 * c.score)}%"
                         options[c.pub_id] = f"{c.title} ({c.year or '?'}) · {how}"
 
                     def choose(e, i=i) -> None:
@@ -110,16 +115,16 @@ def tag_from_list(panel: PublicationsPanel) -> None:
             with ui.row().classes("items-center gap-2"):
                 if m.item.ref:
                     ui.button(
-                        f"Add {m.item.ref}",
+                        _("Add {ref}").format(ref=m.item.ref),
                         icon="add",
                         on_click=lambda i=i, r=m.item.ref: add(i, r),
                     ).props("dense flat").mark(f"reflist-add-{i}")
                 ui.button(
-                    "Search HAL", icon="travel_explore", on_click=lambda i=i: search(i)
+                    _("Search HAL"), icon="travel_explore", on_click=lambda i=i: search(i)
                 ).props("dense flat").mark(f"reflist-search-{i}")
             found = state["found"].get(i)
             if found is not None and not found:
-                ui.label("Nothing found on HAL").classes("text-xs text-grey")
+                ui.label(_("Nothing found on HAL")).classes("text-xs text-grey")
             for f in found or []:
                 with ui.row().classes("items-center no-wrap gap-1 text-xs"):
                     ui.link(f"{f.title} ({f.year or '?'})", f.url, new_tab=True)
@@ -128,20 +133,20 @@ def tag_from_list(panel: PublicationsPanel) -> None:
                     )
                     ui.button(icon="add", on_click=lambda i=i, r=f.ref: add(i, r)).props(
                         "dense flat round size=sm"
-                    ).tooltip("Add it to the papers").mark(f"reflist-add-found-{i}")
+                    ).tooltip(_("Add it to the papers")).mark(f"reflist-add-found-{i}")
 
         busy = ui.spinner(size="sm")
         busy.visible = False
         review()
         with ui.row().classes("w-full items-center"):
             ui.space()
-            ui.button("Cancel", on_click=dlg.close).props("flat")
-            ui.button("Put the tag", icon="sell", on_click=lambda: apply()).mark("reflist-apply")
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Put the tag"), icon="sell", on_click=lambda: apply()).mark("reflist-apply")
 
     def find() -> None:
         items = reflist.split_items(text.value or "")
         if not items:
-            ui.notify("No item in the text", type="warning")
+            ui.notify(_("No item in the text"), type="warning")
             return
         state["matches"] = reflist.match(items, panel.stats)
         state["chosen"] = {
@@ -171,7 +176,7 @@ def tag_from_list(panel: PublicationsPanel) -> None:
             return
         finally:
             busy.visible = False
-        ui.notify(f"Added: {title}")
+        ui.notify(_("Added: {title}").format(title=title))
         await panel.reload()
         m = state["matches"][i]
         # The added paper: by the reference it was added by, else the item's own match.
@@ -185,7 +190,7 @@ def tag_from_list(panel: PublicationsPanel) -> None:
 
     async def apply() -> None:
         if not state["matches"]:
-            ui.notify("Find the papers first", type="warning")
+            ui.notify(_("Find the papers first"), type="warning")
             return
         value = tag.value
         if isinstance(value, str):  # a new tag: within the period when there is one
@@ -193,7 +198,7 @@ def tag_from_list(panel: PublicationsPanel) -> None:
             panel.tags = annotations.all_tags()
         chosen = next((t for t in panel.tags if t.id == value), None)
         if chosen is None:
-            ui.notify("Choose a tag", type="warning")
+            ui.notify(_("Choose a tag"), type="warning")
             return
         numbers: dict[int, int | None] = {}
         entries = []
@@ -215,8 +220,15 @@ def tag_from_list(panel: PublicationsPanel) -> None:
         rest = [s for s in panel.stats if s.id in numbers and s.id not in shown]
         with panel.dialogs:
             ui.notify(
-                f"“{chosen.name}” put on {len(numbers)} papers"
-                + (f" (not shown: {panel.not_shown(rest)})" if rest else ""),
+                ngettext(
+                    "“{tag}” put on {n} papers (not shown: {hidden})",
+                    "“{tag}” put on {n} papers (not shown: {hidden})",
+                    len(numbers),
+                ).format(tag=chosen.name, n=len(numbers), hidden=panel.not_shown(rest))
+                if rest
+                else ngettext(
+                    "“{tag}” put on {n} papers", "“{tag}” put on {n} papers", len(numbers)
+                ).format(tag=chosen.name, n=len(numbers)),
                 type="warning" if rest else None,
             )
 

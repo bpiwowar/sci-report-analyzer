@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 from nicegui import background_tasks, ui
 
 from .. import annotations, contribution, manual, source_settings
-from ..i18n import _
+from ..i18n import N_, _, ngettext
 from ..pubview import (
     HIST_CAP,
     SUMMARY_DETAILS,
@@ -41,7 +41,7 @@ from .theme import DIM_OPACITY, NOTE_EXTRAS, author_html, chip_text, rank_chip, 
 
 logger = logging.getLogger(__name__)
 
-DISCLAIMER = (
+DISCLAIMER = N_(
     "These rankings rate the venue (journal / conference), not the quality or impact "
     "of any individual paper."
 )
@@ -226,8 +226,10 @@ class PublicationsPanel:
             logger.exception("Could not render the publications panel")
             self.container.clear()
             with self.container:
-                ui.label(f"Could not display publications: {e}").classes("text-negative")
-                ui.button("Retry", on_click=self.reload)
+                ui.label(_("Could not display publications: {error}").format(error=e)).classes(
+                    "text-negative"
+                )
+                ui.button(_("Retry"), on_click=self.reload)
 
     def _load_periods(self, keep: int | None = None) -> None:
         """Periods to choose from (those of hidden folders only when selected)."""
@@ -303,9 +305,17 @@ class PublicationsPanel:
     def not_shown(self, pubs: list[PubStat]) -> str:
         """Why papers are not shown: outside the year range, or hidden by the other filters."""
         out = sum(not self.in_years(s) for s in pubs)
-        parts = [f"{out} outside the years {self.lo or '…'}–{self.hi or '…'}"] if out else []
+        parts = (
+            [
+                _("{n} outside the years {start}–{end}").format(
+                    n=out, start=self.lo or "…", end=self.hi or "…"
+                )
+            ]
+            if out
+            else []
+        )
         if len(pubs) > out:
-            parts.append(f"{len(pubs) - out} hidden by the filters")
+            parts.append(_("{n} hidden by the filters").format(n=len(pubs) - out))
         return ", ".join(parts)
 
     def pick(self, sel: Sel) -> None:
@@ -327,7 +337,7 @@ class PublicationsPanel:
             self.render_names()
             if not self.stats:
                 ui.label(
-                    "No publication yet: validate and sync sources in the Sources tab."
+                    _("No publication yet: validate and sync sources in the Sources tab.")
                 ).classes("text-grey")
                 return
             filtered = self.base_rows()
@@ -349,47 +359,52 @@ class PublicationsPanel:
                 )
                 self._contributions(pos_data, sel)
             self._list(conditioned)
-            ui.label(DISCLAIMER).classes("text-xs text-grey")
+            ui.label(_(DISCLAIMER)).classes("text-xs text-grey")
         self.push_url()
 
     def _toolbar(self, filtered: list[PubStat], conditioned: list[PubStat]) -> None:
         years = [s.year for s in self.stats if s.year is not None]
         with ui.row().classes("w-full items-center gap-3"):
             n = (
-                f"{len(conditioned)} of {len(filtered)} publications"
+                ngettext(
+                    "{n} of {total} publications", "{n} of {total} publications", len(filtered)
+                ).format(n=len(conditioned), total=len(filtered))
                 if self.sel
-                else f"{len(filtered)} publications"
+                else ngettext("{n} publications", "{n} publications", len(filtered)).format(
+                    n=len(filtered)
+                )
             )
             ui.label(n).classes("text-lg font-medium")
             if len(filtered) != len(self.stats):
-                ui.label(f"({len(self.stats)} in total)").classes("text-grey")
+                ui.label(_("({n} in total)").format(n=len(self.stats))).classes("text-grey")
             ui.button(
                 icon="summarize", on_click=lambda rows=conditioned: self._summary(rows)
             ).props("flat round dense").tooltip(
-                "Summary of the publications shown, by category (to copy)"
+                _("Summary of the publications shown, by category (to copy)")
             ).mark("summary")
             if self.period is not None:
                 with ui.link(target=report_url(self.period.id), new_tab=True):
                     ui.button(icon="history_edu").props("flat round dense").tooltip(
-                        f"Report within {self.period.name}: Markdown citing the papers "
-                        "(opens a new tab)"
+                        _(
+                            "Report within {period}: Markdown citing the papers (opens a new tab)"
+                        ).format(period=self.period.name)
                     ).mark("report")
             ui.button(icon="playlist_add_check", on_click=lambda: tag_from_list(self)).props(
                 "flat round dense"
-            ).tooltip("Tag from a list: find the papers of a pasted list and tag them").mark(
+            ).tooltip(_("Tag from a list: find the papers of a pasted list and tag them")).mark(
                 "tag-from-list"
             )
             ui.button(
                 icon="download_for_offline",
                 on_click=lambda rows=conditioned: download_dialog(self, rows),
             ).props("flat round dense").tooltip(
-                "Download the open-access PDFs of the papers shown (to view and annotate them)"
+                _("Download the open-access PDFs of the papers shown (to view and annotate them)")
             ).mark("download-pdfs")
             ui.button(icon="add", on_click=self._add_publication).props("flat round dense").tooltip(
-                "Add a publication by hand (DOI or HAL id)"
+                _("Add a publication by hand (DOI or HAL id)")
             ).mark("add-publication")
 
-            options = {0: "All years", **{p.id: period_label(p) for p in self.periods}}
+            options = {0: _("All years"), **{p.id: period_label(p) for p in self.periods}}
 
             def set_period(e) -> None:
                 self.period_id = e.value or None
@@ -405,7 +420,7 @@ class PublicationsPanel:
 
             ui.select(options, value=self.period_id or 0, on_change=set_period).props(
                 "dense outlined"
-            ).classes("w-48").tooltip("Period of interest")
+            ).classes("w-48").tooltip(_("Period of interest"))
 
             def set_year(which: str, v) -> None:
                 setattr(self, which, int(v) if v not in (None, "") else None)
@@ -414,7 +429,7 @@ class PublicationsPanel:
 
             if years:
                 ui.number(
-                    "from",
+                    _("from"),
                     value=self.lo,
                     min=min(years),
                     max=max(years),
@@ -423,7 +438,7 @@ class PublicationsPanel:
                     on_change=lambda e: set_year("lo", e.value),
                 ).props("dense outlined debounce=600").classes("w-24")
                 ui.number(
-                    "to",
+                    _("to"),
                     value=self.hi,
                     min=min(years),
                     max=max(years),
@@ -448,13 +463,13 @@ class PublicationsPanel:
                     tag_options,
                     value=self.tag_filter,
                     multiple=True,
-                    label="tags",
+                    label=_("tags"),
                     on_change=set_tags,
                 ).props("dense outlined use-chips clearable").classes("min-w-32").tooltip(
-                    "Papers with one of these tags (⏱: within the period)"
+                    _("Papers with one of these tags (⏱: within the period)")
                 ).mark("tag-filter")
             ui.button(icon="sell", on_click=self.manage_tags).props("flat round dense").tooltip(
-                "Manage tags (names, colours)"
+                _("Manage tags (names, colours)")
             ).mark("manage-tags-panel")
             if self.flags:
 
@@ -467,7 +482,7 @@ class PublicationsPanel:
                     {f.id: f.name for f in self.flags},
                     value=self.flag_filter,
                     multiple=True,
-                    label="flags",
+                    label=_("flags"),
                     on_change=set_flags,
                 ).props("dense outlined use-chips clearable").classes("min-w-32")
 
@@ -476,14 +491,14 @@ class PublicationsPanel:
                 self.render()
 
             ui.input(
-                placeholder="search title / venue / author", value=self.text, on_change=set_text
+                placeholder=_("search title / venue / author"), value=self.text, on_change=set_text
             ).props("dense outlined clearable debounce=400").classes("w-64")
 
             def set_hide(e) -> None:
                 self.hide_preprints = e.value
                 self.render()
 
-            ui.switch("hide preprints", value=self.hide_preprints, on_change=set_hide)
+            ui.switch(_("hide preprints"), value=self.hide_preprints, on_change=set_hide)
             # Within the current filters (year range, period, flags, search…).
             n_problems = sum(bool(s.problems) for s in self.base_rows(problems_filter=False))
             if n_problems or self.problems_only:
@@ -494,7 +509,7 @@ class PublicationsPanel:
                     self.render()
 
                 ui.switch(
-                    f"⚠ with problems ({n_problems})",
+                    _("⚠ with problems ({n})").format(n=n_problems),
                     value=self.problems_only,
                     on_change=set_problems,
                 ).mark("problems-only")
@@ -507,12 +522,14 @@ class PublicationsPanel:
                     self.render()
 
                 ui.switch(
-                    f"✎ decided by hand ({n_manual})",
+                    _("✎ decided by hand ({n})").format(n=n_manual),
                     value=self.manual_only,
                     on_change=set_manual,
                 ).mark("manual-only").tooltip(
-                    "Papers whose venue was picked or validated, or whose rank or kind was set "
-                    "by hand"
+                    _(
+                        "Papers whose venue was picked or validated, or whose rank or kind was set "
+                        "by hand"
+                    )
                 )
             if self.venue_filter:
                 name = next(
@@ -531,7 +548,9 @@ class PublicationsPanel:
                     self.render()
 
                 ui.chip(
-                    f"venue: {name}", removable=True, on_value_change=lambda e: clear_venue()
+                    _("venue: {name}").format(name=name),
+                    removable=True,
+                    on_value_change=lambda e: clear_venue(),
                 ).props("dense color=primary text-color=white").mark("venue-filter")
             n_hidden = sum(s.hidden for s in self.stats)
             if n_hidden:
@@ -542,7 +561,9 @@ class PublicationsPanel:
                     self.render()
 
                 ui.switch(
-                    f"show hidden ({n_hidden})", value=self.show_hidden, on_change=set_show_hidden
+                    _("show hidden ({n})").format(n=n_hidden),
+                    value=self.show_hidden,
+                    on_change=set_show_hidden,
                 )
             n_outside = sum(
                 self.outside(s) for s in self.stats if not s.hidden and self.in_years(s)
@@ -591,16 +612,24 @@ class PublicationsPanel:
                     confirmed[st.authors[i]] += 1
         if not pending and len(confirmed) <= 1:
             return
-        title = "Name variants" + (f" · {len(pending)} to review" if pending else "")
+        title = (
+            _("Name variants · {n} to review").format(n=len(pending))
+            if pending
+            else _("Name variants")
+        )
         with ui.expansion(title, icon="badge", value=bool(pending)).classes("w-full"):
             if confirmed:
                 ui.label(
-                    "Confirmed: " + ", ".join(f"{n} ({c})" for n, c in confirmed.most_common())
+                    _("Confirmed: {names}").format(
+                        names=", ".join(f"{n} ({c})" for n, c in confirmed.most_common())
+                    )
                 ).classes("text-sm")
             for name, count in pending.most_common():
                 with ui.row().classes("items-center gap-2"):
                     span(author_html(name, "owner?", None))
-                    ui.label(f"{count} paper(s)").classes("text-xs text-grey")
+                    ui.label(
+                        ngettext("{n} paper(s)", "{n} paper(s)", count).format(n=count)
+                    ).classes("text-xs text-grey")
 
                     def accept(n=name) -> None:
                         annotations.add_alias(self.person_id, n)
@@ -610,23 +639,25 @@ class PublicationsPanel:
                         annotations.reject_alias(self.person_id, n)
                         background_tasks.create(self.reload())
 
-                    ui.button("it's them", icon="check", on_click=accept).props("dense flat")
-                    ui.button("not them", icon="close", on_click=reject).props(
+                    ui.button(_("it's them"), icon="check", on_click=accept).props("dense flat")
+                    ui.button(_("not them"), icon="close", on_click=reject).props(
                         "dense flat color=negative"
                     )
 
     def _add_publication(self) -> None:
         """A paper the sources miss, by its DOI or its HAL id (or their URLs)."""
         with self.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-            ui.label("Add a publication").classes("text-lg font-medium")
+            ui.label(_("Add a publication")).classes("text-lg font-medium")
             ui.label(
-                "Its record is fetched and merged with the other sources' (listed in the "
-                "Sources tab, where it can be removed)."
+                _(
+                    "Its record is fetched and merged with the other sources' (listed in the "
+                    "Sources tab, where it can be removed)."
+                )
             ).classes("text-sm text-grey")
             ref = (
                 ui.input(
-                    "DOI or HAL id, or a URL",
-                    placeholder="10.1145/…, hal-01234567, or a doi.org, publisher or HAL URL",
+                    _("DOI or HAL id, or a URL"),
+                    placeholder=_("10.1145/…, hal-01234567, or a doi.org, publisher or HAL URL"),
                 )
                 .classes("w-full")
                 .props("autofocus clearable")
@@ -646,14 +677,14 @@ class PublicationsPanel:
                     return
                 finally:
                     busy.visible = False
-                ui.notify(f"Added: {title}")
+                ui.notify(_("Added: {title}").format(title=title))
                 dlg.close()
                 await self.reload()
 
             ref.on("keydown.enter", add)
             with ui.row().classes("w-full justify-end items-center"):
-                ui.button("Cancel", on_click=dlg.close).props("flat")
-                ui.button("Add", icon="add", on_click=add).mark("add-publication-ok")
+                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+                ui.button(_("Add"), icon="add", on_click=add).mark("add-publication-ok")
         dlg.on_value_change(lambda e: None if e.value else dlg.delete())
         dlg.open()
 
@@ -671,13 +702,14 @@ class PublicationsPanel:
         levels.update(saved.get("details") or {})
         for c in cats:
             levels.setdefault(c.key, default)
+        other = _("Other")
         with self.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
-            ui.label("Summary").classes("text-lg font-medium")
+            ui.label(_("Summary")).classes("text-lg font-medium")
             with ui.row().classes("w-full items-center gap-1"):
-                ui.label("Kinds:").classes("text-sm text-grey w-24")
+                ui.label(_("Kinds:")).classes("text-sm text-grey w-24")
                 kind_boxes = {
                     k: ui.checkbox(
-                        f"{KIND_SHORT.get(k, 'Other') if k else 'Other'} "
+                        f"{(KIND_SHORT.get(k) if k else None) or other} "
                         f"({sum(_kind(r) == k for r in rows)})",
                         value=(k or "none") not in off_kinds,
                         on_change=lambda: fill(),
@@ -686,9 +718,11 @@ class PublicationsPanel:
                     .mark(f"summary-kind-{k or 'none'}")
                     for k in kinds
                 }
-            ui.label("Details").classes("text-sm text-grey").tooltip(
-                "Off: only counted in its kind · Count: the number of papers · List: their "
-                "venues · List + years: with the years"
+            ui.label(_("Details")).classes("text-sm text-grey").tooltip(
+                _(
+                    "Off: only counted in its kind · Count: the number of papers · List: their "
+                    "venues · List + years: with the years"
+                )
             )
 
             @ui.refreshable
@@ -774,15 +808,15 @@ class PublicationsPanel:
 
             with ui.row().classes("w-full items-center"):
                 by_kind = ui.switch(
-                    "By kind of venue", value=saved.get("by_kind", True), on_change=fill
+                    _("By kind of venue"), value=saved.get("by_kind", True), on_change=fill
                 ).mark("summary-by-kind")
                 short = ui.switch(
-                    "Short names", value=saved.get("short", False), on_change=fill
+                    _("Short names"), value=saved.get("short", False), on_change=fill
                 ).mark("summary-short")
                 markdown = ui.switch(
-                    "Markdown list", value=saved.get("markdown", False), on_change=fill
+                    _("Markdown list"), value=saved.get("markdown", False), on_change=fill
                 ).mark("summary-markdown")
-                short.tooltip("Use the venues' short names (acronyms) when they have one")
+                short.tooltip(_("Use the venues' short names (acronyms) when they have one"))
                 lang = (
                     ui.select(SUMMARY_LANGUAGES, value=saved.get("lang", "en"), on_change=fill)
                     .props("dense outlined")
@@ -791,14 +825,14 @@ class PublicationsPanel:
                 )
                 ui.space()
                 ui.button(
-                    "Copy",
+                    _("Copy"),
                     icon="content_copy",
                     on_click=lambda: (
                         ui.clipboard.write(text.value),
-                        ui.notify("Copied"),
+                        ui.notify(_("Copied")),
                     ),
                 ).props("flat dense")
-                ui.button("Close", on_click=dlg.close).props("flat dense")
+                ui.button(_("Close"), on_click=dlg.close).props("flat dense")
             fill()
         dlg.on_value_change(lambda e: None if e.value else dlg.delete())
         dlg.open()
@@ -834,7 +868,7 @@ class PublicationsPanel:
         with ui.row().classes("w-full gap-3"):
             items = [(c.key, c.label, c.colour, c.striped, counts[c.key]) for c in present]
             if predatory:
-                items.append(("predatory", "⚠ predatory", PREDATORY_COLOUR, False, predatory))
+                items.append(("predatory", _("⚠ predatory"), PREDATORY_COLOUR, False, predatory))
             for key, label, colour, track, n in items:
                 dim = owns and sel.key != key
                 dim_cls = "vr-dim" if dim else ""
@@ -886,7 +920,9 @@ class PublicationsPanel:
         chart = ui.echart(
             {
                 "title": {
-                    "text": f"Publications by year · {min(years)}–{max(years)} ({len(years)})",
+                    "text": _("Publications by year · {start}–{end} ({n})").format(
+                        start=min(years), end=max(years), n=len(years)
+                    ),
                     "textStyle": {"fontSize": 13},
                 },
                 "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
@@ -935,8 +971,9 @@ class PublicationsPanel:
             self.pick(
                 Sel(
                     facet,
-                    f"{'co-authors' if facet == 'coauthors' else 'position'} "
-                    f"{labels[e.data_index]}",
+                    (_("co-authors {n}") if facet == "coauthors" else _("position {n}")).format(
+                        n=labels[e.data_index]
+                    ),
                     value=k,
                 )
             )
@@ -954,7 +991,9 @@ class PublicationsPanel:
                 counts[min(n, HIST_CAP)] = counts.get(min(n, HIST_CAP), 0) + 1
             avg = sum(with_authors) / len(with_authors)
             self._hist(
-                f"Co-authors per paper · avg {avg:.1f} ({len(with_authors)})",
+                _("Co-authors per paper · avg {avg} ({n})").format(
+                    avg=f"{avg:.1f}", n=len(with_authors)
+                ),
                 counts,
                 "#6639ba",
                 "coauthors",
@@ -971,7 +1010,7 @@ class PublicationsPanel:
             owns = sel is not None and sel.facet == "contribution"
             years = [s.year for s in known if s.year is not None]
             bins = year_bin_defs(years) if len(set(years)) > 1 else []
-            columns = [("All", None, None), *bins]
+            columns = [(_("All"), None, None), *bins]
             totals = [
                 sum(lo is None or (s.year is not None and lo <= s.year <= hi) for s in known)
                 for _label, lo, hi in columns
@@ -1016,8 +1055,9 @@ class PublicationsPanel:
             chart = ui.echart(
                 {
                     "title": {
-                        "text": f"Contribution role ({len(known)}) · first {share['first']}%"
-                        f" · last {share['last']}%",
+                        "text": _("Contribution role ({n}) · first {first}% · last {last}%").format(
+                            n=len(known), first=share["first"], last=share["last"]
+                        ),
                         "textStyle": {"fontSize": 13},
                     },
                     "tooltip": {
@@ -1038,28 +1078,32 @@ class PublicationsPanel:
             def click(e) -> None:
                 key = next(r.key for r in cfg.roles if r.label == e.series_name)
                 col, lo, hi = columns[e.data_index]
-                label = f"{e.series_name.lower()} author" + (f" ({col})" if lo else "")
+                label = _("{role} author").format(role=e.series_name.lower()) + (
+                    f" ({col})" if lo else ""
+                )
                 self.pick(Sel("contribution", label, lo=lo or 0, hi=hi or 0, key=key))
 
             chart.on_point_click(click)
             with ui.row().classes("items-center gap-1 -mt-1"):
                 with ui.icon("help_outline", size="xs").classes("text-grey"), ui.tooltip():
-                    ui.label("The first rule that matches:")
+                    ui.label(_("The first rule that matches:"))
                     for r in cfg.rules:
                         ui.label(f"{cfg.label(r.role)}: {r.condition}")
-                    ui.label(f"{cfg.label(cfg.fallback)}: otherwise")
-                ui.link("rules", "/settings?tab=contribution").classes("text-xs text-grey")
+                    ui.label(_("{role}: otherwise").format(role=cfg.label(cfg.fallback)))
+                ui.link(_("rules"), "/settings?tab=contribution").classes("text-xs text-grey")
             with_phd = sum("student" in s.author_marks for s in rows)
             with ui.row().classes("gap-2 -mt-2"):
                 if with_phd or any(s.author_notes for s in rows):
-                    label = f"with PhD student {round(100 * with_phd / max(len(rows), 1))}%"
+                    label = _("with PhD student {pct}%").format(
+                        pct=round(100 * with_phd / max(len(rows), 1))
+                    )
                     ui.chip(
                         f"{label} ({with_phd})",
                         selectable=True,
                         selected=sel is not None and sel.facet == "phd",
-                        on_click=lambda: self.pick(Sel("phd", "with a PhD student")),
+                        on_click=lambda: self.pick(Sel("phd", _("with a PhD student"))),
                     ).props("dense").tooltip(
-                        "papers co-authored with a (confirmed) PhD student from theses.fr"
+                        _("papers co-authored with a (confirmed) PhD student from theses.fr")
                     )
                 for c in self.categories:
                     n = sum(f"cat:{c.id}" in s.author_marks for s in rows)
@@ -1067,11 +1111,17 @@ class PublicationsPanel:
                         continue
                     active = sel is not None and sel.facet == "authorcat" and sel.key == str(c.id)
                     ui.chip(
-                        f"with {c.name} {round(100 * n / max(len(rows), 1))}% ({n})",
+                        _("with {category} {pct}% ({n})").format(
+                            category=c.name, pct=round(100 * n / max(len(rows), 1)), n=n
+                        ),
                         selectable=True,
                         selected=active,
                         on_click=lambda c=c: self.pick(
-                            Sel("authorcat", f"with {c.name}", key=str(c.id))
+                            Sel(
+                                "authorcat",
+                                _("with {category}").format(category=c.name),
+                                key=str(c.id),
+                            )
                         ),
                     ).props("dense").style(f"--q-primary:{c.colour}").mark(f"authorcat-{c.id}")
 
@@ -1095,17 +1145,17 @@ class PublicationsPanel:
             shown = {s.id for s in rows}
             rest = [s for s in self.stats if s.id not in shown and tid in s.tags_in(self.period_id)]
             with ui.column().classes("w-full gap-0"):
-                ui.label("In the order of the list").classes("text-sm text-grey mt-4")
+                ui.label(_("In the order of the list")).classes("text-sm text-grey mt-4")
                 for s in sorted(rows, key=order):
                     self._row(s, period)
                 if rest:
                     with ui.row().classes("items-center gap-2 mt-2"):
                         ui.icon("visibility_off", color="orange-8")
-                        ui.label(f"Not shown: {self.not_shown(rest)}").classes(
+                        ui.label(_("Not shown: {why}").format(why=self.not_shown(rest))).classes(
                             "text-sm text-orange-9"
                         ).mark("list-not-shown")
                         if any(not self.in_years(s) for s in rest):
-                            ui.button("Show all years", on_click=self._all_years).props(
+                            ui.button(_("Show all years"), on_click=self._all_years).props(
                                 "flat dense"
                             ).mark("list-all-years")
             return
@@ -1115,7 +1165,7 @@ class PublicationsPanel:
                 with ui.row().classes(
                     "w-full items-center bg-grey-2 dark:bg-grey-9 px-3 py-2 mt-6 mb-2 rounded"
                 ):
-                    ui.label(str(year or "Unknown year")).classes("font-bold")
+                    ui.label(str(year or _("Unknown year"))).classes("font-bold")
                     ui.label(f"{len(group)}").classes("text-grey text-sm")
                 for s in group:
                     self._row(s, period)
@@ -1143,7 +1193,7 @@ class PublicationsPanel:
                 rank_chip(s.badge, s.track, s.kind)
                 if s.overridden:
                     ui.icon("push_pin", size="xs", color="primary").tooltip(
-                        "venue or rank set by hand"
+                        _("venue or rank set by hand")
                     )
                 if problems := s.problems:
                     with ui.icon("warning", size="xs", color="orange-8").mark(f"problems-{s.id}"):
@@ -1163,16 +1213,16 @@ class PublicationsPanel:
             with ui.column().classes("gap-0 grow min-w-0"):
                 # 1. title (the title opens the details: row click)
                 with ui.row().classes("items-center gap-1 no-wrap"):
-                    title = escape(s.title or "(untitled)")
+                    title = escape(s.title or _("(untitled)"))
                     year = f' <span class="text-grey">({s.year})</span>' if s.year else ""
                     span(f'<span class="font-medium">{title}</span>{year}')
                     pdf_button(self, s)
                     if s.missing:
-                        ui.badge("missing from sources", color="grey")
+                        ui.badge(_("missing from sources"), color="grey")
                     if s.archival_only:
-                        ui.badge("preprint", color="grey-6")
+                        ui.badge(_("preprint"), color="grey-6")
                     if s.hidden:
-                        ui.badge("hidden", color="grey-8")
+                        ui.badge(_("hidden"), color="grey-8")
                     if s.has_notes(period.id if period else None):
                         notes = [s.note] if s.note else []
                         if period and (pn := s.period_notes.get(period.id)):
@@ -1212,7 +1262,7 @@ class PublicationsPanel:
                             f"publisher-{s.id}"
                         ):
                             ui.icon("launch", size="xs", color="primary").tooltip(
-                                f"Publisher's page: {s.publisher_url}"
+                                _("Publisher's page: {url}").format(url=s.publisher_url)
                             )
                     shown: set[str] = set()
                     for m in s.members:
@@ -1222,7 +1272,9 @@ class PublicationsPanel:
                             shown.add(m.pdf_url)
                             with ui.link(target=m.pdf_url, new_tab=True).mark(f"pdf-{m.id}"):
                                 ui.icon("picture_as_pdf", size="xs", color="red-7").tooltip(
-                                    f"PDF from {m.source}: {m.pdf_url}"
+                                    _("PDF from {source}: {url}").format(
+                                        source=m.source, url=m.pdf_url
+                                    )
                                 )
                     for _fid, name, colour in s.flags:
                         span(
@@ -1274,7 +1326,11 @@ class PublicationsPanel:
             if b is not None and b.name and b.source in ("core", "scimago", "jcr", "openalex")
             else None
         )
-        tip = "open the venue" + (f" — ranked as: {record}" if record else "")
+        tip = (
+            _("open the venue — ranked as: {record}").format(record=record)
+            if record
+            else _("open the venue")
+        )
         mapped = (
             f'<span title="{escape(tip, quote=True)}">{short}'
             f'<span class="vr-matched">{escape(venue)}</span></span>'

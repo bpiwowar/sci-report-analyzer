@@ -12,6 +12,8 @@ from __future__ import annotations
 import gettext
 import io
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 LOCALES = Path(__file__).parent / "locales"
@@ -49,6 +51,17 @@ def set_language(lang: str | None) -> None:
     global _translation, _lang
     _lang = lang if lang in LANGUAGES else "en"
     _translation = catalog(_lang)
+
+
+@contextmanager
+def using(lang: str) -> Iterator[None]:
+    """Translate into ``lang`` within the block (e.g. a text in a language of its own)."""
+    saved = _lang
+    set_language(lang)
+    try:
+        yield
+    finally:
+        set_language(saved)
 
 
 def language() -> str:

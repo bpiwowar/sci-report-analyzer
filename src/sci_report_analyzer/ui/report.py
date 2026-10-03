@@ -10,6 +10,7 @@ from nicegui import ui
 from .. import annotations, categories, folders, reports, source_settings
 from ..db.models import Period
 from ..db.session import session_scope
+from ..i18n import N_, _, ngettext
 from . import pdf_viewer
 from .mdedit import NOTE_EXTRAS, MarkdownEditor
 
@@ -72,7 +73,7 @@ _OPTION = r"""
 """
 _SELECTED = r"""<span class="ellipsis">{{ props.opt.label.split('\t')[0] }}</span>"""
 
-HELP = (
+HELP = N_(
     "Cite the papers with Pandoc's syntax: `[@key]` its number, `[@a; @b]` several, "
     "`@key` its title, venue, year and category, `[@key]{.notes}` with its notes, "
     "`[@key]{.tags}` with its tags (`{.notes .tags}`: both), `[@key]{**#.index** (.year)}` "
@@ -99,10 +100,10 @@ def register() -> None:
         found = _period(period_id)
         ui.query(".nicegui-content").classes("p-0 gap-0")
         if found is None:
-            ui.label("No such period").classes("p-4")
+            ui.label(_("No such period")).classes("p-4")
             return
-        _, person, name, _ = found
-        ui.page_title(f"Report · {person} · {name}")
+        _pid, person, name, _years = found
+        ui.page_title(_("Report · {person} · {period}").format(person=person, period=name))
         box = ui.column().classes("w-full h-screen gap-0 no-wrap")
         with box:
             ui.spinner().classes("m-4")
@@ -115,9 +116,9 @@ async def _build(box: ui.column, period_id: int, found) -> None:
     person_id, person, name, years = found
     span = {
         (False, False): f"{years[0]}–{years[1]}",
-        (False, True): f"since {years[0]}",
-        (True, False): f"until {years[1]}",
-        (True, True): "any year",
+        (False, True): _("since {year}").format(year=years[0]),
+        (True, False): _("until {year}").format(year=years[1]),
+        (True, True): _("any year"),
     }[(years[0] is None, years[1] is None)]
     stats = await load_stats(person_id)
     primary = source_settings.primary_for(person_id, period_id)
@@ -147,7 +148,7 @@ async def _build(box: ui.column, period_id: int, found) -> None:
 
     def changed(_text: str = "") -> None:
         state["dirty"] = True
-        status.text = "Editing…"
+        status.text = _("Editing…")
         cited = rendered().cited
         if dict(cited) != state["cited"]:
             sidebar.refresh()
@@ -181,19 +182,19 @@ async def _build(box: ui.column, period_id: int, found) -> None:
         if state["dirty"]:
             reports.save(period_id, text=editor.value)
             state["dirty"] = False
-            status.text = "Saved"
+            status.text = _("Saved")
 
     def final_text() -> str:
         ctx = context()
         out = reports.render(editor.value, ctx).text.rstrip()
         if with_list.value:
-            out += "\n\n## Papers\n\n" + reports.bibliography(ctx)
+            out += "\n\n## " + _("Papers") + "\n\n" + reports.bibliography(ctx)
         return out + "\n"
 
     def copy() -> None:
         save()
         ui.clipboard.write(final_text())
-        ui.notify("Copied (citations substituted)")
+        ui.notify(_("Copied (citations substituted)"))
 
     folder = folders.folder_of_period(period_id)
 
@@ -204,12 +205,12 @@ async def _build(box: ui.column, period_id: int, found) -> None:
         def insert() -> None:
             text = categories.markdown(folder[0], period_id, level=3)
             if not text:
-                ui.notify("No excerpt filed yet (select a passage in a PDF)", type="warning")
+                ui.notify(_("No excerpt filed yet (select a passage in a PDF)"), type="warning")
                 return
             editor.insert(text)
 
         ui.button(icon="format_quote", on_click=insert).props("flat dense round size=sm").tooltip(
-            f"Insert the excerpts, by category of {folder[1]} (Markdown)"
+            _("Insert the excerpts, by category of {folder} (Markdown)").format(folder=folder[1])
         ).mark("report-excerpts")
 
     box.clear()
@@ -218,24 +219,26 @@ async def _build(box: ui.column, period_id: int, found) -> None:
             ui.link("SciReport Analyzer", f"/person/{person_id}").classes(
                 "text-white font-bold no-underline"
             )
-            ui.label(f"Report · {person} · {name}").classes("ellipsis grow min-w-0 font-medium")
+            ui.label(_("Report · {person} · {period}").format(person=person, period=name)).classes(
+                "ellipsis grow min-w-0 font-medium"
+            )
             status = ui.label("").classes("text-sm opacity-80").mark("report-status")
             with_list = (
-                ui.checkbox("with the list of papers", value=False)
+                ui.checkbox(_("with the list of papers"), value=False)
                 .props("dense dark")
-                .tooltip("Copy the papers' list (numbered) after the report")
+                .tooltip(_("Copy the papers' list (numbered) after the report"))
                 .mark("report-with-list")
             )
-            ui.button("Copy", icon="content_copy", on_click=copy).props(
+            ui.button(_("Copy"), icon="content_copy", on_click=copy).props(
                 "flat dense color=white"
-            ).tooltip("Copy the report, its citations substituted").mark("report-copy")
+            ).tooltip(_("Copy the report, its citations substituted")).mark("report-copy")
             ui.button(
                 icon="download",
                 on_click=lambda: (
                     save(),
                     ui.download.content(final_text(), f"report-{person}-{name}.md"),
                 ),
-            ).props("flat dense round color=white").tooltip("Download (.md)")
+            ).props("flat dense round color=white").tooltip(_("Download (.md)"))
         with ui.row().classes("w-full grow min-h-0 no-wrap gap-0"):
             with ui.column().classes("grow min-w-0 h-full p-3 gap-2 no-wrap"):
                 with ui.row().classes("w-full items-center gap-3"):
@@ -244,30 +247,30 @@ async def _build(box: ui.column, period_id: int, found) -> None:
                             names,
                             value=[t for t in saved.tag_ids if t in names],
                             multiple=True,
-                            label="Papers to discuss: with one of the tags",
+                            label=_("Papers to discuss: with one of the tags"),
                             on_change=settings_changed,
                         )
                         .props("dense outlined use-chips clearable")
                         .classes("min-w-64")
-                        .tooltip("Without: every paper of the period's years")
+                        .tooltip(_("Without: every paper of the period's years"))
                         .mark("report-tags")
                     )
                     fmt = (
                         ui.input(
-                            "Paper number",
+                            _("Paper number"),
                             value=saved.number_format,
                             on_change=settings_changed,
                         )
                         .props("dense outlined")
                         .classes("w-36")
-                        .tooltip("How a paper's number is written ({n}: the number)")
+                        .tooltip(_("How a paper's number is written ({n}: the number)"))
                         .mark("report-number-format")
                     )
                     cite_as = (
                         ui.select(
                             {t.attrs: f"{t.label}\t{example(t.attrs)}" for t in templates.items},
                             value=templates.default,
-                            label="Cite as",
+                            label=_("Cite as"),
                             on_change=lambda e: default_changed(e.value),
                         )
                         .props(
@@ -275,15 +278,17 @@ async def _build(box: ui.column, period_id: int, found) -> None:
                         )
                         .classes("w-44")
                         .tooltip(
-                            "How a paper is cited when clicked in the side (or Enter); "
-                            "the templates are set in Settings → Report templates"
+                            _(
+                                "How a paper is cited when clicked in the side (or Enter); "
+                                "the templates are set in Settings → Report templates"
+                            )
                         )
                         .mark("report-cite-form")
                     )
                     # (label TAB example: in two columns, the examples aligned)
                     cite_as.add_slot("option", _OPTION)
                     cite_as.add_slot("selected-item", _SELECTED)
-                    ui.markdown(HELP).classes("text-xs text-grey grow min-w-0")
+                    ui.markdown(_(HELP)).classes("text-xs text-grey grow min-w-0")
                 editor = MarkdownEditor(
                     saved.text,
                     on_change=changed,
@@ -301,7 +306,7 @@ async def _build(box: ui.column, period_id: int, found) -> None:
             ):
                 search = (
                     ui.input(
-                        placeholder="Find a paper (⌘/Ctrl-K), Enter: cite it",
+                        placeholder=_("Find a paper (⌘/Ctrl-K), Enter: cite it"),
                         on_change=lambda: sidebar.refresh(),
                     )
                     .props("dense outlined clearable autofocus")
@@ -318,38 +323,53 @@ async def _build(box: ui.column, period_id: int, found) -> None:
                     missing = [p for p in uncited if not p.off_period]
                     off = [p for p in ctx.papers if p.off_period]
                     with ui.row().classes("w-full items-center gap-2"):
+                        n = len(ctx.papers) - len(off)
                         ui.label(
-                            f"{len(ctx.papers) - len(off)} papers · {len(missing)} not discussed"
+                            # (English: "1 papers" too, as the tests expect)
+                            ngettext(
+                                "{n} papers · {missing} not discussed",
+                                "{n} papers · {missing} not discussed",
+                                n,
+                            ).format(n=n, missing=len(missing))
                         ).classes(
                             "text-sm " + ("text-negative" if missing else "text-positive")
                         ).mark("report-count")
                         if off:
                             ui.label(
-                                f"+ {len(off)} off-period · "
-                                f"{len(uncited) - len(missing)} not discussed"
+                                _("+ {n} off-period · {missing} not discussed").format(
+                                    n=len(off), missing=len(uncited) - len(missing)
+                                )
                             ).classes("text-sm text-grey").tooltip(
-                                f"With the tags, but not of the period's years ({span})"
+                                _("With the tags, but not of the period's years ({years})").format(
+                                    years=span
+                                )
                             ).mark("report-count-off")
                         ui.space()
                         if missing:
                             ui.button(
-                                "Cite them",
+                                _("Cite them"),
                                 icon="playlist_add",
                                 on_click=lambda: editor.insert(
                                     "\n".join(f"- [@{p.key}]{{.notes}}" for p in missing) + "\n"
                                 ),
                             ).props("flat dense no-caps size=sm").tooltip(
-                                "Insert the papers not discussed yet (with their notes), "
-                                "at the cursor"
+                                _(
+                                    "Insert the papers not discussed yet (with their notes), "
+                                    "at the cursor"
+                                )
                             ).mark("report-cite-missing")
                     if result.unknown:
-                        ui.label("Unknown: " + ", ".join(f"@{k}" for k in result.unknown)).classes(
-                            "text-sm text-negative"
-                        ).mark("report-unknown")
+                        ui.label(
+                            _("Unknown: {keys}").format(
+                                keys=", ".join(f"@{k}" for k in result.unknown)
+                            )
+                        ).classes("text-sm text-negative").mark("report-unknown")
                     outside = [p for p in ctx.by_key.values() if not p.in_report]
                     if outside:
                         ui.label(
-                            "Cited, without the tags: " + ", ".join(f"@{p.key}" for p in outside)
+                            _("Cited, without the tags: {keys}").format(
+                                keys=", ".join(f"@{p.key}" for p in outside)
+                            )
                         ).classes("text-sm text-warning")
                     words = (search.value or "").lower().split()
 
@@ -378,7 +398,7 @@ async def _build(box: ui.column, period_id: int, found) -> None:
                     for p in shown:
                         row(p)
                     if shown_off:
-                        ui.label(f"Off-period (not {span})").classes(
+                        ui.label(_("Off-period (not {years})").format(years=span)).classes(
                             "w-full text-xs text-grey uppercase mt-3"
                         ).mark("report-off-period")
                         for p in shown_off:
@@ -394,7 +414,7 @@ async def _build(box: ui.column, period_id: int, found) -> None:
 
                 search.on("keydown.enter", cite_first)
                 sidebar()
-    status.text = "Saved" if saved.text else ""
+    status.text = _("Saved") if saved.text else ""
 
     async def reload() -> None:
         """The papers edited elsewhere (e.g. their notes, in the PDF's window): updated."""
@@ -440,14 +460,20 @@ def _paper_row(
         ui.badge(number, color=colour).classes("cursor-pointer shrink-0 mt-1").on(
             "click", lambda: editor.insert(templates.cite(p.key))
         ).tooltip(
-            (f"cited {times}×" if times else "not cited yet")
-            + (" · not in the report's papers" if not p.in_report else "")
-            + (f" · off-period ({s.year or 'no year'})" if p.off_period else "")
-            + " · click: cite it"
+            " · ".join(
+                [_("cited {n}×").format(n=times) if times else _("not cited yet")]
+                + ([_("not in the report's papers")] if not p.in_report else [])
+                + (
+                    [_("off-period ({year})").format(year=s.year or _("no year"))]
+                    if p.off_period
+                    else []
+                )
+                + [_("click: cite it")]
+            )
         ).mark(f"report-cite-{p.key}")
         with ui.column().classes("grow min-w-0 gap-0"):
             with ui.row().classes("w-full items-start no-wrap gap-1"):
-                ui.label(s.title or "(untitled)").classes("text-sm leading-tight grow min-w-0")
+                ui.label(s.title or _("(untitled)")).classes("text-sm leading-tight grow min-w-0")
                 if s.pdf or pdf_viewer.can_download(s):
                     with ui.link(
                         target=pdf_viewer.page_url(s.id, period_id, fetch=not s.pdf),
@@ -456,9 +482,9 @@ def _paper_row(
                         ui.icon(
                             "picture_as_pdf", size="xs", color="red-8" if s.pdf else "grey-6"
                         ).tooltip(
-                            "View the PDF, with its notes (a new window)"
+                            _("View the PDF, with its notes (a new window)")
                             if s.pdf
-                            else "Download the PDF (open access) and view it (a new window)"
+                            else _("Download the PDF (open access) and view it (a new window)")
                         )
             about = " · ".join(x for x in (s.venue, str(s.year or ""), s.category.label) if x)
             ui.label(f"@{p.key} · {about}").classes("w-full text-xs text-grey ellipsis").tooltip(

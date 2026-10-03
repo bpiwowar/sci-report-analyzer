@@ -17,7 +17,7 @@ from nicegui import Client, app, background_tasks, ui
 from .. import annotations, pdfs
 from ..db.models import Publication
 from ..db.session import session_scope
-from ..i18n import _
+from ..i18n import _, ngettext
 
 if TYPE_CHECKING:
     from ..pubview import PubStat
@@ -43,7 +43,7 @@ _TYPES = {
 _SCRIPT = """
 <script>
 window.vrPdf = {
-  url: %(url)s, saving: false, saved: null,
+  url: %(url)s, texts: %(texts)s, saving: false, saved: null,
   win() {
     const f = document.getElementById('vr-pdf-frame');
     return f && f.contentWindow;
@@ -64,7 +64,7 @@ window.vrPdf = {
     if (now) a.pdfViewer._layerProperties?.annotationEditorUIManager?.endCurrentEditing();
     const hash = this.hash();
     if (!now && (this.saved === null || hash === this.saved)) return;
-    this.saving = true; this.status('Saving…');
+    this.saving = true; this.status(this.texts.saving);
     try {
       const data = await a.pdfDocument.saveDocument();
       const res = await fetch(this.url, {
@@ -73,9 +73,9 @@ window.vrPdf = {
       if (!res.ok) throw new Error(await res.text());
       this.saved = hash;
       if (this.hash() === hash) a.pdfDocument.annotationStorage.resetModified();
-      this.status('Saved at ' + new Date().toLocaleTimeString());
+      this.status(this.texts.saved.replace('{time}', new Date().toLocaleTimeString()));
     } catch (e) {
-      this.status('Not saved: ' + e.message);
+      this.status(this.texts.failed.replace('{error}', e.message));
     } finally { this.saving = false; }
   },
   // Back and forward (the viewer's history): the arrows, disabled when there is nowhere to go.
@@ -512,7 +512,7 @@ def gone(element: ui.element) -> bool:
 def _title(pub_id: int) -> tuple[str, int] | None:
     with session_scope() as s:
         pub = s.get(Publication, pub_id)
-        return (pub.title or "(untitled)", pub.person_id) if pub else None
+        return (pub.title or _("(untitled)"), pub.person_id) if pub else None
 
 
 def register() -> None:
@@ -550,7 +550,7 @@ def register() -> None:
         ui.page_title(f"{found[0] if found else 'PDF'} · SciReport Analyzer")
         ui.query(".nicegui-content").classes("p-0 gap-0")
         if found is None:
-            ui.label("No such paper").classes("p-4")
+            ui.label(_("No such paper")).classes("p-4")
             return
         title, person_id = found
         if not pdfs.has_viewer() or pdfs.file_of(pub_id) is None:
@@ -570,15 +570,15 @@ def register() -> None:
             page=page,
         )
         side.attach(box)
-        with side.section("notes", "sell", "Tags and notes"):
+        with side.section("notes", "sell", _("Tags and notes")):
             tags_box = ui.column().classes("w-full gap-2").mark("pdf-notes")
             with tags_box:
                 ui.spinner()
-        with side.section("details", "article", "Publication details", wide=True):
+        with side.section("details", "article", _("Publication details"), wide=True):
             details_box = ui.column().classes("w-full gap-2 vr-details").mark("pdf-pub-details")
             with details_box:
                 ui.spinner()
-        with side.section("bookmarks", "bookmarks", "Bookmarks"):
+        with side.section("bookmarks", "bookmarks", _("Bookmarks")):
             side.bookmarks = bookmarks_section("pub", pub_id)
         ui.timer(0.05, lambda: _side(side, tags_box, details_box, pub_id), once=True)
 
@@ -607,12 +607,17 @@ def viewer_frame(
 ) -> ui.column:
     """The page of a stored PDF: a header (back to ``home``, saving, bookmarks, finding the
     paper of a selection), PDF.js, and the side column (returned)."""
-    ui.add_head_html(_SCRIPT % {"url": json.dumps(file_url)} + script)
+    texts = {
+        "saving": _("Saving…"),
+        "saved": _("Saved at {time}"),
+        "failed": _("Not saved: {error}"),
+    }
+    ui.add_head_html(_SCRIPT % {"url": json.dumps(file_url), "texts": json.dumps(texts)} + script)
     with ui.row().classes("w-full items-center no-wrap gap-2 px-3 py-1 bg-primary text-white"):
         ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
         for icon, step, tip in (
-            ("arrow_back", "back", "Back (after following a link; also ⌥← or ⌘[)"),
-            ("arrow_forward", "forward", "Forward (also ⌥→ or ⌘])"),
+            ("arrow_back", "back", _("Back (after following a link; also ⌥← or ⌘[)")),
+            ("arrow_forward", "forward", _("Forward (also ⌥→ or ⌘])")),
         ):
             ui.button(icon=icon).props(f"flat dense round color=white id=vr-pdf-{step}").on(
                 "click", js_handler=f"() => vrPdf.app()?.pdfHistory?.{step}()"
@@ -622,7 +627,7 @@ def viewer_frame(
         # (the actions on a selection, greyed out without one: their tooltips on a wrapper, a
         # disabled button showing none)
         with ui.element("span").tooltip(
-            "Find the paper of the selected text, e.g. a reference (F)"
+            _("Find the paper of the selected text, e.g. a reference (F)")
         ):
             ui.button(icon="manage_search", on_click=side.find_selection).props(
                 "flat dense round color=white id=vr-pdf-find"
@@ -639,8 +644,9 @@ def viewer_frame(
         ).mark("pdf-area")
         if side.folder and side.source[0] == "doc":  # (excerpts: of documents, not papers)
             with ui.element("span").tooltip(
-                f"Add the selected text (or the highlight clicked) to a category of "
-                f"{side.folder[1]} (E)"
+                _(
+                    "Add the selected text (or the highlight clicked) to a category of {folder} (E)"
+                ).format(folder=side.folder[1])
             ):
                 ui.button(icon="playlist_add", on_click=side.add_excerpt).props(
                     "flat dense round color=white id=vr-pdf-excerpt"
@@ -648,20 +654,20 @@ def viewer_frame(
             ui.on("vr-pdf-excerpt", side.add_excerpt)
         ui.button(icon="bookmark_add", on_click=lambda: side.add_bookmark(*bookmarked)).props(
             "flat dense round color=white"
-        ).tooltip("Bookmark this place, named after the selected text if any (B)").mark(
+        ).tooltip(_("Bookmark this place, named after the selected text if any (B)")).mark(
             "pdf-bookmark"
         )
         ui.on("vr-pdf-bookmark", lambda: side.add_bookmark(*bookmarked))
-        ui.button("Save", icon="save").props("flat dense color=white").on(
+        ui.button(_("Save"), icon="save").props("flat dense color=white").on(
             "click", js_handler="() => vrPdf.save(true)"
-        ).tooltip("Save the annotations into the stored PDF (also every few seconds)")
+        ).tooltip(_("Save the annotations into the stored PDF (also every few seconds)"))
         with ui.link(target=f"{file_url}?download=1"):
             ui.button(icon="download").props("flat dense round color=white").tooltip(
-                "Download a copy"
+                _("Download a copy")
             )
         ui.button(icon="view_sidebar", on_click=lambda: box.set_visibility(not box.visible)).props(
             "flat dense round color=white"
-        ).tooltip("Side panel (notes, bookmarks, papers)").mark("pdf-toggle-notes")
+        ).tooltip(_("Side panel (notes, bookmarks, papers)")).mark("pdf-toggle-notes")
     src = f"/pdfjs/web/viewer.html?file={file_url}%3Fv%3D{version}"
     if page:
         src += f"#page={page}"
@@ -694,9 +700,9 @@ async def _side(side: Side, box: ui.column, details_box: ui.column, pub_id: int)
     @ui.refreshable
     def body() -> None:
         if s is None:
-            ui.label("This paper is no longer in the database").classes("text-grey")
+            ui.label(_("This paper is no longer in the database")).classes("text-grey")
             return
-        options = {0: "All years", **{p.id: period_label(p) for p in periods}}
+        options = {0: _("All years"), **{p.id: period_label(p) for p in periods}}
 
         def set_period(e) -> None:
             state["period"] = next((p for p in periods if p.id == e.value), None)
@@ -705,7 +711,7 @@ async def _side(side: Side, box: ui.column, details_box: ui.column, pub_id: int)
         ui.select(
             options, value=state["period"].id if state["period"] else 0, on_change=set_period
         ).props("dense outlined options-dense").classes("w-full").tooltip(
-            "The period whose tags and notes are shown (e.g. a folder's)"
+            _("The period whose tags and notes are shown (e.g. a folder's)")
         ).mark("pdf-period")
 
         def manage() -> None:
@@ -726,14 +732,14 @@ async def _side(side: Side, box: ui.column, details_box: ui.column, pub_id: int)
     if s is None:
         details_box.clear()
         with details_box:
-            ui.label("This paper is no longer in the database").classes("text-grey")
+            ui.label(_("This paper is no longer in the database")).classes("text-grey")
     else:  # (tags and notes: in their own tab)
         show_details(side.host, s, details_box, None, notes=False)
 
 
 async def install_or_notify(label: ui.label) -> None:
     if not pdfs.has_viewer():
-        label.text = "Installing the PDF viewer (PDF.js, once)…"
+        label.text = _("Installing the PDF viewer (PDF.js, once)…")
         await pdfs.install_viewer()
 
 
@@ -746,9 +752,9 @@ def _prepare(pub_id: int, title: str, fetch: bool, period: int | None) -> None:
         has_pdf = pdfs.file_of(pub_id) is not None
         if not has_pdf and not fetch:
             with status:
-                ui.label("No PDF stored for this paper.")
+                ui.label(_("No PDF stored for this paper."))
                 ui.button(
-                    "Download it",
+                    _("Download it"),
                     icon="download",
                     on_click=lambda: ui.navigate.to(page_url(pub_id, period, fetch=True)),
                 ).props("flat").mark("pdf-fetch")
@@ -765,7 +771,9 @@ def _prepare(pub_id: int, title: str, fetch: bool, period: int | None) -> None:
             status.clear()
             with status:
                 ui.icon("error", color="negative")
-                ui.label(f"Could not get the PDF: {e}").classes("text-negative").mark("pdf-error")
+                ui.label(_("Could not get the PDF: {error}").format(error=e)).classes(
+                    "text-negative"
+                ).mark("pdf-error")
             with box:
                 _upload(pub_id, period)
             return
@@ -778,7 +786,7 @@ async def _get(pub_id: int, label: ui.label) -> None:
     try:
         await install_or_notify(label)
         if pdfs.file_of(pub_id) is None:
-            label.text = "Downloading the PDF…"
+            label.text = _("Downloading the PDF…")
             await pdfs.download(pub_id)
     finally:
         if found := _title(pub_id):
@@ -796,7 +804,7 @@ def _upload(pub_id: int, period: int | None) -> None:
             changed(found[1])
         ui.navigate.to(page_url(pub_id, period))
 
-    ui.label("Or upload it (a PDF file):").classes("text-sm text-grey")
+    ui.label(_("Or upload it (a PDF file):")).classes("text-sm text-grey")
     ui.upload(on_upload=done, auto_upload=True).props('accept=".pdf,application/pdf"').mark(
         "pdf-upload"
     )
@@ -824,12 +832,12 @@ def pdf_button(panel: PublicationsPanel, s: PubStat) -> None:
         with ui.link(target=page_url(s.id, period), new_tab=True).mark(f"view-pdf-{s.id}"):
             ui.icon(
                 "edit_document" if edited else "picture_as_pdf", size="xs", color="red-8"
-            ).tooltip("View the PDF (annotated)" if edited else "View and annotate the PDF")
+            ).tooltip(_("View the PDF (annotated)") if edited else _("View and annotate the PDF"))
     elif can_download(s):
         icon = (
             ui.icon("picture_as_pdf", size="xs", color="grey-6")
             .classes("vr-src cursor-pointer")
-            .tooltip("Download the PDF (open access) to view and annotate it")
+            .tooltip(_("Download the PDF (open access) to view and annotate it"))
             .mark(f"get-pdf-{s.id}")
         )
         if no_confirm():
@@ -853,22 +861,24 @@ def _open_js(pub_id: int, period: int | None) -> str:
 
 def confirm_download(panel: PublicationsPanel, s: PubStat) -> None:
     with panel.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-        ui.label("Download the PDF?").classes("text-lg font-medium")
-        ui.label(s.title or "(untitled)").classes("font-medium")
+        ui.label(_("Download the PDF?")).classes("text-lg font-medium")
+        ui.label(s.title or _("(untitled)")).classes("font-medium")
         with ui.column().classes("gap-0 text-sm"):
             for url in s.pdf_urls:
                 ui.link(url, url, new_tab=True).classes("break-all")
             if s.doi or s.doi_manual:
                 ui.label(
-                    "Else an open-access copy found by Unpaywall"
+                    _("Else an open-access copy found by Unpaywall")
                     if s.pdf_urls
-                    else "From an open-access copy found by Unpaywall (by its DOI)"
+                    else _("From an open-access copy found by Unpaywall (by its DOI)")
                 ).classes("text-grey")
         ui.label(
-            "It is stored in the data directory, and opens in a new window where you can "
-            "highlight and annotate it."
+            _(
+                "It is stored in the data directory, and opens in a new window where you can "
+                "highlight and annotate it."
+            )
         ).classes("text-sm text-grey")
-        again = ui.checkbox("Don't ask again").mark("pdf-no-confirm")
+        again = ui.checkbox(_("Don't ask again")).mark("pdf-no-confirm")
 
         def go() -> None:
             global _no_confirm
@@ -878,8 +888,8 @@ def confirm_download(panel: PublicationsPanel, s: PubStat) -> None:
             dlg.close()
 
         with ui.row().classes("w-full justify-end"):
-            ui.button("Cancel", on_click=dlg.close).props("flat")
-            ui.button("Download and open", icon="download").on(
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Download and open"), icon="download").on(
                 "click", go, js_handler=_open_js(s.id, panel.period_id)
             ).mark("pdf-download-ok")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
@@ -891,16 +901,18 @@ def download_dialog(panel: PublicationsPanel, rows: list[PubStat]) -> None:
     todo = [s for s in rows if not s.pdf and can_download(s)]
     stored = sum(1 for s in rows if s.pdf)
     with panel.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-2xl"):
-        ui.label("Download the PDFs").classes("text-lg font-medium")
+        ui.label(_("Download the PDFs")).classes("text-lg font-medium")
         ui.label(
-            f"{len(todo)} of the {len(rows)} papers shown have an open-access link or a DOI "
-            f"and no stored PDF ({stored} stored already). Their PDFs are downloaded into the "
-            "data directory."
+            _(
+                "{todo} of the {total} papers shown have an open-access link or a DOI and no "
+                "stored PDF ({stored} stored already). Their PDFs are downloaded into the data "
+                "directory."
+            ).format(todo=len(todo), total=len(rows), stored=stored)
         ).classes("text-sm").mark("pdf-batch-info")
         progress = ui.linear_progress(value=0, show_value=False).classes("w-full")
         progress.visible = False
         result = ui.column().classes("w-full gap-1 text-sm")
-        titles = {s.id: s.title or "(untitled)" for s in todo}
+        titles = {s.id: s.title or _("(untitled)") for s in todo}
 
         async def run() -> None:
             start.disable()
@@ -912,11 +924,19 @@ def download_dialog(panel: PublicationsPanel, rows: list[PubStat]) -> None:
             batch = await pdfs.download_many([s.id for s in todo], step)
             progress.visible = False
             with result:
-                ui.label(f"{len(batch.done)} PDFs downloaded").classes("font-medium").mark(
-                    "pdf-batch-done"
-                )
+                ui.label(
+                    ngettext("{n} PDF downloaded", "{n} PDFs downloaded", len(batch.done)).format(
+                        n=len(batch.done)
+                    )
+                ).classes("font-medium").mark("pdf-batch-done")
                 if batch.failed:
-                    ui.label(f"Not found for {len(batch.failed)} papers:").classes("text-grey")
+                    ui.label(
+                        ngettext(
+                            "Not found for {n} paper:",
+                            "Not found for {n} papers:",
+                            len(batch.failed),
+                        ).format(n=len(batch.failed))
+                    ).classes("text-grey")
                     with ui.column().classes("gap-0 max-h-64 overflow-auto"):
                         for pid, why in batch.failed.items():
                             ui.label(f"{titles.get(pid, pid)} — {why}").classes(
@@ -925,8 +945,8 @@ def download_dialog(panel: PublicationsPanel, rows: list[PubStat]) -> None:
             await panel.reload()
 
         with ui.row().classes("w-full justify-end"):
-            ui.button("Close", on_click=dlg.close).props("flat")
-            start = ui.button("Download", icon="download", on_click=run).mark("pdf-batch-ok")
+            ui.button(_("Close"), on_click=dlg.close).props("flat")
+            start = ui.button(_("Download"), icon="download", on_click=run).mark("pdf-batch-ok")
             if not todo:
                 start.disable()
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())

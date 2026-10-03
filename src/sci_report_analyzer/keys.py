@@ -7,15 +7,29 @@ import os
 
 from .db.models import AppSetting
 from .db.session import session_scope
+from .i18n import N_, _
 
-KEYS = {
-    "email": (
-        "SCI_REPORT_ANALYZER_EMAIL",
-        "Your email (required: identifies you to OpenAlex, Crossref, Unpaywall…)",
-    ),
-    "openalex": ("OPENALEX_API_KEY", "OpenAlex API key (free, https://openalex.org/settings/api)"),
-    "semanticscholar": ("S2_API_KEY", "Semantic Scholar API key (optional)"),
-}
+
+class _Keys(dict):
+    """{name: (environment variable, label)}: its labels translated when listed."""
+
+    def items(self):
+        return [(k, (env, _(label))) for k, (env, label) in super().items()]
+
+
+KEYS = _Keys(
+    {
+        "email": (
+            "SCI_REPORT_ANALYZER_EMAIL",
+            N_("Your email (required: identifies you to OpenAlex, Crossref, Unpaywall…)"),
+        ),
+        "openalex": (
+            "OPENALEX_API_KEY",
+            N_("OpenAlex API key (free, https://openalex.org/settings/api)"),
+        ),
+        "semanticscholar": ("S2_API_KEY", N_("Semantic Scholar API key (optional)")),
+    }
+)
 _SETTING = "api_keys"
 
 
@@ -31,7 +45,7 @@ def save_keys(values: dict[str, str]) -> None:
 
 
 def get_key(name: str) -> str | None:
-    env, _ = KEYS[name]
+    env, _label = KEYS[name]
     if v := os.environ.get(env):
         return v
     try:
