@@ -126,7 +126,7 @@ de l'auteur peuvent aussi être corrigées. Les décisions manuelles sont signal
 jamais écrasées par les traitements automatiques ni par les resynchronisations. Sur les pages des canaux, vous pouvez aussi
 **fusionner** des variantes qui désignent le même canal (en donnant au résultat un nouveau nom si vous le souhaitez), ou
 en séparer une ; **Proposer des fusions…** parcourt les canaux qui se ressemblent, une paire à la
-fois (une paire déclarée *pas la même* n'est plus proposée), et la page d'un canal liste les canaux qui
+fois : choisissez le canal principal, puis dites ce que l'autre est pour lui (une paire déclarée *pas la même* n'est plus proposée), et la page d'un canal liste les canaux qui
 semblent liés. Chacun vient avec la relation devinée : le même canal, une de ses sessions (p. ex. *Findings of
 the ACL: EMNLP* est la session Findings d'EMNLP), une conférence commune qui l'inclut (EMNLP-IJCNLP)
 ou un de ses ateliers ; changez-la si besoin, puis appliquez. Les décisions sur les canaux font partie des

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-03 15:34+0200\n"
+"POT-Creation-Date: 2026-10-03 15:59+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -78,8 +78,15 @@ msgstr "+ {n} hors période · {missing} à discuter"
 msgid "1- Title. Authors. Venue, 2023. Lien : https://hal.science/…"
 msgstr "1- Titre. Auteurs. Canal, 2023. Lien : https://hal.science/…"
 
+msgid "1. Which venue is the primary one?"
+msgstr "1. Quel est le canal principal ?"
+
 msgid "10.1145/…, hal-01234567, or a doi.org, publisher or HAL URL"
 msgstr "10.1145/…, hal-01234567, ou une URL doi.org, d'éditeur ou HAL"
+
+#, python-brace-format
+msgid "2. What is “{name}” for the primary venue?"
+msgstr "2. Que représente « {name} » pour le canal principal ?"
 
 #, python-brace-format
 msgid "2y mean citedness {value:.2f}"
@@ -114,6 +121,9 @@ msgid ""
 msgstr ""
 "Un dossier (p. ex. un comité) regroupe des personnes ; chacune y a sa "
 "propre période."
+
+msgid "A joint conference including it"
+msgstr "Une conférence commune qui l'inclut"
 
 msgid "A joint conference including this venue"
 msgstr "Une conférence commune incluant ce canal"
@@ -1570,6 +1580,12 @@ msgstr ""
 "Sa notice est récupérée et fusionnée avec celles des autres sources "
 "(listée dans l'onglet Sources, où elle peut être retirée)."
 
+#, python-brace-format
+msgid "Its {track} track (merged into it, its texts marked as such)"
+msgstr ""
+"Sa session {track} (fusionnée dans celui-ci, ses textes marqués comme "
+"tels)"
+
 msgid "JCR (Journal Citation Reports) import"
 msgstr "Import JCR (Journal Citation Reports)"
 
@@ -1647,9 +1663,6 @@ msgid ""
 msgstr ""
 "Garder les canaux séparés : ce texte devient une variante de ce canal, "
 "prioritaire sur les règles des autres canaux"
-
-msgid "Keep this one"
-msgstr "Conserver celui-ci"
 
 msgid "Kind"
 msgstr "Type"
@@ -1752,6 +1765,9 @@ msgstr "Conférences principales enregistrées"
 
 msgid "Make it a joint venue"
 msgstr "En faire un canal conjoint"
+
+msgid "Make it primary"
+msgstr "En faire le principal"
 
 msgid "Make it the default"
 msgstr "En faire le modèle par défaut"
@@ -1889,13 +1905,13 @@ msgstr ""
 "citée (comme référence)"
 
 msgid ""
-"Merging moves the texts, rules, ISSNs and papers of the other venue into "
-"the kept one; the kept venue's decisions win, the other's fill what it "
-"lacks."
+"Merging moves the texts, rules, ISSNs and papers of the secondary venue "
+"into the primary one; the primary's decisions win, the secondary's fill "
+"what it lacks."
 msgstr ""
-"La fusion déplace les textes, règles, ISSN et articles de l'autre canal "
-"vers celui conservé ; les décisions du canal conservé priment, celles de "
-"l'autre complètent ce qui lui manque."
+"La fusion déplace les textes, règles, ISSN et articles du canal "
+"secondaire vers le principal ; les décisions du principal l'emportent, "
+"celles du secondaire complètent ce qui lui manque."
 
 #, python-brace-format
 msgid "Might be already an excerpt ({n}): merge with it?"
@@ -2263,6 +2279,9 @@ msgstr ""
 "Désactivé : seulement compté dans son type · Nombre : le nombre "
 "d'articles · Liste : leurs canaux de publication · Liste + années : avec "
 "les années"
+
+msgid "One of its workshops"
+msgstr "Un de ses ateliers"
 
 msgid "Only cite its place (a reference)"
 msgstr "Ne citer que son emplacement (une référence)"
@@ -3261,8 +3280,8 @@ msgstr ""
 msgid "The same venue"
 msgstr "Le même canal"
 
-msgid "The second venue is, for the first one"
-msgstr "Le second canal est, pour le premier"
+msgid "The same venue (merged into the primary one)"
+msgstr "Le même canal (fusionné dans le principal)"
 
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
@@ -3890,9 +3909,6 @@ msgstr "filtrer"
 msgid "filter venues"
 msgstr "filtrer les canaux"
 
-msgid "first"
-msgstr "premier"
-
 msgid "flags"
 msgstr "signalements"
 
@@ -4012,9 +4028,6 @@ msgstr ""
 msgid "its year"
 msgstr "son année"
 
-msgid "kept"
-msgstr "conservé"
-
 #, python-brace-format
 msgid "key: “{key}”"
 msgstr "clé : « {key} »"
@@ -4058,9 +4071,6 @@ msgstr "apparié via {source} ({how})"
 
 msgid "merged into"
 msgstr "fusionné dans"
-
-msgid "merged into the other"
-msgstr "fusionné dans l'autre"
 
 msgid "missing from sources"
 msgstr "absent des sources"
@@ -4232,6 +4242,9 @@ msgstr "position {n}"
 msgid "preprint"
 msgstr "prépublication"
 
+msgid "primary"
+msgstr "principal"
+
 msgid "purple"
 msgstr "violet"
 
@@ -4272,8 +4285,8 @@ msgstr "rechercher dans les classements"
 msgid "search title / venue / author"
 msgstr "rechercher titre / canal de publication / auteur"
 
-msgid "second"
-msgstr "second"
+msgid "secondary"
+msgstr "secondaire"
 
 msgid "set by hand"
 msgstr "fixée à la main"

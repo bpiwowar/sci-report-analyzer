@@ -1083,7 +1083,13 @@ async def test_propose_merges_with_a_relation(user: User) -> None:
         "jd",
         [
             pub("a", "Paper A", 2023, "Conference on Things and Stuff", authors=["Jane Doe"]),
-            pub("b", "Paper B", 2022, "Conference on Things and Stuff", authors=["Jane Doe"]),
+            pub(
+                "b",
+                "Paper B",
+                2022,
+                "Findings of the Conference on Things and Stuff",
+                authors=["Jane Doe"],
+            ),
             pub(
                 "c",
                 "Paper C",
@@ -1099,17 +1105,20 @@ async def test_propose_merges_with_a_relation(user: User) -> None:
     await user.should_see(marker="venue-propose-merges")
     user.find("venue-propose-merges").click()
     await user.should_see("Proposal 1 of 1")
+    # The Findings venue has more papers, but the conference is the primary venue.
+    from sci_report_analyzer.db.models import Publication, VenueKey
+    from sci_report_analyzer.db.session import session_scope
+
+    with session_scope() as s:
+        va = s.get(Publication, _pub_id("Paper A")).venue_id
+    await user.should_see(marker=f"proposal-primary-{va}")
     (select,) = user.find("proposal-relation").elements
     assert select.value == "track:findings"  # guessed: no merge fields, what it does instead
     await user.should_see(marker="proposal-relation-effect")
     await user.should_not_see(marker="proposal-name")
     user.find("proposal-merge").click()
     await user.should_see("No merge to propose.")
-    from sci_report_analyzer.db.models import Publication, VenueKey
-    from sci_report_analyzer.db.session import session_scope
-
     with session_scope() as s:
-        va = s.get(Publication, _pub_id("Paper A")).venue_id
         assert s.get(Publication, _pub_id("Paper C")).venue_id == va
         assert {k.track for k in s.query(VenueKey).filter_by(venue_id=va)} == {None, "findings"}
 
@@ -1439,13 +1448,13 @@ async def test_propose_merges_one_at_a_time(user: User) -> None:
     user.find("venue-propose-merges").click()
     await user.should_see("Proposal 1 of 2")
     # The pair whose venue has the most papers is proposed first, that venue kept.
-    await user.should_see(marker=f"proposal-kept-{keep}")
+    await user.should_see(marker=f"proposal-primary-{keep}")
     assert user.find("proposal-name").elements.pop().value == "Workshop on Things"
-    user.find(f"proposal-keep-{other}").click()  # the other way round...
-    await user.should_see(marker=f"proposal-kept-{other}")
+    user.find(f"proposal-make-primary-{other}").click()  # the other way round...
+    await user.should_see(marker=f"proposal-primary-{other}")
     assert user.find("proposal-name").elements.pop().value == "Intl. Workshop on Things"
-    user.find(f"proposal-keep-{keep}").click()  # ... and back
-    await user.should_see(marker=f"proposal-kept-{keep}")
+    user.find(f"proposal-make-primary-{keep}").click()  # ... and back
+    await user.should_see(marker=f"proposal-primary-{keep}")
     user.find("proposal-use-name-1").click()  # the other venue's name, to edit
     assert user.find("proposal-name").elements.pop().value == "Intl. Workshop on Things"
     user.find("proposal-name").clear().type("Things Workshop")
