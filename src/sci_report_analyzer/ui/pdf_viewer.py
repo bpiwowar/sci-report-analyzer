@@ -18,6 +18,7 @@ from .. import annotations, pdfs
 from ..db.models import Publication
 from ..db.session import session_scope
 from ..i18n import _, ngettext
+from .theme import MARKDOWN_CSS
 
 if TYPE_CHECKING:
     from ..pubview import PubStat
@@ -612,6 +613,7 @@ def viewer_frame(
         "saved": _("Saved at {time}"),
         "failed": _("Not saved: {error}"),
     }
+    ui.add_css(MARKDOWN_CSS)
     ui.add_head_html(_SCRIPT % {"url": json.dumps(file_url), "texts": json.dumps(texts)} + script)
     with ui.row().classes("w-full items-center no-wrap gap-2 px-3 py-1 bg-primary text-white"):
         ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")

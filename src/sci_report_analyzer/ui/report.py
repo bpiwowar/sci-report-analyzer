@@ -13,6 +13,7 @@ from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
 from . import pdf_viewer
 from .mdedit import NOTE_EXTRAS, MarkdownEditor
+from .theme import MARKDOWN_CSS
 
 # The citation at the cursor: its paper highlighted in the sidebar (and scrolled to).
 _CSS = ".vr-at-cursor { background: rgba(255, 193, 7, 0.25); box-shadow: inset 3px 0 #ffc107; }"
@@ -99,6 +100,7 @@ def register() -> None:
     def report_page(period_id: int) -> None:
         found = _period(period_id)
         ui.query(".nicegui-content").classes("p-0 gap-0")
+        ui.add_css(MARKDOWN_CSS)
         if found is None:
             ui.label(_("No such period")).classes("p-4")
             return

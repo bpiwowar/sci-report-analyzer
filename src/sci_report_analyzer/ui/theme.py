@@ -78,6 +78,24 @@ CSS = """
 .vr-track { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 3px,
             transparent 3px 7px); }
 """
+MARKDOWN_CSS = """
+/* Markdown headings at text scale, told apart by bullets: # •, ## ••, ### •••…
+   (doubled class: wins over NiceGUI's 3rem h1). */
+.nicegui-markdown.nicegui-markdown :is(h1, h2, h3, h4, h5, h6) {
+  font-size:1em; font-weight:700; line-height:1.4; letter-spacing:normal; margin:.7em 0 .3em;
+}
+.nicegui-markdown.nicegui-markdown :is(h1, h2, h3, h4, h5, h6)::before {
+  color:var(--q-primary); margin-right:.4em; letter-spacing:.05em;
+}
+.nicegui-markdown h1::before { content:"•"; }
+.nicegui-markdown h2::before { content:"••"; }
+.nicegui-markdown h3::before { content:"•••"; }
+.nicegui-markdown h4::before { content:"••••"; }
+.nicegui-markdown h5::before { content:"•••••"; }
+.nicegui-markdown h6::before { content:"••••••"; }
+.nicegui-markdown.nicegui-markdown > :first-child { margin-top:.3em; }
+"""
+CSS += MARKDOWN_CSS
 CSS += f".vr-dim {{ opacity:{DIM_OPACITY}; }}\n"
 
 
