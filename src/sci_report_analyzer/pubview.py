@@ -124,6 +124,8 @@ class PubStat:
     hidden: bool
     archival_only: bool
     disagree: bool
+    # The sources give different tracks (e.g. demo and short), not settled by hand.
+    track_conflict: bool = False
     tags: set[int] = field(default_factory=set)  # global tags (ids)
     period_tags: dict[int, set[int]] = field(default_factory=dict)  # period id -> tag ids
     period_notes: dict[int, str] = field(default_factory=dict)  # period id -> note
@@ -197,6 +199,8 @@ class PubStat:
             out.append("no year")
         if self.disagree and not self.overridden:
             out.append("sources give different venues — pick one in the details")
+        if self.track_conflict:
+            out.append("sources give different tracks — pick one in the details or flag it")
         if self.missing:
             out.append("no longer in any source")
         return out
@@ -294,20 +298,20 @@ def same_venue(view: MemberView) -> tuple:
     return ("venue", view.venue_id)
 
 
-def venue_track(views: list[MemberView], view: MemberView) -> str | None:
-    """The track the sources give for a record's venue: a track (demo, findings, workshop...)
-    wins over none, e.g. a demo paper whose other records name only the conference; None when
-    they give different tracks (a disagreement)."""
-    key = same_venue(view)
-    tracks = {v.eff_track for v in views if same_venue(v) == key and v.eff_track}
-    if len(tracks) != 1:
-        return None
-    return next(iter(tracks))
+def paper_tracks(views: list[MemberView]) -> set[str]:
+    """The tracks (demo, short, findings, workshop...) the records give, whatever their
+    venue (a source may not resolve the venue, e.g. a HAL text, but they are one paper)."""
+    return {v.eff_track for v in views if v.eff_track}
 
 
 def track_of(view: MemberView, views: list[MemberView]) -> str | None:
-    """A record's track, or the one the other records of its venue give."""
-    return view.eff_track or venue_track(views, view)
+    """A record's track, or the one the other records give: a track wins over none (a demo
+    paper whose other records name only the conference); None when they give different
+    tracks (a conflict, to be resolved by hand)."""
+    if view.eff_track:
+        return view.eff_track
+    tracks = paper_tracks(views)
+    return next(iter(tracks)) if len(tracks) == 1 else None
 
 
 def doi_member(views: list[MemberView]) -> MemberView | None:
@@ -777,10 +781,19 @@ async def load_stats(person_id: int) -> list[PubStat]:
                         pos = marks.index(m) + 1  # position found through a name / alias
                         break
             venue_ids = {
-                (same_venue(v), track_of(v, venue_members(views)))
+                same_venue(v)
                 for v in venue_members(views)
                 if not v.archival and v.venue_id and not v.minor
             }
+            # Different tracks: to be settled by hand (a flag with a track, or a source
+            # validated), even when a DOI record gives the venue.
+            track_conflict = (
+                len(paper_tracks(venue_members(views))) > 1
+                and not flag_track
+                and not validated
+                and not pub.rank_override
+                and not no_venue
+            )
             dm = doi_member(views)
             pdf_links = list(dict.fromkeys(v.pdf_url for v in views if v.pdf_url))
             url = next((v.url for v in views if not v.archival and v.url), None) or next(
@@ -820,6 +833,7 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     archival_only=archival_only,
                     # With a DOI record, its venue is the paper's: no disagreement.
                     disagree=len(venue_ids) > 1 and (dm is None or dm.minor) and not no_venue,
+                    track_conflict=track_conflict,
                     tags={tg.id for tg in pub.tags},
                     period_tags=period_tags.get(pub.id, {}),
                     period_notes=period_notes.get(pub.id, {}),
