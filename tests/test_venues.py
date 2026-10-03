@@ -841,3 +841,25 @@ def test_venue_choices_show_acronyms_first():
         "[QR] Workshop on Quiet Ranks",
         "[STR] Symposium on Timely Rankings (STR)",
     ]
+
+
+def test_a_track_wins_whatever_the_venue_and_different_tracks_conflict():
+    from sci_report_analyzer import annotations
+
+    pid = make_person()
+    add_source(pid, "hal", "idhal:x", [pub("a", "Paper A", 2020, "Some Odd Meeting", doi="10.1/x")])
+    add_source(pid, "dblp", "x", [pub("b", "Paper A", 2020, "ACL (System Demonstrations)")])
+    (a,) = stats(pid).values()
+    assert a.track == "demo" and not a.track_conflict  # a track wins over none
+    add_source(pid, "openalex", "o", [pub("c", "Paper A", 2020, "ACL (Short Papers)")])
+    (a,) = stats(pid).values()
+    assert a.track_conflict
+    assert any("different tracks" in p for p in a.problems)
+    annotations.set_venue_source(a.id, "openalex")  # settled by hand
+    (a,) = stats(pid).values()
+    assert a.track == "short" and not a.track_conflict
+    annotations.set_venue_source(a.id, None)
+    short = next(f for f in annotations.all_flags() if f.name == "short")
+    annotations.toggle_flag(a.id, short.id)  # or by a flag
+    (a,) = stats(pid).values()
+    assert a.track == "short" and not a.track_conflict
