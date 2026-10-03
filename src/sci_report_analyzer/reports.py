@@ -108,14 +108,20 @@ def report_papers(
     tag_ids: list[int],
     period_id: int | None,
     years: tuple[int | None, int | None] = (None, None),
+    primary: str | None = None,
 ) -> list[Paper]:
     """The papers to discuss, numbered: those with one of the tags (else those of the
-    period's ``years``, not hidden), those of other years ``off_period``. Numbers: those of a
+    period's ``years``, not hidden, listed by the ``primary`` source if any), those of other
+    years ``off_period``. Numbers: those of a
     tag put from a list (the first such tag), else by year (latest first), then title."""
     if tag_ids:
         rows = tagged(stats, tag_ids, period_id)
     else:
-        rows = [s for s in stats if not s.hidden and in_years(s, years)]
+        rows = [
+            s
+            for s in stats
+            if not s.hidden and in_years(s, years) and (primary is None or primary in s.sources)
+        ]
     rows.sort(key=lambda r: (-(r.year or 0), (r.title or "").lower()))
     listed = next(
         (t for t in tag_ids if any(r.number_of(t, period_id) is not None for r in rows)), None

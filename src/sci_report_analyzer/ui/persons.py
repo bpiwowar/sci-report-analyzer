@@ -9,9 +9,10 @@ from nicegui import background_tasks, ui
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from .. import annotations, folders, manual, pubview
+from .. import annotations, folders, manual, pubview, source_settings
 from ..db.models import Person, Publication
 from ..db.session import session_scope
+from ..i18n import _
 from ..sources import ADAPTERS
 from ..sync import discover, is_syncing, start_sync
 from .categories_editor import categories_dialog
@@ -151,7 +152,7 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
 
 def _sync(person_ids: list[int] | None) -> None:
     started = 0
-    for person, _ in _people():
+    for person, _status in _people():
         if person_ids is not None and person.id not in person_ids:
             continue
         if any(ln.is_stale or ln.sync_state == "error" for ln in person.links):
@@ -402,7 +403,7 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
 
 
 def _any_running() -> bool:
-    return any(is_syncing(p.id) for p, _ in _people())
+    return any(is_syncing(p.id) for p, _st in _people())
 
 
 def _card(
@@ -511,6 +512,27 @@ def folder_dialog(f: folders.FolderView | None) -> None:
             with day.add_slot("append"):
                 ui.icon("edit_calendar").on("click", menu.open).classes("cursor-pointer")
         notes = ui.textarea("Notes", value=f.notes if f else "").classes("w-full")
+        default = source_settings.default_primary()
+        primary = (
+            ui.select(
+                {
+                    None: _("Default ({source})").format(
+                        source=ADAPTERS[default].label if default in ADAPTERS else _("none")
+                    ),
+                    source_settings.NO_PRIMARY: _("None"),
+                    **{
+                        n: a.label
+                        for n, a in ADAPTERS.items()
+                        if a.linkable and a.provides_publications
+                    },
+                },
+                value=f.primary_source if f else None,
+                label=_("Primary source"),
+            )
+            .classes("w-full")
+            .tooltip(_("Papers this source doesn't list for a person are not counted"))
+            .mark("folder-primary")
+        )
         hidden = ui.checkbox("Hidden", value=f.hidden if f else False)
 
         def save() -> None:
@@ -522,7 +544,12 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 ui.notify("Invalid date (YYYY-MM-DD)", type="warning")
                 return
             fid = folders.save_folder(
-                f.id if f else None, name.value.strip(), d, hidden.value, notes.value
+                f.id if f else None,
+                name.value.strip(),
+                d,
+                hidden.value,
+                notes.value,
+                primary.value,
             )
             _goto(fid)  # before closing: a closed dialog loses its client
             dlg.close()

@@ -31,6 +31,7 @@ class FolderView:
     hidden: bool
     notes: str | None
     members: list[Member] = field(default_factory=list)
+    primary_source: str | None = None  # (see source_settings.folder_primary)
 
 
 def folders(*, include_hidden: bool = True) -> list[FolderView]:
@@ -64,6 +65,7 @@ def folders(*, include_hidden: bool = True) -> list[FolderView]:
                     ),
                     key=lambda m: m.name.lower(),
                 ),
+                f.primary_source,
             )
             for f in s.scalars(q)
         ]
@@ -76,6 +78,7 @@ def save_folder(
     day: date | None = None,
     hidden: bool = False,
     notes: str | None = None,
+    primary_source: str | None = None,
 ) -> int:
     with session_scope() as s:
         f = s.get(Folder, folder_id) if folder_id else None
@@ -83,6 +86,7 @@ def save_folder(
             f = Folder(name=name)
             s.add(f)
         f.name, f.date, f.hidden, f.notes = name, day, hidden, notes or None
+        f.primary_source = primary_source
         for p in f.periods:
             p.name = name  # a folder period is named after its folder
         s.flush()

@@ -332,6 +332,26 @@ def _publication_sources() -> None:
         ui.notify("Saved: re-sync to fetch from newly enabled sources", type="positive")
 
     ui.button("Save", icon="save", on_click=save).props("dense").mark("use-sources-save")
+    ui.label(_("Primary source")).classes("text-lg mt-4")
+    ui.label(
+        _(
+            "A paper the primary source doesn't list for a person is not counted (stats, "
+            "reports, summary): e.g. HAL, where CNRS researchers must deposit their papers. "
+            "The other sources still help find its venue. Applies to people with a validated "
+            "profile on that source; a folder can use another one."
+        )
+    ).classes("text-sm text-grey")
+    choices = {n: a.label for n, a in ADAPTERS.items() if a.linkable and a.provides_publications}
+
+    def set_primary(e) -> None:
+        source_settings.set_default_primary(e.value)
+        ui.notify(_("Saved"), type="positive")
+
+    ui.select(
+        {None: _("None"), **choices},
+        value=source_settings.default_primary(),
+        on_change=set_primary,
+    ).classes("w-48").mark("primary-source")
 
 
 def matching_tab() -> None:

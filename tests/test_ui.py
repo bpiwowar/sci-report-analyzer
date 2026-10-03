@@ -1636,3 +1636,27 @@ async def test_possible_author_discarded_from_the_warning(user: User) -> None:
     await user.should_see("Won't be suggested again")
     await user.should_see("the person's name is not found among the authors")
     await user.should_not_see(marker="possible-no-0")
+
+
+async def test_primary_source_filters_the_panel(user: User) -> None:
+    from sci_report_analyzer import folders, source_settings
+
+    pid = _seed()  # DBLP only
+    add_source(
+        pid, "hal", "idhal:jd", [pub("h", "Deep ranking for search", 2021, "Neural Computation")]
+    )
+    await user.open("/settings")
+    user.find("primary-source").elements.pop().value = "hal"
+    assert source_settings.default_primary() == "hal"
+    await user.open(f"/person/{pid}")
+    await user.should_see("Deep ranking for search")
+    await user.should_not_see("A workshop contribution")  # not in HAL: not counted
+    user.find("show-outside").click()
+    await user.should_see("A workshop contribution")
+    await user.should_not_see("Deep ranking for search")
+    # A folder without a primary source counts everything.
+    fid = folders.save_folder(None, "Committee", primary_source=source_settings.NO_PRIMARY)
+    period = folders.add_person(fid, pid)
+    await user.open(f"/person/{pid}/{period}")
+    await user.should_see("A workshop contribution")
+    await user.should_see("Deep ranking for search")

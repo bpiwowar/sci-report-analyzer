@@ -13,7 +13,8 @@ from urllib.parse import urlencode
 
 from nicegui import background_tasks, ui
 
-from .. import annotations, contribution, manual
+from .. import annotations, contribution, manual, source_settings
+from ..i18n import _
 from ..pubview import (
     HIST_CAP,
     SUMMARY_DETAILS,
@@ -30,6 +31,7 @@ from ..pubview import (
 )
 from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR, TRACK_LABEL
 from ..ranking.kinds import KIND_SHORT
+from ..sources import ADAPTERS
 from .pdf_viewer import download_dialog, pdf_button, watch
 from .pub_details import open_details, source_badge
 from .reflist import tag_from_list
@@ -85,6 +87,10 @@ class PublicationsPanel:
         self.text = ""
         self.hide_preprints = False
         self.show_hidden = False
+        # The source a paper must be in to count (None: any), and whether to show only the
+        # papers it doesn't list (to fix them there).
+        self.primary: str | None = None
+        self.show_outside = False
         self.problems_only = False
         self.manual_only = False  # papers whose venue, rank or kind was decided by hand
         self.venue_filter: int | None = None  # only the papers of a venue
@@ -204,6 +210,7 @@ class PublicationsPanel:
     async def reload(self) -> None:
         try:
             self.stats = await load_stats(self.person_id)
+            self.primary = source_settings.primary_for(self.person_id, self.period_id)
             self.categories = annotations.author_categories()
             self.cat_colours = {f"cat:{c.id}": c.colour for c in self.categories}
             if self.container.is_deleted:
@@ -265,6 +272,8 @@ class PublicationsPanel:
                 continue
             if s.hidden and not self.show_hidden:
                 continue
+            if self.primary and self.outside(s) != self.show_outside:
+                continue
             if problems_filter and self.problems_only and not s.problems:
                 continue
             if self.manual_only and not s.decided_by_hand:
@@ -281,6 +290,10 @@ class PublicationsPanel:
                 continue
             rows.append(s)
         return rows
+
+    def outside(self, s: PubStat) -> bool:
+        """Whether the primary source doesn't list the paper (it doesn't count)."""
+        return bool(self.primary) and self.primary not in s.sources
 
     def in_years(self, s: PubStat) -> bool:
         return s.year is None or (
@@ -385,6 +398,7 @@ class PublicationsPanel:
                 else:
                     self.lo = self.hi = None
                 self.tag_filter = self._known_tags(self.tag_filter)
+                self.primary = source_settings.primary_for(self.person_id, self.period_id)
                 self.sel = None
                 self._save_state()
                 self.render()
@@ -530,6 +544,25 @@ class PublicationsPanel:
                 ui.switch(
                     f"show hidden ({n_hidden})", value=self.show_hidden, on_change=set_show_hidden
                 )
+            n_outside = sum(
+                self.outside(s) for s in self.stats if not s.hidden and self.in_years(s)
+            )
+            if self.primary and (n_outside or self.show_outside):
+
+                def set_show_outside(e) -> None:
+                    self.show_outside = e.value
+                    self.sel = None
+                    self.render()
+
+                ui.switch(
+                    _("only those not in {source} ({n})").format(
+                        source=ADAPTERS[self.primary].label, n=n_outside
+                    ),
+                    value=self.show_outside,
+                    on_change=set_show_outside,
+                ).tooltip(
+                    _("Papers the primary source doesn't list: not counted (add them there)")
+                ).mark("show-outside")
             if self.sel:
                 with ui.chip(
                     self.sel.label, removable=True, color="primary", text_color="white"
@@ -941,7 +974,7 @@ class PublicationsPanel:
             columns = [("All", None, None), *bins]
             totals = [
                 sum(lo is None or (s.year is not None and lo <= s.year <= hi) for s in known)
-                for _, lo, hi in columns
+                for _label, lo, hi in columns
             ]
             cfg = contribution.load_config()
             series = []
@@ -952,12 +985,12 @@ class PublicationsPanel:
                         and (lo is None or (s.year is not None and lo <= s.year <= hi))
                         for s in known
                     )
-                    for _, lo, hi in columns
+                    for _label, lo, hi in columns
                 ]
                 if not counts[0]:
                     continue
                 data = []
-                for (_, lo, _), n, total in zip(columns, counts, totals, strict=True):
+                for (_label, lo, _hi), n, total in zip(columns, counts, totals, strict=True):
                     picked = owns and sel.key == key and sel.lo == (lo or 0)
                     data.append(
                         {
@@ -1191,7 +1224,7 @@ class PublicationsPanel:
                                 ui.icon("picture_as_pdf", size="xs", color="red-7").tooltip(
                                     f"PDF from {m.source}: {m.pdf_url}"
                                 )
-                    for _, name, colour in s.flags:
+                    for _fid, name, colour in s.flags:
                         span(
                             f'<span class="vr-chip" '
                             f'style="background:{colour};color:{chip_text(colour)}">'

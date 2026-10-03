@@ -1,6 +1,6 @@
 from datetime import date
 
-from helpers import make_person
+from helpers import add_source, make_person, pub
 
 from sci_report_analyzer import annotations, folders
 
@@ -112,3 +112,40 @@ def test_folder_tags_are_per_person_and_folder():
         "audition",
         "shortlisted",
     ]
+
+
+def test_primary_source_default_and_folder_override():
+    import asyncio
+
+    from sci_report_analyzer import pubview, reports, source_settings
+
+    pid = make_person()
+    add_source(pid, "hal", "idhal:jd", [pub("a", "In HAL", 2020, "ACL", doi="10.1/a")])
+    add_source(
+        pid,
+        "dblp",
+        "x",
+        [pub("a", "In HAL", 2020, "ACL", doi="10.1/a"), pub("b", "Only DBLP", 2021, "ACL")],
+    )
+    assert source_settings.primary_for(pid) is None  # none by default
+    source_settings.set_default_primary("hal")
+    assert source_settings.primary_for(pid) == "hal"
+    stats = asyncio.run(pubview.load_stats(pid))
+    keys = reports.citation_keys(stats)
+    listed = reports.report_papers(stats, keys, [], None, primary="hal")
+    assert [p.stat.title for p in listed] == ["In HAL"]
+    # A folder uses the default, none, or another source.
+    fid = folders.save_folder(None, "Committee")
+    period = folders.add_person(fid, pid, 2020, 2024)
+    assert source_settings.primary_for(pid, period) == "hal"
+    folders.save_folder(fid, "Committee", primary_source=source_settings.NO_PRIMARY)
+    assert source_settings.primary_for(pid, period) is None
+    folders.save_folder(fid, "Committee", primary_source="dblp")
+    assert source_settings.primary_for(pid, period) == "dblp"
+    assert folders.folders()[0].primary_source == "dblp"
+    # Not for someone without a profile there (nothing would count), nor a disabled source.
+    other = make_person("John Roe")
+    add_source(other, "dblp", "y", [pub("c", "Paper C", 2020, "ACL")])
+    assert source_settings.primary_for(other) is None
+    source_settings.set_disabled({"hal"})
+    assert source_settings.primary_for(pid) is None
