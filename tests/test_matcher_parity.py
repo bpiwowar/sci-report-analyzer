@@ -84,5 +84,7 @@ def test_rule_examples():
     before = {r["id"]: r["before"] for r in GOLDEN["rules"]}
     rules = {r.id: r for r in DEFAULT_NORM_RULES}
     for rid, after in expected.items():
+        if rid == "ordinals":  # now in the English and French rules
+            continue
         assert rules[rid].apply(before[rid]) == after
         assert rules[rid].example == before[rid]

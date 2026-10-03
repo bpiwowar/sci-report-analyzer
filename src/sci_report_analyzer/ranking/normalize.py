@@ -8,8 +8,11 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Iterable
+from functools import lru_cache
 
 from pydantic import BaseModel, Field
+
+from . import ordinals
 
 # Words (and period-abbreviations of them) that carry no discriminating signal
 # for venue matching. Discriminating abbreviations like "Comput." / "Inf." are
@@ -130,11 +133,23 @@ def _caps(token: str) -> int:
     return len(re.findall(r"[A-Z]", token))
 
 
+@lru_cache(maxsize=256)
+def _compile(pattern: str, replacement: str, ignore_case: bool) -> re.Pattern[str] | None:
+    """A rule's regex, its word lists (``{ordinals:fr}``) expanded; none if invalid."""
+    try:
+        rx = re.compile(ordinals.expand(pattern), re.ASCII | (re.I if ignore_case else 0))
+        rx.sub(replacement, "")  # validates the replacement's group references
+    except (re.error, IndexError):
+        return None
+    return rx
+
+
 class NormRule(BaseModel):
     """A venue-text normalization rule: a regex substitution (Python syntax, ``\\1``
     back-references), applied in order to the venue texts of the sources.
 
-    Rules compile with ``re.ASCII`` (``\\b``, ``\\d``, ``\\w`` behave like JavaScript's).
+    Rules compile with ``re.ASCII`` (``\\b``, ``\\d``, ``\\w`` behave like JavaScript's);
+    ``{ordinals:en}`` and ``{ordinals:fr}`` stand for the spelled ordinals (``ordinals``).
     """
 
     id: str
@@ -152,12 +167,7 @@ class NormRule(BaseModel):
     example: str | None = None
 
     def compiled(self) -> re.Pattern[str] | None:
-        try:
-            rx = re.compile(self.pattern, re.ASCII | (re.I if self.ignore_case else 0))
-            rx.sub(self.replacement, "")  # validates the replacement's group references
-        except (re.error, IndexError):
-            return None
-        return rx
+        return _compile(self.pattern, self.replacement, self.ignore_case)
 
     def applies_to(self, source: str | None) -> bool:
         return self.enabled and (not self.sources or source in self.sources)
@@ -170,36 +180,24 @@ class NormRule(BaseModel):
 # Word boundaries around digits (ASCII, as in JavaScript).
 _B0, _B1 = r"(?<![A-Za-z0-9_])", r"(?![A-Za-z0-9_])"
 
-# Spelled ordinals, by their ending: "…th" (fourth, fourteenth, twentieth, hundredth;
-# not "North", "Health": the stems are those of numbers), first / second / third.
-ORDINAL_WORDS_EN = (
-    r"(?:[a-z]+-)?(?:first|second|third|"
-    r"(?:four|fif|six|seven|eigh|nin|ten|eleven|twelf|[a-z]+teen|[a-z]+ie|hundred)th)"
-)
-# "…ième" (deuxième, quatorzième, vingt-et-unième), premier / première.
-ORDINAL_WORDS_FR = r"(?:[a-z-]+i[eè]me|premi(?:er|[eè]re))s?"
-# An event word after an ordinal: "First Workshop on…", not the "Second Language" of a title.
-_EVENT_EN = (
-    r"(?=\s+(?:annual|international|national|european|asian|joint|acm|ieee|conference|"
-    r"workshop|symposium|meeting|congress|colloquium|edition|forum|summit)\b)"
-)
-
 LANGUAGE_RULES: tuple[NormRule, ...] = (
     NormRule(
-        id="ordinalWordsEn",
-        name="Spelled ordinals",
-        description="Remove ordinals in words (…th, first, second, third) before an event "
-        "word (Annual, Conference, Workshop…).",
-        pattern=rf"\b{ORDINAL_WORDS_EN}\b{_EVENT_EN}",
+        id="ordinalsEn",
+        name="Ordinals",
+        description="Remove ordinals: 1st, 35th…, and in words, first to thousandth "
+        "(twenty-first, one hundred and first…).",
+        pattern=r"\b(?:\d+(?:st|nd|rd|th)|{ordinals:en})\b",
         ignore_case=True,
         language="en",
         example="Fourteenth ACM Conference on Recommender Systems",
     ),
     NormRule(
-        id="ordinalWordsFr",
-        name="Spelled ordinals",
-        description="Remove ordinals in words (…ième, premier, première).",
-        pattern=rf"(?<![a-zà-ÿ]){ORDINAL_WORDS_FR}(?![a-zà-ÿ])",
+        id="ordinalsFr",
+        name="Ordinals",
+        description="Remove ordinals: 1er, 17e, 22èmes…, and in words, premier to millième "
+        "(second, vingt et unième…).",
+        pattern=r"(?<![\wÀ-ÿ])(?:\d+(?:e|er|re|[eèé]re|i?[eè]me)s?|{ordinals:fr})"
+        r"(?![\wÀ-ÿ])",
         ignore_case=True,
         language="fr",
         example="Quatorzième conférence en recherche d'information",
@@ -232,14 +230,6 @@ DEFAULT_NORM_RULES: tuple[NormRule, ...] = (
         pattern=r",\s*(?=[^\s,]*[A-Z][^\s,]*[A-Z])[^\s,]+\s+(?:19|20)\d{2}\s*\Z",
         replacement="",
         example="IEEE Conference on Decision and Control, CDC 2025",
-    ),
-    NormRule(
-        id="ordinals",
-        name="Ordinals",
-        description="Remove ordinal numbers such as 45th, 1st, 17e, 22èmes.",
-        pattern=r"\b\d+(?:st|nd|rd|th|e|er|eme|ème)s?\b",
-        ignore_case=True,
-        example="45th Annual Meeting",
     ),
     NormRule(
         id="years",

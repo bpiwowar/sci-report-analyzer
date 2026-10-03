@@ -1,4 +1,7 @@
-"""cleaning rules: spelled ordinals, by language (added to the rules saved in the settings)
+"""cleaning rules: ordinals, by language (in the rules saved in the settings)
+
+The English and French rules (digits and words: 35th, Fourteenth, 17e, quatorzième)
+replace the general "Ordinals" rule (dropped if it was not edited).
 
 Revision ID: a9c3e5f17d28
 Revises: b7e2f4a91c03
@@ -21,10 +24,10 @@ RULES = json.loads(
     r"""
 [
     {
-        "id": "ordinalWordsEn",
-        "name": "Spelled ordinals",
-        "description": "Remove ordinals in words (…th, first, second, third) before an event word (Annual, Conference, Workshop…).",
-        "pattern": "\\b(?:[a-z]+-)?(?:first|second|third|(?:four|fif|six|seven|eigh|nin|ten|eleven|twelf|[a-z]+teen|[a-z]+ie|hundred)th)\\b(?=\\s+(?:annual|international|national|european|asian|joint|acm|ieee|conference|workshop|symposium|meeting|congress|colloquium|edition|forum|summit)\\b)",
+        "id": "ordinalsEn",
+        "name": "Ordinals",
+        "description": "Remove ordinals: 1st, 35th…, and in words, first to thousandth (twenty-first, one hundred and first…).",
+        "pattern": "\\b(?:\\d+(?:st|nd|rd|th)|{ordinals:en})\\b",
         "replacement": " ",
         "ignore_case": true,
         "enabled": true,
@@ -33,10 +36,10 @@ RULES = json.loads(
         "example": "Fourteenth ACM Conference on Recommender Systems"
     },
     {
-        "id": "ordinalWordsFr",
-        "name": "Spelled ordinals",
-        "description": "Remove ordinals in words (…ième, premier, première).",
-        "pattern": "(?<![a-zà-ÿ])(?:[a-z-]+i[eè]me|premi(?:er|[eè]re))s?(?![a-zà-ÿ])",
+        "id": "ordinalsFr",
+        "name": "Ordinals",
+        "description": "Remove ordinals: 1er, 17e, 22èmes…, and in words, premier to millième (second, vingt et unième…).",
+        "pattern": "(?<![\\wÀ-ÿ])(?:\\d+(?:e|er|re|[eèé]re|i?[eè]me)s?|{ordinals:fr})(?![\\wÀ-ÿ])",
         "replacement": " ",
         "ignore_case": true,
         "enabled": true,
@@ -48,6 +51,22 @@ RULES = json.loads(
 """
 )
 IDS = {r["id"] for r in RULES}
+# The general rule they replace, as it was by default.
+OLD = {
+    "id": "ordinals",
+    "name": "Ordinals",
+    "description": "Remove ordinal numbers such as 45th, 1st, 17e, 22èmes.",
+    "pattern": r"\b\d+(?:st|nd|rd|th|e|er|eme|ème)s?\b",
+    "replacement": " ",
+    "ignore_case": True,
+    "enabled": True,
+    "sources": [],
+    "example": "45th Annual Meeting",
+}
+
+
+def _unchanged(rule: dict) -> bool:
+    return rule.get("id") == "ordinals" and all(rule.get(k, v) == v for k, v in OLD.items())
 
 
 def _update(change) -> None:
@@ -66,8 +85,19 @@ def _update(change) -> None:
 
 
 def upgrade() -> None:
-    _update(lambda rules: [r for r in RULES if r["id"] not in {x["id"] for x in rules}] + rules)
+    def change(rules: list[dict]) -> list[dict]:
+        ids = {x.get("id") for x in rules}
+        return [r for r in RULES if r["id"] not in ids] + [r for r in rules if not _unchanged(r)]
+
+    _update(change)
 
 
 def downgrade() -> None:
-    _update(lambda rules: [r for r in rules if r.get("id") not in IDS])
+    def change(rules: list[dict]) -> list[dict]:
+        kept = [r for r in rules if r.get("id") not in IDS]
+        if any(r.get("id") == "ordinals" for r in kept):
+            return kept
+        at = next((i for i, r in enumerate(kept) if r.get("id") == "years"), 0)
+        return [*kept[:at], OLD, *kept[at:]]
+
+    _update(change)
