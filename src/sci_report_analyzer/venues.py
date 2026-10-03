@@ -961,7 +961,7 @@ def set_not_same(a: int, b: int) -> None:
 def merge_proposals(rows: list[VenueRow]) -> list[tuple[VenueRow, VenueRow, float]]:
     """Pairs of venues of the same family that look alike (as for ``similar_venues``), most
     alike first; in each, the venue to keep (most papers) comes first. Pairs said not to be
-    the same are left out."""
+    the same, or already related (see ``related``), are left out."""
     toks = {r.id: _row_tokens(r) for r in rows}
     # Only venues sharing a word or their acronym are compared.
     index: dict[tuple[str, str], list[VenueRow]] = defaultdict(list)
@@ -979,6 +979,8 @@ def merge_proposals(rows: list[VenueRow]) -> list[tuple[VenueRow, VenueRow, floa
                 if pair in seen or pair in not_same:
                     continue
                 seen.add(pair)
+                if related(a, b):
+                    continue
                 score = _similarity(a, toks[a.id], b, toks[b.id])
                 if score >= PROPOSAL_SCORE:
                     keep, other = sorted((a, b), key=lambda r: (-r.publications, r.id))

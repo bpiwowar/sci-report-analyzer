@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-03 14:24+0200\n"
+"POT-Creation-Date: 2026-10-03 15:34+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -2651,6 +2651,9 @@ msgstr "Rejetés ({n})"
 msgid "Related venues?"
 msgstr "Canaux liés ?"
 
+msgid "Relation recorded"
+msgstr "Relation enregistrée"
+
 msgid "Remove"
 msgstr "Supprimer"
 
@@ -3244,6 +3247,9 @@ msgstr ""
 
 msgid "The same venue"
 msgstr "Le même canal"
+
+msgid "The second venue is, for the first one"
+msgstr "Le second canal est, pour le premier"
 
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
@@ -3871,6 +3877,9 @@ msgstr "filtrer"
 msgid "filter venues"
 msgstr "filtrer les canaux"
 
+msgid "first"
+msgstr "premier"
+
 msgid "flags"
 msgstr "signalements"
 
@@ -4249,6 +4258,9 @@ msgstr "rechercher dans les classements"
 
 msgid "search title / venue / author"
 msgstr "rechercher titre / canal de publication / auteur"
+
+msgid "second"
+msgstr "second"
 
 msgid "set by hand"
 msgstr "fixée à la main"
