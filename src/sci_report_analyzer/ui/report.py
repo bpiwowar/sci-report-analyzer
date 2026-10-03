@@ -7,7 +7,7 @@ import re
 
 from nicegui import ui
 
-from .. import annotations, categories, folders, reports
+from .. import annotations, categories, folders, reports, source_settings
 from ..db.models import Period
 from ..db.session import session_scope
 from . import pdf_viewer
@@ -120,6 +120,7 @@ async def _build(box: ui.column, period_id: int, found) -> None:
         (True, True): "any year",
     }[(years[0] is None, years[1] is None)]
     stats = await load_stats(person_id)
+    primary = source_settings.primary_for(person_id, period_id)
     keys = reports.citation_keys(stats)
     seen = {"signature": reports.signature(person_id)}
     saved = reports.get(period_id)
@@ -130,7 +131,7 @@ async def _build(box: ui.column, period_id: int, found) -> None:
 
     def context() -> reports.Context:
         tag_ids = [t for t in tags.value or [] if t in names]
-        papers = reports.report_papers(stats, keys, tag_ids, period_id, years)
+        papers = reports.report_papers(stats, keys, tag_ids, period_id, years, primary)
         return reports.Context(
             papers,
             stats,

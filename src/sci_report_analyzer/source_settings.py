@@ -6,9 +6,9 @@ publications and the venues (they are kept: enabling it again brings them back).
 
 from __future__ import annotations
 
-from sqlalchemy import and_
+from sqlalchemy import and_, select
 
-from .db.models import AppSetting, SourceLink
+from .db.models import AppSetting, Folder, Period, SourceLink
 from .db.session import session_scope
 
 KEY = "enabled_sources"
@@ -44,3 +44,48 @@ def active_links():
     """SQL condition: validated links of enabled sources."""
     cond = SourceLink.status == "validated"
     return and_(cond, SourceLink.source.not_in(disabled())) if disabled() else cond
+
+
+# ---- the primary source ---------------------------------------------------------------------
+# A paper the person's profile on it doesn't list is not counted (e.g. HAL, where CNRS
+# researchers must deposit their papers); the other sources still help with its venue.
+
+PRIMARY_KEY = "primary_source"
+NO_PRIMARY = "none"  # a folder without a primary source (whatever the default)
+
+
+def default_primary() -> str | None:
+    with session_scope() as s:
+        row = s.get(AppSetting, PRIMARY_KEY)
+        return (row.value or {}).get("source") if row else None
+
+
+def set_default_primary(source: str | None) -> None:
+    with session_scope() as s:
+        s.merge(AppSetting(key=PRIMARY_KEY, value={"source": source}))
+
+
+def folder_primary(folder: Folder | None) -> str | None:
+    """The primary source of a folder: its own, else the default (None: none)."""
+    source = folder.primary_source if folder is not None else None
+    if source is None:
+        return default_primary()
+    return None if source == NO_PRIMARY else source
+
+
+def primary_for(person_id: int, period_id: int | None = None) -> str | None:
+    """The primary source for a person's papers (within a period: that of its folder), if
+    enabled and the person has a validated profile there (else nothing would count)."""
+    with session_scope() as s:
+        period = s.get(Period, period_id) if period_id else None
+        source = folder_primary(period.folder if period else None)
+        if source is None or not enabled(source):
+            return None
+        linked = s.scalar(
+            select(SourceLink.id).where(
+                SourceLink.person_id == person_id,
+                SourceLink.source == source,
+                SourceLink.status == "validated",
+            )
+        )
+        return source if linked is not None else None

@@ -48,6 +48,12 @@ and reports, to prepare an evaluation.
 Your **email** (Settings → API keys) is required before anything is fetched: it is sent to
 the sources (OpenAlex, Crossref and Unpaywall ask for it) so they can reach you.
 
+A **primary source** (Settings → Sources; a folder can use another one, or none) decides
+which papers count: one it doesn't list for the person is left out of the panel, the reports
+and the summary, e.g. HAL, where CNRS researchers must deposit their papers. The switch
+*only those not in HAL* lists them, to add them there. The other sources still help find
+the venue and track. People without a validated profile on that source are not affected.
+
 ## Merging
 
 Records from different sources are merged when they share a DOI, or have the same title
@@ -147,7 +153,9 @@ Satellite tracks (Findings, demos, short papers…) and workshops are shown as s
 striped categories, e.g. "Findings CORE A" or "Workshop A*". **Flags** with a track (short,
 demo…) put a paper in such a category; other flags are just labels you can filter on.
 When the sources disagree only because some give a track (demo, short…) and others none,
-the track wins (demo, Findings, workshop…). Likewise a workshop
+the track wins (demo, Findings, workshop…), whatever the venue each one gives. Different
+tracks (e.g. demo and short) are a problem to settle: validate a source in the details, or
+flag the paper. Likewise a workshop
 wins over its main conference (e.g. a DOI record giving EMNLP for a BlackboxNLP paper).
 Edited proceedings (chairing) keep their venue's rank in categories of their own, e.g.
 "Proc. (ed.) CORE A*"; an edited volume without a venue is matched by its title.
