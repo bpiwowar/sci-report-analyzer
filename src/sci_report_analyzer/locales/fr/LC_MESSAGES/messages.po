@@ -1237,7 +1237,7 @@ msgid "Find the papers first"
 msgstr "Trouvez d'abord les articles"
 
 msgid "Findings track (host conference rank)"
-msgstr "Piste Findings (rang de la conférence hôte)"
+msgstr "Session Findings (rang de la conférence hôte)"
 
 msgid "Flags"
 msgstr "Signalements"
@@ -1247,7 +1247,7 @@ msgid ""
 "satellite category (e.g. “Short CORE A*”) in the distribution."
 msgstr ""
 "Les signalements s’attachent aux publications. Un signalement avec une "
-"piste place l’article dans une catégorie satellite (p. ex. « Court CORE "
+"session place l’article dans une catégorie satellite (p. ex. « Court CORE "
 "A* ») dans la distribution."
 
 msgid "Flags, tags & categories"
@@ -3230,7 +3230,7 @@ msgid ""
 "The sources give different venues or tracks: select one to validate it "
 "for this paper, or several venues to merge them."
 msgstr ""
-"Les sources donnent des canaux de publication ou des pistes différents : "
+"Les sources donnent des canaux de publication ou des sessions différents : "
 "sélectionnez-en un pour le valider pour cet article, ou plusieurs canaux "
 "pour les fusionner."
 
@@ -3252,7 +3252,7 @@ msgid ""
 "The venue kept gets the others' variants (with their tracks), rules, "
 "ISSNs and papers; its own decisions win, the others' fill what it lacks."
 msgstr ""
-"Le canal conservé reçoit les variantes (avec leurs pistes), règles, ISSN "
+"Le canal conservé reçoit les variantes (avec leurs sessions), règles, ISSN "
 "et articles des autres ; ses propres décisions l'emportent, celles des "
 "autres complètent ce qui lui manque."
 
@@ -3359,20 +3359,20 @@ msgid "To (year)"
 msgstr "À (année)"
 
 msgid "Track"
-msgstr "Piste"
+msgstr "Session"
 
 msgid "Track of the papers with this variant"
-msgstr "Piste des articles ayant cette variante"
+msgstr "Session des articles ayant cette variante"
 
 msgid "Track of the publications whose venue text matches (demo, findings...)"
-msgstr "Piste des publications dont le texte de canal correspond (démo, findings…)"
+msgstr "Session des publications dont le texte de canal correspond (démo, findings…)"
 
 msgid "Track saved"
-msgstr "Piste enregistrée"
+msgstr "Session enregistrée"
 
 #, python-brace-format
 msgid "Track: {why}"
-msgstr "Piste : {why}"
+msgstr "Session : {why}"
 
 msgid "Try a venue text"
 msgstr "Essayer un texte de canal de publication"
@@ -4053,7 +4053,7 @@ msgid "no such period"
 msgstr "période introuvable"
 
 msgid "no track"
-msgstr "aucune piste"
+msgstr "session normale"
 
 msgid "no validated source"
 msgstr "aucune source validée"
@@ -4264,7 +4264,7 @@ msgstr "texte de la source : « {text} »"
 
 msgid "sources give different tracks — pick one in the details or flag it"
 msgstr ""
-"les sources donnent des pistes différentes — choisissez-en une dans les "
+"les sources donnent des sessions différentes — choisissez-en une dans les "
 "détails ou ajoutez un signalement"
 
 msgid "sources give different venues — pick one in the details"
@@ -4313,11 +4313,11 @@ msgstr "l'expression régulière ne le reconnaît pas"
 
 #, python-brace-format
 msgid "the venue from {source}, main track"
-msgstr "le canal de publication de {source}, piste principale"
+msgstr "le canal de publication de {source}, session principale"
 
 #, python-brace-format
 msgid "the venue from {source}, {track} track"
-msgstr "le canal de publication de {source}, piste {track}"
+msgstr "le canal de publication de {source}, session {track}"
 
 #, python-brace-format
 msgid "the workshop rather than its main conference ({names})"
@@ -4331,7 +4331,7 @@ msgstr "à"
 
 #, python-brace-format
 msgid "track: {track}"
-msgstr "piste : {track}"
+msgstr "session : {track}"
 
 #, python-brace-format
 msgid "unknown DBLP pid {pid}"
@@ -4689,7 +4689,7 @@ msgstr ""
 
 #, python-brace-format
 msgid "{track} track: {why}"
-msgstr "Piste {track} : {why}"
+msgstr "Session {track} : {why}"
 
 #, python-brace-format
 msgid "{track} {category}"
@@ -4705,16 +4705,16 @@ msgstr "{what} : {note}"
 
 #, python-brace-format
 msgid "{why}; it wins over the sources giving no track"
-msgstr "{why} ; elle l'emporte sur les sources ne donnant aucune piste"
+msgstr "{why} ; elle l'emporte sur les sources donnant la session normale"
 
 #, python-brace-format
 msgid "{why}; it wins over {sources} (no track: the main conference)"
 msgstr ""
-"{why} ; elle l'emporte sur {sources} (aucune piste : la conférence "
+"{why} ; elle l'emporte sur {sources} (session normale : la conférence "
 "principale)"
 
 msgid "— (no track)"
-msgstr "— (pas de piste)"
+msgstr "— (session normale)"
 
 msgid "— automatic"
 msgstr "— automatique"
