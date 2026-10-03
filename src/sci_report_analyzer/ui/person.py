@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from html import escape
+
 from fastapi import Request
 from nicegui import background_tasks, ui
 from sqlalchemy import select
@@ -10,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from .. import annotations, folders, manual, theses
 from ..db.models import Person, SourceLink, Thesis
 from ..db.session import session_scope
+from ..i18n import N_, _, ngettext
 from ..source_settings import active_links
 from ..sources import ADAPTERS
 from ..sources.base import SourceError
@@ -31,6 +35,20 @@ from ..sync import (
 from .documents_page import documents_view
 from .panel import PublicationsPanel, period_label
 from .theme import STATUS_COLOUR, fmt_dt, frame, source_tag
+
+# Shown with _(): the update statuses of a source (SourceLink.status_label, the keys of
+# STATUS_COLOUR).
+_DISPLAYED = (
+    N_("up to date"),
+    N_("updating…"),
+    N_("error"),
+    N_("never synced"),
+    N_("out of date"),
+    N_("not used"),
+    N_("candidate"),
+    N_("rejected"),
+    N_("validated"),
+)
 
 
 def _refresh(r) -> None:
@@ -72,8 +90,8 @@ def register() -> None:
 def _person_page(request: Request, person_id: int, tab: str, period: int | None) -> None:
     person = _load(person_id)
     if person is None:
-        with frame("Not found"):
-            ui.label("Unknown person")
+        with frame(_("Not found")):
+            ui.label(_("Unknown person"))
         return
     # The folder the person is seen from: that of the period, else the People page's one.
     state_period = period or annotations.panel_state(person_id).get("period_id")
@@ -136,17 +154,17 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
                     f"ORCID {person.orcid}", f"https://orcid.org/{person.orcid}", new_tab=True
                 ).classes("text-xs").mark("person-orcid")
         with ui.tabs(value=tab).props("inline-label dense").classes("grow") as tabs:
-            ui.tab("publications", "Publications", icon="article")
-            ui.tab("sources", "Sources", icon="hub")
-            ui.tab("periods", "Periods", icon="date_range")
-            ui.tab("theses", "Theses", icon="school")
-            ui.tab("documents", "Documents", icon="description").mark("tab-documents")
+            ui.tab("publications", _("Publications"), icon="article")
+            ui.tab("sources", _("Sources"), icon="hub")
+            ui.tab("periods", _("Periods"), icon="date_range")
+            ui.tab("theses", _("Theses"), icon="school")
+            ui.tab("documents", _("Documents"), icon="description").mark("tab-documents")
         with ui.row():
             ui.button(
                 icon="delete_sweep",
                 on_click=lambda: purge_dialog([person.id], person.name, ui.navigate.reload),
             ).props("flat round color=negative").tooltip(
-                "Purge: remove all papers and re-sync"
+                _("Purge: remove all papers and re-sync")
             ).mark("purge-person")
             ui.button(icon="edit", on_click=lambda: edit.open()).props("flat round")
             ui.button(icon="delete", on_click=lambda: confirm.open()).props(
@@ -154,25 +172,25 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
             )
 
     with ui.dialog() as edit, ui.card().classes("w-96"):
-        name = ui.input("Name", value=person.name).classes("w-full")
-        aff = ui.input("Affiliation", value=person.affiliation or "").classes("w-full")
+        name = ui.input(_("Name"), value=person.name).classes("w-full")
+        aff = ui.input(_("Affiliation"), value=person.affiliation or "").classes("w-full")
         orcid = (
             ui.input("ORCID", value=person.orcid or "", placeholder="0000-0002-1825-0097")
             .classes("w-full")
-            .tooltip("Helps matching: profiles with this ORCID are shown in green")
+            .tooltip(_("Helps matching: profiles with this ORCID are shown in green"))
             .mark("person-orcid-input")
         )
         aliases = (
-            ui.textarea("Name aliases (one per line)", value="\n".join(person.aliases or []))
+            ui.textarea(_("Name aliases (one per line)"), value="\n".join(person.aliases or []))
             .classes("w-full")
-            .tooltip("Other spellings used in author lists, e.g. “B. Doe”")
+            .tooltip(_("Other spellings used in author lists, e.g. “B. Doe”"))
         )
-        notes = ui.textarea("Notes", value=person.notes or "").classes("w-full")
+        notes = ui.textarea(_("Notes"), value=person.notes or "").classes("w-full")
 
         def save() -> None:
             value = normalize_orcid(orcid.value)
             if orcid.value.strip() and value is None:
-                ui.notify("Not an ORCID (e.g. 0000-0002-1825-0097)", type="warning")
+                ui.notify(_("Not an ORCID (e.g. 0000-0002-1825-0097)"), type="warning")
                 return
             with session_scope() as s:
                 p = s.get(Person, person.id)
@@ -183,20 +201,22 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
             ui.navigate.reload()
 
         with ui.row().classes("justify-end w-full"):
-            ui.button("Cancel", on_click=edit.close).props("flat")
-            ui.button("Save", on_click=save)
+            ui.button(_("Cancel"), on_click=edit.close).props("flat")
+            ui.button(_("Save"), on_click=save)
 
     with ui.dialog() as confirm, ui.card():
-        ui.label(f"Delete {person.name} and all their data (flags, stars, periods)?")
+        ui.label(
+            _("Delete {name} and all their data (flags, stars, periods)?").format(name=person.name)
+        )
         with ui.row().classes("justify-end w-full"):
-            ui.button("Cancel", on_click=confirm.close).props("flat")
+            ui.button(_("Cancel"), on_click=confirm.close).props("flat")
 
             def delete() -> None:
                 with session_scope() as s:
                     s.delete(s.get(Person, person.id))
                 ui.navigate.to("/")
 
-            ui.button("Delete", color="negative", on_click=delete)
+            ui.button(_("Delete"), color="negative", on_click=delete)
     return tabs
 
 
@@ -208,22 +228,36 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
         with ui.row().classes("items-center gap-2 no-wrap"):
             ui.icon("warning", size="lg", color="negative")
-            ui.label(f"Purge the papers of {who}?").classes("text-xl font-medium")
+            ui.label(_("Purge the papers of {who}?").format(who=who)).classes("text-xl font-medium")
         with ui.column().classes("gap-1 bg-red-1 rounded p-3 w-full"):
-            ui.label(f"This removes, for {n['people']} person(s):").classes("font-medium")
-            ui.label(f"• {n['papers']} paper(s) and {n['records']} source record(s)")
             ui.label(
-                f"• everything set on these papers: {n['annotated']} paper(s) have flags, "
-                "stars, a venue / rank / kind set by hand, corrections, a note, are hidden "
-                "or were merged / split by hand"
+                ngettext(
+                    "This removes, for {n} person(s):",
+                    "This removes, for {n} person(s):",
+                    n["people"],
+                ).format(n=n["people"])
+            ).classes("font-medium")
+            ui.label(
+                _("• {papers} paper(s) and {records} source record(s)").format(
+                    papers=n["papers"], records=n["records"]
+                )
+            )
+            ui.label(
+                _(
+                    "• everything set on these papers: {n} paper(s) have flags, "
+                    "stars, a venue / rank / kind set by hand, corrections, a note, are hidden "
+                    "or were merged / split by hand"
+                ).format(n=n["annotated"])
             ).classes("text-negative" if n["annotated"] else "")
             ui.label(
-                "Then all their validated sources are synced again from scratch. Sources, "
-                "periods, name aliases, PhD students and venue decisions are kept."
+                _(
+                    "Then all their validated sources are synced again from scratch. Sources, "
+                    "periods, name aliases, PhD students and venue decisions are kept."
+                )
             ).classes("text-sm")
-            ui.label("This cannot be undone.").classes("text-negative font-medium")
+            ui.label(_("This cannot be undone.")).classes("text-negative font-medium")
         word = (
-            ui.input("Type PURGE to confirm")
+            ui.input(_("Type PURGE to confirm"))
             .props("dense outlined")
             .classes("w-full")
             .mark("purge-word")
@@ -231,19 +265,26 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
 
         def ok() -> None:
             if (word.value or "").strip().upper() != "PURGE":
-                ui.notify("Type PURGE to confirm", type="warning")
+                ui.notify(_("Type PURGE to confirm"), type="warning")
                 return
             purge(person_ids)
             for pid in person_ids:
                 start_sync(pid)
-            ui.notify(f"Papers purged; re-syncing {n['people']} person(s)", type="positive")
+            ui.notify(
+                ngettext(
+                    "Papers purged; re-syncing {n} person(s)",
+                    "Papers purged; re-syncing {n} person(s)",
+                    n["people"],
+                ).format(n=n["people"]),
+                type="positive",
+            )
             if after:
                 after()
             dlg.close()  # last: a closed dialog is deleted, with its UI context
 
         with ui.row().classes("w-full justify-end"):
-            ui.button("Cancel", on_click=dlg.close).props("flat")
-            ui.button("Purge and re-sync", icon="delete_forever", on_click=ok).props(
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Purge and re-sync"), icon="delete_forever", on_click=ok).props(
                 "color=negative"
             ).mark("purge-confirm")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
@@ -260,21 +301,21 @@ def stale_banner(person_id: int) -> None:
             running = [
                 ADAPTERS[ln.source].label for ln in person.links if ln.sync_state == "running"
             ]
-            ui.label("Updating " + (", ".join(running) or "…"))
+            ui.label(_("Updating {sources}").format(sources=", ".join(running) or "…"))
         return
     if stale:
         with ui.row().classes("w-full items-center bg-amber-1 text-amber-10 rounded p-2 gap-3"):
             ui.icon("warning")
-            names = ", ".join(f"{ADAPTERS[ln.source].label} ({ln.status_label})" for ln in stale)
-            ui.label(f"Some sources are not up to date: {names}")
+            names = ", ".join(f"{ADAPTERS[ln.source].label} ({_(ln.status_label)})" for ln in stale)
+            ui.label(_("Some sources are not up to date: {names}").format(names=names))
             ui.button(
-                "Sync now", icon="sync", on_click=lambda: _sync(person_id, only_stale=True)
+                _("Sync now"), icon="sync", on_click=lambda: _sync(person_id, only_stale=True)
             ).props("dense")
 
 
 def _sync(person_id: int, *, only_stale: bool = False) -> None:
     if not start_sync(person_id, only_stale=only_stale):
-        ui.notify("A sync is already running")
+        ui.notify(_("A sync is already running"))
     _refresh(stale_banner)
     _refresh(sources_list)
 
@@ -286,23 +327,26 @@ def sources_view(person_id: int, on_change) -> None:
     state = {"was_running": False}
 
     with ui.row().classes("w-full items-center gap-2"):
-        ui.button("Re-sync all", icon="sync", on_click=lambda: _sync(person_id))
+        ui.button(_("Re-sync all"), icon="sync", on_click=lambda: _sync(person_id))
 
         async def search_again() -> None:
-            ui.notify("Searching every source…")
+            ui.notify(_("Searching every source…"))
             errors = await discover(person_id)
             if errors:
                 ui.notify(
-                    "Failed: " + "; ".join(f"{k}: {v}" for k, v in errors.items()),
+                    _("Failed: {errors}").format(
+                        errors="; ".join(f"{k}: {v}" for k, v in errors.items())
+                    ),
                     type="warning",
                     multi_line=True,
                 )
             _refresh(sources_list)
 
-        ui.button("Search sources again", icon="search", on_click=search_again).props("outline")
-        url = ui.input("Add a profile by URL or id").classes("w-96").props("dense clearable")
+        ui.button(_("Search sources again"), icon="search", on_click=search_again).props("outline")
+        url = ui.input(_("Add a profile by URL or id")).classes("w-96").props("dense clearable")
         src = ui.select(
-            {"": "auto-detect", **{k: a.label for k, a in ADAPTERS.items() if a.linkable}}, value=""
+            {"": _("auto-detect"), **{k: a.label for k, a in ADAPTERS.items() if a.linkable}},
+            value="",
         ).props("dense")
 
         def add() -> None:
@@ -312,15 +356,19 @@ def sources_view(person_id: int, on_change) -> None:
                 ext = ADAPTERS[name].parse_url(text)
                 if ext:
                     add_link(person_id, name, ext)
-                    ui.notify(f"Added {ADAPTERS[name].label} profile {ext} — syncing")
+                    ui.notify(
+                        _("Added {source} profile {id} — syncing").format(
+                            source=ADAPTERS[name].label, id=ext
+                        )
+                    )
                     url.value = ""
                     background_tasks.create(_sync_one(person_id, None, name, ext))
                     _refresh(sources_list)
                     _refresh(stale_banner)
                     return
-            ui.notify("Could not recognise this URL / id", type="warning")
+            ui.notify(_("Could not recognise this URL / id"), type="warning")
 
-        ui.button("Add", on_click=add).props("dense")
+        ui.button(_("Add"), on_click=add).props("dense")
 
     sources_list(person_id)
 
@@ -382,17 +430,21 @@ def sources_list(person_id: int) -> None:
             .mark("orcid-suggestion")
         ):
             ui.icon("badge", color="positive")
-            ui.label(f"The validated profiles give the ORCID {found}.").classes("grow")
+            ui.label(
+                _("The validated profiles give the ORCID {orcid}.").format(orcid=found)
+            ).classes("grow")
 
             def use(o=found) -> None:
-                ui.notify(f"ORCID {o} set: candidates with it are shown in green")
+                ui.notify(
+                    _("ORCID {orcid} set: candidates with it are shown in green").format(orcid=o)
+                )
                 set_orcid(person_id, o)
                 _refresh(sources_list)
 
-            ui.button("Use it", icon="check", on_click=use).props("dense").mark("orcid-use")
-    ui.label("Validated sources").classes("text-lg mt-2")
+            ui.button(_("Use it"), icon="check", on_click=use).props("dense").mark("orcid-use")
+    ui.label(_("Validated sources")).classes("text-lg mt-2")
     if not validated:
-        ui.label("None yet: validate candidates below, or add a profile by URL.").classes(
+        ui.label(_("None yet: validate candidates below, or add a profile by URL.")).classes(
             "text-grey"
         )
     with ui.column().classes("w-full gap-2"):
@@ -402,27 +454,27 @@ def sources_list(person_id: int) -> None:
     if items := manual.added(person_id):
         _added_list(person_id, items)
 
-    ui.label("Candidates to review").classes("text-lg mt-4")
+    ui.label(_("Candidates to review")).classes("text-lg mt-4")
     if not candidates:
-        ui.label("No pending candidate.").classes("text-grey")
+        ui.label(_("No pending candidate.")).classes("text-grey")
     with ui.grid(columns="repeat(auto-fill, minmax(360px, 1fr))").classes("w-full"):
         for ln in candidates:
             _candidate_card(person_id, ln, person.orcid or suggested_orcid(person), bool(validated))
 
     if rejected:
-        with ui.expansion(f"Rejected ({len(rejected)})").classes("w-full"):
+        with ui.expansion(_("Rejected ({n})").format(n=len(rejected))).classes("w-full"):
             for ln in rejected:
                 with ui.row().classes("items-center gap-2"):
                     source_tag(ln.source, url=_link_url(ln))
                     ui.link(ln.display_name or ln.external_id, ln.url or "#", new_tab=True)
                     ui.button(
-                        "restore", on_click=lambda i=ln.id: _set(person_id, i, "candidate")
+                        _("restore"), on_click=lambda i=ln.id: _set(person_id, i, "candidate")
                     ).props("flat dense")
 
 
 def _added_list(person_id: int, items: list[manual.AddedItem]) -> None:
     """Publications added by hand (Publications tab → +), with their source record."""
-    ui.label("Added by hand").classes("text-lg mt-4")
+    ui.label(_("Added by hand")).classes("text-lg mt-4")
     with ui.column().classes("w-full gap-1").mark("added-publications"):
         for it in items:
             with ui.row().classes("w-full items-center gap-3 px-2"):
@@ -430,17 +482,17 @@ def _added_list(person_id: int, items: list[manual.AddedItem]) -> None:
                 ui.link(it.title or it.id, it.url, new_tab=True)
                 ui.label(it.id).classes("text-grey text-xs")
                 if it.state and it.state != "up to date":
-                    ui.badge(it.state, color=STATUS_COLOUR.get(it.state, "grey"))
+                    ui.badge(_(it.state), color=STATUS_COLOUR.get(it.state, "grey"))
                 ui.space()
 
                 async def remove(i=it) -> None:
                     await manual.remove(person_id, i)
-                    ui.notify(f"Removed {i.id}")
+                    ui.notify(_("Removed {id}").format(id=i.id))
                     _refresh(sources_list)
 
                 ui.button(icon="delete", on_click=remove).props(
                     "flat round dense color=negative"
-                ).tooltip("Remove (the paper stays if another source has it)").mark(
+                ).tooltip(_("Remove (the paper stays if another source has it)")).mark(
                     f"remove-added-{it.id}"
                 )
 
@@ -461,52 +513,66 @@ def _validated_card(person_id: int, ln: SourceLink) -> None:
             new_tab=True,
         ).classes("font-medium")
         ui.label(ln.external_id).classes("text-grey text-xs")
-        ui.badge(ln.status_label, color=STATUS_COLOUR.get(ln.status_label, "grey"))
+        ui.badge(_(ln.status_label), color=STATUS_COLOUR.get(ln.status_label, "grey"))
         if ln.sync_state == "running":
             ui.spinner(size="xs")
-        ui.label(f"last sync {fmt_dt(ln.last_synced_at)}").classes("text-sm text-grey")
+        ui.label(_("last sync {when}").format(when=fmt_dt(ln.last_synced_at))).classes(
+            "text-sm text-grey"
+        )
         if ln.record_count is not None:
-            ui.label(f"{ln.record_count} records").classes("text-sm text-grey")
+            ui.label(
+                ngettext("{n} records", "{n} records", ln.record_count).format(n=ln.record_count)
+            ).classes("text-sm text-grey")
         ui.space()
         if ln.source == "scholar":
             _scholar_upload(person_id, ln)
         ui.button(
             icon="sync", on_click=lambda i=ln.id: background_tasks.create(_sync_one(person_id, i))
-        ).props("flat round dense").tooltip("Sync this source")
+        ).props("flat round dense").tooltip(_("Sync this source"))
         ui.button(icon="link_off", on_click=lambda i=ln.id: _set(person_id, i, "rejected")).props(
             "flat round dense color=negative"
-        ).tooltip("Unlink (reject)")
+        ).tooltip(_("Unlink (reject)"))
     if ln.sync_state == "error" and ln.last_error:
         ui.label(ln.last_error).classes("text-negative text-sm -mt-2 ml-4")
 
 
 def _scholar_upload(person_id: int, ln: SourceLink) -> None:
     with ui.dialog() as dlg, ui.card():
-        ui.label("Upload a saved Google Scholar profile page").classes("text-lg")
+        ui.label(_("Upload a saved Google Scholar profile page")).classes("text-lg")
         ui.markdown(
-            "Open the profile, click **Show more** until every paper is listed, then "
-            "save the page (HTML) and upload it here."
+            _(
+                "Open the profile, click **Show more** until every paper is listed, then "
+                "save the page (HTML) and upload it here."
+            )
         )
 
         async def handle(e) -> None:
             html = await e.file.text()
             sid = profile_id_from_html(html)
             if sid and sid != ln.external_id:
-                ui.notify(f"This page is for profile {sid}, not {ln.external_id}", type="warning")
+                ui.notify(
+                    _("This page is for profile {found}, not {expected}").format(
+                        found=sid, expected=ln.external_id
+                    ),
+                    type="warning",
+                )
                 return
             result = parse_profile(html, [ln.display_name or ""])
             if not result.publications:
-                ui.notify("No publications found in this page", type="warning")
+                ui.notify(_("No publications found in this page"), type="warning")
                 return
             finish_link(ln.id, result)
-            ui.notify(f"Imported {len(result.publications)} publications")
+            n = len(result.publications)
+            ui.notify(
+                ngettext("Imported {n} publications", "Imported {n} publications", n).format(n=n)
+            )
             _refresh(sources_list)
             dlg.close()
             _refresh(stale_banner)
 
         ui.upload(on_upload=handle, auto_upload=True, max_files=1).props('accept=".html,.htm"')
     ui.button(icon="upload_file", on_click=dlg.open).props("flat round dense").tooltip(
-        "Upload a saved profile page"
+        _("Upload a saved profile page")
     )
 
 
@@ -525,13 +591,15 @@ def _candidate_card(
             )
             ui.space()
             ui.badge(f"{ln.score:.2f}", color="positive" if ln.score >= 0.9 else "grey").tooltip(
-                "match score (name, ORCID, affiliation, known titles, papers in common)"
+                _("match score (name, ORCID, affiliation, known titles, papers in common)")
             )
         details = []
         if ev.get("affiliation"):
             details.append(ev["affiliation"])
         if ev.get("works_count") is not None:
-            details.append(f"{ev['works_count']} works")
+            details.append(
+                ngettext("{n} works", "{n} works", ev["works_count"]).format(n=ev["works_count"])
+            )
         own_id = ln.external_id if ln.source == "orcid" else ""
         theirs = normalize_orcid(ev.get("orcid") or own_id)
         if theirs:
@@ -540,11 +608,11 @@ def _candidate_card(
                 f"ORCID {theirs}" + (" ✓" if same else " ≠" if orcid else ""),
                 color="positive" if same else "negative" if orcid else "grey-6",
             ).props("outline" if not orcid else "").tooltip(
-                "the person's ORCID"
+                _("the person's ORCID")
                 if same
-                else f"not the person's ORCID ({orcid})"
+                else _("not the person's ORCID ({orcid})").format(orcid=orcid)
                 if orcid
-                else "set the person's ORCID (edit) to check it"
+                else _("set the person's ORCID (edit) to check it")
             ).mark(f"candidate-orcid-{ln.id}")
         if ev.get("topics"):
             details.append(", ".join(t for t in ev["topics"] if t))
@@ -557,39 +625,41 @@ def _candidate_card(
         if ov := ev.get("overlap"):
             share = ov["matched"] / ov["total"] if ov["total"] else 0
             ui.badge(
-                f"{ov['matched']}/{ov['total']} papers already known ({share:.0%})",
+                _("{matched}/{total} papers already known ({share})").format(
+                    matched=ov["matched"], total=ov["total"], share=f"{share:.0%}"
+                ),
                 color="positive" if share >= 0.3 else "warning" if share > 0 else "negative",
-            ).tooltip("its papers found in the validated sources").mark(
+            ).tooltip(_("its papers found in the validated sources")).mark(
                 f"candidate-overlap-{ln.id}"
             )
         with ui.row():
             ui.button(
-                "Validate", icon="check", on_click=lambda i=ln.id: _validate(person_id, i)
+                _("Validate"), icon="check", on_click=lambda i=ln.id: _validate(person_id, i)
             ).props("dense")
             ui.button(
-                "Reject", icon="close", on_click=lambda i=ln.id: _set(person_id, i, "rejected")
+                _("Reject"), icon="close", on_click=lambda i=ln.id: _set(person_id, i, "rejected")
             ).props("dense flat color=negative")
             if can_probe and ADAPTERS[ln.source].provides_publications:
                 ui.button(icon="join_inner", on_click=lambda i=ln.id: _probe(person_id, i)).props(
                     "dense flat"
-                ).tooltip("Fetch its papers and check how many the validated sources have").mark(
+                ).tooltip(_("Fetch its papers and check how many the validated sources have")).mark(
                     f"candidate-probe-{ln.id}"
                 )
 
 
 async def _probe(person_id: int, link_id: int) -> None:
-    ui.notify("Fetching the candidate's papers…")
+    ui.notify(_("Fetching the candidate's papers…"))
     try:
         await probe_overlap(link_id)
     except Exception as e:
-        ui.notify(f"Could not fetch its papers: {e}", type="warning")
+        ui.notify(_("Could not fetch its papers: {error}").format(error=e), type="warning")
         return
     _refresh(sources_list)
 
 
 def _validate(person_id: int, link_id: int) -> None:
     # Before refreshing the list: it holds the clicked button (deleted with it).
-    ui.notify("Validated — syncing this source", type="positive")
+    ui.notify(_("Validated — syncing this source"), type="positive")
     _set(person_id, link_id, "validated")
     background_tasks.create(_sync_one(person_id, link_id))
 
@@ -603,23 +673,27 @@ def periods_view(person_id: int, on_change) -> None:
         items = [p for p in annotations.periods(person_id) if p.folder_id is None]
         if not items:
             ui.label(
-                "No period yet. Periods are named year ranges (e.g. “HDR 2015–2024”); "
-                "papers can be starred, tagged and annotated within each period."
+                _(
+                    "No period yet. Periods are named year ranges (e.g. “HDR 2015–2024”); "
+                    "papers can be starred, tagged and annotated within each period."
+                )
             ).classes("text-grey")
         for p in items:
             with ui.row().classes("items-center gap-2"):
-                name = ui.input("Name", value=p.name).props("dense")
+                name = ui.input(_("Name"), value=p.name).props("dense")
                 start = (
-                    ui.number("From", value=p.start_year, format="%d")
+                    ui.number(_("From"), value=p.start_year, format="%d")
                     .props("dense")
                     .classes("w-24")
                 )
-                end = ui.number("To", value=p.end_year, format="%d").props("dense").classes("w-24")
+                end = (
+                    ui.number(_("To"), value=p.end_year, format="%d").props("dense").classes("w-24")
+                )
                 ui.label(f"★ {len(p.stars)}").classes("text-amber-8")
 
                 def save(pid=p.id, n=name, a=start, b=end) -> None:
                     annotations.save_period(person_id, n.value, _int(a.value), _int(b.value), pid)
-                    ui.notify("Period saved")
+                    ui.notify(_("Period saved"))
                     on_change()
 
                 def remove(pid=p.id) -> None:
@@ -632,9 +706,9 @@ def periods_view(person_id: int, on_change) -> None:
 
     listing()
     with ui.row().classes("items-center gap-2 mt-4"):
-        name = ui.input("New period name").props("dense")
-        start = ui.number("From", format="%d").props("dense").classes("w-24")
-        end = ui.number("To", format="%d").props("dense").classes("w-24")
+        name = ui.input(_("New period name")).props("dense")
+        start = ui.number(_("From"), format="%d").props("dense").classes("w-24")
+        end = ui.number(_("To"), format="%d").props("dense").classes("w-24")
 
         def add() -> None:
             if not name.value:
@@ -644,16 +718,16 @@ def periods_view(person_id: int, on_change) -> None:
             listing.refresh()
             on_change()
 
-        ui.button("Add period", icon="add", on_click=add)
+        ui.button(_("Add period"), icon="add", on_click=add)
 
     folders_section(person_id, on_change)
 
 
 def folders_section(person_id: int, on_change) -> None:
     """The person's period in each of their folders."""
-    ui.label("In folders").classes("text-lg mt-6")
+    ui.label(_("In folders")).classes("text-lg mt-6")
     ui.label(
-        "A folder (e.g. a committee) groups people; each person has their own period in it."
+        _("A folder (e.g. a committee) groups people; each person has their own period in it.")
     ).classes("text-sm text-grey")
 
     @ui.refreshable
@@ -670,19 +744,21 @@ def folders_section(person_id: int, on_change) -> None:
                 if p.folder.date:
                     ui.label(p.folder.date.isoformat()).classes("text-sm text-grey")
                 if p.folder.hidden:
-                    ui.badge("hidden", color="grey")
+                    ui.badge(_("hidden"), color="grey")
                 start = (
-                    ui.number("From", value=p.start_year, format="%d")
+                    ui.number(_("From"), value=p.start_year, format="%d")
                     .props("dense")
                     .classes("w-24")
                 )
-                end = ui.number("To", value=p.end_year, format="%d").props("dense").classes("w-24")
+                end = (
+                    ui.number(_("To"), value=p.end_year, format="%d").props("dense").classes("w-24")
+                )
                 ui.label(f"★ {len(p.stars)}").classes("text-amber-8")
                 tags = (
                     ui.select(
                         sorted(set(p.tags or []), key=str.lower),
                         value=list(p.tags or []),
-                        label="Tags",
+                        label=_("Tags"),
                         multiple=True,
                         new_value_mode="add-unique",
                         with_input=True,
@@ -695,7 +771,7 @@ def folders_section(person_id: int, on_change) -> None:
                 def save(pid=p.id, a=start, b=end, t=tags) -> None:
                     folders.set_period(pid, _int(a.value), _int(b.value))
                     folders.set_tags(pid, t.value or [])
-                    ui.notify("Period saved")
+                    ui.notify(_("Period saved"))
                     on_change()
 
                 def leave(fid=p.folder_id) -> None:
@@ -706,13 +782,15 @@ def folders_section(person_id: int, on_change) -> None:
                 ui.button(icon="save", on_click=save).props("flat round dense")
                 ui.button(icon="folder_off", on_click=leave).props(
                     "flat round dense color=negative"
-                ).tooltip("Remove from this folder (its stars, tags and notes on papers are lost)")
+                ).tooltip(
+                    _("Remove from this folder (its stars, tags and notes on papers are lost)")
+                )
         joined = {p.folder_id for p in mine}
         others = {f.id: f.name for f in folders.folders() if f.id not in joined}
         if others:
             with ui.row().classes("items-center gap-2 mt-2"):
                 pick = (
-                    ui.select(others, label="Add to a folder")
+                    ui.select(others, label=_("Add to a folder"))
                     .props("dense outlined")
                     .classes("w-64")
                 )
@@ -723,7 +801,7 @@ def folders_section(person_id: int, on_change) -> None:
                         listing.refresh()
                         on_change()
 
-                ui.button("Add", icon="create_new_folder", on_click=join).props("dense")
+                ui.button(_("Add"), icon="create_new_folder", on_click=join).props("dense")
 
     listing()
 
@@ -744,7 +822,7 @@ def student_aliases_view(person_id: int, rows: list[Thesis]) -> None:
         return
     with session_scope() as s:
         current = dict(s.get(Person, person_id).student_aliases or {})
-    with ui.expansion("PhD student name aliases (for highlighting in author lists)").classes(
+    with ui.expansion(_("PhD student name aliases (for highlighting in author lists)")).classes(
         "w-full"
     ):
         inputs = {}
@@ -753,7 +831,7 @@ def student_aliases_view(person_id: int, rows: list[Thesis]) -> None:
                 ui.label(name).classes("w-56")
                 inputs[name] = (
                     ui.input(
-                        placeholder="other spellings, comma-separated",
+                        placeholder=_("other spellings, comma-separated"),
                         value=", ".join(current.get(name, [])),
                     )
                     .props("dense outlined")
@@ -767,9 +845,9 @@ def student_aliases_view(person_id: int, rows: list[Thesis]) -> None:
                     for n, i in inputs.items()
                     if i.value.strip()
                 }
-            ui.notify("Aliases saved (reload the publications to see them)")
+            ui.notify(_("Aliases saved (reload the publications to see them)"))
 
-        ui.button("Save aliases", icon="save", on_click=save)
+        ui.button(_("Save aliases"), icon="save", on_click=save)
 
 
 class ThesesView:
@@ -790,7 +868,7 @@ class ThesesView:
                 )
             )
         if not self.rows:
-            ui.label("No thesis: validate a theses.fr profile in the Sources tab.").classes(
+            ui.label(_("No thesis: validate a theses.fr profile in the Sources tab.")).classes(
                 "text-grey"
             )
             return
@@ -832,18 +910,24 @@ class ThesesView:
                 )
                 with ui.row().classes("items-center gap-4"):
                     ui.label(
-                        f"{len(rows)} of {len(self.rows)} theses in {where}"
+                        _("{n} of {total} theses in {where}").format(
+                            n=len(rows), total=len(self.rows), where=where
+                        )
                         if not self.show_all
-                        else f"All {len(self.rows)} theses (period: {where})"
+                        else _("All {total} theses (period: {where})").format(
+                            total=len(self.rows), where=where
+                        )
                     ).classes("text-grey").mark("theses-period")
 
                     def toggle(e) -> None:
                         self.show_all = e.value
                         self.render()
 
-                    ui.switch("show all", value=self.show_all, on_change=toggle).tooltip(
-                        "Also the theses outside the period (supervision overlapping it; "
-                        "juries: the defence within it)"
+                    ui.switch(_("show all"), value=self.show_all, on_change=toggle).tooltip(
+                        _(
+                            "Also the theses outside the period (supervision overlapping it; "
+                            "juries: the defence within it)"
+                        )
                     ).mark("theses-all")
             with session_scope() as s:
                 outcomes = dict(s.get(Person, self.person_id).student_outcomes or {})
@@ -860,18 +944,23 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
         "w-full"
     ):
         columns = [
-            {"name": "start", "label": "Start", "field": "start", "sortable": True},
-            {"name": "end", "label": "End", "field": "end", "sortable": True},
-            {"name": "student", "label": "PhD student", "field": "student", "sortable": True},
-            {"name": "title", "label": "Title", "field": "title", "align": "left"},
-            {"name": "sup", "label": "Supervisors", "field": "sup", "align": "left"},
-            {"name": "inst", "label": "Institution", "field": "inst", "align": "left"},
-            {"name": "status", "label": "Status", "field": "status"},
+            {"name": "start", "label": _("Start"), "field": "start", "sortable": True},
+            {"name": "end", "label": _("End"), "field": "end", "sortable": True},
+            {"name": "student", "label": _("PhD student"), "field": "student", "sortable": True},
+            {"name": "title", "label": _("Title"), "field": "title", "align": "left"},
+            {"name": "sup", "label": _("Supervisors"), "field": "sup", "align": "left"},
+            {"name": "inst", "label": _("Institution"), "field": "inst", "align": "left"},
+            {"name": "status", "label": _("Status"), "field": "status"},
         ]
         supervised = role == "director"
         if supervised:
             columns.append(
-                {"name": "outcome", "label": "After the PhD", "field": "outcome", "align": "left"}
+                {
+                    "name": "outcome",
+                    "label": _("After the PhD"),
+                    "field": "outcome",
+                    "align": "left",
+                }
             )
         table = (
             ui.table(
@@ -886,9 +975,9 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
                         "title": t.title,
                         "sup": ", ".join(t.supervisors or []),
                         "inst": t.institution,
-                        "status": "defended"
+                        "status": _("defended")
                         if t.status == "soutenue"
-                        else "in progress"
+                        else _("in progress")
                         if t.status == "enCours"
                         else t.status,
                         "url": t.url,
@@ -909,13 +998,18 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
             .props("dense flat wrap-cells")
             .mark(f"theses-{role}")
         )
+        estimated = escape(
+            _(
+                "Estimated: {n} years before the defence "
+                "(theses.fr only gives the start of the theses in progress)"
+            ).format(n=theses.TYPICAL_YEARS)
+        )
         table.add_slot(
             "body-cell-start",
             f"""
             <q-td :props="props">
               <span v-if="props.row.estimated" class="text-grey">≈ {{{{ props.value }}}}
-                <q-tooltip>Estimated: {theses.TYPICAL_YEARS} years before the defence
-                (theses.fr only gives the start of the theses in progress)</q-tooltip>
+                <q-tooltip>{estimated}</q-tooltip>
               </span>
               <span v-else>{{{{ props.value }}}}</span>
             </q-td>""",
@@ -936,19 +1030,29 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
                     <q-btn v-for="l in props.row.links" :key="l.url" :href="l.url"
                            target="_blank" :label="l.label" flat dense no-caps size="sm"
                            color="primary">
-                      <q-tooltip>Search {{ l.name }} on {{ l.label }}</q-tooltip>
+                      <q-tooltip>__SEARCH__</q-tooltip>
                     </q-btn>
                   </div>
                   <div class="cursor-pointer" :class="props.value ? '' : 'text-grey'">
-                    {{ props.value || 'add a note…' }}
+                    {{ props.value || __ADD_NOTE__ }}
                     <q-popup-edit v-model="props.row.outcome" buttons v-slot="scope"
                         @save="v => $parent.$emit('outcome',
                                                   {student: props.row.student, note: v})">
                       <q-input v-model="scope.value" type="textarea" autogrow dense autofocus
-                               label="What became of them (position, employer…)" />
+                               label="__OUTCOME_LABEL__" />
                     </q-popup-edit>
                   </div>
-                </q-td>""",
+                </q-td>""".replace(
+                    "__SEARCH__",
+                    escape(_("Search {name} on {source}")).format(
+                        name="{{ l.name }}", source="{{ l.label }}"
+                    ),
+                )
+                .replace("__ADD_NOTE__", json.dumps(_("add a note…")))
+                .replace(
+                    "__OUTCOME_LABEL__",
+                    escape(_("What became of them (position, employer…)"), quote=True),
+                ),
             )
 
             def save_outcome(e) -> None:
@@ -956,7 +1060,7 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
                 for r in table.rows:
                     if r["student"] == e.args["student"]:
                         r["outcome"] = e.args["note"].strip()
-                ui.notify("Note saved")
+                ui.notify(_("Note saved"))
 
             table.on("outcome", save_outcome)
 

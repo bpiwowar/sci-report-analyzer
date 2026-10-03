@@ -3,23 +3,26 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields, replace
 from typing import Any
 from urllib.parse import quote
 
+from ..i18n import N_, Labels, _
 from .matcher import Record, record_key
 
 SOURCES = ("scimago", "core", "jcr", "openalex", "predatory", "manual", "archival")
 TOGGLABLE_SOURCES = ("scimago", "core", "jcr", "openalex", "predatory")
-SOURCE_LABELS = {
-    "scimago": "Scimago (SJR)",
-    "core": "CORE",
-    "jcr": "JCR (imported)",
-    "openalex": "OpenAlex (live fallback)",
-    "predatory": "Predatory list",
-    "manual": "Manual",
-    "archival": "Archival",
-}
+SOURCE_LABELS = Labels(
+    {
+        "scimago": "Scimago (SJR)",
+        "core": "CORE",
+        "jcr": N_("JCR (imported)"),
+        "openalex": N_("OpenAlex (live fallback)"),
+        "predatory": N_("Predatory list"),
+        "manual": N_("Manual"),
+        "archival": N_("Archival"),
+    }
+)
 
 
 @dataclass
@@ -89,7 +92,7 @@ class Badge:
     @property
     def rank_label(self) -> str:
         if self.archival:
-            return self.name or "archival"
+            return self.name or _("archival")
         if self.quartile:
             return f"JCR {self.quartile}" if self.source == "jcr" else self.quartile
         if self.coreRank:
@@ -97,8 +100,8 @@ class Badge:
         if self.source == "openalex":
             return f"h {self.hindex}" if self.hindex is not None else "openalex"
         if self.predatory and self.source == "predatory":
-            return "⚠ predatory"
-        return "other"
+            return _("⚠ predatory")
+        return _("other")
 
 
 # CORE editions (the year each one came out: it applies from then to the next one).
@@ -335,12 +338,14 @@ OTHER_COLOUR = "#57606a"
 UNRANKED_COLOUR = "#d0d7de"
 PREDATORY_COLOUR = "#cf222e"
 
-TRACK_LABEL = {
-    "findings": "Findings",
-    "tutorial": "Tutorial",
-    "demo": "Demo",
-    "short": "Short",
-}
+TRACK_LABEL = Labels(
+    {
+        "findings": "Findings",
+        "tutorial": N_("Tutorial"),
+        "demo": N_("Demo"),
+        "short": N_("Short"),
+    }
+)
 # Workshops are a venue kind (ranked as their main conference), not a track.
 TRACK_ORDER = ("findings", "tutorial", "demo", "short")
 _TRACK_RE = (
@@ -359,50 +364,58 @@ def detect_track(venue: str | None) -> str | None:
 
 def _base(badge: Badge | None) -> tuple[str, str, str]:
     if badge is None:
-        return "unranked", "unranked", UNRANKED_COLOUR
+        return "unranked", _("unranked"), UNRANKED_COLOUR
     key = _QUARTILE_KEYS.get(badge.quartile or "") or _CORE_KEYS.get(badge.coreRank or "")
     if key:
         for k, label, colour in BASE_CATEGORIES:
             if k == key:
                 return k, label, colour
-    return "other", "other", OTHER_COLOUR
+    return "other", _("other"), OTHER_COLOUR
 
 
 def category_of(badge: Badge | None, track: str | None, kind: str | None = None) -> Category:
     """Distribution category: the rank when there is one, else the venue kind."""
-    base_key, base_label, colour = _base(badge)
+    base_key, _label, colour = _base(badge)
     if kind in ("intl_workshop", "natl_workshop") and base_key not in ("other", "unranked"):
         # Its own category: "Workshop A*" (the rank of its main conference).
-        return Category(
-            f"workshop:{base_key}", f"Workshop {base_label}", colour, base_key, None, True
-        )
-    if kind == "proceedings" and base_key not in ("other", "unranked"):
+        cat = Category(f"workshop:{base_key}", "", colour, base_key, None, True)
+    elif kind == "proceedings" and base_key not in ("other", "unranked"):
         # Its own category: "Proc. (ed.) CORE A*" (chairing an A* conference counts more).
-        return Category(
-            f"edited:{base_key}",
-            f"Proc. (ed.) {base_label}",
-            colour,
-            base_key,
-            None,
-            edited=True,
-        )
-    if base_key in ("other", "unranked") and kind:
-        from .kinds import KIND_COLOUR, KIND_SHORT
+        cat = Category(f"edited:{base_key}", "", colour, base_key, None, edited=True)
+    else:
+        if base_key in ("other", "unranked") and kind:
+            from .kinds import KIND_COLOUR
 
-        base_key, base_label, colour = f"k_{kind}", KIND_SHORT[kind], KIND_COLOUR[kind]
-    if track:
-        name = TRACK_LABEL.get(track, track.title())
-        scope = {"k_intl_conference": "Intl.", "k_natl_conference": "Natl."}.get(base_key)
-        # An unranked conference track reads "Intl. demo", not "Demo Intl. conf.".
-        label = f"{scope} {name.lower()}" if scope else f"{name} {base_label}"
-        return Category(
-            f"{track}:{base_key}",
-            label,
-            colour,
-            base_key,
-            track,
-        )
-    return Category(base_key, base_label, colour, base_key)
+            base_key, colour = f"k_{kind}", KIND_COLOUR[kind]
+        key = f"{track}:{base_key}" if track else base_key
+        cat = Category(key, "", colour, base_key, track)
+    return replace(cat, label=category_label(cat))
+
+
+def category_label(cat: Category) -> str:
+    """``cat``'s label, in the language of the moment."""
+    base = cat.base_key
+    if base.startswith("k_"):
+        from .kinds import KIND_SHORT
+
+        base_label = KIND_SHORT[base[2:]]
+    elif base in ("other", "unranked"):
+        base_label = _("other") if base == "other" else _("unranked")
+    else:
+        base_label = next(label for k, label, _c in BASE_CATEGORIES if k == base)
+    if cat.workshop:
+        return _("Workshop {category}").format(category=base_label)
+    if cat.edited:
+        return _("Proc. (ed.) {category}").format(category=base_label)
+    if not cat.track:
+        return base_label
+    name = TRACK_LABEL.get(cat.track, cat.track.title())
+    # An unranked conference track reads "Intl. demo", not "Demo Intl. conf.".
+    if base == "k_intl_conference":
+        return _("Intl. {track}").format(track=name.lower())
+    if base == "k_natl_conference":
+        return _("Natl. {track}").format(track=name.lower())
+    return _("{track} {category}").format(track=name, category=base_label)
 
 
 def category_order(c: Category) -> int:
@@ -415,13 +428,18 @@ def category_order(c: Category) -> int:
 
 
 # What each level means (shown next to manual-level editors and on the help page).
-LEVEL_HELP: dict[str, str] = {
-    "Q1": "Journal quartile 1: top 25% of its subject category (Scimago SJR or JCR impact factor).",
-    "Q2": "Journal quartile 2: top 25–50% of its category.",
-    "Q3": "Journal quartile 3: top 50–75% of its category.",
-    "Q4": "Journal quartile 4: bottom 25% of its category.",
-    "A*": "CORE A*: flagship conference, a leading venue in its discipline area (~top 7%).",
-    "A": "CORE A: excellent conference, highly respected in its area (~next 17%).",
-    "B": "CORE B: good conference, well regarded in its area (~next 27%).",
-    "C": "CORE C: ranked conference meeting minimum standards.",
-}
+LEVEL_HELP: dict[str, str] = Labels(
+    {
+        "Q1": N_(
+            "Journal quartile 1: top 25% of its subject category (Scimago SJR or JCR impact "
+            "factor)."
+        ),
+        "Q2": N_("Journal quartile 2: top 25–50% of its category."),
+        "Q3": N_("Journal quartile 3: top 50–75% of its category."),
+        "Q4": N_("Journal quartile 4: bottom 25% of its category."),
+        "A*": N_("CORE A*: flagship conference, a leading venue in its discipline area (~top 7%)."),
+        "A": N_("CORE A: excellent conference, highly respected in its area (~next 17%)."),
+        "B": N_("CORE B: good conference, well regarded in its area (~next 27%)."),
+        "C": N_("CORE C: ranked conference meeting minimum standards."),
+    }
+)

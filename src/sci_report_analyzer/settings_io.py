@@ -19,6 +19,7 @@ from sqlalchemy.orm import object_session, selectinload
 from . import venue_match
 from .db.models import Flag, JcrRecord, PublicationFlag, Venue, VenueKey
 from .db.session import session_scope
+from .i18n import _
 from .ranking.service import (
     MatchSettings,
     VenuePattern,
@@ -154,9 +155,9 @@ class Conflict:
 
 
 def _rule_text(r) -> str:
-    flags = "" if r.enabled else " (disabled)"
-    scope = f" [only {', '.join(r.sources)}]" if r.sources else ""
-    case = " [ignore case]" if r.ignore_case else ""
+    flags = "" if r.enabled else " " + _("(disabled)")
+    scope = " " + _("[only {sources}]").format(sources=", ".join(r.sources)) if r.sources else ""
+    case = " " + _("[ignore case]") if r.ignore_case else ""
     return f"{r.pattern} → “{r.replacement}”{case}{scope}{flags}"
 
 
@@ -297,7 +298,14 @@ def _venue_conflicts(s, vio: VenueIO) -> list[Conflict]:
     for key in vio.keys:
         vk = s.get(VenueKey, key)
         if vk is not None and vk.venue_id != local.id:
-            out.append(Conflict("variant", key, f"in “{vk.venue.name}”", f"in “{vio.name}”"))
+            out.append(
+                Conflict(
+                    "variant",
+                    key,
+                    _("in “{venue}”").format(venue=vk.venue.name),
+                    _("in “{venue}”").format(venue=vio.name),
+                )
+            )
     return out
 
 

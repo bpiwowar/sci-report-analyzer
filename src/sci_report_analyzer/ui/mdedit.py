@@ -8,22 +8,23 @@ from collections.abc import Callable
 
 from nicegui import ui
 
+from ..i18n import N_, _
 from .theme import NOTE_EXTRAS
 
 # (icon, tooltip, kind, args): kind "wrap" (before, after, placeholder) or "line" (prefix).
 TOOLS = [
-    ("format_bold", "Bold (⌘/Ctrl-B)", "wrap", ("**", "**", "bold")),
-    ("format_italic", "Italic (⌘/Ctrl-I)", "wrap", ("*", "*", "italic")),
-    ("title", "Heading", "line", ("### ",)),
-    ("format_list_bulleted", "List", "line", ("- ",)),
-    ("format_list_numbered", "Numbered list", "line", ("1. ",)),
-    ("format_quote", "Quote", "line", ("> ",)),
-    ("code", "Code", "wrap", ("`", "`", "code")),
-    ("link", "Link", "wrap", ("[", "](https://)", "text")),
-    ("functions", "LaTeX ($…$ inline, $$…$$ display)", "wrap", ("$", "$", "x^2")),
+    ("format_bold", N_("Bold (⌘/Ctrl-B)"), "wrap", ("**", "**", N_("bold"))),
+    ("format_italic", N_("Italic (⌘/Ctrl-I)"), "wrap", ("*", "*", N_("italic"))),
+    ("title", N_("Heading"), "line", ("### ",)),
+    ("format_list_bulleted", N_("List"), "line", ("- ",)),
+    ("format_list_numbered", N_("Numbered list"), "line", ("1. ",)),
+    ("format_quote", N_("Quote"), "line", ("> ",)),
+    ("code", N_("Code"), "wrap", ("`", "`", N_("code"))),
+    ("link", N_("Link"), "wrap", ("[", "](https://)", N_("text"))),
+    ("functions", N_("LaTeX ($…$ inline, $$…$$ display)"), "wrap", ("$", "$", "x^2")),
 ]
 
-MODES = {"edit": "Edit", "split": "Split", "preview": "Preview"}
+MODES = {"edit": N_("Edit"), "split": N_("Split"), "preview": N_("Preview")}
 
 
 class MarkdownEditor:
@@ -55,16 +56,22 @@ class MarkdownEditor:
                     ui.button(
                         icon=icon,
                         on_click=lambda kind=kind, args=args: (
-                            self.wrap(*args) if kind == "wrap" else self.prefix_lines(*args)
+                            self.wrap(*args[:2], _(args[2]))
+                            if kind == "wrap"
+                            else self.prefix_lines(*args)
                         ),
-                    ).props("flat dense round size=sm").tooltip(tip)
+                    ).props("flat dense round size=sm").tooltip(_(tip))
                 ui.space()
                 if toolbar:
                     toolbar()
                 self.mode = (
-                    ui.toggle(MODES, value=mode, on_change=lambda: self._layout())
+                    ui.toggle(
+                        {k: _(v) for k, v in MODES.items()},
+                        value=mode,
+                        on_change=lambda: self._layout(),
+                    )
                     .props("dense flat no-caps size=sm")
-                    .tooltip("Edit, edit beside the preview, or the preview only")
+                    .tooltip(_("Edit, edit beside the preview, or the preview only"))
                 )
                 if mark:
                     self.mode.mark(f"{mark}-mode")
@@ -73,8 +80,8 @@ class MarkdownEditor:
                 "w-full no-wrap gap-2 items-stretch" + (" grow min-h-0" if fill else "")
             ):
                 keys = {
-                    "Mod-b": lambda: self.wrap("**", "**", "bold"),
-                    "Mod-i": lambda: self.wrap("*", "*", "italic"),
+                    "Mod-b": lambda: self.wrap("**", "**", _("bold")),
+                    "Mod-i": lambda: self.wrap("*", "*", _("italic")),
                 }
                 self.editor = (
                     ui.codemirror(

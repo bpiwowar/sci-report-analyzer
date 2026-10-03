@@ -620,7 +620,7 @@ def test_summary_by_category_with_venues_and_years():
     assert summary_lines(rows, by_kind=True, hidden={"a", "b"})[0] == "4 Intl. conf."
     fr = summary_lines(rows, short=True, by_kind=True, years=False, lang="fr")
     assert fr[0] == "4 Conf. int.: 3 CORE A (3x STR); 1 CORE B (STR)"
-    assert fr[-1] == "1 Autre (sans lieu)"
+    assert fr[-1] == "1 Autre (sans canal)"
     # Per category: just the count, the venues without years.
     mixed = summary_lines(rows, short=True, by_kind=True, details={"a": "list", "b": "count"})
     assert mixed[0] == "4 Intl. conf.: 3 CORE A (3x STR); 1 CORE B"
@@ -629,6 +629,13 @@ def test_summary_by_category_with_venues_and_years():
     assert md[0] == "- 4 Intl. conf.: 3 CORE A (2x STR 2024, STR 2023); 1 CORE B (STR 2019)"
     assert md[-1] == "- 1 Other (no venue 2024)"
     assert summary_lines(rows, short=True, markdown=True)[0] == "- 3 CORE A (2x STR 2024, STR 2023)"
+    # The summary's language, whatever the app's.
+    from sci_report_analyzer import i18n
+
+    with i18n.using("fr"):
+        rows = list(stats(pid).values())
+        assert summary_lines(rows, short=True, by_kind=True, years=False) == no_years
+        assert summary_lines(rows, short=True, by_kind=True, years=False, lang="fr") == fr
 
 
 def test_a_workshop_does_not_take_its_main_conference_acronym():

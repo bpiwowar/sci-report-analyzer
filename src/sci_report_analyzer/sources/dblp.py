@@ -7,6 +7,7 @@ from collections import defaultdict
 from typing import Any
 
 from ..authors import name_key
+from ..i18n import _
 from ..ranking.badge import detect_track
 from ..ranking.kinds import WORKSHOP_RE
 from ..ranking.normalize import is_non_venue, normalize
@@ -118,7 +119,7 @@ class DblpAdapter(SourceAdapter):
         return m.group(1) if m else None
 
     async def search(self, name: str, affiliation: str | None = None) -> list[AuthorCandidate]:
-        surname, _ = name_key(name)
+        surname, _given = name_key(name)
         if not surname:
             return []
         rows = await sparql(
@@ -169,7 +170,7 @@ class DblpAdapter(SourceAdapter):
             # Distinguish "no publications" from a wrong pid.
             exists = await sparql(f"SELECT ?n WHERE {{ {pid_uri} dblp:creatorName ?n }} LIMIT 1")
             if not exists:
-                raise SourceError(f"unknown DBLP pid {external_id}")
+                raise SourceError(_("unknown DBLP pid {pid}").format(pid=external_id))
             return FetchResult()
         sigs = await sparql(
             f"""SELECT ?pub ?o ?n WHERE {{

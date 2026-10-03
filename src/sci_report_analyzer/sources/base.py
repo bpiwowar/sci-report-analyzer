@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from .. import __version__
+from ..i18n import _
 from ..keys import get_key
 
 logger = logging.getLogger(__name__)
@@ -145,7 +146,7 @@ def to_year(v: Any) -> int | None:
 
 class NoContactEmail(SourceError):
     def __init__(self) -> None:
-        super().__init__("set your email in Settings → API keys first")
+        super().__init__(_("set your email in Settings → API keys first"))
 
 
 def contact_email() -> str:
@@ -191,26 +192,33 @@ async def get_json(
             res = await client().request(method, url, params=params, headers=headers, data=data)
         except httpx.TransportError as e:
             if attempt == retries:
-                raise SourceError(f"network error: {e}") from e
+                raise SourceError(_("network error: {error}").format(error=e)) from e
             await asyncio.sleep(delay)
             delay *= 2
             continue
         if res.status_code == 429 or res.status_code >= 500:
             if attempt == retries:
-                raise SourceError(f"HTTP {res.status_code} from {url}")
+                raise SourceError(
+                    _("HTTP {status} from {url}").format(status=res.status_code, url=url)
+                )
             wait = float(res.headers.get("Retry-After", delay)) if res.status_code == 429 else delay
             if wait > 120:
                 try:
                     message = res.json().get("message")
                 except ValueError:
                     message = None
-                raise SourceError(message or f"rate limited by {url} (retry in {wait:.0f}s)")
+                raise SourceError(
+                    message
+                    or _("rate limited by {url} (retry in {wait}s)").format(
+                        url=url, wait=f"{wait:.0f}"
+                    )
+                )
             logger.info("HTTP %s from %s, retrying in %.1fs", res.status_code, url, wait)
             await asyncio.sleep(min(wait, 60))
             delay *= 2
             continue
         if res.status_code == 404:
-            raise SourceError(f"not found: {url}")
+            raise SourceError(_("not found: {url}").format(url=url))
         res.raise_for_status()
         return res.json()
-    raise SourceError(f"giving up on {url}")
+    raise SourceError(_("giving up on {url}").format(url=url))

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from nicegui import ui
 
 from .. import categories, documents, folders, manual, reflist
-from ..i18n import _
+from ..i18n import N_, _
 from ..sources.base import SourceError
 from .panel import PublicationsPanel
 from .pdf_viewer import changed, watch
@@ -105,7 +105,7 @@ class Side:
         """The details of a paper (as in the publications panel), instead of the overview."""
         s = next((x for x in self.host.stats if x.id == pub_id), None)
         if s is None:
-            ui.notify("This paper is no longer in the database", type="warning")
+            ui.notify(_("This paper is no longer in the database"), type="warning")
             return
         self.overview.visible = False
         self.details.visible = True
@@ -113,7 +113,7 @@ class Side:
         self._fit()
         self.details.clear()
         with self.details:
-            ui.button("Back", icon="arrow_back", on_click=self.back).props("flat dense").mark(
+            ui.button(_("Back"), icon="arrow_back", on_click=self.back).props("flat dense").mark(
                 "pdf-side-back"
             )
             if header:
@@ -137,19 +137,20 @@ class Side:
     async def add_bookmark(self, kind: str, key: int) -> None:
         loc = await ui.run_javascript("vrPdf.location()")
         if not loc:
-            ui.notify("The PDF is not shown yet", type="warning")
+            ui.notify(_("The PDF is not shown yet"), type="warning")
             return
         name = " ".join((loc.get("text") or "").split())[:80]
         documents.add_bookmark(kind, key, name, int(loc["p"]), loc.get("y"))
         if self.bookmarks:
             self.bookmarks()
-        ui.notify(f"Bookmarked: {name or 'page ' + str(loc['p'])}")
+        where = name or _("page {page}").format(page=loc["p"])
+        ui.notify(_("Bookmarked: {name}").format(name=where))
 
     async def add_excerpt(self) -> None:
         """File the selected text in one of the folder's categories."""
         if self.folder is None:
             ui.notify(
-                "Excerpts are filed in a folder's categories: open the PDF from a folder",
+                _("Excerpts are filed in a folder's categories: open the PDF from a folder"),
                 type="warning",
             )
             return
@@ -228,22 +229,22 @@ class Side:
     async def find_selection(self) -> None:
         sel = await ui.run_javascript("vrPdf.selection()")
         if not sel or not (sel.get("text") or "").strip():
-            ui.notify("Select the reference (or its title) in the PDF first", type="warning")
+            ui.notify(_("Select the reference (or its title) in the PDF first"), type="warning")
             return
         find_dialog(self, sel["text"], sel.get("p"), sel.get("rects") or [])
 
 
 def bookmarks_section(kind: str, key: int) -> Callable[[], None]:
     """The bookmarks of a PDF (to jump to, rename, delete); returns its refresh."""
-    ui.label("Bookmarks").classes("font-medium")
+    ui.label(_("Bookmarks")).classes("font-medium")
 
     @ui.refreshable
     def listing() -> None:
         marks = documents.bookmarks(kind, key)
         if not marks:
-            ui.label("None: ‘bookmark’ in the header adds one (here, or at a selection)").classes(
-                "text-sm text-grey"
-            )
+            ui.label(
+                _("None: ‘bookmark’ in the header adds one (here, or at a selection)")
+            ).classes("text-sm text-grey")
         for i, b in enumerate(marks):
             with ui.row().classes("w-full items-center no-wrap gap-1").mark(f"bookmark-{i}"):
                 ui.icon("bookmark", size="xs", color="primary")
@@ -251,7 +252,7 @@ def bookmarks_section(kind: str, key: int) -> Callable[[], None]:
                 ui.label(b["name"]).classes(
                     "grow min-w-0 ellipsis cursor-pointer text-primary hover:underline"
                 ).on("click", js_handler=f"() => vrPdf.go({b['p']}, {y})").tooltip(b["name"])
-                ui.label(f"p. {b['p']}").classes("text-xs text-grey shrink-0")
+                ui.label(_("p. {page}").format(page=b["p"])).classes("text-xs text-grey shrink-0")
                 ui.button(icon="edit", on_click=lambda i=i: rename(i)).props(
                     "flat dense round size=xs"
                 ).mark(f"bookmark-rename-{i}")
@@ -268,7 +269,9 @@ def bookmarks_section(kind: str, key: int) -> Callable[[], None]:
     def rename(i: int) -> None:
         marks = documents.bookmarks(kind, key)
         with ui.dialog() as dlg, ui.card().classes("w-96"):
-            name = ui.input("Name", value=marks[i]["name"]).classes("w-full").mark("bookmark-name")
+            name = (
+                ui.input(_("Name"), value=marks[i]["name"]).classes("w-full").mark("bookmark-name")
+            )
 
             def ok() -> None:
                 if name.value.strip():
@@ -279,8 +282,8 @@ def bookmarks_section(kind: str, key: int) -> Callable[[], None]:
 
             name.on("keydown.enter", ok)
             with ui.row().classes("w-full justify-end"):
-                ui.button("Cancel", on_click=dlg.close).props("flat")
-                ui.button("Rename", on_click=ok).mark("bookmark-rename-ok")
+                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+                ui.button(_("Rename"), on_click=ok).mark("bookmark-rename-ok")
         dlg.on_value_change(lambda e: None if e.value else dlg.delete())
         dlg.open()
 
@@ -294,7 +297,7 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
     item = documents.selection_item(text)
     state: dict = {"found": None}
     with side.host.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-2xl"):
-        ui.label("Find the paper").classes("text-lg font-medium")
+        ui.label(_("Find the paper")).classes("text-lg font-medium")
         ui.label(reflist.label(item, 300)).classes("text-sm text-grey").mark("find-text")
         busy = ui.spinner(size="sm")
         busy.visible = False
@@ -310,38 +313,41 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
 
         @ui.refreshable
         def body() -> None:
+            untitled = _("(untitled)")
             rows = [r for r in side.stats if not r.hidden]
             [m] = reflist.match([item], rows)
             if m.candidates:
-                ui.label("Among the papers").classes("font-medium")
+                ui.label(_("Among the papers")).classes("font-medium")
             else:
-                ui.label("None of the papers matches").classes("text-grey").mark("find-none")
+                ui.label(_("None of the papers matches")).classes("text-grey").mark("find-none")
             for c in m.candidates:
                 with ui.row().classes("w-full items-center no-wrap gap-2"):
-                    ui.label(f"{c.title or '(untitled)'} ({c.year or '?'})").classes("grow min-w-0")
-                    ui.label("its id" if c.by_id else f"{round(100 * c.score)}%").classes(
+                    ui.label(f"{c.title or untitled} ({c.year or '?'})").classes("grow min-w-0")
+                    ui.label(_("its id") if c.by_id else f"{round(100 * c.score)}%").classes(
                         "text-xs text-grey shrink-0"
                     )
-                    ui.button("Show", icon="article", on_click=lambda c=c: show(c.pub_id)).props(
+                    ui.button(_("Show"), icon="article", on_click=lambda c=c: show(c.pub_id)).props(
                         "flat dense"
                     ).mark(f"find-show-{c.pub_id}")
                     if side.link and page:
                         ui.button(
-                            "Link here", icon="link", on_click=lambda c=c: link(c.pub_id)
+                            _("Link here"), icon="link", on_click=lambda c=c: link(c.pub_id)
                         ).props("flat dense").tooltip(
-                            "Link the selection to this paper (in this document)"
+                            _("Link the selection to this paper (in this document)")
                         ).mark(f"find-link-{c.pub_id}")
             with ui.row().classes("items-center gap-2"):
                 if item.ref and not any(c.by_id for c in m.candidates):
-                    ui.button(f"Add {item.ref}", icon="add", on_click=lambda: add(item.ref)).props(
-                        "flat dense"
-                    ).mark("find-add-ref")
-                ui.button("Search HAL", icon="travel_explore", on_click=search).props(
+                    ui.button(
+                        _("Add {ref}").format(ref=item.ref),
+                        icon="add",
+                        on_click=lambda: add(item.ref),
+                    ).props("flat dense").mark("find-add-ref")
+                ui.button(_("Search HAL"), icon="travel_explore", on_click=search).props(
                     "flat dense"
                 ).mark("find-search")
             found = state["found"]
             if found is not None and not found:
-                ui.label("Nothing found on HAL").classes("text-xs text-grey")
+                ui.label(_("Nothing found on HAL")).classes("text-xs text-grey")
             for f in found or []:
                 with ui.row().classes("w-full items-center no-wrap gap-1 text-xs"):
                     ui.link(f"{f.title} ({f.year or '?'})", f.url, new_tab=True).classes(
@@ -352,7 +358,7 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
                     )
                     ui.button(icon="add", on_click=lambda r=f.ref: add(r)).props(
                         "dense flat round size=sm"
-                    ).tooltip("Add it to the papers").mark("find-add-found")
+                    ).tooltip(_("Add it to the papers")).mark("find-add-found")
 
         async def search() -> None:
             busy.visible = True
@@ -375,14 +381,14 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
                 return
             finally:
                 busy.visible = False
-            ui.notify(f"Added: {title}")
+            ui.notify(_("Added: {title}").format(title=title))
             state["found"] = None
             await side.host.reload()
             body.refresh()
 
         body()
         with ui.row().classes("w-full justify-end"):
-            ui.button("Close", on_click=dlg.close).props("flat")
+            ui.button(_("Close"), on_click=dlg.close).props("flat")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()
 
@@ -390,11 +396,11 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
 # An excerpt's colours (its tint on the PDF; None: the default, amber).
 COLOURS = {
     None: "#ffc107",
-    "#4caf50": "green",
-    "#2196f3": "blue",
-    "#e91e63": "pink",
-    "#9c27b0": "purple",
-    "#ff5722": "orange",
+    "#4caf50": N_("green"),
+    "#2196f3": N_("blue"),
+    "#e91e63": N_("pink"),
+    "#9c27b0": N_("purple"),
+    "#ff5722": N_("orange"),
 }
 
 
@@ -412,24 +418,24 @@ def excerpt_properties(
         return int(v) if v else None
 
     with ui.row().classes("items-center gap-2"):
-        start_in = ui.number("From (year)", value=start, format="%d").props("dense outlined")
+        start_in = ui.number(_("From (year)"), value=start, format="%d").props("dense outlined")
         start_in.classes("w-32").mark("excerpt-start")
-        end_in = ui.number("To (year)", value=end, format="%d").props("dense outlined")
+        end_in = ui.number(_("To (year)"), value=end, format="%d").props("dense outlined")
         end_in.classes("w-32").mark("excerpt-end")
-        flag = ui.checkbox("Influence", value=influence).mark("excerpt-influence")
-        flag.tooltip("Shows the person's influence (“rayonnement”: invited talks, prizes…)")
+        flag = ui.checkbox(_("Influence"), value=influence).mark("excerpt-influence")
+        flag.tooltip(_("Shows the person's influence (“rayonnement”: invited talks, prizes…)"))
         ui.icon("public", size="xs", color="teal").classes("-ml-2")
 
     @ui.refreshable
     def swatches() -> None:
         with ui.row().classes("items-center gap-1"):
-            ui.label("Colour").classes("text-sm text-grey")
+            ui.label(_("Colour")).classes("text-sm text-grey")
             for c in COLOURS:
                 ring = "ring-2 ring-offset-1 ring-grey-8" if c == chosen["colour"] else ""
                 ui.element("div").classes(f"w-5 h-5 rounded-full cursor-pointer {ring}").style(
                     f"background: {c or COLOURS[None]}"
                 ).on("click", lambda c=c: (chosen.update(colour=c), swatches.refresh())).tooltip(
-                    COLOURS[c] if c else "amber (the default)"
+                    _(COLOURS[c]) if c else _("amber (the default)")
                 ).mark(f"excerpt-colour-{(c or 'default').lstrip('#')}")
 
     swatches()
@@ -512,20 +518,21 @@ def category_picker(
     text: str,
     chosen: Callable[..., None],
     *,
-    title: str = "Add to a category",
-    done: str = "Added to",
+    title: str = N_("Add to a category"),
+    done: str = N_("Added to {category}"),
     current: int | None = None,
     properties: bool = False,
     merge: Callable[[categories.ExcerptView, bool], None] | None = None,
 ) -> None:
     """Choose the category of an excerpt (``chosen`` is called with it): click it, or type to
-    find it (Enter: the first one), or name a new one. ``current``: its category, shown;
+    find it (Enter: the first one), or name a new one. ``title``, ``done`` (its
+    ``{category}`` named): marked with ``N_``, translated here. ``current``: its category, shown;
     ``properties``: also its years and influence flag (passed to ``chosen`` as keywords);
     ``merge``: or merge it with an excerpt (called with it, and whether only its place is
     cited), the similar ones shown with a warning."""
     folder_id, folder_name = side.folder
     with side.host.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-        ui.label(title).classes("text-lg font-medium")
+        ui.label(_(title)).classes("text-lg font-medium")
         short = text if len(text) <= 300 else text[:299] + "…"
         ui.label(f"“{' '.join(short.split())}”").classes("text-sm text-grey").mark("excerpt-text")
         if merge is not None and side.period_id is not None:
@@ -534,7 +541,11 @@ def category_picker(
             )
         props = excerpt_properties() if properties else dict
         search = (
-            ui.input(placeholder=f"Find a category of {folder_name} (Enter: the first one)")
+            ui.input(
+                placeholder=_("Find a category of {folder} (Enter: the first one)").format(
+                    folder=folder_name
+                )
+            )
             .props("dense outlined clearable autofocus")
             .classes("w-full")
             .mark("category-search")
@@ -551,16 +562,16 @@ def category_picker(
             chosen(cat_id, **props())
             dlg.close()
             name = next((n.path for n in categories.tree(folder_id) if n.id == cat_id), "")
-            ui.notify(f"{done} {name}")
+            ui.notify(_(done).format(category=name))
 
         @ui.refreshable
         def listing() -> None:
             nodes = matching()
             if not nodes:
                 ui.label(
-                    "No category yet: type a name, then Enter (or ‘create’)"
+                    _("No category yet: type a name, then Enter (or ‘create’)")
                     if not search.value
-                    else "No such category: Enter (or ‘create’) creates it"
+                    else _("No such category: Enter (or ‘create’) creates it")
                 ).classes("text-sm text-grey").mark("category-none")
             q = (search.value or "").strip()
             for n in nodes:
@@ -577,7 +588,7 @@ def category_picker(
                         "grow" + (" text-grey" if n.id == current else "")
                     )
                     if n.id == current:
-                        ui.label("(its category)").classes("text-xs text-grey")
+                        ui.label(_("(its category)")).classes("text-xs text-grey")
                     if n.years:
                         ui.label(n.years).classes("text-xs text-grey")
 
@@ -597,10 +608,10 @@ def category_picker(
             search.value = ""
             listing.refresh()
             parent.set_options(parents(), value=parent.value)
-            ui.notify(f"Category “{name}” created")
+            ui.notify(_("Category “{name}” created").format(name=name))
 
         def parents() -> dict[int, str]:
-            return {0: "(top level)", **{n.id: n.path for n in categories.tree(folder_id)}}
+            return {0: _("(top level)"), **{n.id: n.path for n in categories.tree(folder_id)}}
 
         search.on_value_change(lambda: listing.refresh())
         search.on("keydown.enter", enter)
@@ -608,16 +619,16 @@ def category_picker(
             listing()
         with ui.row().classes("w-full items-center gap-2"):
             parent = (
-                ui.select(parents(), value=0, label="Create under")
+                ui.select(parents(), value=0, label=_("Create under"))
                 .props("dense outlined options-dense")
                 .classes("w-56")
                 .mark("category-parent")
             )
-            ui.button("Create", icon="add", on_click=create).props("flat dense").tooltip(
-                "Create a category named as typed above"
+            ui.button(_("Create"), icon="add", on_click=create).props("flat dense").tooltip(
+                _("Create a category named as typed above")
             ).mark("category-create")
             ui.space()
-            ui.button("Close", on_click=dlg.close).props("flat").mark("category-close")
+            ui.button(_("Close"), on_click=dlg.close).props("flat").mark("category-close")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()
 
@@ -637,20 +648,22 @@ def categories_section(side: Side) -> Callable[[], None]:
     def listing() -> None:
         if side.folder is None or side.period_id is None:
             ui.label(
-                "Excerpts are filed in the categories of a folder: open the PDF from one."
+                _("Excerpts are filed in the categories of a folder: open the PDF from one.")
             ).classes("text-sm text-grey")
             return
         folder_id, folder_name = side.folder
         nodes = categories.tree(folder_id)
         with ui.row().classes("w-full items-center gap-1"):
-            ui.label(f"Categories of {folder_name}").classes("font-medium grow")
+            ui.label(_("Categories of {folder}").format(folder=folder_name)).classes(
+                "font-medium grow"
+            )
             ui.button(
                 icon="content_copy",
                 on_click=lambda: (
                     ui.clipboard.write(categories.markdown(folder_id, side.period_id)),
-                    ui.notify("Copied (Markdown)"),
+                    ui.notify(_("Copied (Markdown)")),
                 ),
-            ).props("flat dense round size=sm").tooltip("Copy the excerpts, as Markdown").mark(
+            ).props("flat dense round size=sm").tooltip(_("Copy the excerpts, as Markdown")).mark(
                 "excerpts-copy"
             )
             ui.button(icon="badge", on_click=name_documents).props(
@@ -660,11 +673,13 @@ def categories_section(side: Side) -> Callable[[], None]:
             )
             ui.button(icon="edit", on_click=lambda: edit(folder_id)).props(
                 "flat dense round size=sm"
-            ).tooltip("Edit the categories").mark("categories-edit")
+            ).tooltip(_("Edit the categories")).mark("categories-edit")
         if not nodes:
             ui.label(
-                "None yet: select a passage, then ‘add to a category’ in the header (or edit "
-                "the categories)."
+                _(
+                    "None yet: select a passage, then ‘add to a category’ in the header (or "
+                    "edit the categories)."
+                )
             ).classes("text-sm text-grey")
             return
         by_cat: dict[int, list[categories.ExcerptView]] = {}
@@ -674,10 +689,12 @@ def categories_section(side: Side) -> Callable[[], None]:
         if merging:
             with ui.row().classes("w-full items-center no-wrap gap-1 bg-amber-1 p-1 rounded"):
                 short = merging.text if len(merging.text) <= 60 else merging.text[:59] + "…"
-                ui.label(f"Click the excerpt to merge “{short}” with").classes("text-sm grow")
+                ui.label(_("Click the excerpt to merge “{text}” with").format(text=short)).classes(
+                    "text-sm grow"
+                )
                 ui.button(icon="close", on_click=lambda: merge_mode(None)).props(
                     "flat dense round size=xs"
-                ).tooltip("Cancel").mark("excerpt-merge-cancel")
+                ).tooltip(_("Cancel")).mark("excerpt-merge-cancel")
         for n in nodes:
             items = by_cat.get(n.id, [])
             with (
@@ -741,7 +758,11 @@ def categories_section(side: Side) -> Callable[[], None]:
                 else:
                     url = excerpt_url(x)
                     label.on("click", js_handler=f"() => window.open({json.dumps(url)})")
-                where = f"p. {x.page}" if here else f"{x.source}, p. {x.page or '?'}"
+                where = (
+                    _("p. {page}").format(page=x.page)
+                    if here
+                    else _("{source}, p. {page}").format(source=x.source, page=x.page or "?")
+                )
                 with ui.row().classes("w-full items-center no-wrap gap-1"):
                     ui.label(where).classes("text-xs text-grey ellipsis")
                     if not member and lead.years:
@@ -750,7 +771,7 @@ def categories_section(side: Side) -> Callable[[], None]:
                         )
                     if not member and lead.influence:
                         ui.icon("public", size="xs", color="teal").classes("shrink-0").tooltip(
-                            "Influence"
+                            _("Influence")
                         ).mark(f"excerpt-influence-{x.id}")
                     cite = (  # (in a group, its text not edited: quote it, or only cite it)
                         [
@@ -772,22 +793,25 @@ def categories_section(side: Side) -> Callable[[], None]:
                     actions = (
                         [
                             *cite,
-                            ("split", "call_split", "Take it out of the group", split),
-                            ("remove", "delete", "Remove", remove),
+                            ("split", "call_split", _("Take it out of the group"), split),
+                            ("remove", "delete", _("Remove"), remove),
                         ]
                         if member
                         else [
-                            ("edit", "edit", "Edit (text, years, influence…)", edit_excerpt),
+                            ("edit", "edit", _("Edit (text, years, influence…)"), edit_excerpt),
                             *cite,
-                            ("move", "drive_file_move", "Move to another category", move),
+                            ("move", "drive_file_move", _("Move to another category"), move),
                             (
                                 "merge",
                                 "call_merge",
-                                "Merge with another excerpt: click it then (or drag this one "
-                                "onto it; onto its top or bottom edge: placed before or after)",
+                                _(
+                                    "Merge with another excerpt: click it then (or drag this "
+                                    "one onto it; onto its top or bottom edge: placed before or "
+                                    "after)"
+                                ),
                                 merge_mode,
                             ),
-                            ("remove", "delete", "Remove", remove),
+                            ("remove", "delete", _("Remove"), remove),
                         ]
                     )
                     for mark, icon, tip, act in actions:
@@ -863,7 +887,11 @@ def categories_section(side: Side) -> Callable[[], None]:
             return t if len(t) <= 80 else t[:79] + "…"
 
         with side.host.dialogs, ui.dialog() as dialog, ui.card():
-            ui.label(f"Merge “{short(source.text)}” with “{short(target.text)}”?")
+            ui.label(
+                _("Merge “{first}” with “{second}”?").format(
+                    first=short(source.text), second=short(target.text)
+                )
+            )
             ui.label(
                 _(
                     "They are on one item (in the order of their PDFs), with the second one's "
@@ -883,8 +911,8 @@ def categories_section(side: Side) -> Callable[[], None]:
                 .mark("excerpt-merge-mode")
             )
             with ui.row().classes("w-full justify-end"):
-                ui.button("Cancel", on_click=dialog.close).props("flat")
-                ui.button("Merge", on_click=yes).mark("excerpt-merge-confirm")
+                ui.button(_("Cancel"), on_click=dialog.close).props("flat")
+                ui.button(_("Merge"), on_click=yes).mark("excerpt-merge-confirm")
         dialog.on("hide", lambda: (dialog.delete(), listing.refresh()))
         dialog.open()
 
@@ -896,10 +924,10 @@ def categories_section(side: Side) -> Callable[[], None]:
 
         short = e.text if len(e.text) <= 120 else e.text[:119] + "…"
         with side.host.dialogs, ui.dialog() as dialog, ui.card():
-            ui.label(f"Remove the excerpt “{short}”?")
+            ui.label(_("Remove the excerpt “{text}”?").format(text=short))
             with ui.row().classes("w-full justify-end"):
-                ui.button("Cancel", on_click=dialog.close).props("flat")
-                ui.button("Remove", on_click=yes).props("color=negative").mark(
+                ui.button(_("Cancel"), on_click=dialog.close).props("flat")
+                ui.button(_("Remove"), on_click=yes).props("color=negative").mark(
                     "excerpt-remove-confirm"
                 )
         dialog.on("hide", dialog.delete)
@@ -911,7 +939,12 @@ def categories_section(side: Side) -> Callable[[], None]:
             side.refresh_excerpts()
 
         category_picker(
-            side, e.text, to, title="Move to a category", done="Moved to", current=e.category_id
+            side,
+            e.text,
+            to,
+            title=N_("Move to a category"),
+            done=N_("Moved to {category}"),
+            current=e.category_id,
         )
 
     def originals(e: categories.ExcerptView, text: ui.textarea) -> None:
@@ -938,7 +971,7 @@ def categories_section(side: Side) -> Callable[[], None]:
                     )
                     with ui.column().classes("gap-0 grow min-w-0"):
                         ui.label(original).classes("text-sm")
-                        where = f"{x.source}, p. {x.page or '?'}"
+                        where = _("{source}, p. {page}").format(source=x.source, page=x.page or "?")
                         if x.ref_only:
                             where += " · " + _("cited by its place only")
                         ui.label(where).classes("text-xs text-grey")
@@ -983,8 +1016,8 @@ def categories_section(side: Side) -> Callable[[], None]:
                 side.refresh_excerpts()
 
             with ui.row().classes("w-full justify-end"):
-                ui.button("Cancel", on_click=dialog.close).props("flat")
-                ui.button("Save", on_click=save).mark("excerpt-edit-save")
+                ui.button(_("Cancel"), on_click=dialog.close).props("flat")
+                ui.button(_("Save"), on_click=save).mark("excerpt-edit-save")
         dialog.on_value_change(lambda ev: None if ev.value else dialog.delete())
         dialog.open()
 

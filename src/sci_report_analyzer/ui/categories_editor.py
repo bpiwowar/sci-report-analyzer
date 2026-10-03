@@ -48,18 +48,20 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
             changed()
 
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
-        ui.label(f"Categories of {name}").classes("text-lg font-medium")
+        ui.label(_("Categories of {folder}").format(folder=name)).classes("text-lg font-medium")
         ui.label(
-            "Excerpts of the people's documents (a passage selected in a PDF) are filed in "
-            "them; in this order in the reports. Drag to order and nest them. Years "
-            "(optional): those a category is about."
+            _(
+                "Excerpts of the people's documents (a passage selected in a PDF) are filed in "
+                "them; in this order in the reports. Drag to order and nest them. Years "
+                "(optional): those a category is about."
+            )
         ).classes("text-sm text-grey")
 
         @ui.refreshable
         def listing() -> None:
             nodes = categories.tree(folder_id)
             if not nodes:
-                ui.label("No category yet").classes("text-grey")
+                ui.label(_("No category yet")).classes("text-grey")
             for n in nodes:
                 row = (
                     ui.row()
@@ -74,8 +76,10 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                 row.on("drop", lambda e, n=n: dropped(e.args, n.id), js_handler=_DROP)
                 with row:
                     ui.icon("drag_indicator", color="grey").classes("cursor-move").tooltip(
-                        "Drag: onto the top / bottom of a category (before / after it), or "
-                        "its middle (inside it)"
+                        _(
+                            "Drag: onto the top / bottom of a category (before / after it), or "
+                            "its middle (inside it)"
+                        )
                     )
                     title = (
                         ui.input(value=n.name)
@@ -84,19 +88,19 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                         .mark(f"category-name-{n.id}")
                     )
                     start = (
-                        ui.number(placeholder="from", value=n.start_year, format="%d")
+                        ui.number(placeholder=_("from"), value=n.start_year, format="%d")
                         .props("dense borderless")
                         .classes("w-16")
                         .mark(f"category-from-{n.id}")
                     )
                     end = (
-                        ui.number(placeholder="to", value=n.end_year, format="%d")
+                        ui.number(placeholder=_("to"), value=n.end_year, format="%d")
                         .props("dense borderless")
                         .classes("w-16")
                         .mark(f"category-to-{n.id}")
                     )
 
-                    def save(_=None, n=n, t=title, a=start, b=end) -> None:
+                    def save(_e=None, n=n, t=title, a=start, b=end) -> None:
                         categories.update(n.id, t.value, _int(a.value), _int(b.value))
                         if changed:
                             changed()
@@ -106,8 +110,8 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                         field.on("keydown.enter", save)
                     ui.button(
                         icon="subdirectory_arrow_right",
-                        on_click=lambda n=n: (categories.add(folder_id, "New", n.id), done()),
-                    ).props("flat dense round size=sm").tooltip("Add a subcategory").mark(
+                        on_click=lambda n=n: (categories.add(folder_id, _("New"), n.id), done()),
+                    ).props("flat dense round size=sm").tooltip(_("Add a subcategory")).mark(
                         f"category-sub-{n.id}"
                     )
                     ui.button(icon="delete", on_click=lambda n=n: delete(n)).props(
@@ -115,7 +119,7 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                     ).mark(f"category-delete-{n.id}")
             if nodes:  # (dropped here: the last one at the top level)
                 end_zone = (
-                    ui.label("Drop here: last, at the top level")
+                    ui.label(_("Drop here: last, at the top level"))
                     .classes("w-full text-xs text-grey text-center rounded p-1 border-dashed")
                     .style("border: 1px dashed #bbb")
                     .mark("category-drop-end")
@@ -135,7 +139,7 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
             if categories.place(int(args["id"]), target, args.get("where") or "inside"):
                 done()
             else:
-                ui.notify("A category cannot go within itself", type="warning")
+                ui.notify(_("A category cannot go within itself"), type="warning")
 
         def delete(n: categories.Node) -> None:
             """Once confirmed; with excerpts (there or below): to move them first."""
@@ -193,7 +197,7 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
             listing()
         with ui.row().classes("w-full items-center gap-2"):
             new = (
-                ui.input(placeholder="New category")
+                ui.input(placeholder=_("New category"))
                 .props("dense outlined")
                 .classes("w-64")
                 .mark("category-new")
@@ -206,7 +210,7 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                     done()
 
             new.on("keydown.enter", add)
-            ui.button("Add", icon="add", on_click=add).props("flat dense").mark("category-add")
+            ui.button(_("Add"), icon="add", on_click=add).props("flat dense").mark("category-add")
             others = {
                 f.id: f.name
                 for f in folders.folders()
@@ -214,7 +218,7 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
             }
             if others:
                 source = (
-                    ui.select(others, label="Copy those of")
+                    ui.select(others, label=_("Copy those of"))
                     .props("dense outlined")
                     .classes("w-48")
                     .mark("category-copy-from")
@@ -223,13 +227,15 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                 def copy() -> None:
                     if source.value:
                         n = categories.copy_tree(source.value, folder_id)
-                        ui.notify(f"{n} categories copied")
+                        ui.notify(
+                            ngettext("{n} category copied", "{n} categories copied", n).format(n=n)
+                        )
                         done()
 
                 ui.button(icon="content_copy", on_click=copy).props("flat dense round").tooltip(
-                    "Add the categories of another folder"
+                    _("Add the categories of another folder")
                 ).mark("category-copy")
             ui.space()
-            ui.button("Close", on_click=dlg.close).props("flat")
+            ui.button(_("Close"), on_click=dlg.close).props("flat")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()

@@ -11,40 +11,45 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from ..i18n import N_, Labels
 from .badge import Badge
 
-KINDS: dict[str, str] = {
-    "intl_conference": "International conference",
-    "intl_workshop": "International workshop",
-    "intl_journal": "International journal",
-    "natl_conference": "National conference",
-    "natl_workshop": "National workshop",
-    "natl_journal": "National journal",
-    "preprint": "Preprint",
-    "book": "Book",
-    "chapter": "Book chapter",
-    "proceedings": "Edited proceedings / volume",
-    "software": "Software",
-    "dataset": "Dataset",
-    "thesis": "Thesis (PhD & other)",
-    "other": "Other (report…)",
-}
-KIND_SHORT = {
-    "intl_conference": "Intl. conf.",
-    "intl_workshop": "Intl. workshop",
-    "intl_journal": "Intl. journal",
-    "natl_conference": "Natl. conf.",
-    "natl_workshop": "Natl. workshop",
-    "natl_journal": "Natl. journal",
-    "preprint": "Preprint",
-    "book": "Book",
-    "chapter": "Chapter",
-    "proceedings": "Proceedings (ed.)",
-    "software": "Software",
-    "dataset": "Dataset",
-    "thesis": "Thesis",
-    "other": "Other",
-}
+KINDS: dict[str, str] = Labels(
+    {
+        "intl_conference": N_("International conference"),
+        "intl_workshop": N_("International workshop"),
+        "intl_journal": N_("International journal"),
+        "natl_conference": N_("National conference"),
+        "natl_workshop": N_("National workshop"),
+        "natl_journal": N_("National journal"),
+        "preprint": N_("Preprint"),
+        "book": N_("Book"),
+        "chapter": N_("Book chapter"),
+        "proceedings": N_("Edited proceedings / volume"),
+        "software": N_("Software"),
+        "dataset": N_("Dataset"),
+        "thesis": N_("Thesis (PhD & other)"),
+        "other": N_("Other (report…)"),
+    }
+)
+KIND_SHORT = Labels(
+    {
+        "intl_conference": N_("Intl. conf."),
+        "intl_workshop": N_("Intl. workshop"),
+        "intl_journal": N_("Intl. journal"),
+        "natl_conference": N_("Natl. conf."),
+        "natl_workshop": N_("Natl. workshop"),
+        "natl_journal": N_("Natl. journal"),
+        "preprint": N_("Preprint"),
+        "book": N_("Book"),
+        "chapter": N_("Chapter"),
+        "proceedings": N_("Proceedings (ed.)"),
+        "software": N_("Software"),
+        "dataset": N_("Dataset"),
+        "thesis": N_("Thesis"),
+        "other": N_("Other"),
+    }
+)
 # Unranked international venues: a muted tone of their family's ramp (conferences violet to
 # blue, journals green; see BASE_CATEGORIES).
 KIND_COLOUR = {
@@ -72,7 +77,7 @@ UNRANKED_KINDS = ("software", "dataset")
 # A publication's kind, never a venue's: a venue is not an edited volume (its proceedings,
 # edited by someone, are among its records), nor a thesis.
 PUBLICATION_ONLY_KINDS = ("proceedings", "thesis")
-VENUE_KINDS = {k: v for k, v in KINDS.items() if k not in PUBLICATION_ONLY_KINDS}
+VENUE_KINDS = Labels({k: v for k, v in dict.items(KINDS) if k not in PUBLICATION_ONLY_KINDS})
 # Not in a venue at all: a book's or a chapter's "venue" is its own title, series or
 # publisher; a thesis', its university.
 NO_VENUE_KINDS = ("book", "chapter", "thesis")

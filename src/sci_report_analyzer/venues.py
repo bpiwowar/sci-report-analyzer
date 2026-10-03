@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 from . import venue_match
 from .db.models import AppSetting, Publication, SourceLink, SourcePub, Venue, VenueKey
 from .db.session import session_scope
+from .i18n import _
 from .ranking.badge import Badge, category_of, category_order
 from .ranking.kinds import (
     KINDS,
@@ -338,7 +339,7 @@ def find_venues(query: str, limit: int = 10) -> list[VenueHit]:
                 VenueHit(
                     v.name,
                     venue_id=v.id,
-                    detail="venue",
+                    detail=_("venue"),
                     short=v.short_name or paren_acronym(v.name),
                     kind=KINDS.get(v.kind or ""),
                 )
@@ -352,9 +353,13 @@ def find_venues(query: str, limit: int = 10) -> list[VenueHit]:
                 b.name or "?",
                 record_key=b.recordKey,
                 badge=b,
-                detail=f"{b.source} record · {round(b.score * 100)}%",
+                detail=_("{source} record · {score}%").format(
+                    source=b.source, score=round(b.score * 100)
+                ),
                 short=auto_short_name(b),
-                kind={"conference": "Conference", "journal": "Journal"}.get(b.type or "", b.type),
+                kind={"conference": _("Conference"), "journal": _("Journal")}.get(
+                    b.type or "", b.type
+                ),
             )
         )
     return hits
@@ -557,7 +562,7 @@ def detect_parts(rows: list[VenueRow]) -> dict[int, list[int]]:
     for r in rows:
         if r.kind in WORKSHOP_KINDS or r.hosts:
             continue
-        texts = [r.name, *(ex for _, ex, *_ in r.variants), *r.raw_examples]
+        texts = [r.name, *(ex for _k, ex, *_rest in r.variants), *r.raw_examples]
         found = set().union(*map(_acronyms, texts)) & known.keys()
         if r.short_manual and r.short_name:
             found.discard(_fold(r.short_name))
@@ -625,24 +630,24 @@ async def part_badges(
 
 def joint_differ(parts: list[tuple[Venue, Badge | None]]) -> bool:
     """The parts of a joint venue have different levels."""
-    return len({_level_key(b) for _, b in parts}) > 1
+    return len({_level_key(b) for _p, b in parts}) > 1
 
 
 def _joint_badge(v: Venue, parts: list[tuple[Venue, Badge | None]]) -> Badge | None:
     """The level of the part chosen by hand, else the one the parts share; when they differ,
     the lowest (until a part is chosen)."""
-    names = [p.name for p, _ in parts]
+    names = [p.name for p, _b in parts]
     use = (v.joint or {}).get("use")
     chosen = next((b for p, b in parts if p.id == use), None)
     if chosen is not None:
         return chosen.copy(manual=True, extra={**chosen.extra, "joint": names})
-    if any(p.id == use for p, _ in parts):
+    if any(p.id == use for p, _b in parts):
         return None  # the chosen part is not ranked
     differ = joint_differ(parts)
     if differ:
-        b = max((b for _, b in parts), key=lambda b: category_order(category_of(b, None)))
+        b = max((b for _p, b in parts), key=lambda b: category_order(category_of(b, None)))
     else:
-        b = min((b for _, b in parts if b is not None), key=_quality, default=None)
+        b = min((b for _p, b in parts if b is not None), key=_quality, default=None)
     if b is None:
         return None
     return b.copy(manual=False, extra={**b.extra, "joint": names, "joint_differ": differ})
@@ -780,7 +785,7 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
         badge = (
             None
             if light
-            else await venue_badge(v, [s for s, _ in samples.most_common()], venues=by_id)
+            else await venue_badge(v, [s for s, _n in samples.most_common()], venues=by_id)
         )
         if light:
             kind = v.kind or "other"
@@ -839,7 +844,7 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
         row.url = v.url
         row.short_name = v.short_name or auto_short_name(
             badge,
-            [t for t, _ in row.raw_examples.most_common()],
+            [t for t, _n in row.raw_examples.most_common()],
             workshop=row.kind in WORKSHOP_KINDS,
         )
         out.append(row)
@@ -887,7 +892,7 @@ def venue_papers(pub_ids: Iterable[int]) -> list[VenuePaper]:
 
 def _row_tokens(r: VenueRow) -> set[str]:
     out = set(tokenize(r.name))
-    for _, example, *_ in r.variants:
+    for _k, example, *_rest in r.variants:
         out |= set(tokenize(example))
     return out
 
@@ -905,7 +910,7 @@ def similar_venues(
             continue
         score = _similarity(row, mine, r, _row_tokens(r))
         if q:
-            texts = [r.name, r.short_name or "", *(ex or k for k, ex, *_ in r.variants)]
+            texts = [r.name, r.short_name or "", *(ex or k for k, ex, *_rest in r.variants)]
             if not any(q in normalize(t) for t in texts):
                 continue
         elif score < 0.3:

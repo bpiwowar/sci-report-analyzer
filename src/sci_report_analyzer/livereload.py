@@ -15,6 +15,8 @@ from pathlib import Path
 
 from nicegui import background_tasks, ui
 
+from .i18n import _, ngettext
+
 logger = logging.getLogger(__name__)
 
 PACKAGE_DIR = Path(__file__).parent
@@ -36,7 +38,7 @@ async def _watch() -> None:
         return path.endswith((".py", ".mako")) and "__pycache__" not in path
 
     async for changes in awatch(PACKAGE_DIR, watch_filter=only_code):
-        for _, path in changes:
+        for _change, path in changes:
             changed.add(str(Path(path).relative_to(PACKAGE_DIR)))
         logger.info("Code changed: %s", ", ".join(sorted(changed)))
 
@@ -62,10 +64,10 @@ def banner() -> None:
         busy = any(not t.done() for t in _running.values())
         if busy and not state["confirm"]:
             state["confirm"] = True
-            button.text = "Restart anyway"
-            label.text = "A sync is running and would be interrupted."
+            button.text = _("Restart anyway")
+            label.text = _("A sync is running and would be interrupted.")
             return
-        ui.notify("Restarting… the page will reload by itself", type="info")
+        ui.notify(_("Restarting… the page will reload by itself"), type="info")
         restart()
 
     def later() -> None:
@@ -76,13 +78,17 @@ def banner() -> None:
         ui.icon("system_update")
         label = ui.label()
         ui.space()
-        button = ui.button("Restart & reload", icon="restart_alt", on_click=apply).props("dense")
-        ui.button("Later", on_click=later).props("dense flat")
+        button = ui.button(_("Restart & reload"), icon="restart_alt", on_click=apply).props("dense")
+        ui.button(_("Later"), on_click=later).props("dense flat")
 
     def check() -> None:
         # Shown again if more files change after "Later".
         if changed and len(changed) > state["dismissed"] and not box.visible:
-            label.text = f"New version available ({len(changed)} file(s) changed)"
+            label.text = ngettext(
+                "New version available ({n} file changed)",
+                "New version available ({n} files changed)",
+                len(changed),
+            ).format(n=len(changed))
             box.set_visibility(True)
 
     ui.timer(1.0, check)

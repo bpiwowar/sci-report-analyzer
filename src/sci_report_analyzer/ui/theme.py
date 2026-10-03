@@ -175,7 +175,7 @@ def rank_chip(badge: Badge | None, track: str | None = None, kind: str | None = 
     if cat.base_key.startswith("k_"):
         label = cat.label
     elif not badge:
-        label = "not ranked"
+        label = _("not ranked")
     else:
         label = badge.rank_label if cat.base_key == "other" else cat.label
     if badge and badge.predatory:
@@ -194,40 +194,52 @@ def rank_chip(badge: Badge | None, track: str | None = None, kind: str | None = 
 
 def badge_details(b: Badge) -> str:
     how = (
-        "manual"
+        _("manual")
         if b.manual
-        else "forced"
+        else _("forced")
         if b.forced
-        else "corrected"
+        else _("corrected")
         if b.corrected
-        else "exact"
+        else _("exact")
         if b.exact
-        else f"fuzzy {round(b.score * 100)}%"
+        else _("fuzzy {score}%").format(score=round(b.score * 100))
     )
-    lines = [b.name or "(unnamed)", f"matched via {b.source} ({how})"]
+    lines = [
+        b.name or _("(unnamed)"),
+        _("matched via {source} ({how})").format(source=b.source, how=how),
+    ]
     if b.quartile:
-        lines.append(f"Quartile {b.quartile}" + (f" ({b.sjrYear})" if b.sjrYear else ""))
+        if b.sjrYear:
+            lines.append(
+                _("Quartile {quartile} ({year})").format(quartile=b.quartile, year=b.sjrYear)
+            )
+        else:
+            lines.append(_("Quartile {quartile}").format(quartile=b.quartile))
     if latest := b.extra.get("sjrLatest"):
-        lines.append(f"Latest ({latest[0]}): {latest[1] or 'no quartile'}")
+        lines.append(
+            _("Latest ({year}): {quartile}").format(
+                year=latest[0], quartile=latest[1] or _("no quartile")
+            )
+        )
     if b.coreRank:
         lines.append(f"CORE {b.coreRank} ({b.coreEdition or ''})")
     elif b.coreHistory and b.coreEdition:
-        lines.append(f"Not in {b.coreEdition} (dropped from CORE)")
+        lines.append(_("Not in {edition} (dropped from CORE)").format(edition=b.coreEdition))
     if latest := b.extra.get("coreLatest"):
-        now = f"CORE {latest[1]}" if latest[1] else "not ranked"
-        lines.append(f"Latest listing ({latest[0]}): {now}")
+        now = f"CORE {latest[1]}" if latest[1] else _("not ranked")
+        lines.append(_("Latest listing ({year}): {rank}").format(year=latest[0], rank=now))
     if b.sjr is not None:
         lines.append(f"SJR {b.sjr}")
     if b.hindex is not None:
-        lines.append(f"h-index {b.hindex}")
+        lines.append(_("h-index {value}").format(value=b.hindex))
     if b.impactFactor is not None:
-        lines.append(f"IF {b.impactFactor}")
+        lines.append(_("IF {value}").format(value=b.impactFactor))
     if b.twoYearMeanCitedness is not None:
-        lines.append(f"2y mean citedness {b.twoYearMeanCitedness:.2f}")
+        lines.append(_("2y mean citedness {value:.2f}").format(value=b.twoYearMeanCitedness))
     if b.findings:
-        lines.append("Findings track (host conference rank)")
+        lines.append(_("Findings track (host conference rank)"))
     if b.predatory:
-        lines.append("⚠ listed as predatory")
+        lines.append(_("⚠ listed as predatory"))
     return "\n".join(lines)
 
 
@@ -267,7 +279,7 @@ def level_hint(select) -> ui.label:
     """A label explaining the level currently chosen in ``select``."""
     return (
         ui.label()
-        .bind_text_from(select, "value", lambda v: LEVEL_HELP.get(v or "", "Custom level."))
+        .bind_text_from(select, "value", lambda v: LEVEL_HELP.get(v or "", _("Custom level.")))
         .classes("text-xs text-grey")
     )
 
@@ -311,8 +323,8 @@ def merge_direction(target: str, others: list[str]) -> None:
                 ui.label(name).classes("text-sm").mark("merge-from")
         with ui.row().classes("items-center gap-2 no-wrap"):
             ui.icon("south", color="primary")
-            ui.label("merged into").classes("text-xs text-grey")
+            ui.label(_("merged into")).classes("text-xs text-grey")
         with ui.row().classes("items-center gap-2 no-wrap"):
             ui.icon("check_circle", color="positive", size="xs")
             ui.label(target).classes("text-sm font-bold").mark("merge-into")
-            ui.label("(kept)").classes("text-xs text-grey")
+            ui.label(_("(kept)")).classes("text-xs text-grey")

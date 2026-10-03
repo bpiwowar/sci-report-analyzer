@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from .db.models import Person, SourceLink
 from .db.session import session_scope
+from .i18n import _
 from .source_settings import enabled
 from .sources import doi as doi_source
 from .sources.base import normalize_doi
@@ -61,9 +62,13 @@ async def add_publication(person_id: int, text: str) -> str:
     """Add a publication by DOI or HAL id; returns its title. ValueError when it cannot be."""
     ref = parse_reference(text)
     if ref is None:
-        raise ValueError("Not a DOI nor a HAL document (or their URL)")
+        raise ValueError(_("Not a DOI nor a HAL document (or their URL)"))
     if not enabled(ref.kind):
-        raise ValueError(f"The {ref.kind.upper()} source is disabled (Settings → Sources)")
+        raise ValueError(
+            _("The {source} source is disabled (Settings → Sources)").format(
+                source=ref.kind.upper()
+            )
+        )
     if ref.kind == "doi":
         return await _add_doi(person_id, ref.id)
     return await _add_hal(person_id, ref.id)
@@ -73,9 +78,9 @@ async def _add_doi(person_id: int, doi: str) -> str:
     await doi_source.ensure([doi])
     record = doi_source.cached([doi]).get(doi)
     if record is None:
-        raise ValueError(f"DOI {doi} could not be fetched (try again later)")
+        raise ValueError(_("DOI {doi} could not be fetched (try again later)").format(doi=doi))
     if record.status != "ok":
-        raise ValueError(f"DOI {doi} is not registered")
+        raise ValueError(_("DOI {doi} is not registered").format(doi=doi))
     with session_scope() as s:
         link = _doi_link(s, s.get(Person, person_id))
         if doi not in (added := added_dois(link)):
@@ -95,7 +100,9 @@ async def _add_hal(person_id: int, hal_id: str) -> str:
         if not found:
             s.delete(link)  # (a failed sync can be retried by adding it again)
     if not found:
-        raise ValueError(f"HAL: {error}" if error else f"HAL document {hal_id} not found")
+        raise ValueError(
+            f"HAL: {error}" if error else _("HAL document {id} not found").format(id=hal_id)
+        )
     await sync_dois(person_id)  # its DOI's record
     return title or hal_id
 

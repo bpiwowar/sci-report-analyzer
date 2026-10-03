@@ -38,6 +38,7 @@ from .db.models import (
     Report,
 )
 from .db.session import session_scope
+from .i18n import _
 from .pubview import PubStat, hashtag, tagged
 
 NUMBER_FORMAT = "**#{n}**"
@@ -213,7 +214,7 @@ class Context:
     def entry(self, p: Paper, *, notes: bool = False, tags: bool = False, indent: int = 0) -> str:
         s = p.stat
         about = [
-            f"**{s.title or '(untitled)'}**",
+            f"**{s.title or _('(untitled)')}**",
             f"*{s.venue}*" if s.venue else None,
             str(s.year) if s.year else None,
             s.category.label,
@@ -399,7 +400,7 @@ def with_references(text: str, ctx: Context) -> str:
     """The text, its citations substituted, then the papers cited (by number)."""
     out = render(text, ctx).text.rstrip()
     if ctx.by_key:
-        out += "\n\n## References\n\n" + bibliography(ctx)
+        out += "\n\n## " + _("References") + "\n\n" + bibliography(ctx)
     return out + "\n"
 
 
@@ -497,7 +498,7 @@ def check_template(attrs: str) -> str | None:
     if not attrs:
         return None
     if not (attrs.startswith("{") and attrs.endswith("}")) or parse_attrs(attrs[1:-1]) is None:
-        return "Expected {…} with balanced parentheses, e.g. {.short-venue (.year)}"
+        return _("Expected {…} with balanced parentheses, e.g. {.short-venue (.year)}")
     return None
 
 

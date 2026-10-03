@@ -23,6 +23,7 @@ from .db.models import (
     utcnow,
 )
 from .db.session import session_scope
+from .i18n import N_
 from .merge import cluster, merge_person
 from .ranking.kinds import is_edited_volume
 from .ranking.normalize import normalize
@@ -32,6 +33,20 @@ from .sources import doi as doi_source
 from .sources.base import AuthorCandidate, FetchResult, SourceError, normalize_doi
 
 logger = logging.getLogger(__name__)
+
+# A link's update status (``SourceLink.status_label``: its link status, else its sync state),
+# compared in code in English and translated where shown, with ``_(status)``.
+STATUS_LABELS = (
+    N_("up to date"),
+    N_("updating…"),
+    N_("never synced"),
+    N_("out of date"),
+    N_("not used"),
+    N_("error"),
+    N_("candidate"),
+    N_("validated"),
+    N_("rejected"),
+)
 
 _running: dict[int, asyncio.Task] = {}
 

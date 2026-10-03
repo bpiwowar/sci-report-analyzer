@@ -10,6 +10,7 @@ from nicegui import ui
 
 from .. import annotations
 from ..db.models import Tag
+from ..i18n import _
 from .mdedit import MarkdownEditor
 from .theme import chip_style, chip_text, span
 
@@ -19,12 +20,12 @@ DEFAULT_COLOUR = "#0969da"
 def tag_chip(t: Tag, number: int | None = None) -> None:
     """A tag, with the paper's number in the list it was put from."""
     n = f" #{number}" if number is not None else ""
+    kind = _("tag within the period") if t.per_period else _("tag")
     span(
         f'<span class="vr-chip" style="background:{t.colour};color:{chip_text(t.colour)}">'
         f"{'⏱ ' if t.per_period else ''}{escape(t.name)}{n}</span>"
     ).tooltip(
-        ("tag within the period" if t.per_period else "tag")
-        + (f", number {number} in its list" if n else "")
+        _("{tag}, number {number} in its list").format(tag=kind, number=number) if n else kind
     )
 
 
@@ -41,21 +42,21 @@ def tags_section(on_change: Callable[[], None] | None = None) -> None:
         tags = annotations.all_tags()
         for t in tags:
             with ui.row().classes("items-center gap-2"):
-                name = ui.input("Name", value=t.name).props("dense").mark(f"tag-name-{t.id}")
+                name = ui.input(_("Name"), value=t.name).props("dense").mark(f"tag-name-{t.id}")
                 colour = (
-                    ui.color_input("Colour", value=t.colour, preview=True)
+                    ui.color_input(_("Colour"), value=t.colour, preview=True)
                     .props("dense")
                     .classes("w-36")
                     .mark(f"tag-colour-{t.id}")
                 )
-                ui.label("within a period" if t.per_period else "global").classes(
+                ui.label(_("within a period") if t.per_period else _("global")).classes(
                     "text-sm text-grey w-28"
                 )
 
                 def save(tid=t.id, n=name, c=colour) -> None:
                     if n.value.strip():
                         annotations.save_tag(n.value, c.value, tag_id=tid)
-                        ui.notify("Saved")
+                        ui.notify(_("Saved"))
                         changed()
 
                 ui.button(icon="save", on_click=save).props("flat round dense").mark(
@@ -66,22 +67,24 @@ def tags_section(on_change: Callable[[], None] | None = None) -> None:
                         icon="delete",
                         on_click=lambda tid=t.id: (annotations.delete_tag(tid), changed()),
                     ).props("flat round dense color=negative").tooltip(
-                        "Delete the tag (from every paper)"
+                        _("Delete the tag (from every paper)")
                     )
 
     ui.label(
-        "Tags are put on papers from their details. A global tag sticks to the paper; a tag "
-        "within a period (⏱, e.g. “starred”) is set separately in each period / folder."
+        _(
+            "Tags are put on papers from their details. A global tag sticks to the paper; a tag "
+            "within a period (⏱, e.g. “starred”) is set separately in each period / folder."
+        )
     ).classes("text-grey")
     listing()
     with ui.row().classes("items-center gap-2 mt-2"):
-        name = ui.input("New tag").props("dense").mark("new-tag-name")
+        name = ui.input(_("New tag")).props("dense").mark("new-tag-name")
         colour = (
-            ui.color_input("Colour", value=DEFAULT_COLOUR, preview=True)
+            ui.color_input(_("Colour"), value=DEFAULT_COLOUR, preview=True)
             .props("dense")
             .classes("w-36")
         )
-        per_period = ui.checkbox("within a period").mark("new-tag-period")
+        per_period = ui.checkbox(_("within a period")).mark("new-tag-period")
 
         def add() -> None:
             if name.value.strip():
@@ -89,13 +92,13 @@ def tags_section(on_change: Callable[[], None] | None = None) -> None:
                 name.value = ""
                 changed()
 
-        ui.button("Add", on_click=add).mark("new-tag-add")
+        ui.button(_("Add"), on_click=add).mark("new-tag-add")
 
 
 def tags_dialog(on_change: Callable[[], None]) -> None:
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-2xl"):
         with ui.row().classes("w-full items-center justify-between"):
-            ui.label("Tags").classes("text-lg font-medium")
+            ui.label(_("Tags")).classes("text-lg font-medium")
             ui.button(icon="close", on_click=dlg.close).props("flat round")
         tags_section(on_change)
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
@@ -128,11 +131,11 @@ def note_editor(
         if text != state["saved"]:
             state["saved"] = text
             save(text)
-        status.text = "Saved"
+        status.text = _("Saved")
 
     def typed(text: str) -> None:
         state.update(typed=text, at=time.monotonic())
-        status.text = "Editing…"
+        status.text = _("Editing…")
 
     def tick() -> None:
         if state["typed"] is not None and time.monotonic() - state["at"] > 1.0:
@@ -164,7 +167,7 @@ def paper_tags_and_notes(
 ) -> None:
     """A paper's tags (global, and within ``period``) and its notes (its own, and within
     the period), in its details."""
-    ui.label("Tags").classes("font-medium")
+    ui.label(_("Tags")).classes("font-medium")
     pid = period.id if period else None
 
     @ui.refreshable
@@ -191,10 +194,12 @@ def paper_tags_and_notes(
                 ).style(chip_style(t.colour, on)).props(
                     "dense " + ("color=primary" if on else "")
                 ).mark(f"tag-{t.name}").tooltip(
-                    f"within {period.name}" if t.per_period else "on the paper (every period)"
+                    _("within {period}").format(period=period.name)
+                    if t.per_period
+                    else _("on the paper (every period)")
                 )
             new = (
-                ui.input(placeholder="+ new tag")
+                ui.input(placeholder=_("+ new tag"))
                 .props("dense borderless")
                 .classes("w-32")
                 .mark("paper-new-tag")
@@ -202,12 +207,12 @@ def paper_tags_and_notes(
             per = (
                 ui.checkbox("⏱", value=False)
                 .props("dense")
-                .tooltip("Within the period only")
+                .tooltip(_("Within the period only"))
                 .mark("paper-new-tag-period")
             )
             if period is None:
                 per.disable()
-                per.tooltip("Choose a period to make a tag within the period")
+                per.tooltip(_("Choose a period to make a tag within the period"))
 
             def create() -> None:
                 name = (new.value or "").strip()
@@ -219,7 +224,7 @@ def paper_tags_and_notes(
                     tags[:] = annotations.all_tags()
                 tag = next(t for t in tags if t.id == tid)
                 if tag.per_period and period is None:
-                    ui.notify("Choose a period first", type="warning")
+                    ui.notify(_("Choose a period first"), type="warning")
                     return
                 if tid not in s.tags_in(pid):
                     annotations.toggle_tag(s.id, tid, pid)
@@ -230,11 +235,11 @@ def paper_tags_and_notes(
 
             new.on("keydown.enter", create)
             ui.button(icon="settings", on_click=manage).props("flat round dense size=sm").tooltip(
-                "Manage tags (names, colours)"
+                _("Manage tags (names, colours)")
             ).mark("manage-tags")
 
     chips()
-    ui.label("Notes").classes("font-medium mt-2")
+    ui.label(_("Notes")).classes("font-medium mt-2")
 
     def save_note(text: str) -> None:
         annotations.set_note(s.id, text)
@@ -242,7 +247,7 @@ def paper_tags_and_notes(
         reload()
 
     note_editor(
-        "Note (on the paper)",
+        _("Note (on the paper)"),
         s.note,
         save_note,
         mark="paper-note",
@@ -261,7 +266,7 @@ def paper_tags_and_notes(
             reload()
 
         note_editor(
-            f"Note within {period.name}",
+            _("Note within {period}").format(period=period.name),
             s.period_notes.get(pid),
             save_period_note,
             mark="period-note",
