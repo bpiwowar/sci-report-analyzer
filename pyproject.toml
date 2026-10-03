@@ -1,0 +1,56 @@
+[project]
+name = "sci-report-analyzer"
+version = "1.0.0"
+description = "Track researchers' publications across sources and rank their venues, with per-person folders, notes and reports"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Benjamin Piwowarski", email = "benjamin@piwowarski.fr" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.20.0",
+    "beautifulsoup4>=4.15.0",
+    "httpx>=0.28.1",
+    "lark>=1.3.1",
+    "latex2mathml>=3.81.1",
+    "lxml>=6.1.3",
+    "nicegui>=3.17.1",
+    "pydantic>=2.13.5",
+    "sqlalchemy>=2.1.1",
+]
+
+[project.scripts]
+sci-report-analyzer = "sci_report_analyzer.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "respx>=0.23.1",
+    "ruff>=0.16.9",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+"src/sci_report_analyzer/db/migrations/versions/*" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = ["live: hits real remote APIs (run with -m live)"]
+addopts = "-m 'not live'"
