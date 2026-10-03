@@ -16,7 +16,7 @@ from . import venue_match
 from .db.models import AppSetting, Publication, SourceLink, SourcePub, Venue, VenueKey
 from .db.session import session_scope
 from .i18n import _
-from .ranking.badge import Badge, category_of, category_order
+from .ranking.badge import TRACK_ORDER, Badge, category_of, category_order, detect_track
 from .ranking.kinds import (
     KINDS,
     VENUE_KINDS,
@@ -985,6 +985,159 @@ def merge_proposals(rows: list[VenueRow]) -> list[tuple[VenueRow, VenueRow, floa
                     out.append((keep, other, score))
     out.sort(key=lambda t: (-t[2], -(t[0].publications + t[1].publications)))
     return out
+
+
+# ---- related venues ---------------------------------------------------------------------------
+#
+# How another venue relates to one: the same venue, one of its tracks, a joint conference
+# including it or one of its workshops. "~" reverses it: the venue is the other's track…
+
+RELATION_KINDS = ("same", "track", "joint", "workshop")
+_FINDINGS = re.compile(r"\bfindings\b", re.I)
+# Two conferences joined by "and" ("… Conference on X and the International Joint Conference
+# on Y"); IJCAI, a single "International Joint Conference", is not one.
+_JOINT = re.compile(
+    r"\b(?:conference|symposium|meeting|workshop)\b.*\band\b(?:\s+the)?\b.*"
+    r"\b(?:conference|symposium|meeting|workshop)\b",
+    re.I,
+)
+
+
+def _texts(r: VenueRow) -> list[str]:
+    return [r.name, *(ex for _k, ex, *_rest in r.variants if ex)]
+
+
+def _track_word(text: str) -> str | None:
+    if _FINDINGS.search(text):
+        return "findings"
+    return detect_track(text)
+
+
+def venue_track(r: VenueRow) -> str | None:
+    """The track a venue looks like (Findings, demo…): named by its name or all its texts."""
+    if t := _track_word(r.name):
+        return t
+    tracks = {_track_word(t) for t in _texts(r)}
+    return tracks.pop() if len(tracks) == 1 else None
+
+
+def looks_joint(r: VenueRow) -> bool:
+    """A venue that looks like a joint conference (its parts known, or its name joins two);
+    a workshop is not one (its texts name its main conference)."""
+    if r.kind in WORKSHOP_KINDS or r.hosts:
+        return False
+    return bool(r.parts) or any(_JOINT.search(t) for t in _texts(r))
+
+
+def _looks_workshop(r: VenueRow) -> bool:
+    return r.kind in WORKSHOP_KINDS or bool(r.hosts) or bool(WORKSHOP_RE.search(r.name))
+
+
+def guess_relation(row: VenueRow, other: VenueRow) -> str:
+    """How ``other`` relates to ``row``: "same", "track:<track>", "joint" (other is a joint
+    conference including row), "workshop" (other is a workshop of row), or "~" + one of the
+    last three when it is the other way round."""
+    track, other_track = venue_track(row), venue_track(other)
+    if other_track and not track:
+        return f"track:{other_track}"
+    if track and not other_track:
+        return f"~track:{track}"
+    joint, other_joint = looks_joint(row), looks_joint(other)
+    if other_joint and not joint:
+        return "joint"
+    if joint and not other_joint:
+        return "~joint"
+    workshop, other_workshop = _looks_workshop(row), _looks_workshop(other)
+    if other_workshop and not workshop:
+        return "workshop"
+    if workshop and not other_workshop:
+        return "~workshop"
+    return "same"
+
+
+def relation_choices(guess: str) -> list[str]:
+    """The relations to offer: the guess, the same venue, and each relation both ways (the
+    tracks only in the guessed direction)."""
+    rev = "~" if guess.startswith("~") else ""
+    tracks = [f"{rev}track:{t}" for t in TRACK_ORDER]
+    out = ["same", *tracks, "joint", "~joint", "workshop", "~workshop"]
+    return [guess, *(r for r in out if r != guess)]
+
+
+def related(row: VenueRow, other: VenueRow) -> bool:
+    """``other`` is already a part, a joint venue, a host or a workshop of ``row``."""
+    return (
+        any(other.id == p for p, *_ in row.parts)
+        or any(row.id == p for p, *_ in other.parts)
+        or any(other.id == h for h, *_ in row.hosts)
+        or any(row.id == h for h, *_ in other.hosts)
+    )
+
+
+def suggest_related(
+    row: VenueRow, rows: list[VenueRow], limit: int = 4
+) -> list[tuple[list[VenueRow], str]]:
+    """Venues that look related to ``row`` (those said not to be or already related left
+    out), with their guessed relation; those that look like the same venue as each other
+    with the same relation are grouped (most papers first), to be merged together first."""
+    not_same = not_same_pairs()
+    found = [
+        r
+        for r, _score in similar_venues(row, rows, limit=limit * 2)
+        if (min(r.id, row.id), max(r.id, row.id)) not in not_same and not related(row, r)
+    ][:limit]
+    groups: list[tuple[list[VenueRow], str]] = []
+    for r in found:
+        rel = guess_relation(row, r)
+        toks = _row_tokens(r)
+        group = next(
+            (
+                g
+                for g, grel in groups
+                if grel == rel
+                and rel != "same"
+                and all(_similarity(r, toks, o, _row_tokens(o)) >= PROPOSAL_SCORE for o in g)
+            ),
+            None,
+        )
+        if group is None:
+            groups.append(([r], rel))
+        else:
+            group.append(r)
+            group.sort(key=lambda o: (-o.publications, o.id))
+    return groups
+
+
+def relate_venues(row_id: int, other_ids: list[int], relation: str) -> int:
+    """Record how other venues relate to a venue (see ``guess_relation``); several others
+    are merged together first (into the first). Returns the venue left for ``row_id``
+    (another one when it was merged)."""
+    other, *rest = other_ids
+    if relation == "same":
+        merge_venues(row_id, other_ids)
+        return row_id
+    if rest:
+        merge_venues(other, rest)
+    reverse = relation.startswith("~")
+    kind, _sep, track = relation.lstrip("~").partition(":")
+    sat, main = (row_id, other) if reverse else (other, row_id)  # the satellite and its venue
+    if kind == "track":
+        with session_scope() as s:
+            for vk in s.scalars(select(VenueKey).where(VenueKey.venue_id == sat)):
+                vk.track = vk.track or track
+        merge_venues(main, [sat])
+        return main
+    if kind == "joint":
+        with session_scope() as s:
+            j = s.get(Venue, sat).joint or {}
+        set_joint_parts(sat, [*(j.get("parts") or []), main])
+    elif kind == "workshop":
+        with session_scope() as s:
+            hosts = s.get(Venue, sat).hosts or []
+        save_hosts(sat, [*hosts, {"venue_id": main, "from": None, "to": None}])
+    else:
+        raise ValueError(f"unknown relation: {relation!r}")
+    return row_id
 
 
 def venue_options() -> dict[int, str]:

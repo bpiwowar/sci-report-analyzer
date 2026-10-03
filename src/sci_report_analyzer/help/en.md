@@ -126,7 +126,10 @@ position can also be corrected. Manual decisions are flagged and
 never overridden by automatic processing or re-syncs. On the venue pages you can also
 **merge** variants that are the same venue (giving the result a new name if you like), or
 split one out; **Propose merges…** goes through the venues that look alike, one pair at a
-time (a pair said *not the same* is not proposed again). Venue decisions are part of the
+time (a pair said *not the same* is not proposed again). A venue page lists the venues that
+look related, with the relation guessed: the same venue, one of its tracks (e.g. *Findings of
+the ACL: EMNLP* is EMNLP's Findings track), a joint conference including it (EMNLP-IJCNLP)
+or one of its workshops; change it if needed, then apply. Venue decisions are part of the
 exported settings.
 
 ## Categories and levels

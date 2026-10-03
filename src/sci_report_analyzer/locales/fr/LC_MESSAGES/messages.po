@@ -115,6 +115,9 @@ msgstr ""
 "Un dossier (p. ex. un comité) regroupe des personnes ; chacune y a sa "
 "propre période."
 
+msgid "A joint conference including this venue"
+msgstr "Une conférence commune incluant ce canal"
+
 msgid ""
 "A journal gets its quartile of a paper's year: download the years missing"
 " from scimagojr.com (it blocks the app) and drop their CSVs here, the "
@@ -166,6 +169,9 @@ msgstr ""
 "personnes ayant un profil validé sur cette source ; un dossier peut en "
 "utiliser une autre."
 
+msgid "A part of this joint conference"
+msgstr "Une composante de cette conférence commune"
+
 msgid "A percentage is compared with p"
 msgstr "Un pourcentage se compare à p"
 
@@ -206,6 +212,9 @@ msgstr ""
 "d'après les acronymes de ses textes. Ses articles prennent le niveau "
 "commun à ses conférences ; s'ils diffèrent, celui que vous choisissez "
 "(sinon le plus bas). Un niveau fixé à la main ci-dessous prime."
+
+msgid "A workshop of this venue"
+msgstr "Un atelier de ce canal"
 
 #, python-brace-format
 msgid ""
@@ -404,6 +413,9 @@ msgstr "Parmi les articles"
 
 msgid "Annotations"
 msgstr "Annotations"
+
+msgid "Apply"
+msgstr "Appliquer"
 
 msgid "Archival"
 msgstr "Archive"
@@ -1239,6 +1251,10 @@ msgstr "Trouvez d'abord les articles"
 msgid "Findings track (host conference rank)"
 msgstr "Session Findings (rang de la conférence hôte)"
 
+#, python-brace-format
+msgid "First, {names} are merged into “{name}”."
+msgstr "D'abord, {names} sont fusionnés dans « {name} »."
+
 msgid "Flags"
 msgstr "Signalements"
 
@@ -1247,8 +1263,8 @@ msgid ""
 "satellite category (e.g. “Short CORE A*”) in the distribution."
 msgstr ""
 "Les signalements s’attachent aux publications. Un signalement avec une "
-"session place l’article dans une catégorie satellite (p. ex. « Court CORE "
-"A* ») dans la distribution."
+"session place l’article dans une catégorie satellite (p. ex. « Court CORE"
+" A* ») dans la distribution."
 
 msgid "Flags, tags & categories"
 msgstr "Signalements, étiquettes et catégories"
@@ -1830,10 +1846,6 @@ msgstr[1] "Fusionner {n} canaux dans celui-ci"
 msgid "Merge “{first}” with “{second}”?"
 msgstr "Fusionner « {first} » avec « {second} » ?"
 
-#, python-brace-format
-msgid "Merge “{name}” into this venue"
-msgstr "Fusionner « {name} » dans ce canal"
-
 msgid "Merged"
 msgstr "Fusionné"
 
@@ -2175,6 +2187,9 @@ msgstr "Absent de {edition} (retiré de CORE)"
 msgid "Not loaded: download it"
 msgstr "Non chargée : la télécharger"
 
+msgid "Not related: never propose it again"
+msgstr "Sans rapport : ne plus jamais le proposer"
+
 #, python-brace-format
 msgid "Not saved: {error}"
 msgstr "Non enregistré : {error}"
@@ -2447,9 +2462,6 @@ msgstr "Doctorant…"
 msgid "Pick a ranking record"
 msgstr "Choisir une fiche de classement"
 
-msgid "Possibly the same venue:"
-msgstr "Peut-être le même canal :"
-
 msgid "Predatory list"
 msgstr "Liste des prédateurs"
 
@@ -2635,6 +2647,9 @@ msgstr "Rejeter"
 #, python-brace-format
 msgid "Rejected ({n})"
 msgstr "Rejetés ({n})"
+
+msgid "Related venues?"
+msgstr "Canaux liés ?"
 
 msgid "Remove"
 msgstr "Supprimer"
@@ -3197,6 +3212,13 @@ msgstr ""
 "Les anciens noms restent des variantes, leurs textes sont donc toujours "
 "reconnus"
 
+msgid "The main conference of this workshop"
+msgstr "La conférence principale de cet atelier"
+
+#, python-brace-format
+msgid "The main venue (this one is its {track} track)"
+msgstr "Le canal principal (celui-ci est sa session {track})"
+
 msgid ""
 "The other sources' venues are then ignored for this paper, also after a "
 "re-sync."
@@ -3220,6 +3242,9 @@ msgstr ""
 "Les règles d'autres canaux de publication reconnaissent aussi ce texte : "
 "{venues}. Cliquez pour les fusionner en un seul canal."
 
+msgid "The same venue"
+msgstr "Le même canal"
+
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
 
@@ -3230,9 +3255,9 @@ msgid ""
 "The sources give different venues or tracks: select one to validate it "
 "for this paper, or several venues to merge them."
 msgstr ""
-"Les sources donnent des canaux de publication ou des sessions différents : "
-"sélectionnez-en un pour le valider pour cet article, ou plusieurs canaux "
-"pour les fusionner."
+"Les sources donnent des canaux de publication ou des sessions différents "
+": sélectionnez-en un pour le valider pour cet article, ou plusieurs "
+"canaux pour les fusionner."
 
 msgid ""
 "The sources' texts with this name belong to it; add variants or rules in "
@@ -3252,9 +3277,9 @@ msgid ""
 "The venue kept gets the others' variants (with their tracks), rules, "
 "ISSNs and papers; its own decisions win, the others' fill what it lacks."
 msgstr ""
-"Le canal conservé reçoit les variantes (avec leurs sessions), règles, ISSN "
-"et articles des autres ; ses propres décisions l'emportent, celles des "
-"autres complètent ce qui lui manque."
+"Le canal conservé reçoit les variantes (avec leurs sessions), règles, "
+"ISSN et articles des autres ; ses propres décisions l'emportent, celles "
+"des autres complètent ce qui lui manque."
 
 #, python-brace-format
 msgid "The {source} source is disabled (Settings → Sources)"
@@ -3346,6 +3371,10 @@ msgstr[1] "Cela supprime, pour {n} personnes :"
 msgid "This venue has no paper any more"
 msgstr "Ce canal n'a plus d'article"
 
+#, python-brace-format
+msgid "This venue's {track} track"
+msgstr "La session {track} de ce canal"
+
 msgid "Title"
 msgstr "Titre"
 
@@ -3365,7 +3394,9 @@ msgid "Track of the papers with this variant"
 msgstr "Session des articles ayant cette variante"
 
 msgid "Track of the publications whose venue text matches (demo, findings...)"
-msgstr "Session des publications dont le texte de canal correspond (démo, findings…)"
+msgstr ""
+"Session des publications dont le texte de canal correspond (démo, "
+"findings…)"
 
 msgid "Track saved"
 msgstr "Session enregistrée"
@@ -4264,8 +4295,8 @@ msgstr "texte de la source : « {text} »"
 
 msgid "sources give different tracks — pick one in the details or flag it"
 msgstr ""
-"les sources donnent des sessions différentes — choisissez-en une dans les "
-"détails ou ajoutez un signalement"
+"les sources donnent des sessions différentes — choisissez-en une dans les"
+" détails ou ajoutez un signalement"
 
 msgid "sources give different venues — pick one in the details"
 msgstr ""
@@ -4729,6 +4760,26 @@ msgstr[0] "« {name} » a un extrait (avec ses sous-catégories) : déplacez-le 
 msgstr[1] ""
 "« {name} » a {n} extraits (avec ses sous-catégories) : déplacez-les "
 "d'abord."
+
+#, python-brace-format
+msgid ""
+"“{sat}” becomes a joint conference including “{main}”: its papers take "
+"its level."
+msgstr ""
+"« {sat} » devient une conférence commune incluant « {main} » : ses "
+"articles prennent son niveau."
+
+#, python-brace-format
+msgid "“{sat}” becomes a workshop of “{main}”: its papers take its rank."
+msgstr ""
+"« {sat} » devient un atelier de « {main} » : ses articles prennent son "
+"rang."
+
+#, python-brace-format
+msgid "“{sat}” is merged into “{main}”, its texts marked as its {track} track."
+msgstr ""
+"« {sat} » est fusionné dans « {main} », ses textes marqués comme sa "
+"session {track}."
 
 #, python-brace-format
 msgid "“{tag}” put on {n} papers"

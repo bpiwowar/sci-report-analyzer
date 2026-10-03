@@ -1023,23 +1023,8 @@ def venue_dialog(
         for vid, host, *_rest in row.hosts:  # (a workshop: its main conferences' ranks)
             r = next((r for r in all_rows if r.id == vid), None)
             _core_history(r.badge if r else None, host)
-        if suggestions := venues.similar_venues(row, all_rows, limit=4):
-            with (
-                ui.row()
-                .classes("items-center gap-2 w-full bg-blue-1 rounded p-1")
-                .mark("venue-suggestions")
-            ):
-                ui.icon("merge", color="primary")
-                ui.label(_("Possibly the same venue:")).classes("text-sm")
-                for i, (r, _score) in enumerate(suggestions):
-                    with ui.row().classes("items-center gap-0 no-wrap"):
-                        ui.label(f"{r.name} ({r.publications})").classes("text-sm")
-                        ui.button(
-                            icon="call_merge",
-                            on_click=lambda r=r: _confirm_merge(row, [r], merged),
-                        ).props("flat round dense size=sm").tooltip(
-                            _("Merge “{name}” into this venue").format(name=r.name)
-                        ).mark(f"venue-suggest-merge-{i}")
+        if suggestions := venues.suggest_related(row, all_rows):
+            _related_strip(row, suggestions, merged)
 
         with ui.tabs().classes("w-full").props("align=left dense") as tabs:
             t_rank = ui.tab("ranking", _("Name and ranking")).mark("venue-tab-ranking")
@@ -1415,6 +1400,105 @@ def venue_dialog(
             ui.button(_("Save"), on_click=save).mark("venue-save")
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()
+
+
+def _relation_label(relation: str) -> str:
+    """What a suggested venue is, for the open one."""
+    kind, _sep, track = relation.partition(":")
+    track = TRACK_LABEL.get(track, track)
+    return {
+        "same": _("The same venue"),
+        "track": _("This venue's {track} track").format(track=track),
+        "~track": _("The main venue (this one is its {track} track)").format(track=track),
+        "joint": _("A joint conference including this venue"),
+        "~joint": _("A part of this joint conference"),
+        "workshop": _("A workshop of this venue"),
+        "~workshop": _("The main conference of this workshop"),
+    }[kind]
+
+
+def _relation_sentence(row: venues.VenueRow, group: list[venues.VenueRow], relation: str) -> str:
+    """What recording a relation does."""
+    reverse = relation.startswith("~")
+    kind, _sep, track = relation.lstrip("~").partition(":")
+    sat, main = (row, group[0]) if reverse else (group[0], row)
+    if kind == "track":
+        text = _("“{sat}” is merged into “{main}”, its texts marked as its {track} track.")
+    elif kind == "joint":
+        text = _(
+            "“{sat}” becomes a joint conference including “{main}”: its papers take its level."
+        )
+    else:
+        text = _("“{sat}” becomes a workshop of “{main}”: its papers take its rank.")
+    text = text.format(sat=sat.name, main=main.name, track=TRACK_LABEL.get(track, track))
+    if len(group) > 1:
+        first = _("First, {names} are merged into “{name}”.").format(
+            names=", ".join(f"“{r.name}”" for r in group[1:]), name=group[0].name
+        )
+        text = f"{first} {text}"
+    return text
+
+
+def _related_strip(
+    row: venues.VenueRow,
+    suggestions: list[tuple[list[venues.VenueRow], str]],
+    finish: Callable[[int], object],
+) -> None:
+    """Venues that look related to ``row``, each with its guessed relation (to change), to
+    record it or to say they are not related."""
+
+    def apply(group: list[venues.VenueRow], relation: str) -> None:
+        if relation == "same":
+            _confirm_merge(row, group, finish)
+            return
+        with ui.dialog() as dlg, ui.card().classes("min-w-96"):
+            ui.label(_relation_label(relation)).classes("text-lg font-medium")
+            ui.label(_relation_sentence(row, group, relation)).classes("text-sm")
+
+            def ok() -> None:
+                kept = venues.relate_venues(row.id, [r.id for r in group], relation)
+                dlg.close()
+                finish(kept)
+
+            with ui.row().classes("w-full justify-end"):
+                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+                ui.button(_("Apply"), icon="check", on_click=ok).mark("venue-relate-confirm")
+        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
+        dlg.open()
+
+    def unrelated(group: list[venues.VenueRow], line) -> None:
+        for r in group:
+            venues.set_not_same(row.id, r.id)
+        line.delete()
+
+    with ui.column().classes("w-full gap-1 bg-blue-1 rounded p-2").mark("venue-suggestions"):
+        with ui.row().classes("items-center gap-2"):
+            ui.icon("merge", color="primary")
+            ui.label(_("Related venues?")).classes("text-sm font-medium")
+        for i, (group, guess) in enumerate(suggestions):
+            with ui.row().classes("w-full items-center gap-2 no-wrap pl-2") as line:
+                with ui.column().classes("grow gap-0"):
+                    for r in group:
+                        ui.label(f"{r.name} ({r.publications})").classes("text-sm")
+                rel = (
+                    ui.select(
+                        {k: _relation_label(k) for k in venues.relation_choices(guess)},
+                        value=guess,
+                    )
+                    .props("dense outlined options-dense")
+                    .classes("w-72")
+                    .mark(f"venue-suggest-relation-{i}")
+                )
+                ui.button(
+                    _("Apply"),
+                    icon="call_merge",
+                    on_click=lambda g=group, rel=rel: apply(g, rel.value),
+                ).props("dense flat no-caps color=primary").mark(f"venue-suggest-merge-{i}")
+                ui.button(
+                    icon="close", on_click=lambda g=group, line=line: unrelated(g, line)
+                ).props("flat round dense size=sm").tooltip(
+                    _("Not related: never propose it again")
+                ).mark(f"venue-suggest-unrelated-{i}")
 
 
 def _confirm_merge(

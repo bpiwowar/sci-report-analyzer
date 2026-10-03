@@ -1020,6 +1020,38 @@ async def test_venue_opens_in_place_with_merge_suggestions(user: User) -> None:
     assert va == vb
 
 
+async def test_venue_suggestion_as_a_track(user: User) -> None:
+    pid = make_person("Jane Doe")
+    add_source(
+        pid,
+        "hal",
+        "jd",
+        [
+            pub("a", "Paper A", 2023, "Conference on Things (THINGS)", authors=["Jane Doe"]),
+            pub("b", "Paper B", 2023, "Findings of Things: THINGS", authors=["Jane Doe"]),
+        ],
+    )
+    a = _pub_id("Paper A")
+    await user.open(f"/person/{pid}")
+    await user.should_see("Paper A")
+    user.find(f"pub-venue-link-{a}").click()
+    await user.should_see(marker="venue-suggestions", retries=40)
+    (select,) = user.find("venue-suggest-relation-0").elements
+    assert select.value == "track:findings"
+    user.find("venue-suggest-merge-0").click()
+    await user.should_see(marker="venue-relate-confirm")
+    user.find("venue-relate-confirm").click()
+    await user.should_see("Paper B")
+    from sci_report_analyzer.db.models import Publication, VenueKey
+    from sci_report_analyzer.db.session import session_scope
+
+    await asyncio.sleep(0.3)
+    with session_scope() as s:
+        va = s.get(Publication, a).venue_id
+        assert s.get(Publication, _pub_id("Paper B")).venue_id == va
+        assert {k.track for k in s.query(VenueKey).filter_by(venue_id=va)} == {None, "findings"}
+
+
 async def test_resolve_conflicts_one_at_a_time(user: User) -> None:
     from sci_report_analyzer import venues
     from sci_report_analyzer.ranking.service import VenuePattern

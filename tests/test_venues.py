@@ -870,3 +870,79 @@ def test_a_track_wins_whatever_the_venue_and_different_tracks_conflict():
     annotations.toggle_flag(a.id, short.id)  # or by a flag
     (a,) = stats(pid).values()
     assert a.track == "short" and not a.track_conflict
+
+
+EMNLP = "Conference on Empirical Methods in Natural Language Processing"
+EMNLP_IJCNLP = f"{EMNLP} and the International Joint Conference on Natural Language Processing"
+
+
+def _emnlp_setup():
+    pid = make_person()
+    add_source(
+        pid,
+        "hal",
+        "h",
+        [
+            pub("a", "Main paper", 2023, f"{EMNLP} (EMNLP)"),
+            pub("b", "Other main paper", 2022, f"{EMNLP} (EMNLP)"),
+            pub(
+                "f",
+                "Findings paper",
+                2023,
+                "Findings of the Association for Computational Linguistics: EMNLP 2023",
+            ),
+            pub("j", "Joint paper", 2019, EMNLP_IJCNLP),
+            pub("k", "Proceedings paper", 2019, f"Proceedings of the {EMNLP_IJCNLP}"),
+        ],
+    )
+    _stats(pid)
+    return pid, {
+        t: _venue_of(t)
+        for t in ("Main paper", "Findings paper", "Joint paper", "Proceedings paper")
+    }
+
+
+def test_related_venues_guessed():
+    _, v = _emnlp_setup()
+    rows = _rows()
+    main = rows[v["Main paper"]]
+    guesses = {
+        tuple(r.id for r in group): rel
+        for group, rel in venues.suggest_related(main, list(rows.values()))
+    }
+    joint = tuple(sorted((v["Joint paper"], v["Proceedings paper"])))
+    assert guesses[(v["Findings paper"],)] == "track:findings"
+    # The two joint conference texts: one group, to be merged first.
+    assert {tuple(sorted(k)): rel for k, rel in guesses.items()}[joint] == "joint"
+    # The other way round, from the Findings venue.
+    assert venues.guess_relation(rows[v["Findings paper"]], main) == "~track:findings"
+    # IJCAI is one conference, not a joint one.
+    ijcai = venues.VenueRow(
+        id=0,
+        name="International Joint Conference on Artificial Intelligence",
+        kind="",
+        kind_manual=False,
+        badge=None,
+        manual=False,
+    )
+    assert not venues.looks_joint(ijcai)
+
+
+def test_relate_venues_as_track_and_joint():
+    pid, v = _emnlp_setup()
+    main = v["Main paper"]
+    assert venues.relate_venues(main, [v["Findings paper"]], "track:findings") == main
+    st = _stats(pid)
+    assert st["Findings paper"].venue_id == main
+    with session_scope() as s:
+        tracks = {k.track for k in s.scalars(select(VenueKey).where(VenueKey.venue_id == main))}
+    assert tracks == {None, "findings"}
+
+    joint, proc = v["Joint paper"], v["Proceedings paper"]
+    assert venues.relate_venues(main, [joint, proc], "joint") == main
+    st = _stats(pid)
+    assert st["Proceedings paper"].venue_id == st["Joint paper"].venue_id == joint
+    assert [p for p, *_ in _rows()[joint].parts] == [main]
+    # Related now: not suggested again.
+    rows = _rows()
+    assert not venues.suggest_related(rows[main], list(rows.values()))
