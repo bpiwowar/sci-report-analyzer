@@ -207,17 +207,10 @@ LANGUAGE_RULES: tuple[NormRule, ...] = (
 DEFAULT_NORM_RULES: tuple[NormRule, ...] = (
     *LANGUAGE_RULES,
     NormRule(
-        id="parentheses",
-        name="Parentheses",
-        description="Remove parenthesised text (one level of nesting).",
-        pattern=r"\((?:[^()]|\([^()]*\))*\)",
-        example="Neural Information Processing Systems (NeurIPS)",
-    ),
-    NormRule(
         id="parenAcronym",
         name="Parenthesised acronym",
-        description="Remove a parenthesised acronym (≥2 capitals); only matters when "
-        "“Parentheses” is disabled.",
+        description="Remove a parenthesised acronym (≥2 capitals); other parenthesised "
+        "text is kept (it can name a track: “(Demonstrations)”).",
         pattern=r"\(\s*(?=[^\s()]*[A-Z][^\s()]*[A-Z])[^\s()]+\s*\)",
         example="Neural Information Processing Systems (NeurIPS) (Spotlight)",
     ),
@@ -296,11 +289,10 @@ def apply_rules(segment: str | None, rules: Iterable[NormRule], source: str | No
     return _MULTISPACE.sub(" ", v).strip()
 
 
-def clean_venue(segment: str | None, *, strip_parens: bool = True) -> str:
+def clean_venue(segment: str | None) -> str:
     """Clean a venue text with the default rules.
 
     ``"Nature methods, 2019"`` → ``"Nature methods"``; word qualifiers are kept so
     ``"ECCV 2018 workshops"`` stays ``"ECCV workshops"``.
     """
-    rules = [r for r in DEFAULT_NORM_RULES if strip_parens or r.id != "parentheses"]
-    return apply_rules(segment, rules)
+    return apply_rules(segment, DEFAULT_NORM_RULES)

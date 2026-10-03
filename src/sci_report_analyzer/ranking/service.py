@@ -51,7 +51,7 @@ OPENALEX_BACKOFF = timedelta(minutes=15)
 
 
 # Bumped when the matching logic changes, so that cached matches are recomputed.
-MATCH_VERSION = "m7"
+MATCH_VERSION = "m8"
 # Words saying a venue text is a conference (not a journal).
 _CONFERENCE_CUE = re.compile(
     r"\b(?:conf(?:erence|\.)?|conférence|symposium|workshops?|congress|colloque|"
@@ -69,6 +69,16 @@ _NOT_A_JOURNAL = re.compile(
 )
 # Minimum score of a conference record replacing a fuzzy journal match.
 CONFERENCE_ALT_SCORE = 0.75
+
+
+# Parenthesised text, kept in the cleaned texts (it can name a track: "(Demonstrations)")
+# but not in the rankings: "ACL (Findings)", "... Linguistics (Volume 1: Long Papers)".
+_PARENS = re.compile(r"\((?:[^()]|\([^()]*\))*\)")
+
+
+def for_rankings(text: str) -> str:
+    """A cleaned venue text as the rankings name it: without its parenthesised text."""
+    return re.sub(r"\s{2,}", " ", _PARENS.sub(" ", text)).strip()
 
 
 def paren_acronym(raw: str | None) -> str | None:
@@ -401,6 +411,8 @@ class RankingService:
             return with_corrected(hit[0])
 
         match_venue = (self.clean(host_raw, source) or venue) if findings else venue
+        if corrected is None:
+            match_venue = for_rankings(match_venue) or match_venue
         # Matching takes a few ms: let the other tasks run between the venues of a batch.
         await asyncio.sleep(0)
 
@@ -497,7 +509,7 @@ class RankingService:
     def candidates(self, raw: str, issn: str | None = None, limit: int = 8) -> list[Badge]:
         """Candidate records for the manual picker (cleaned name + detected acronyms)."""
         st = self.settings
-        cleaned = self.clean(raw)
+        cleaned = for_rankings(self.clean(raw))
         scored: list[tuple[Any, bool]] = [
             (r, False) for r in self.matcher.candidates(cleaned, issn)
         ]
