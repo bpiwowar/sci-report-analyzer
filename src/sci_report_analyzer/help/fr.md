@@ -36,7 +36,7 @@ Une **source principale** (Paramètres → Sources ; un dossier peut en utilise
 quels articles comptent : un article qu'elle ne liste pas pour la personne est exclu du panneau, des rapports
 et de la synthèse, par exemple HAL, où les chercheurs du CNRS doivent déposer leurs articles. L'interrupteur
 *seulement ceux absents de HAL* les liste, pour les y ajouter. Les autres sources aident toujours à trouver
-le canal et la piste. Les personnes sans profil validé sur cette source ne sont pas concernées.
+le canal et la session. Les personnes sans profil validé sur cette source ne sont pas concernées.
 
 ## Fusion
 
@@ -59,7 +59,7 @@ Chaque source donne un texte de canal, qui est apparié à un canal :
    à la main l'emporte sur tout le reste. Sinon, une **règle de canal** (une expression régulière sur le texte de la source,
    dans l'onglet Appariement du canal) peut le revendiquer ; sinon, un nouveau canal est créé.
    Une notice dont l'ISSN figure sur un canal appartient à celui-ci quel que soit son texte.
-3. Les variantes et les règles de canal peuvent attribuer aux articles une **piste** (démo, findings…).
+3. Les variantes et les règles de canal peuvent attribuer aux articles une **session** (démo, findings…).
 
 Lorsque les sources d'un article donnent des canaux différents, l'un d'eux est choisi automatiquement ; vous pouvez
 valider une autre source pour l'article. Paramètres → Données et cache permet d'effacer tout ce qui a été
@@ -133,12 +133,12 @@ paramètres exportés.
 
 <!-- levels -->
 
-Les pistes satellites (Findings, démos, articles courts…) et les ateliers sont affichés comme des catégories
-hachurées distinctes, par exemple « Findings CORE A » ou « Atelier A* ». Les **signalements** associés à une piste (court,
+Les sessions satellites (Findings, démos, articles courts…) et les ateliers sont affichés comme des catégories
+hachurées distinctes, par exemple « Findings CORE A » ou « Atelier A* ». Les **signalements** associés à une session (court,
 démo…) placent un article dans une telle catégorie ; les autres signalements sont de simples libellés sur lesquels filtrer.
-Lorsque les sources ne divergent que parce que certaines donnent une piste (démo, court…) et d'autres aucune,
-la piste l'emporte (démo, Findings, atelier…), quel que soit le canal donné par chacune. Des
-pistes différentes (par exemple démo et court) sont un problème à régler : validez une source dans les détails, ou
+Lorsque les sources ne divergent que parce que certaines donnent une session (démo, court…) et d'autres la session normale,
+la session l'emporte (démo, Findings, atelier…), quel que soit le canal donné par chacune. Des
+sessions différentes (par exemple démo et court) sont un problème à régler : validez une source dans les détails, ou
 signalez l'article. De même, un atelier
 l'emporte sur sa conférence principale (par exemple une notice DOI donnant EMNLP pour un article de BlackboxNLP).
 Les actes édités (présidence) conservent le rang de leur canal dans des catégories propres, par exemple
