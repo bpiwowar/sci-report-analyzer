@@ -267,7 +267,8 @@ le bouton ❝ du rapport les insère, par catégorie.
 Les **dossiers** (page Personnes) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers
 (définie dans son onglet Périodes), avec ses propres étoiles, étiquettes et notes ; ouvrir une personne depuis un
-dossier sélectionne celle-ci.
+dossier sélectionne celle-ci. Retirer une personne d'un dossier (✕ sur sa carte, ou dans son onglet Périodes)
+garde cette période, avec ses données, comme l'une de ses propres périodes, ou la supprime.
 
 **Catégories de coauteurs** (par exemple « Collaborateurs int. ») : cliquez sur le nom d'un coauteur dans les
 détails d'une publication pour le placer dans une catégorie (ou pour indiquer qu'il s'agit de la personne ou de l'un de

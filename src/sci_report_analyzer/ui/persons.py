@@ -17,7 +17,7 @@ from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
 from ..sync import discover, is_syncing, start_sync
 from .categories_editor import categories_dialog
-from .person import purge_dialog
+from .person import purge_dialog, remove_from_folder_dialog
 from .theme import STATUS_COLOUR, fmt_dt, frame, source_tag
 
 
@@ -514,8 +514,7 @@ def _card(
                 ui.space()
 
                 def remove() -> None:
-                    folders.remove_person(folder_id, person.id)
-                    ui.navigate.reload()
+                    remove_from_folder_dialog(folder_id, person.id, ui.navigate.reload)
 
                 ui.button(icon="close", on_click=remove).props("flat round dense size=sm").on(
                     "click.stop", lambda: None

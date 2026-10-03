@@ -268,7 +268,8 @@ the report's ❝ button inserts them, by category.
 **Folders** (People page) group people, e.g. for a hiring committee: a folder has a name,
 a date and can be hidden. Each person has their **own period** in each of their folders
 (set in their Periods tab), with its own stars, tags and notes; opening a person from a
-folder selects it.
+folder selects it. Removing a person from a folder (✕ on their card, or in their Periods
+tab) either keeps that period, with its data, as one of their own periods, or deletes it.
 
 **Co-author categories** (e.g. "Intl. collaborators"): click a co-author's name in a
 publication's details to put them in a category (or to say they are the person or one of

@@ -921,6 +921,9 @@ msgstr "Supprimer"
 msgid "Delete rule"
 msgstr "Supprimer la règle"
 
+msgid "Delete the data"
+msgstr "Supprimer les données"
+
 msgid ""
 "Delete the files of papers no longer in the database, and forget the PDFs"
 " whose file was deleted by hand"
@@ -1625,6 +1628,9 @@ msgstr "Président du jury"
 
 msgid "Keep all local"
 msgstr "Tout garder en local"
+
+msgid "Keep as a period"
+msgstr "Garder comme période"
 
 msgid "Keep both texts (two quotes)"
 msgstr "Garder les deux textes (deux citations)"
@@ -2663,10 +2669,17 @@ msgstr "Retirer (l'article reste si une autre source l'a)"
 msgid "Remove from the folder"
 msgstr "Retirer du dossier"
 
-msgid "Remove from this folder (its stars, tags and notes on papers are lost)"
+msgid ""
+"Remove from the folder: keep the person's stars, tags, notes, documents "
+"and report there as one of their own periods (Periods tab), or delete "
+"them?"
 msgstr ""
-"Retirer de ce dossier (ses étoiles, étiquettes et notes sur les articles "
-"sont perdues)"
+"Retirer du dossier : garder les étoiles, étiquettes, notes, documents et "
+"rapport de la personne comme l'une de ses propres périodes (onglet "
+"Périodes), ou les supprimer ?"
+
+msgid "Remove from this folder"
+msgstr "Retirer de ce dossier"
 
 #, python-brace-format
 msgid "Remove the excerpt “{text}”?"

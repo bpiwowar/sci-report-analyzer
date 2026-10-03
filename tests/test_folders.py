@@ -29,6 +29,13 @@ def test_folder_membership_and_periods():
     assert folders.folders(include_hidden=False) == []
     folders.remove_person(fid, b)
     assert [m.name for m in folders.folders()[0].members] == ["Ann"]
+    # Taken out keeping the data, the folder period becomes one of the person's own.
+    pb = folders.add_person(fid, b, 2021, 2023)
+    folders.remove_person(fid, b, keep=True)
+    assert [m.name for m in folders.folders()[0].members] == ["Ann"]
+    assert [(p.id, p.name, p.start_year, p.folder_id) for p in annotations.periods(b)] == [
+        (pb, "Hiring committee", 2021, None)
+    ]
     folders.delete_folder(fid)
     assert [p.name for p in annotations.periods(a, include_hidden_folders=True)] == ["HDR"]
 

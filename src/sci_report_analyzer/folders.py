@@ -126,13 +126,18 @@ def add_person(
         return p.id
 
 
-def remove_person(folder_id: int, person_id: int) -> None:
-    """Take a person out of a folder (their period, with its paper tags and notes, is deleted)."""
+def remove_person(folder_id: int, person_id: int, *, keep: bool = False) -> None:
+    """Take a person out of a folder: their period in it, with its paper tags, notes,
+    documents and report, is deleted; or, with ``keep``, becomes one of their own periods
+    (still named after the folder)."""
     with session_scope() as s:
         for p in s.scalars(
             select(Period).where(Period.folder_id == folder_id, Period.person_id == person_id)
         ):
-            s.delete(p)
+            if keep:
+                p.folder_id = None
+            else:
+                s.delete(p)
 
 
 def set_period(period_id: int, start: int | None, end: int | None) -> None:

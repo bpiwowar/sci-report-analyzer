@@ -549,6 +549,29 @@ async def test_folders_on_people_page(user: User) -> None:
     assert folders.folders()[0].hidden
 
 
+async def test_remove_from_folder_keeping_or_deleting_data(user: User) -> None:
+    from sci_report_analyzer import annotations, folders
+
+    pid = _seed()
+    other = make_person("John Roe")
+    fid = folders.save_folder(None, "Hiring committee")
+    period = folders.add_person(fid, pid, 2020, 2024)
+    folders.add_person(fid, other)
+    # From the folder: kept as one of the person's own periods.
+    await user.open(f"/?folder={fid}")
+    user.find(f"remove-{pid}").click()
+    user.find("remove-keep").click()
+    assert [m.name for m in folders.folders()[0].members] == ["John Roe"]
+    assert [(p.id, p.name, p.folder_id) for p in annotations.periods(pid)] == [
+        (period, "Hiring committee", None)
+    ]
+    # From the person's Periods tab: deleted.
+    await user.open(f"/person/{other}?tab=periods")
+    user.find(f"leave-{fid}").click()
+    user.find("remove-delete").click()
+    assert folders.folders()[0].members == [] and annotations.periods(other) == []
+
+
 async def test_people_cleanup_delete(user: User) -> None:
     from sci_report_analyzer import folders
 
