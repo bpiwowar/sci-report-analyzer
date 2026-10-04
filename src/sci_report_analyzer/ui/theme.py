@@ -195,6 +195,35 @@ def chip_text(colour: str | None) -> str:
     return text_colour(c) if re.fullmatch(r"#[0-9a-fA-F]{6}", c) else "#fff"
 
 
+def chip_html(
+    label: str,
+    colour: str | None = None,
+    *,
+    style: str = "",
+    title: str | None = None,
+    striped: bool = False,
+) -> str:
+    """A chip: ``label`` (escaped) on ``colour`` (its text readable), with more ``style``
+    (e.g. a track's, ``track_style``), a hover ``title``; ``striped``: a track's stripes."""
+    css = (f"background:{colour};color:{chip_text(colour)};" if colour else "") + style
+    cls = "vr-chip vr-track" if striped else "vr-chip"
+    hover = f' title="{escape(title)}"' if title else ""
+    return f'<span class="{cls}" style="{css}"{hover}>{escape(label)}</span>'
+
+
+# The main track (no track): a discreet chip.
+MAIN_TRACK_STYLE = "background:transparent;color:#8c959f;border:1px dashed #c8d1da"
+
+
+def track_style(track: str | None, colours: dict[str, str] | None = None) -> str:
+    """A track's chip style, in its colour (``colours``: those of the tracks as edited, else
+    as saved); the main track (no track) discreet."""
+    if not track:
+        return MAIN_TRACK_STYLE
+    colour = tracks.colour(track) if colours is None else colours.get(track, tracks.FALLBACK_COLOUR)
+    return f"background:{colour};color:{chip_text(colour)}"
+
+
 def chip_style(colour: str, selected: bool = True) -> str:
     """The style of a selectable q-chip in ``colour``, its text readable when selected."""
     return f"--q-primary:{colour}" + (f";color:{chip_text(colour)}" if selected else "")
@@ -215,14 +244,7 @@ def stripes(cat: Category) -> str:
 
 def track_chip_html(track: str | None) -> str:
     """A track's chip, in its colour (none: the main track, discreet)."""
-    if track:
-        colour = tracks.colour(track)
-        style = f"background:{colour};color:{chip_text(colour)}"
-        label = tracks.name(track)
-    else:
-        style = "background:transparent;color:#8c959f;border:1px dashed #c8d1da"
-        label = _("main track")
-    return f'<span class="vr-chip" style="{style}">{escape(label)}</span>'
+    return chip_html(tracks.name(track) if track else _("main track"), style=track_style(track))
 
 
 def track_chip(track: str | None, mark: str | None = None) -> ui.html:
@@ -241,12 +263,7 @@ def rank_chip(badge: Badge | None, track: str | None = None, kind: str | None = 
         label = badge.rank_label if cat.base_key == "other" else cat.label
     if badge and badge.predatory:
         label = f"⚠ {label}"
-    cls = "vr-chip vr-track" if cat.striped else "vr-chip"
-    colour = cat.colour
-    el = span(
-        f'<span class="{cls}" style="background:{colour};color:{text_colour(colour)}'
-        f'{stripes(cat)}">{escape(label)}</span>'
-    )
+    el = span(chip_html(label, cat.colour, style=stripes(cat), striped=cat.striped))
     if badge:
         with el:
             ui.tooltip(badge_details(badge)).style("white-space:pre-line")

@@ -19,7 +19,6 @@ from ..ranking.badge import (
     category_of,
     core_periods,
     sjr_periods,
-    text_colour,
 )
 from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
 from ..ranking.service import VenuePattern, service
@@ -29,6 +28,7 @@ from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
 from .pub_details import VIA_LABEL, venue_rule_dialog
 from .theme import (
     badge_details,
+    chip_html,
     frame,
     level_hint,
     level_options,
@@ -36,6 +36,7 @@ from .theme import (
     rank_chip,
     source_tag,
     span,
+    track_style,
 )
 
 TABS = {
@@ -64,18 +65,9 @@ def _chip_html(row: venues.VenueRow) -> str:
     if dropped := venues.dropped_from_core(badge):
         label = _("CORE {rank} until {year}").format(rank=dropped[0], year=dropped[1])
         colour = UNRANKED_COLOUR
-    style = f"background:{colour};color:{text_colour(colour)}"
-    return f'<span class="vr-chip" style="{style}">{escape(label)}</span>' + (
+    return chip_html(label, colour) + (
         f' <span title="{escape(_("manual decision"))}">✎</span>' if row.manual else ""
     )
-
-
-def _track_style(track: str | None, colours: dict[str, str]) -> str:
-    """A track chip in its colour (Settings → Tracks); the main session (no track) discreet."""
-    if not track:
-        return "background:transparent;color:#8c959f;border:1px dashed #c8d1da"
-    colour = colours.get(track, tracks.FALLBACK_COLOUR)
-    return f"background:{colour};color:{text_colour(colour)}"
 
 
 def _track_picker(
@@ -93,7 +85,7 @@ def _track_picker(
 
     def paint(t: str | None) -> None:
         chip.text = tracks.name(t) if t else _("no track")
-        chip.style(replace=_track_style(t, colours) + ";padding:0 8px;min-height:20px")
+        chip.style(replace=track_style(t, colours) + ";padding:0 8px;min-height:20px")
         chip.value = t
 
     def pick(t: str | None) -> None:
@@ -104,8 +96,7 @@ def _track_picker(
         for k in (*([None] if main else []), *tracks.track_ids()):
             label = tracks.name(k) if k else _("no track")
             with ui.menu_item(on_click=lambda k=k: pick(k)).mark(f"{mark}-{k or 'none'}"):
-                style = _track_style(k, colours)
-                span(f'<span class="vr-chip" style="{style}">{escape(label)}</span>')
+                span(chip_html(label, style=track_style(k, colours)))
     paint(track)
     return chip
 
@@ -1656,9 +1647,9 @@ def venue_dialog(
                             .mark(f"venue-variant-group-{track or 'none'}")
                         ):
                             if track:
-                                label = escape(tracks.name(track))
-                                style = _track_style(track, colours)
-                                span(f'<span class="vr-chip" style="{style}">{label}</span>')
+                                span(
+                                    chip_html(tracks.name(track), style=track_style(track, colours))
+                                )
                             else:
                                 ui.label(_("Main venue")).classes("text-sm text-grey")
                         for v in sorted(groups[track], key=lambda v: -v[2]):
@@ -1865,8 +1856,7 @@ def _this_label(relation: str, colours: dict[str, str]) -> str:
         "~workshop": _("One of its workshops"),
         "workshop": _("Its main conference (it is a workshop of this venue)"),
     }[kind]
-    label = escape(tracks.name(track))
-    chip = f'<span class="vr-chip" style="{_track_style(track, colours)}">{label}</span>'
+    chip = chip_html(tracks.name(track), style=track_style(track, colours))
     return escape(text).format(track=chip)
 
 
