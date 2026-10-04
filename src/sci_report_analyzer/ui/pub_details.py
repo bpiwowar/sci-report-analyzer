@@ -9,24 +9,19 @@ from urllib.parse import quote_plus
 
 from nicegui import background_tasks, ui
 
-from .. import annotations, merge, pdfs, persons, sync, venues
+from .. import annotations, merge, pdfs, persons, pubview, sync, venues
 from ..i18n import N_, Labels, _, ngettext
 from ..pubview import (
     MemberView,
     PubStat,
-    doi_member,
     pick_reason,
     pick_venue_member,
-    same_venue,
-    track_of,
-    venue_members,
 )
 from ..ranking import tracks
 from ..ranking.badge import Badge
 from ..ranking.kinds import (
     CONFERENCE_LIKE,
     KINDS,
-    NO_VENUE_KINDS,
     PUBLICATION_ONLY_KINDS,
     VENUE_KINDS,
     WORKSHOP_KINDS,
@@ -1264,16 +1259,16 @@ VIA_LABEL = Labels(
 )
 
 
-def _matching_tab(s: PubStat, done, show_venue) -> None:
-    """How the venue is matched, step by step; each step can be overridden."""
-    options = venues.venue_options()
-    names = venues.venue_names()
-    venue_id = s.venue_id
-    venue_name = options.get(venue_id or -1)
+class _Scope:
+    """Where a decision is saved: on the paper's venue (by default), or only for this paper
+    (when ticked)."""
 
-    def venue_scope() -> ui.checkbox | None:
-        """Scope of a decision: the venue (default), or only this paper when ticked."""
-        if venue_id is None:
+    def __init__(self, venue_id: int | None, venue_name: str | None) -> None:
+        self.venue_id, self.venue_name = venue_id, venue_name
+
+    def box(self) -> ui.checkbox | None:
+        """Its checkbox (none without a venue)."""
+        if self.venue_id is None:
             return None
         with ui.row().classes("items-center gap-2"):
             box = ui.checkbox(_("Only for this paper")).mark("only-this-paper")
@@ -1287,15 +1282,30 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
                 else _(
                     "otherwise saved on the venue “{venue}”: applies to all its papers, "
                     "for every person, and is kept on re-sync"
-                ).format(venue=venue_name)
+                ).format(venue=self.venue_name)
             ),
         )
         return box
 
+    @staticmethod
     def for_venue(box) -> bool:
         return box is not None and not box.value
 
-    # 1. venue from the sources -----------------------------------------------------------
+
+def _matching_tab(s: PubStat, done, show_venue) -> None:
+    """How the venue is matched, step by step; each step can be overridden."""
+    options = venues.venue_options()
+    scope = _Scope(s.venue_id, options.get(s.venue_id or -1))
+    _source_step(s, done, show_venue, options, scope)
+    _kind_step(s, done, scope)
+    _rank_step(s, done, scope)
+
+
+def _source_step(s: PubStat, done, show_venue, options: dict[int, str], scope: _Scope) -> None:
+    """1. The venue from the sources: their records by venue and track, to validate one or
+    merge venues; a link to another venue by hand."""
+    names = venues.venue_names()
+    venue_id, venue_name = s.venue_id, scope.venue_name
     step = _Step(
         1,
         N_("Venue from the sources"),
@@ -1307,39 +1317,12 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
             done(_("Venue back to automatic")),
         ),
     )
-    # Preprints (arXiv, HAL deposits...) don't rank the paper: only the published versions
-    # are listed (unless there are only preprints).
-    published = [m for m in s.members if not m.archival] or s.members
-    preprints = len(s.members) - len(published)
-    used = {m.id for m in venue_members(s.members)}
-    # Sources grouped by venue and track (a different track is a disagreement too; a record
-    # without one takes that of its venue's other records: a demo paper is a demo).
-    Key = tuple[int | None, str | None]
-    groups: dict[Key, list[MemberView]] = {}
-    for m in published:
-        groups.setdefault((m.venue_id, track_of(m, published)), []).append(m)
-    first = [k for k in groups if k[0] == venue_id and k[1] == s.track] or [
-        k for k in groups if k[0] == venue_id
-    ]
-    if first:  # the paper's venue first
-        groups = {first[0]: groups.pop(first[0]), **groups}
-    no_venue = s.kind in NO_VENUE_KINDS and venue_id is None
-    if no_venue:
-        groups = {}
-    several = len([g for g in groups if g[0] is not None]) > 1
-    # A workshop's main conference is no disagreement (the workshop is more precise).
-    dm = doi_member(s.members)
-    conflicting = len(
-        {
-            (same_venue(ms[0]), k[1])
-            for k, ms in groups.items()
-            if k[0] is not None and not all(m.minor for m in ms)
-        }
-    ) > 1 and (dm is None or dm.minor)
-    picked: set[Key] = set()
+    found = pubview.venue_groups(s)
+    groups = found.groups
+    picked: set[pubview.GroupKey] = set()
     buttons: dict[str, ui.button] = {}
 
-    def toggle(key: Key, on: bool) -> None:
+    def toggle(key: pubview.GroupKey, on: bool) -> None:
         (picked.add if on else picked.discard)(key)
         if buttons:
             buttons["validate"].set_enabled(len(picked) == 1)
@@ -1348,7 +1331,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
     def validate() -> None:
         (key,) = picked
         vid, track = key
-        members = [m for m in groups[key] if m.id in used] or groups[key]
+        members = [m for m in found.groups[key] if m.id in found.used] or found.groups[key]
         m = pick_venue_member(members) or members[0]
         label = ADAPTERS[m.source].label
         with transient_dialog() as (dlg, _card):
@@ -1382,75 +1365,10 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
 
             actions(dlg, _("Validate"), ok, mark="confirm-validate")
 
-    def explain_box(m: MemberView) -> None:
-        """The cleaned text; a click shows how it was cleaned and matched."""
-        from ..venue_match import explain
-
-        box = ui.column().classes("gap-0 pl-2 border-l-2 w-full")
-        box.visible = False
-        state = {"filled": False}
-
-        def show() -> None:
-            if not state["filled"]:
-                state["filled"] = True
-                e = explain(m.source, m.venue)
-                with box:
-                    ui.label(_("source text: “{text}”").format(text=m.venue)).classes(
-                        "text-xs font-mono"
-                    )
-                    for name, text in e.steps:
-                        ui.label(f"{name} → “{text}”").classes("text-xs font-mono text-grey")
-                    ui.label(_("key: “{key}”").format(key=e.key)).classes(
-                        "text-xs font-mono text-grey"
-                    )
-                    how = VIA_LABEL.get(e.via or "", e.via or _("no venue"))
-                    if e.via == "pattern" and e.detail:
-                        how += f": {e.detail}"
-                    elif e.via in ("variant", "auto") and e.detail:
-                        how = _("{how} (variant “{variant}”)").format(how=how, variant=e.detail)
-                    ui.label(f"→ {e.venue_name or _('no venue')} — {how}").classes("text-xs")
-            box.visible = not box.visible
-
-        with ui.row().classes("items-center gap-2 no-wrap"):
-            source_badge(m)
-            ui.button(
-                service.clean(m.venue, m.source) or m.venue or _("no venue"), on_click=show
-            ).props("flat dense no-caps size=sm align=left").classes("text-body2 min-w-0").style(
-                "white-space:normal;text-align:left"
-            ).tooltip(_("Show how the text was cleaned and matched")).mark(f"member-text-{m.id}")
-            if m.conflicts:
-                others = ", ".join(names.get(c, "?") for c in m.conflicts)
-                ui.button(
-                    icon="warning",
-                    on_click=lambda m=m: merge_venues_dialog(
-                        [m.venue_id, *m.conflicts], done, text=m.venue
-                    ),
-                ).props("flat round dense size=sm color=orange-8").tooltip(
-                    _(
-                        "The rules of other venues match this text too: {venues}. "
-                        "Click to merge them into one venue."
-                    ).format(venues=others)
-                ).mark(f"conflict-{m.id}")
-            ui.button(
-                icon="tune",
-                on_click=lambda m=m: venue_rule_dialog(
-                    done, sample=(m.source, m.venue), venue_id=m.venue_id
-                ),
-            ).props("flat round dense size=sm").tooltip(
-                _("Add a venue rule: texts matching a regex belong to a venue")
-            ).mark(f"mapping-{m.id}")
-            if m.id not in used:
-                ui.label(_("not used")).classes("text-xs text-grey").tooltip(
-                    _("{source} venues are only used when no other source gives one").format(
-                        source=ADAPTERS[m.source].label
-                    )
-                )
-        box.move(target_index=-1)
-
     with step.result:
         if not s.members:
             ui.label(_("no source record")).classes("text-grey text-sm")
-        if no_venue:
+        if found.no_venue:
             ui.label(
                 _(
                     "A {kind} has no venue (the sources give “{venue}”): change its kind if it "
@@ -1466,7 +1384,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
             ui.label(_("Linked by hand to “{venue}”").format(venue=venue_name)).classes(
                 "text-xs text-primary"
             )
-        elif conflicting and not s.venue_source:
+        elif found.conflicting and not s.venue_source:
             ui.label(
                 _(
                     "The sources give different venues or tracks: select one to validate it for "
@@ -1474,7 +1392,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
                 )
             ).classes("text-xs text-orange-9")
         auto = pick_venue_member(s.members) if not (s.venue_source or s.venue_manual) else None
-        if auto is not None and several:
+        if auto is not None and found.several:
             with ui.row().classes("items-start gap-1 no-wrap w-full").mark("auto-pick"):
                 ui.icon("auto_awesome", size="xs", color="primary")
                 ui.label(
@@ -1489,7 +1407,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
                 ui.column().classes("w-full gap-0 border rounded p-1").mark(f"venue-group-{suffix}")
             ):
                 with ui.row().classes("items-center gap-2 no-wrap w-full"):
-                    if several and vid is not None:
+                    if found.several and vid is not None:
                         ui.checkbox(on_change=lambda e, k=key: toggle(k, e.value)).props(
                             "dense"
                         ).mark(f"pick-venue-{suffix}")
@@ -1534,8 +1452,8 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
                             + ("text-positive" if what != "used" else "text-primary")
                         )
                 for m in members:
-                    explain_box(m)
-        if several:
+                    _explain_box(m, names, found.used, done)
+        if found.several:
             with ui.row().classes("items-center gap-2"):
                 buttons["validate"] = (
                     ui.button(_("Validate for this paper"), icon="task_alt", on_click=validate)
@@ -1555,11 +1473,13 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
                 )
                 buttons["validate"].set_enabled(False)
                 buttons["merge"].set_enabled(False)
-        if preprints:
+        if found.preprints:
             ui.label(
                 ngettext(
-                    "{n} preprint record ignored", "{n} preprint records ignored", preprints
-                ).format(n=preprints)
+                    "{n} preprint record ignored",
+                    "{n} preprint records ignored",
+                    found.preprints,
+                ).format(n=found.preprints)
             ).classes("text-xs text-grey")
         ui.button(
             _("Search for another venue"),
@@ -1570,7 +1490,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
         ).props("dense flat no-caps").mark("search-venue")
     with step.editor, ui.row().classes("items-center gap-2 w-full no-wrap"):
         pick_venue = (
-            ui.select(options, value=venue_id, with_input=True, label=_("Link to another venue"))
+            ui.select(options, value=s.venue_id, with_input=True, label=_("Link to another venue"))
             .props("dense outlined clearable")
             .classes("grow")
         )
@@ -1583,7 +1503,9 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
         step.cancel_button()
         ui.button(_("Link"), icon="link", on_click=link).props("dense")
 
-    # 2. kind ------------------------------------------------------------------------------
+
+def _kind_step(s: PubStat, done, scope: _Scope) -> None:
+    """2. The kind of publication: detected, set on the venue or for this paper."""
     source_label = {
         "forced": _("set for this paper"),
         "venue": _("set on the venue"),
@@ -1616,18 +1538,18 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
             .props("dense outlined")
             .classes("w-72")
         )
-        kind_box = venue_scope()
+        kind_box = scope.box()
 
         def save_kind() -> None:
-            if for_venue(kind_box) and kind.value in PUBLICATION_ONLY_KINDS:
+            if scope.for_venue(kind_box) and kind.value in PUBLICATION_ONLY_KINDS:
                 ui.notify(
                     _("A venue cannot be “{kind}”: saved for this paper").format(
                         kind=KINDS[kind.value]
                     ),
                     type="info",
                 )
-            if for_venue(kind_box) and kind.value not in PUBLICATION_ONLY_KINDS:
-                venues.update_venue(venue_id, kind=kind.value or None)
+            if scope.for_venue(kind_box) and kind.value not in PUBLICATION_ONLY_KINDS:
+                venues.update_venue(s.venue_id, kind=kind.value or None)
                 annotations.set_kind_override(s.id, None)
                 done(_("Kind saved on the venue"))
             else:
@@ -1638,7 +1560,9 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
             step.cancel_button()
             ui.button(_("Save"), on_click=save_kind).props("dense")
 
-    # 3. rank ------------------------------------------------------------------------------
+
+def _rank_step(s: PubStat, done, scope: _Scope) -> None:
+    """3. The rank: the venue's, or a level or record set (on the venue or for this paper)."""
     b = s.badge
     rank_manual = bool(s.rank_override) or bool(b and (b.manual or b.forced))
     step = _Step(
@@ -1702,7 +1626,73 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
                 _("{what}: {note}").format(what=what, note=s.rank_note) if s.rank_note else what
             ).classes("text-xs text-primary").mark("rank-note")
     with step.editor:
-        _rank_editor(s, done, venue_scope, for_venue, venue_id, step)
+        _rank_editor(s, done, scope.box, scope.for_venue, s.venue_id, step)
+
+
+def _explain_box(m: MemberView, names: dict[int, str], used: set[int], done) -> None:
+    """A source's record: its cleaned venue text (a click shows how it was cleaned and
+    matched), the other venues whose rules match it too, a venue rule to add; ``used``: the
+    records whose venue is used."""
+    from ..venue_match import explain
+
+    box = ui.column().classes("gap-0 pl-2 border-l-2 w-full")
+    box.visible = False
+    state = {"filled": False}
+
+    def show() -> None:
+        if not state["filled"]:
+            state["filled"] = True
+            e = explain(m.source, m.venue)
+            with box:
+                ui.label(_("source text: “{text}”").format(text=m.venue)).classes(
+                    "text-xs font-mono"
+                )
+                for name, text in e.steps:
+                    ui.label(f"{name} → “{text}”").classes("text-xs font-mono text-grey")
+                ui.label(_("key: “{key}”").format(key=e.key)).classes("text-xs font-mono text-grey")
+                how = VIA_LABEL.get(e.via or "", e.via or _("no venue"))
+                if e.via == "pattern" and e.detail:
+                    how += f": {e.detail}"
+                elif e.via in ("variant", "auto") and e.detail:
+                    how = _("{how} (variant “{variant}”)").format(how=how, variant=e.detail)
+                ui.label(f"→ {e.venue_name or _('no venue')} — {how}").classes("text-xs")
+        box.visible = not box.visible
+
+    with ui.row().classes("items-center gap-2 no-wrap"):
+        source_badge(m)
+        ui.button(
+            service.clean(m.venue, m.source) or m.venue or _("no venue"), on_click=show
+        ).props("flat dense no-caps size=sm align=left").classes("text-body2 min-w-0").style(
+            "white-space:normal;text-align:left"
+        ).tooltip(_("Show how the text was cleaned and matched")).mark(f"member-text-{m.id}")
+        if m.conflicts:
+            others = ", ".join(names.get(c, "?") for c in m.conflicts)
+            ui.button(
+                icon="warning",
+                on_click=lambda m=m: merge_venues_dialog(
+                    [m.venue_id, *m.conflicts], done, text=m.venue
+                ),
+            ).props("flat round dense size=sm color=orange-8").tooltip(
+                _(
+                    "The rules of other venues match this text too: {venues}. "
+                    "Click to merge them into one venue."
+                ).format(venues=others)
+            ).mark(f"conflict-{m.id}")
+        ui.button(
+            icon="tune",
+            on_click=lambda m=m: venue_rule_dialog(
+                done, sample=(m.source, m.venue), venue_id=m.venue_id
+            ),
+        ).props("flat round dense size=sm").tooltip(
+            _("Add a venue rule: texts matching a regex belong to a venue")
+        ).mark(f"mapping-{m.id}")
+        if m.id not in used:
+            ui.label(_("not used")).classes("text-xs text-grey").tooltip(
+                _("{source} venues are only used when no other source gives one").format(
+                    source=ADAPTERS[m.source].label
+                )
+            )
+    box.move(target_index=-1)
 
 
 def _track_line(s: PubStat) -> None:
