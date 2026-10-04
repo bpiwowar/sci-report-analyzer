@@ -142,8 +142,8 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
                 .tooltip(
                     _(
                         "Their numbers (.index, .number, [@key]): as put from a list, else by "
-                        "year; then the other papers as first cited. They are the papers to "
-                        "discuss (without: those of the period's years)."
+                        "year; the other papers apart, from 1, as first cited. They are the "
+                        "papers to discuss (without: those of the period's years)."
                     )
                 )
                 .mark("folder-number-tag")
@@ -188,6 +188,27 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
                     listed.set_value(reports.NUMBER_FORMAT),
                 ),
             ).props("flat round dense").tooltip(_("The default formats"))
+        same = (
+            ui.label(
+                _(
+                    "Both formats are the same: the papers with the tag and the others, each "
+                    "numbered from 1, cannot be told apart."
+                )
+            )
+            .classes("text-sm text-warning")
+            .mark("folder-same-formats")
+        )
+
+        def check_formats() -> None:
+            same.visible = (
+                bool(tag.value)
+                and (fmt.value or reports.REFERENCE_FORMAT).strip()
+                == (listed.value or reports.NUMBER_FORMAT).strip()
+            )
+
+        for el in (tag, fmt, listed):
+            el.on_value_change(check_formats)
+        check_formats()
         ui.label(_("Templates of the folder")).classes("font-medium mt-2")
         ui.markdown(
             _(

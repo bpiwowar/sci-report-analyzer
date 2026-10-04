@@ -13,9 +13,10 @@ syntax, substituted when shown or copied.
 - ``[@key]{.starred}``: a named template (Settings → Citation templates, or the folder's),
   also usable within another one (``{.starred: .notes}``).
 
-Within a folder, the papers with its numbered tag (see ``Numbering``) are numbered first
-(as listed, else by year): the papers to discuss, each to be cited at least once (without a
-numbered tag, those of the period's years).
+Within a folder, the papers with its numbered tag (see ``Numbering``) are numbered as listed
+(else by year), and the other papers cited apart, each from 1, as first cited: the former
+are the papers to discuss, each to be cited at least once (without a numbered tag, those of
+the period's years, every paper numbered as first cited).
 """
 
 from __future__ import annotations
@@ -158,7 +159,8 @@ class Context:
     hide_tags: set[int] = field(default_factory=set)  # (the numbered tag: not repeated)
     period_id: int | None = None
     number_format: str = NUMBER_FORMAT
-    listed_format: str | None = None  # (that of the numbered papers, if not number_format)
+    # That of the numbered papers, the others numbered apart (none: after them, as number_format).
+    listed_format: str | None = None
     templates: dict[str, str] = field(default_factory=dict)  # named ones: name -> {attrs}
     # The papers each to be cited (by default, the numbered ones; see citation_status).
     discuss: list[Paper] | None = None
@@ -166,7 +168,8 @@ class Context:
     def __post_init__(self) -> None:
         self.by_key = {p.key: p for p in self.papers}
         self._stat_by_key = {self.keys[s.id]: s for s in self.stats if s.id in self.keys}
-        self._next = max((p.number for p in self.papers), default=0) + 1
+        apart = self.listed_format is not None
+        self._next = 1 if apart else max((p.number for p in self.papers), default=0) + 1
         if self.discuss is None:
             self.discuss = list(self.papers)
 
@@ -414,8 +417,8 @@ def render(text: str, ctx: Context) -> Rendered:
 
 
 def bibliography(ctx: Context, *, notes: bool = False, tags: bool = False) -> str:
-    """The list of the papers (the numbered ones, and the others cited), by number."""
-    papers = sorted(ctx.by_key.values(), key=lambda p: p.number)
+    """The list of the papers (the numbered ones, then the others cited), by number."""
+    papers = sorted(ctx.by_key.values(), key=lambda p: (not p.in_report, p.number))
     return "\n".join("- " + ctx.entry(p, notes=notes, tags=tags, indent=2) for p in papers)
 
 
@@ -442,9 +445,9 @@ def uncited(ctx: Context, cited: Counter) -> list[Paper]:
 @dataclass
 class Numbering:
     """How a folder's notes number papers: those with ``tag_id`` (within the person's
-    period), as listed (else by year), then the others as first cited; ``format``: how a
-    number is written (``{index}``: the number), ``listed_format``: that of the papers with
-    the tag. No tag: every paper as first cited."""
+    period), as listed (else by year), and the others apart (from 1) as first cited;
+    ``format``: how a number is written (``{index}``: the number), ``listed_format``: that
+    of the papers with the tag. No tag: every paper as first cited."""
 
     tag_id: int | None = None
     format: str = REFERENCE_FORMAT

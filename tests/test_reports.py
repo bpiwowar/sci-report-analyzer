@@ -205,18 +205,20 @@ def test_folder_numbering_templates_and_status():
     stats = asyncio.run(pubview.load_stats(pid))
     ctx = reports.folder_context(stats, period)
     r = reports.render(f"[@{keys[b]}] [@{keys[c]}]", ctx)
-    assert r.text == "**#2** **#3**"
+    assert r.text == "**#2** **#1**"  # (the others numbered apart, here in the same format)
     st = reports.citation_status(ctx, r.cited)
     assert [p.key for p in st.missing] == [keys[a]] and [p.key for p in st.outside] == [keys[c]]
     assert st.colour == "negative"
-    # Copied: the references numbered as cited, the listed papers apart from the others.
+    # Copied: the listed papers, then the others (from 1, as first cited), each in its format.
     reports.save_numbering(fid, reports.Numbering(star, "[{index}]", "**#{index}**"))
     ctx = reports.folder_context(stats, period)
-    out = reports.with_references(f"[@{keys[b]}] [@{keys[c]}]", ctx)
-    assert out.startswith("**#2** [3]\n")
-    refs = out.split("References")[1]
-    assert "- **#1** **Deep ranking for search**" in refs
-    assert "- **#2** **The neural retrieval**" in refs and "- [3] **Deep ranking again**" in refs
+    out = reports.with_references(f"[@{keys[c]}] [@{keys[b]}]", ctx)
+    assert out.startswith("[1] **#2**\n")
+    refs = out.split("References")[1].strip().splitlines()
+    assert refs[0].startswith("- **#1** **Deep ranking for search**")
+    assert refs[1].startswith("- **#2** **The neural retrieval**")
+    assert refs[2].startswith("- [1] **Deep ranking again**")
+    assert reports.render(f"[@{keys[c]}]{{.index}}", ctx).text == "1"
     reports.save_numbering(fid, reports.Numbering(star, "**#{index}**"))
     ctx = reports.folder_context(stats, period)
     r = reports.render(f"[@{keys[a]}; @{keys[b]}]", ctx)
@@ -276,8 +278,10 @@ async def test_folder_notes_citation_status(user: User, monkeypatch, tmp_path):
     # A click: the folder's numbering and templates.
     user.find(marker="citation-status").click()
     await user.should_see(marker="folder-number-tag")
+    await user.should_see(marker="folder-same-formats")  # (both "#{index}")
     user.find(marker="folder-number-format").clear().type("[{index}]")
     user.find(marker="folder-listed-format").clear().type("§{index}")
+    await user.should_not_see(marker="folder-same-formats")
     user.find(marker="folder-citations-save").click()
     await user.should_see("Good: §1.")
     assert reports.numbering(fid) == reports.Numbering(star, "[{index}]", "§{index}")
