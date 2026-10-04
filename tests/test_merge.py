@@ -1,4 +1,4 @@
-from helpers import add_source, make_person, pub
+from helpers import add_source, make_person, pub, toggle_star
 from sqlalchemy import select
 
 from sci_report_analyzer import annotations, sync
@@ -94,7 +94,7 @@ def test_ids_stable_and_annotations_survive_resync():
         pub_id = s.scalar(select(Publication.id))
     annotations.set_track_override(pub_id, "demo")
     period = annotations.save_period(pid, "HDR", 2015, 2024)
-    annotations.toggle_star(period, pub_id)
+    toggle_star(period, pub_id)
     # Re-sync with one more record
     from sci_report_analyzer.sources.base import FetchResult
 
@@ -329,7 +329,7 @@ def test_annotations_follow_a_paper_merged_by_a_sync():
     assert len(ids) == 2
     loser = ids["Learning to rank for web search engines"]
     period = annotations.save_period(pid, "HDR", 2015, 2024)
-    annotations.toggle_star(period, loser)
+    toggle_star(period, loser)
     annotations.set_note(loser, "keep this")
     # The second record now carries the DOI: the same paper.
     sync.finish_link(

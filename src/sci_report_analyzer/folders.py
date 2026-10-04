@@ -278,12 +278,6 @@ def set_parent(folder_id: int, parent_id: int | None) -> int:
         return _resettle(s, before)
 
 
-def own_settings(folder_id: int) -> bool:
-    """Whether a folder uses settings of its own (else: its parent's)."""
-    with session_scope() as s:
-        return s.get(FolderSettingsUse, folder_id) is not None
-
-
 def use_own_settings(folder_id: int) -> None:
     """A folder gets settings of its own: a copy of those it used (its people's excerpts
     filed in the copies of their categories)."""

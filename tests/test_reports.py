@@ -3,7 +3,7 @@
 import asyncio
 
 import pytest
-from helpers import add_source, make_person, pub
+from helpers import add_source, make_person, pub, uncited
 from nicegui.testing import User
 
 from sci_report_analyzer import annotations, folders, pubview, reports
@@ -75,7 +75,7 @@ def test_keys_numbers_and_substitution():
     assert lines[-1] == "Other: **#3** and [@nobody]."  # a paper without the tag: next number
     assert r.unknown == ["nobody"]
     assert r.cited["smith2022neural"] == 3
-    assert reports.uncited(ctx, r.cited) == []
+    assert uncited(ctx, r.cited) == []
     # Templates (parsed: a group without a value is dropped, an unclosed one left as is).
     assert reports.render("[@smith2022neural]{.short-venue (.year)}", ctx).text == "ECIR (2022)"
     out = reports.render(f"[@smith2022neural; @{keys[a]}]{{.number .year}}", ctx).text
@@ -97,7 +97,7 @@ def test_keys_numbers_and_substitution():
     out = reports.render(f"[@{keys[a]}]{{.tags}}", ctx).text
     assert out.startswith("[2] **Deep ranking for search**") and out.endswith("#strong")
     assert "#discuss" not in out
-    assert reports.uncited(ctx, reports.render("", ctx).cited) == papers
+    assert uncited(ctx, reports.render("", ctx).cited) == papers
     assert reports.bibliography(ctx).splitlines()[0].startswith("- [1] **The neural")
     # Without tags: the papers of the period's years.
     assert len(reports.papers_to_discuss(stats, keys, [], period, (2022, None))) == 1

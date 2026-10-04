@@ -158,13 +158,6 @@ def link_venues(pending: dict[int, int | None]) -> None:
                 pub.venue_id = venue_id
 
 
-def _venue_for_raw(session: Session, raw: str) -> Venue:
-    venue = ensure_venue(session, raw)
-    if venue is None:
-        raise ValueError(f"empty venue text: {raw!r}")
-    return venue
-
-
 def _changed(*, rematch: bool = False) -> None:
     """After a venue change; ``rematch`` re-matches the venue texts (the variants or venue
     rules changed). The cached matches are kept: they are those of venue texts (a venue's
@@ -175,27 +168,6 @@ def _changed(*, rematch: bool = False) -> None:
 
 
 # ---- manual venue-level decisions ----------------------------------------------------------
-
-
-def set_correction(raw: str, text: str | None) -> None:
-    """Match every variant of this venue as ``text`` (None clears)."""
-    with session_scope() as s:
-        _venue_for_raw(s, raw).match_text = text or None
-    _changed()
-
-
-def set_level(raw: str, type_: str | None, rank: str | None) -> None:
-    with session_scope() as s:
-        v = _venue_for_raw(s, raw)
-        v.level_type, v.level_rank = (type_, rank) if rank else (None, None)
-    _changed()
-
-
-def set_kind(raw: str, kind: str | None) -> None:
-    with session_scope() as s:
-        v = _venue_for_raw(s, raw)
-        v.kind, v.kind_manual = kind, bool(kind)
-    _changed()
 
 
 def update_venue(venue_id: int, **values: Any) -> None:

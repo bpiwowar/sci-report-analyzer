@@ -97,10 +97,6 @@ def tag_numbered(tag_id: int, numbers: dict[int, int | None], period_id: int | N
             s.add(row)
 
 
-def toggle_star(period_id: int, pub_id: int) -> bool:
-    return toggle_tag(pub_id, starred_tag_id(), period_id)
-
-
 def set_note(pub_id: int, text: str | None, period_id: int | None = None) -> None:
     """The paper's note (Markdown), or its note within a period; empty: none."""
     text = (text or "").strip() or None

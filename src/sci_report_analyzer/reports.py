@@ -471,10 +471,6 @@ def with_references(text: str, ctx: Context) -> str:
     return out + "\n"
 
 
-def uncited(ctx: Context, cited: Counter) -> list[Paper]:
-    return [p for p in ctx.papers if not cited.get(p.key)]
-
-
 # ---- A folder's citations: its numbering, and the status of its papers ---------------------
 
 
