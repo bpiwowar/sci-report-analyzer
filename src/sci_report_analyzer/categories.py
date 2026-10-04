@@ -1,6 +1,7 @@
 """Categories of a folder (an ordered tree, e.g. a committee's grid: "Research", under it
 "Projects"…): those of its settings (shared, see folders.settings_id), and the excerpts of
-its people's PDFs filed in them: listed by category, as Markdown for a report."""
+its people's PDFs filed in them (with a text per category and person, e.g. a summary):
+listed by category, as Markdown for a report."""
 
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 
 from . import folders
-from .db.models import Category, Excerpt, PeriodDocument, Publication
+from .db.models import Category, Excerpt, PeriodDocument, Publication, SectionText
 from .db.session import session_scope
 from .i18n import _
 
@@ -303,7 +304,8 @@ def excerpt_count(cat_id: int) -> int:
 
 def move_excerpts(cat_id: int, target_id: int) -> int:
     """Move the excerpts of a category and of those below it (with their groups) to another
-    one, after its own; returns how many (none: the target is within it)."""
+    one, after its own, their sections' texts after its own; returns how many excerpts
+    (none: the target is within it)."""
     ids = subtree(cat_id)
     if target_id in ids:
         return 0
@@ -321,6 +323,7 @@ def move_excerpts(cat_id: int, target_id: int) -> int:
                 last[e.period_id] = _last(s, target_id, e.period_id)
             last[e.period_id] += 1
             e.category_id, e.position = target_id, last[e.period_id]
+        _move_texts(s, ids, lambda _i: target_id)
         return len(moved)
 
 
@@ -379,8 +382,9 @@ def _places(nodes: list[Node]) -> dict[int, tuple]:
 
 def remap(s, period_ids: list[int], source_id: int, settings_id: int) -> int:
     """File the excerpts of some people (their periods) filed in categories of some settings
-    in the categories of others, at the same place (same names; see _places); those missing
-    are added (with their colour and years). Returns how many were added."""
+    in the categories of others, at the same place (same names; see _places), with their
+    sections' texts; those missing are added (with their colour and years). Returns how many
+    were added."""
     if not period_ids or source_id == settings_id:
         return 0
     old, new = _tree(s, source_id), _tree(s, settings_id)
@@ -389,6 +393,13 @@ def remap(s, period_ids: list[int], source_id: int, settings_id: int) -> int:
             select(Excerpt.category_id).where(
                 Excerpt.period_id.in_(period_ids),
                 Excerpt.category_id.in_([n.id for n in old]),
+            )
+        )
+    ) | set(
+        s.scalars(
+            select(SectionText.category_id).where(
+                SectionText.period_id.in_(period_ids),
+                SectionText.category_id.in_([n.id for n in old]),
             )
         )
     )
@@ -424,8 +435,71 @@ def remap(s, period_ids: list[int], source_id: int, settings_id: int) -> int:
         select(Excerpt).where(Excerpt.period_id.in_(period_ids), Excerpt.category_id.in_(used))
     ):
         e.category_id = target[e.category_id]
+    _move_texts(s, list(used), target.__getitem__, period_ids)
     s.flush()
     return added
+
+
+# ---- The texts of the sections ------------------------------------------------------------
+
+
+def section_texts(period_id: int) -> dict[int, str]:
+    """The texts (Markdown) of the sections of a person's excerpts within a folder (their
+    period), by category: put after the category's heading (e.g. a summary of its items)."""
+    with session_scope() as s:
+        return dict(
+            s.execute(
+                select(SectionText.category_id, SectionText.text).where(
+                    SectionText.period_id == period_id
+                )
+            ).all()
+        )
+
+
+def section_text(period_id: int, category_id: int) -> str:
+    """The text of a category's section (see section_texts), else ""."""
+    with session_scope() as s:
+        row = s.get(SectionText, (period_id, category_id))
+        return row.text if row is not None else ""
+
+
+def set_section_text(period_id: int, category_id: int, text: str | None) -> None:
+    """Set the text of a category's section (blank: removed)."""
+    text = (text or "").strip()
+    with session_scope() as s:
+        row = s.get(SectionText, (period_id, category_id))
+        if not text:
+            if row is not None:
+                s.delete(row)
+        elif row is None:
+            s.add(SectionText(period_id=period_id, category_id=category_id, text=text))
+        else:
+            row.text = text
+
+
+def delete_section_text(period_id: int, category_id: int) -> None:
+    set_section_text(period_id, category_id, None)
+
+
+def _move_texts(
+    s, ids: list[int], target: Callable[[int], int], period_ids: list[int] | None = None
+) -> None:
+    """The sections' texts of some categories (of some periods: all by default) go to others
+    (``target``: by category), after the text there if any."""
+    query = select(SectionText).where(SectionText.category_id.in_(ids))
+    if period_ids is not None:
+        query = query.where(SectionText.period_id.in_(period_ids))
+    for t in sorted(s.scalars(query), key=lambda t: ids.index(t.category_id)):
+        to = target(t.category_id)
+        if to == t.category_id:
+            continue
+        s.delete(t)
+        s.flush()
+        if (there := s.get(SectionText, (t.period_id, to))) is not None:
+            there.text = f"{there.text}\n\n{t.text}"
+        else:
+            s.add(SectionText(period_id=t.period_id, category_id=to, text=t.text))
+        s.flush()
 
 
 # ---- Excerpts -------------------------------------------------------------------------------
@@ -804,12 +878,15 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | N
     "Rayonnement" section at the end. ``nested`` (None: the folder's choice, see
     reports.nested_influence): them only there instead, under subsections named after their
     categories (as nested as these, one level below), taken out of their categories. The
-    categories with no excerpt (nor below) are left out."""
+    categories with no excerpt (nor below) are left out. A section's text (see
+    section_texts) follows its heading; nested, that of a section left out (all its excerpts
+    taken out) follows the heading of its subsection in the Rayonnement section."""
     if nested is None:
         from . import reports
 
         nested = reports.nested_influence(folder_id)
     nodes = tree(folder_id)
+    texts = section_texts(period_id)
     by_cat: dict[int, list[ExcerptView]] = {}
     for e in excerpts(period_id, grouped=True):
         by_cat.setdefault(e.category_id, []).append(e)
@@ -839,6 +916,23 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | N
     def counted(n: Node, own: Callable[[Node], int]) -> int:
         return own(n) + sum(counted(c, own) for c in n.children)
 
+    def text(n: Node) -> list[str]:
+        return [f"{texts[n.id]}\n"] if texts.get(n.id) else []
+
+    # (nested: the gathering category and those above it, their sections there in any case)
+    up: set[int] = set()
+    if nested and gather is not None:
+        parents = {n.id: n.parent_id for n in nodes}
+        i: int | None = gather.id
+        while i is not None:
+            up.add(i)
+            i = parents[i]
+
+    def left_out(n: Node) -> bool:
+        """Nested: whether a category's own section is left out (its text then in the
+        Rayonnement section)."""
+        return n.id not in up and not counted(n, lambda m: len(shown.get(m.id, [])))
+
     def influence(base: int) -> list[str]:
         """The flagged excerpts: items (by path), or subsections below the ``base`` level."""
         out: list[str] = []
@@ -849,6 +943,7 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | N
                     out += [f"- **{n.path}**", *(f"  - {x}" for x in items)]
             elif counted(n, lambda m: len(flagged.get(m.id, []))):
                 out.append(heading(n, base + 1 + n.depth))
+                out += text(n) if left_out(n) else []
                 out += [*(f"- {x}" for x in items), *([""] if items else [])]
         return out
 
@@ -862,6 +957,7 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | N
         if not counted(n, own):
             continue
         out.append(heading(n, level + n.depth))
+        out += text(n)
         for e in shown.get(n.id, []):  # (a group: its quotes, on one item)
             out.append("- " + _markdown_item(e))
         if shown.get(n.id) and (n is not gather or nested or not gathered):

@@ -1309,6 +1309,9 @@ msgstr "Déposer ici : au premier niveau"
 msgid "Drop here: last, at the top level"
 msgstr "Déposer ici : en dernier, au premier niveau"
 
+msgid "E.g. a summary of its items"
+msgstr "P. ex. un résumé de ses éléments"
+
 msgid ""
 "Each named: it is used as `.name` in the folder's notes, instead of the "
 "general template of that name (Settings → Citation templates)."
@@ -3047,6 +3050,13 @@ msgstr ""
 "resynchroniser"
 
 msgid ""
+"Put after the heading of the category in the excerpts of the notes, "
+"before its items. Empty: none."
+msgstr ""
+"Placé après le titre de la catégorie dans les extraits des notes, avant "
+"ses éléments. Vide : aucun."
+
+msgid ""
 "Put the person in a folder, or add a period (Periods tab), to add "
 "documents."
 msgstr ""
@@ -3793,8 +3803,15 @@ msgstr "Tester un texte de canal"
 msgid "Text"
 msgstr "Texte"
 
+msgid "Text (Markdown)"
+msgstr "Texte (Markdown)"
+
 msgid "Text of the group"
 msgstr "Texte du groupe"
+
+#, python-brace-format
+msgid "Text of the section “{category}”"
+msgstr "Texte de la section « {category} »"
 
 msgid ""
 "Text the automatic ranking lookup searches for, instead of the venue's "
@@ -4045,6 +4062,12 @@ msgstr ""
 
 msgid "The text of the group (edit it with its pencil)"
 msgstr "Le texte du groupe (modifiez-le avec son crayon)"
+
+msgid "The text of this section (Markdown, e.g. a summary of its items)"
+msgstr "Le texte de cette section (Markdown, p. ex. un résumé de ses éléments)"
+
+msgid "The text of this section (click to edit it)"
+msgstr "Le texte de cette section (cliquez pour le modifier)"
 
 msgid "The track's identifier (in the exported settings)"
 msgstr "L'identifiant de la session (dans les paramètres exportés)"

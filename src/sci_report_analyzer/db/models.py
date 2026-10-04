@@ -405,6 +405,21 @@ class Excerpt(Base):
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
+class SectionText(Base):
+    """The text (Markdown) of a category's section in a person's excerpts within a folder
+    (their period's): e.g. a summary of its items, put after its heading."""
+
+    __tablename__ = "section_text"
+
+    period_id: Mapped[int] = mapped_column(
+        ForeignKey("period.id", ondelete="CASCADE"), primary_key=True
+    )
+    category_id: Mapped[int] = mapped_column(
+        ForeignKey("category.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    text: Mapped[str] = mapped_column(Text)
+
+
 STARRED = "starred"  # Tag.key of the built-in period tag behind the ★ button
 
 

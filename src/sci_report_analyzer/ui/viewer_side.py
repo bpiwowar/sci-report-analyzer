@@ -13,6 +13,7 @@ from nicegui import ui
 from .. import annotations, categories, documents, folders, manual, pdftext, reflist, reports
 from ..i18n import N_, _
 from ..sources.base import SourceError
+from . import section_text
 from .mdedit import MarkdownEditor, quote
 from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
@@ -1030,6 +1031,7 @@ def categories_section(side: Side) -> Callable[[], None]:
         side.excerpt_rows.clear()
         for e in categories.excerpts(side.period_id, grouped=True):
             by_cat.setdefault(e.category_id, []).append(e)
+        texts = categories.section_texts(side.period_id)
         merging = state["merging"]
         if merging:
             with ui.row().classes("w-full items-center no-wrap gap-1 bg-amber-1 p-1 rounded"):
@@ -1061,6 +1063,8 @@ def categories_section(side: Side) -> Callable[[], None]:
                     ui.label(n.years).classes("text-xs text-grey")
                 if items:
                     ui.badge(str(len(items))).props("rounded color=amber-8")
+                section_text.edit_button(side, n)
+            section_text.show(side, n, texts.get(n.id, ""))
             if n.influence:  # (after its own: those flagged elsewhere, as copied)
                 paths = {c.id: c.path for c in nodes}
                 flagged = [

@@ -15,7 +15,8 @@ syntax, substituted when shown or copied.
   also usable within another one (``{.starred: .notes}``);
 - ``[]{.publications}``, ``[]{.excerpts}`` (alone on their line): a block (see
   ``Context.blocks``), e.g. the summary of the period's publications, its excerpts by
-  category (their headings below that of the block); with its options as classes:
+  category (their headings below that of the block, each followed by the section's text if
+  any, see categories.section_texts); with its options as classes:
   ``[]{.excerpts .nested-influence}`` the "rayonnement" excerpts only in the Rayonnement
   section, under subsections of their categories (``.flat-influence``: also in their
   categories, as by default; the default: the folder's, see ``nested_influence``).
