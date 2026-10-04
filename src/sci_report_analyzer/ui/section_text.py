@@ -11,6 +11,8 @@ from nicegui import ui
 
 from .. import categories, reports
 from ..i18n import _
+from .dialogs import actions, transient_dialog
+from .mdedit import MarkdownEditor
 from .theme import NOTE_EXTRAS
 
 if TYPE_CHECKING:
@@ -57,23 +59,19 @@ def _rendered(side: Side, text: str) -> str:
 
 
 def edit(side: Side, node: categories.Node) -> None:
-    """A dialog: the section's text (Markdown; empty: removed)."""
+    """A dialog: the section's text, in the notes' Markdown editor (with its preview; empty:
+    removed)."""
     if side.period_id is None:
         return
     period_id = side.period_id
-    with side.host.dialogs, ui.dialog() as dialog, ui.card().classes("w-[36rem]"):
-        ui.label(_("Text of the section “{category}”").format(category=node.path)).classes(
-            "text-lg"
-        )
-        text = (
-            ui.textarea(
-                _("Text (Markdown)"),
-                value=categories.section_text(period_id, node.id),
-                placeholder=_("E.g. a summary of its items"),
-            )
-            .props("outlined autogrow autofocus")
-            .classes("w-full")
-            .mark("section-text-input")
+    title = _("Text of the section “{category}”").format(category=node.path)
+    with side.host.dialogs, transient_dialog(title, width="w-[56rem] max-w-full") as (dlg, _c):
+        editor = MarkdownEditor(
+            categories.section_text(period_id, node.id),
+            render=lambda t: _rendered(side, t),
+            mode="split",
+            mark="section-text-input",
+            height="14rem",
         )
         ui.label(
             _(
@@ -83,14 +81,10 @@ def edit(side: Side, node: categories.Node) -> None:
         ).classes("text-xs text-grey")
 
         def save() -> None:
-            categories.set_section_text(period_id, node.id, text.value)
-            dialog.close()
+            categories.set_section_text(period_id, node.id, editor.value)
             side.refresh_excerpts()
             if side.folder_refresh is not None:  # (the notes' preview)
                 side.folder_refresh()
 
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Cancel"), on_click=dialog.close).props("flat").mark("section-text-cancel")
-            ui.button(_("Save"), on_click=save).mark("section-text-save")
-    dialog.on_value_change(lambda ev: None if ev.value else dialog.delete())
-    dialog.open()
+        actions(dlg, _("Save"), save, mark="section-text-save")
+    editor.focus()
