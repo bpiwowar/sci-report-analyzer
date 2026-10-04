@@ -89,3 +89,10 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
   the general one), and usable inside other templates: e.g. `.starred` =
   `.index (.short-venue .year)`, where `.index` is itself expanded (the paper's index
   among the folder's starred papers, as set above).
+
+## Notes: citations everywhere
+
+The global notes (a paper's own note, not within a folder; the document's note) should
+have the citation icons and capabilities of the folder notes: `[@key]` citations rendered
+in the preview (with the citation template), Shift-click on a paper to cite it there, and
+the citation-status icon.
