@@ -24,6 +24,7 @@ from ..ranking.badge import (
 from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
 from ..ranking.service import VenuePattern, service
 from ..sources import ADAPTERS
+from . import dnd
 from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
 from .pub_details import VIA_LABEL, venue_rule_dialog
 from .theme import (
@@ -1012,15 +1013,10 @@ def _table(
     return update
 
 
-_ROW_SLOT = """
-<q-tr :props="props" draggable="true" class="cursor-pointer"
-  @dragstart="e => { e.dataTransfer.setData('text/plain', String(props.row.id));
-                     e.dataTransfer.effectAllowed = 'move' }"
-  @dragover.prevent="e => e.currentTarget.classList.add('vr-drop')"
-  @dragleave="e => e.currentTarget.classList.remove('vr-drop')"
-  @drop.prevent="e => { e.currentTarget.classList.remove('vr-drop');
-    $parent.$emit('venue_drop',
-                  {src: Number(e.dataTransfer.getData('text/plain')), dst: props.row.id}) }"
+_ROW_SLOT = (
+    """
+<q-tr :props="props" class="cursor-pointer"
+  DND
   @click="$parent.$emit('open_venue', props.row)">
   <q-td v-for="col in props.cols" :key="col.name" :props="props">
     <span v-if="col.name === 'rank'" v-html="col.value"></span>
@@ -1035,6 +1031,13 @@ _ROW_SLOT = """
   </q-td>
 </q-tr>
 """
+).replace(
+    "DND",
+    # (a venue dropped onto another: merged into it, once confirmed)
+    dnd.vue_attrs(
+        "venue", "props.row.id", "$parent.$emit('venue_drop', {src: d.id, dst: props.row.id})"
+    ),
+)
 
 
 def _hosts_editor(row: venues.VenueRow, go) -> Callable[[], list[dict] | None]:

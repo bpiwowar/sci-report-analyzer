@@ -15,6 +15,7 @@ from ..i18n import N_, _
 from ..sources.base import SourceError
 from .categories_editor import categories_dialog
 from .dialogs import actions, close, confirm, ok_handler, transient_dialog
+from .dnd import draggable, drop_zone
 from .mdedit import MarkdownEditor, quote
 from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
@@ -23,10 +24,7 @@ from .reflist import tag_from_list
 from .theme import int_or_none
 
 ui.add_css(
-    ".vr-drop { outline: 2px dashed #ffa000; outline-offset: 1px; }"
-    " .vr-drop-before { box-shadow: inset 0 2px #ffa000; }"
-    " .vr-drop-after { box-shadow: inset 0 -2px #ffa000; }"
-    " .vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
+    ".vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
     " box-shadow: 0 0 0 2px #ffa000; }",
     shared=True,
 )
@@ -1039,10 +1037,16 @@ def categories_section(side: Side) -> Callable[[], None]:
                     ui.column()
                     .classes("w-full gap-0")
                     .style(f"padding-left:{1.2 * n.depth + 0.6}rem")
-                    .props('draggable="true"')
                     .mark(f"excerpt-{e.id}") as block
                 ):
-                    _droppable(block, e, lambda source_id, zone, e=e: dropped(source_id, zone, e))
+                    # (onto its top or bottom: placed before / after it; its middle: merged)
+                    draggable(block, "excerpt", e.id)
+                    drop_zone(
+                        block,
+                        "excerpt",
+                        lambda source_id, zone, e=e: dropped(source_id, zone, e),
+                        middle="merge",
+                    )
                     if e.group_text:
                         ui.label(e.group_text).classes("text-sm line-clamp-4").style(
                             f"border-left: 3px solid {e.colour}; padding-left: 0.4rem"
@@ -1347,40 +1351,6 @@ def categories_section(side: Side) -> Callable[[], None]:
 
     listing()
     return listing.refresh
-
-
-def _droppable(
-    block: ui.element, e: categories.ExcerptView, dropped: Callable[[int, str], None]
-) -> None:
-    """An excerpt's block, dragged (its id) and dropped on: ``dropped`` with the id of the
-    one dropped, and where: on its top or bottom quarter "before" / "after" it, else
-    "merge"."""
-    zone = (
-        "const r = ev.currentTarget.getBoundingClientRect(), f = (ev.clientY - r.top) / r.height;"
-        " const z = f < 0.25 ? 'before' : f > 0.75 ? 'after' : 'merge';"
-    )
-    clear = "ev.currentTarget.classList.remove('vr-drop', 'vr-drop-before', 'vr-drop-after');"
-    block.on(
-        "dragstart",
-        js_handler="(ev) => { ev.stopPropagation(); "
-        f"ev.dataTransfer.setData('text/plain', 'excerpt:{e.id}'); }}",
-    )
-    block.on(
-        "dragover",
-        js_handler=f"(ev) => {{ ev.preventDefault(); {zone} {clear} "
-        "ev.currentTarget.classList.add(z === 'merge' ? 'vr-drop' : 'vr-drop-' + z); }",
-    )
-    block.on("dragleave", js_handler=f"(ev) => {{ {clear} }}")
-    block.on(
-        "drop",
-        lambda ev: (
-            dropped(int(ev.args[0].split(":")[1]), ev.args[1])
-            if isinstance(ev.args, list) and str(ev.args[0]).startswith("excerpt:")
-            else None
-        ),
-        js_handler=f"(ev) => {{ ev.preventDefault(); {zone} {clear} "
-        "emit(ev.dataTransfer.getData('text/plain'), z); }",
-    )
 
 
 def excerpt_url(e: categories.ExcerptView) -> str:

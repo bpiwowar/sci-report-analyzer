@@ -78,7 +78,11 @@ CSS = """
 .vr-venue-link { color:inherit; text-decoration:none; }
 .vr-venue-link:hover .vr-matched { border-bottom-style:solid; }
 .vr-count-link { color:var(--q-primary); cursor:pointer; text-decoration:underline dotted; }
-.vr-drop td { background: rgba(9,105,218,.15) !important; outline: 1px dashed var(--q-primary); }
+/* Drag and drop (ui/dnd.py): dropped before, after or onto an item. */
+.vr-drop-before { box-shadow: inset 0 2px 0 var(--q-primary); }
+.vr-drop-after { box-shadow: inset 0 -2px 0 var(--q-primary); }
+.vr-drop-on, .vr-drop-on > td { background: rgba(25,118,210,.12) !important; }
+.vr-drop-on { outline: 1px dashed var(--q-primary); outline-offset: -1px; }
 .vr-row:hover { background: rgba(127,127,127,.08); }
 .vr-track { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 3px,
             transparent 3px 7px); }
