@@ -614,6 +614,31 @@ async def test_folder_dialog_saves_its_notes_only_if_edited(user: User) -> None:
     assert folders.folders()[0].notes == "Mine."
 
 
+async def test_deleting_a_folder_or_a_tag_is_confirmed(user: User) -> None:
+    from sci_report_analyzer import annotations, folders
+
+    fid = folders.save_folder(None, "Prize committee")
+    await user.open(f"/?folder={fid}")
+    user.find(marker="folder-edit").click()
+    user.find(marker="folder-delete").click()
+    await user.should_see(
+        "Delete the folder “Prize committee” and its periods? Its people are kept."
+    )
+    assert folders.folders()
+    user.find(marker="folder-delete-ok").click()
+    await user.should_not_see(marker="folder-delete-ok")
+    assert not folders.folders()
+
+    tid = annotations.save_tag("To discuss", None)
+    await user.open("/settings?tab=tags")
+    user.find(marker=f"tag-delete-{tid}").click()
+    await user.should_see("Delete the tag “To discuss”, from every paper?")
+    assert any(t.id == tid for t in annotations.all_tags())
+    user.find(marker="tag-delete-ok").click()
+    await user.should_not_see(marker=f"tag-delete-{tid}")
+    assert not any(t.id == tid for t in annotations.all_tags())
+
+
 async def test_folders_tree_editor(user: User) -> None:
     from sci_report_analyzer import categories, folders
 

@@ -17,7 +17,7 @@ from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
 from ..sync import discover, is_syncing, start_sync
 from .categories_editor import categories_dialog
-from .dialogs import actions, confirm, ok_handler, transient_dialog
+from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
 from .folders_editor import ALL, folders_tree
 from .person import purge_dialog, remove_from_folder_dialog
@@ -640,13 +640,22 @@ def folder_dialog(f: folders.FolderView | None) -> None:
             _goto(fid)
 
         def delete() -> None:
-            folders.delete_folder(f.id)
-            _goto(ALL)
+            close_then(
+                dlg,
+                lambda: confirm(
+                    _("Delete the folder “{folder}” and its periods? Its people are kept.").format(
+                        folder=f.name
+                    ),
+                    _("Delete"),
+                    lambda: (folders.delete_folder(f.id), _goto(ALL)),
+                    mark="folder-delete-ok",
+                ),
+            )
 
         with ui.row().classes("justify-end w-full"):
             if f is not None:
-                ui.button(_("Delete"), on_click=ok_handler(dlg, delete)).props(
-                    "flat color=negative"
-                ).tooltip(_("Deletes the folder and its periods (people are kept)"))
+                ui.button(_("Delete"), on_click=delete).props("flat color=negative").tooltip(
+                    _("Deletes the folder and its periods (people are kept)")
+                ).mark("folder-delete")
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(_("Save"), on_click=ok_handler(dlg, save)).mark("folder-save")

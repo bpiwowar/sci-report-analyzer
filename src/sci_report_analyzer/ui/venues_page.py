@@ -24,7 +24,7 @@ from ..ranking.badge import (
 from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
 from ..ranking.service import VenuePattern, service
 from ..sources import ADAPTERS
-from .dialogs import actions, confirm, ok_handler, transient_dialog
+from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
 from .pub_details import VIA_LABEL, venue_rule_dialog
 from .theme import (
     badge_details,
@@ -1818,8 +1818,16 @@ def venue_dialog(
         with ui.row().classes("justify-end w-full"):
             ui.button(
                 _("Clear manual decisions"),
-                on_click=lambda: (venues.clear_manual(row.id), finish()),
-            ).props("flat color=negative")
+                on_click=lambda: confirm(
+                    _(
+                        "Clear the manual decisions on “{venue}” (its kind, level, ranking "
+                        "record, short name, search text, joint conference, workshop hosts)?"
+                    ).format(venue=row.name),
+                    _("Clear"),
+                    lambda: (venues.clear_manual(row.id), finish()),
+                    mark="venue-clear-manual-ok",
+                ),
+            ).props("flat color=negative").mark("venue-clear-manual")
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(_("Save"), on_click=save).mark("venue-save")
 
@@ -2111,11 +2119,10 @@ def _relate_dialog(row: venues.VenueRow, other: venues.VenueRow, merged) -> None
             )
 
         def ok() -> None:
-            dlg.close()  # (first: the merge's dialog is not within this one)
             if rel.value == "same":
-                _confirm_merge(row, [other], merged, swappable=True)
+                close_then(dlg, lambda: _confirm_merge(row, [other], merged, swappable=True))
             else:
-                merged(venues.relate_venues(row.id, [other.id], rel.value))
+                close_then(dlg, lambda: merged(venues.relate_venues(row.id, [other.id], rel.value)))
 
         rel.on_value_change(lambda _e: show())
         show()
