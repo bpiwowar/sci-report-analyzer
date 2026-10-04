@@ -97,19 +97,6 @@ def tag_numbered(tag_id: int, numbers: dict[int, int | None], period_id: int | N
             s.add(row)
 
 
-def _list_key(person_id: int, tag_id: int, period_id: int | None) -> str:
-    return f"ui.reflist.{person_id}.{period_id or 0}.{tag_id}"
-
-
-def tag_list(person_id: int, tag_id: int, period_id: int | None = None) -> list[dict]:
-    """The last list a tag was put from (its items: number, text, the paper's id or None)."""
-    return list(ui_state(_list_key(person_id, tag_id, period_id), []))
-
-
-def save_tag_list(person_id: int, tag_id: int, period_id: int | None, entries: list[dict]) -> None:
-    save_ui_state(_list_key(person_id, tag_id, period_id), entries)
-
-
 def toggle_star(period_id: int, pub_id: int) -> bool:
     return toggle_tag(pub_id, starred_tag_id(), period_id)
 

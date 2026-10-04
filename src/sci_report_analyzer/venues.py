@@ -198,12 +198,6 @@ def set_kind(raw: str, kind: str | None) -> None:
     _changed()
 
 
-def set_record(raw: str, record_key: str | None) -> None:
-    with session_scope() as s:
-        _venue_for_raw(s, raw).record_key = record_key
-    _changed()
-
-
 def update_venue(venue_id: int, **values: Any) -> None:
     rematch = False
     with session_scope() as s:
@@ -1089,7 +1083,6 @@ def merge_proposals(rows: list[VenueRow]) -> list[tuple[VenueRow, VenueRow, floa
 # How another venue relates to one: the same venue, one of its tracks, a joint conference
 # including it or one of its workshops. "~" reverses it: the venue is the other's track…
 
-RELATION_KINDS = ("same", "track", "joint", "workshop")
 # A venue joining two conferences (Settings → Detection rules).
 _JOINT = Rule("joint")
 

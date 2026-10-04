@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .db.models import Person, Publication, SourceLink, SourcePub, utcnow
+from .db.models import Person, Publication, SourcePub, utcnow
 from .ranking.normalize import is_non_venue, normalize
 from .sources import PRIORITY
 from .sources.base import normalize_doi
@@ -301,7 +301,3 @@ def join_publications(session: Session, target: Publication, others: Sequence[Pu
     session.flush()
     session.refresh(target)
     canonical(target, target.members)
-
-
-def links_for(person: Person, status: str = "validated") -> list[SourceLink]:
-    return [ln for ln in person.links if ln.status == status]
