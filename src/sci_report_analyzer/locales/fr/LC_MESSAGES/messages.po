@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-03 15:59+0200\n"
+"POT-Creation-Date: 2026-10-04 10:37+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -2939,6 +2939,9 @@ msgstr "Recherche dans toutes les sources…"
 #, python-brace-format
 msgid "Searching sources for {name}…"
 msgstr "Recherche des sources pour {name}…"
+
+msgid "Searching venues of every kind"
+msgstr "Recherche parmi les canaux de tous types"
 
 msgid ""
 "Select an area of a page: draw a rectangle, its text is the selection (A;"
