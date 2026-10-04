@@ -228,8 +228,6 @@ async def _shown(user: User, marker: str) -> bool:
 
 
 async def test_viewer_changes_reach_the_panel(user: User):
-    from sci_report_analyzer.ui import pdf_viewer
-
     pid, _, ids = _person()
     a = ids["Deep ranking for search"]
     await user.open(f"/person/{pid}")
