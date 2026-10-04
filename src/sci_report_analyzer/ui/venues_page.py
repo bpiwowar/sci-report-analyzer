@@ -22,7 +22,7 @@ from ..ranking.badge import (
     text_colour,
 )
 from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
-from ..ranking.service import service
+from ..ranking.service import VenuePattern, service
 from ..sources import ADAPTERS
 from .pub_details import VIA_LABEL, venue_rule_dialog
 from .theme import (
@@ -1489,11 +1489,12 @@ def venue_dialog(
                         key_texts.get(key, []),
                         key=lambda t: -row.source_texts.get((t.source, t.raw), 0),
                     )
+                    cleaned = service.clean(example, source) if example else key
                     with ui.column().classes("gap-0 w-full").mark(f"venue-variant-{key}"):
                         with ui.row().classes("items-center gap-2 no-wrap w-full"):
-                            ui.label(service.clean(example, source) if example else key).classes(
-                                "text-sm"
-                            ).tooltip(_("Cleaned text (after the normalization rules)"))
+                            ui.label(cleaned).classes("text-sm").tooltip(
+                                _("Cleaned text (after the normalization rules)")
+                            )
                             ui.label(
                                 ngettext("{n} record", "{n} records", count).format(n=count)
                                 + (" · " + _("set by hand") if manual else "")
@@ -1504,6 +1505,14 @@ def venue_dialog(
                                 f"venue-variant-track-{key}",
                                 colours=colours,
                             ).tooltip(_("Track of the papers with this variant"))
+                            ui.button(
+                                icon="rule",
+                                on_click=lambda c=cleaned, t=track: edit_rule(
+                                    prefill=VenuePattern(pattern=venues.text_regex(c), track=t)
+                                ),
+                            ).props("flat round dense size=sm").tooltip(
+                                _("Turn into a venue rule (to edit): its near variants match too")
+                            ).mark(f"venue-variant-rule-{key}")
                             if len(row.variants) > 1:
                                 ui.button(
                                     icon="call_split",
@@ -1592,14 +1601,20 @@ def venue_dialog(
                     )
                 rule_host = ui.element("div")  # rule dialogs live outside the refreshed list
 
-                def edit_rule(index: int | None = None) -> None:
+                def edit_rule(
+                    index: int | None = None, prefill: VenuePattern | None = None
+                ) -> None:
                     with rule_host:
-                        venue_rule_dialog(rule_saved, venue_id=row.id, index=index)
+                        venue_rule_dialog(rule_saved, venue_id=row.id, index=index, prefill=prefill)
 
                 def rule_saved(message: str) -> None:
                     ui.notify(
                         _("{message} (applied everywhere)").format(message=message), type="positive"
                     )
+                    # (The variants now matched by the rule are gone.)
+                    keys = venues.variant_keys(row.id)
+                    row.variants[:] = [v for v in row.variants if v[0] in keys]
+                    variants_view.refresh()
                     rules_view.refresh()
 
                 @ui.refreshable

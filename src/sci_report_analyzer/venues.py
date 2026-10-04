@@ -1270,11 +1270,67 @@ def venue_texts() -> list[tuple[str, str, int]]:
     return [(src, text, n) for src, text, n in rows]
 
 
-def save_patterns(venue_id: int, patterns: list[VenuePattern]) -> None:
+def save_patterns(
+    venue_id: int, patterns: list[VenuePattern], drop_variants: Iterable[str] = ()
+) -> None:
+    """The venue's rules; ``drop_variants``: the keys of its variants removed (those now
+    matched by a rule)."""
+    drop = set(drop_variants)
     with session_scope() as s:
         v = s.get(Venue, venue_id)
         v.patterns = [p.model_dump(exclude_defaults=True) for p in patterns] or None
+        for vk in s.scalars(select(VenueKey).where(VenueKey.venue_id == venue_id)):
+            if vk.key in drop:
+                s.delete(vk)
     _changed(rematch=True)
+
+
+@dataclass
+class RuleVariant:
+    """A venue's variant a rule matches (all its source texts)."""
+
+    key: str
+    text: str  # its cleaned text
+    track: str | None
+
+
+@dataclass
+class RuleVariants:
+    """The venue's variants a rule matches: of the rule's track (redundant: removed when
+    it is saved), or of another one (in conflict with it)."""
+
+    redundant: list[RuleVariant] = field(default_factory=list)
+    conflicting: list[RuleVariant] = field(default_factory=list)
+
+
+def rule_variants(venue_id: int, rule: VenuePattern) -> RuleVariants:
+    """The venue's variants whose source texts (else the text it was made from) all match
+    ``rule``."""
+    venue_match.refresh()
+    texts: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for m in venue_match.matches().values():
+        texts[m.key].append((m.source, m.raw))
+    out = RuleVariants()
+    with session_scope() as s:
+        for vk in s.scalars(select(VenueKey).where(VenueKey.venue_id == venue_id)):
+            raws = texts.get(vk.key) or ([(vk.source, vk.example)] if vk.example else [])
+            if not raws or not all(rule.applies(src, raw) for src, raw in raws):
+                continue
+            text = service.clean(vk.example, vk.source) if vk.example else vk.key
+            found = RuleVariant(vk.key, text, vk.track or None)
+            same = found.track == (rule.track or None)
+            (out.redundant if same else out.conflicting).append(found)
+    return out
+
+
+def variant_keys(venue_id: int) -> set[str]:
+    with session_scope() as s:
+        return set(s.scalars(select(VenueKey.key).where(VenueKey.venue_id == venue_id)))
+
+
+def text_regex(text: str) -> str:
+    """A regex matching ``text`` (its words in order, any spacing): a venue rule's start."""
+    return r"\s+".join(re.escape(w) for w in text.split())
 
 
 def venue_patterns(venue_id: int) -> list[VenuePattern]:

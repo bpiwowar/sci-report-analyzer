@@ -1423,6 +1423,47 @@ async def test_venue_variants_grouped_by_track_with_their_raw_texts(user: User) 
     await user.should_see(f"{WIDG_DEMO} (1)")
 
 
+async def test_variant_into_a_venue_rule(user: User) -> None:
+    """A variant turned into a venue rule: the variants it matches are removed; one of
+    another track is in conflict (the regex edited, or the variant removed)."""
+    from sci_report_analyzer import venues
+    from sci_report_analyzer.db.models import Publication
+    from sci_report_analyzer.db.session import session_scope
+    from sci_report_analyzer.ranking.service import service
+
+    widg = "Conference on Widget Processing"
+    texts = [widg, f"Intl. {widg}", f"{widg} (Demonstrations)", f"{widg} (Tutorials)"]
+    pid = make_person("Jane Doe")
+    add_source(pid, "hal", "jd", [pub(f"p{i}", t, 2023, t) for i, t in enumerate(texts)])
+    await user.open(f"/person/{pid}")
+    await user.should_see(widg)
+    with session_scope() as s:
+        vid = s.get(Publication, _pub_id(widg)).venue_id
+    for raw in texts[1:]:
+        venues.add_variant(vid, raw, "hal")
+    keys = [service.key(t, "hal") for t in texts]
+    venues.set_variant_track(keys[2], "demo")
+    venues.set_variant_track(keys[3], "tutorial")
+    await user.open(f"/venues?focus={vid}")
+    user.find("venue-tab-matching").click()
+    user.find(f"venue-variant-rule-{keys[0]}").click()
+    await user.should_see(marker="rule-save")
+    (pattern,) = user.find("rule-pattern").elements
+    assert pattern.value == venues.text_regex(service.clean(widg, "hal"))
+    # It matches the demo and tutorial variants too: edited so that the demo one is not.
+    user.find("rule-save").click()
+    await user.should_see(marker="rule-conflicts")
+    await user.should_see(f"{service.clean(texts[2], 'hal')} (Demo)")
+    user.find("rule-conflict-edit").click()
+    pattern.value = pattern.value + r"(?! \(Demo)"
+    user.find("rule-save").click()
+    await user.should_not_see(f"{service.clean(texts[2], 'hal')} (Demo)")
+    user.find("rule-conflict-remove").click()
+    await user.should_see("3 variants now matched by the rule were removed")
+    assert venues.variant_keys(vid) == {keys[2]}
+    assert [r.pattern for r in venues.venue_patterns(vid)] == [pattern.value]
+
+
 async def test_venue_suggestion_as_a_track(user: User) -> None:
     pid = make_person("Jane Doe")
     add_source(

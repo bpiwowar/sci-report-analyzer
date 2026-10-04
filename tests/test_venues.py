@@ -7,7 +7,12 @@ from sci_report_analyzer import pubview, sync, venues
 from sci_report_analyzer.db.models import Publication, Venue, VenueKey
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.ranking.kinds import KindEvidence, detect_kind
-from sci_report_analyzer.ranking.service import load_settings, save_settings
+from sci_report_analyzer.ranking.service import (
+    VenuePattern,
+    load_settings,
+    save_settings,
+    service,
+)
 from sci_report_analyzer.sources.base import FetchResult
 
 
@@ -1075,3 +1080,39 @@ def test_venue_chip_unranked_kind_or_dropped_from_core():
 
     assert "CORE A until 2008" in chip("intl_conference", old)
     assert "CORE A" not in chip("shared_task", old) and "Shared task" in chip("shared_task", old)
+
+
+WIDGETS = "Widget Processing Conference"
+
+
+def _widget_venue() -> tuple[int, int, str]:
+    """A venue with three variants (one of the demo track): (person, venue, demo key)."""
+    pid = make_person()
+    texts = [WIDGETS, f"Intl. {WIDGETS}", f"{WIDGETS} (Demonstrations)"]
+    add_source(pid, "hal", "h", [pub(f"p{i}", t, 2023, t) for i, t in enumerate(texts)])
+    _stats(pid)
+    vid = _venue_of(WIDGETS)
+    for raw in texts[1:]:
+        venues.add_variant(vid, raw, "hal")
+    demo = service.key(texts[2], "hal")
+    venues.set_variant_track(demo, "demo")
+    return pid, vid, demo
+
+
+def test_variants_a_rule_matches():
+    """A rule made from a variant: the variants it matches are redundant (removed with
+    its saving), those of another track in conflict with it."""
+    pid, vid, demo = _widget_venue()
+    assert venues.text_regex("Widget  Processing (WIDG)") == r"Widget\s+Processing\s+\(WIDG\)"
+    rule = VenuePattern(pattern=venues.text_regex(WIDGETS))
+    found = venues.rule_variants(vid, rule)
+    assert len(found.redundant) == 2 and all(v.track is None for v in found.redundant)
+    assert [(v.key, v.track) for v in found.conflicting] == [(demo, "demo")]
+    # A rule of the demo track: the demo variant is redundant, the others in conflict.
+    found_demo = venues.rule_variants(vid, rule.model_copy(update={"track": "demo"}))
+    assert [v.key for v in found_demo.redundant] == [demo]
+    venues.save_patterns(vid, [rule], [v.key for v in found.redundant])
+    assert venues.variant_keys(vid) == {demo}
+    st = _stats(pid)
+    assert {s.venue_id for s in st.values()} == {vid}
+    assert st[WIDGETS].track is None and st[f"{WIDGETS} (Demonstrations)"].track == "demo"
