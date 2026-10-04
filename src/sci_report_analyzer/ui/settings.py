@@ -1580,6 +1580,83 @@ def tracks_tab() -> None:
         t.rules.append(tracks.TrackRule(id=f"{t.id}_{n}", pattern=""))
         listing.refresh()
 
+    def reset_name_rule(r: tracks.NameRule) -> None:
+        d = tracks.DEFAULT_NAME_RULES[r.id]
+        r.pattern, r.replacement, r.ignore_case = d.pattern, d.replacement, d.ignore_case
+        listing.refresh()
+
+    def name_rule_row(
+        t: tracks.Track, r: tracks.NameRule, track_changed: Callable[[], None]
+    ) -> None:
+        """A name rule of ``t`` (its examples shown with the name the track's rules give)."""
+        row = ui.column().classes("w-full gap-0 border rounded p-1").mark(f"track-name-rule-{r.id}")
+
+        @ui.refreshable
+        def status() -> None:
+            o = tracks.name_rule_origin(r)
+            _show_origin(row, o)
+            if o == "edited":
+                ui.button(icon="restart_alt", on_click=lambda: reset_name_rule(r)).props(
+                    "flat round dense size=sm"
+                ).tooltip(_("Reset to the default")).mark(f"track-name-rule-reset-{r.id}")
+
+        @ui.refreshable
+        def shown() -> None:
+            if r.pattern and r.compiled() is None:
+                ui.label(_("invalid regex")).classes("text-negative text-xs")
+                return
+            for ex in r.examples:
+                found = tracks.conference_name(t.id, ex, t.name_rules)
+                ui.label(f"“{ex}” → “{found or ex}”").classes(
+                    "text-xs font-mono " + ("text-grey" if found else "text-negative")
+                )
+            if (d := tracks.DEFAULT_NAME_RULES.get(r.id)) and tracks.name_rule_origin(
+                r
+            ) == "edited":
+                case = " " + _("[ignore case]") if d.ignore_case else ""
+                ui.label(
+                    _("default: {pattern}").format(pattern=f"{d.pattern} → “{d.replacement}”{case}")
+                ).classes("text-xs text-grey font-mono break-all")
+
+        def changed(_e=None) -> None:
+            status.refresh()
+            shown.refresh()
+            track_changed()
+
+        with row:
+            with ui.row().classes("items-center gap-2 w-full no-wrap"):
+                with ui.row().classes("items-center gap-1 no-wrap shrink-0"):
+                    status()
+                ui.input(_("pattern"), value=r.pattern, on_change=changed).bind_value(
+                    r, "pattern"
+                ).props("dense outlined debounce=300").classes("grow font-mono").mark(
+                    f"track-name-pattern-{r.id}"
+                )
+                ui.icon("arrow_forward")
+                ui.input(_("replacement"), value=r.replacement, on_change=changed).bind_value(
+                    r, "replacement"
+                ).props("dense outlined debounce=300").classes("w-32 font-mono").mark(
+                    f"track-name-replacement-{r.id}"
+                )
+                ui.checkbox(_("ignore case"), value=r.ignore_case, on_change=changed).bind_value(
+                    r, "ignore_case"
+                )
+                if r.id not in tracks.DEFAULT_NAME_RULES:
+                    ui.button(
+                        icon="delete",
+                        on_click=lambda: (t.name_rules.remove(r), listing.refresh()),
+                    ).props("flat round dense color=negative").tooltip(_("Delete the rule"))
+            with ui.column().classes("gap-0 pl-2"):
+                shown()
+
+    def add_name_rule(t: tracks.Track) -> None:
+        ids = {r.id for x in defs for r in x.name_rules}
+        n = 1
+        while f"{t.id}_name_{n}" in ids:
+            n += 1
+        t.name_rules.append(tracks.NameRule(id=f"{t.id}_name_{n}", pattern=""))
+        listing.refresh()
+
     def reset_track(t: tracks.Track) -> None:
         defs[at(t)] = tracks.DEFAULTS[t.id].model_copy(deep=True)
         listing.refresh()
@@ -1667,6 +1744,20 @@ def tracks_tab() -> None:
             ui.button(_("Add a rule"), icon="add", on_click=lambda: add_rule(t)).props(
                 "flat dense"
             ).mark(f"track-add-rule-{t.id}")
+            # Its name rules (in their order).
+            ui.label(_("Name of the conference")).classes("text-sm font-bold mt-1")
+            ui.label(
+                _(
+                    "A venue marked as this track (Venues → “Mark as a track”) is renamed to "
+                    "its conference's name: the one these regexes give from its name, applied "
+                    "in turn (\\1, \\2… or \\g<name> in the replacement)."
+                )
+            ).classes("text-xs text-grey")
+            for r in t.name_rules:
+                name_rule_row(t, r, status.refresh)
+            ui.button(_("Add a name rule"), icon="add", on_click=lambda: add_name_rule(t)).props(
+                "flat dense"
+            ).mark(f"track-add-name-rule-{t.id}")
 
     @ui.refreshable
     def listing() -> None:
@@ -1675,10 +1766,15 @@ def tracks_tab() -> None:
 
     listing()
 
+    def new_id(label: str) -> str:
+        """A new track's id: unique, also among those deleted but not saved yet (their
+        papers still have them)."""
+        return tracks.new_id(label, {*saved_ids, *(t.id for t in defs)})
+
     def add_track() -> None:
         if not (label := (new_name.value or "").strip()):
             return
-        tid = tracks.new_id(label, (t.id for t in defs))
+        tid = new_id(label)
         n = sum(t.id not in tracks.DEFAULTS for t in defs)
         names = {lang: "" for lang in i18n.LANGUAGES} | {"en": label}
         colour = NEW_TRACK_COLOURS[n % len(NEW_TRACK_COLOURS)]
@@ -1686,13 +1782,22 @@ def tracks_tab() -> None:
         new_name.value = ""
         listing.refresh()
 
+    def show_id(e) -> None:
+        label = (e.value or "").strip()
+        id_hint.text = (
+            _("Its identifier: {id} (it cannot be changed later)").format(id=new_id(label))
+            if label
+            else ""
+        )
+
     with ui.row().classes("items-center gap-2 mt-2"):
         new_name = (
-            ui.input(_("New track (its English name)"))
+            ui.input(_("New track (its English name)"), on_change=show_id)
             .props("dense outlined")
             .mark("track-new-name")
         )
         ui.button(_("Add a track"), icon="add", on_click=add_track).props("flat").mark("track-add")
+        id_hint = ui.label().classes("text-xs text-orange-9").mark("track-new-id")
 
     def reset() -> None:
         defs[:] = tracks.default_tracks() + [t for t in defs if t.id not in tracks.DEFAULTS]
@@ -1700,7 +1805,12 @@ def tracks_tab() -> None:
         preview()
 
     def save() -> bool:
-        bad = [t.name() for t in defs for r in t.rules if r.pattern and r.compiled() is None]
+        bad = [
+            t.name()
+            for t in defs
+            for r in (*t.rules, *t.name_rules)
+            if r.pattern and r.compiled() is None
+        ]
         if bad:
             ui.notify(_("Invalid rule: {names}").format(names=", ".join(bad)), type="negative")
             return False
@@ -1772,9 +1882,51 @@ def io_tab() -> None:
     )
 
 
+def _import_tracks(
+    mapping: settings_io.TrackMapping, mode: str, choice: dict[str, bool], remove: set[str]
+) -> None:
+    """How the file's tracks map to the local ones (by id); the local ones it lacks are
+    kept or removed (``remove``)."""
+    ui.label(_("Tracks")).classes("font-medium")
+
+    def chip(t: tracks.Track) -> None:
+        with tracks.using([t]):  # (as defined in the file, or here)
+            track_chip(t.id)
+
+    def line(t: tracks.Track, what: str) -> None:
+        with ui.row().classes("items-center gap-2 no-wrap").mark(f"import-track-{t.id}"):
+            chip(t)
+            ui.label(what).classes("text-sm text-grey")
+
+    for t in mapping.added:
+        line(t, _("added (from the file)"))
+    for local, imported in mapping.both:
+        if not mapping.differ(local, imported):
+            line(local, _("in both, the same"))
+        elif mode == "replace" or choice.get(f"matching:tracks.{local.id}"):
+            line(imported, _("in both: the file's"))
+        else:
+            line(local, _("in both: the local one"))
+    for t in mapping.local:
+        with ui.row().classes("items-center gap-2 no-wrap").mark(f"import-track-{t.id}"):
+            chip(t)
+            ui.label(_("not in the file (added here)")).classes("text-sm text-grey")
+            ui.toggle(
+                {False: _("keep it"), True: _("remove it")},
+                value=t.id in remove,
+                on_change=lambda e, tid=t.id: remove.add(tid) if e.value else remove.discard(tid),
+            ).props("dense no-caps size=sm").mark(f"import-track-remove-{t.id}")
+    if mapping.local:
+        ui.label(
+            _("A track removed is no paper's, variant's or venue rule's track any more.")
+        ).classes("text-xs text-grey")
+
+
 def import_dialog(data: settings_io.SettingsFile) -> None:
     conflicts = settings_io.find_conflicts(data)
     choice: dict[str, bool] = {c.id: True for c in conflicts}  # True = take imported
+    mapping = settings_io.track_mapping(data)
+    remove: set[str] = set()  # the local tracks the file lacks, removed
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
         ui.label(_("Import settings")).classes("text-lg")
         ui.label(
@@ -1796,6 +1948,13 @@ def import_dialog(data: settings_io.SettingsFile) -> None:
             value="merge",
         ).props("inline")
 
+        @ui.refreshable
+        def tracks_view() -> None:
+            _import_tracks(mapping, mode.value, choice, remove)
+
+        with ui.column().classes("w-full gap-1").mark("import-tracks"):
+            tracks_view()
+        mode.on_value_change(tracks_view.refresh)
         conflict_box = ui.column().classes("w-full")
 
         @ui.refreshable
@@ -1821,13 +1980,18 @@ def import_dialog(data: settings_io.SettingsFile) -> None:
                                 True: _("imported: {value}").format(value=c.imported),
                             },
                             value=choice[c.id],
-                            on_change=lambda e, cid=c.id: choice.__setitem__(cid, e.value),
+                            on_change=lambda e, cid=c.id: choose(cid, e.value),
                         ).props("dense no-caps size=sm")
+
+        def choose(cid: str, v: bool) -> None:
+            choice[cid] = v
+            tracks_view.refresh()
 
         def _all(v: bool) -> None:
             for k in choice:
                 choice[k] = v
             conflict_list.refresh()
+            tracks_view.refresh()
 
         with conflict_box:
             conflict_list()
@@ -1835,7 +1999,7 @@ def import_dialog(data: settings_io.SettingsFile) -> None:
 
         def apply() -> None:
             take = {k for k, v in choice.items() if v}
-            counts = settings_io.import_settings(data, mode.value, take)
+            counts = settings_io.import_settings(data, mode.value, take, remove)
             ui.notify(
                 _("Imported: {counts}").format(
                     counts=", ".join(f"{v} {k}" for k, v in counts.items())
@@ -1846,5 +2010,5 @@ def import_dialog(data: settings_io.SettingsFile) -> None:
 
         with ui.row().classes("justify-end w-full"):
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Import"), on_click=apply)
+            ui.button(_("Import"), on_click=apply).mark("import-apply")
     dlg.open()

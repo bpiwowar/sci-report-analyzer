@@ -5496,3 +5496,52 @@ msgid "Turn into a venue rule (to edit): its near variants match too"
 msgstr ""
 "En faire une règle du canal (à modifier) : ses variantes proches sont "
 "aussi reconnues"
+
+msgid "A track removed is no paper's, variant's or venue rule's track any more."
+msgstr ""
+"Une session supprimée n'est plus celle d'aucun article, variante ou règle "
+"de canal."
+
+msgid ""
+"A venue marked as this track (Venues → “Mark as a track”) is renamed to "
+"its conference's name: the one these regexes give from its name, applied "
+"in turn (\\1, \\2… or \\g<name> in the replacement)."
+msgstr ""
+"Un canal marqué comme cette session (Canaux → « Marquer comme "
+"session ») est renommé du nom de sa conférence : celui que donnent ces "
+"regex à partir de son nom, appliquées tour à tour (\\1, \\2… ou \\g<name> "
+"dans le remplacement)."
+
+msgid "Add a name rule"
+msgstr "Ajouter une règle de nom"
+
+#, python-brace-format
+msgid "Its identifier: {id} (it cannot be changed later)"
+msgstr "Son identifiant : {id} (il ne pourra plus être changé)"
+
+msgid "Papers of one of these tracks"
+msgstr "Articles de l'une de ces sessions"
+
+msgid "added (from the file)"
+msgstr "ajoutée (du fichier)"
+
+msgid "in both, the same"
+msgstr "dans les deux, identique"
+
+msgid "in both: the file's"
+msgstr "dans les deux : celle du fichier"
+
+msgid "in both: the local one"
+msgstr "dans les deux : celle d'ici"
+
+msgid "keep it"
+msgstr "la garder"
+
+msgid "not in the file (added here)"
+msgstr "absente du fichier (ajoutée ici)"
+
+msgid "remove it"
+msgstr "la supprimer"
+
+msgid "tracks"
+msgstr "sessions"

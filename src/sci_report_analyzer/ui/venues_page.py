@@ -2035,7 +2035,8 @@ def _relate_dialog(row: venues.VenueRow, other: venues.VenueRow, merged) -> None
 
 def _track_box(row: venues.VenueRow, merged) -> None:
     """No main venue to merge into: this venue is a track (demo…) of its conference, all its
-    texts marked so, renamed (its track part removed) to stand for the conference."""
+    texts marked so, renamed (as the track's name rules propose) to stand for the
+    conference."""
     guess = venues.venue_track(row)
     with ui.row().classes("w-full items-center gap-2 no-wrap mt-2"):
         ui.label(_("No main venue? This venue is a track of its conference:")).classes(
@@ -2057,8 +2058,10 @@ def _track_box(row: venues.VenueRow, merged) -> None:
                     "It stays the venue of its conference, renamed to its conference's name."
                 ).format(track=label)
             ).classes("text-sm")
+            # (Proposed by the track's name rules, Settings → Tracks.)
+            proposed = tracks.conference_name(track.value, row.name)
             name = (
-                ui.input(_("Name of the conference"), value=venues.track_free_name(row.name))
+                ui.input(_("Name of the conference"), value=proposed or row.name)
                 .props("dense")
                 .classes("w-full")
                 .tooltip(_("The former names stay variants, so their texts keep matching"))

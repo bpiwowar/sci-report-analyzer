@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sci_report_analyzer import pubview, sync, venues
 from sci_report_analyzer.db.models import Publication, Venue, VenueKey
 from sci_report_analyzer.db.session import session_scope
+from sci_report_analyzer.ranking import tracks
 from sci_report_analyzer.ranking.kinds import KindEvidence, detect_kind
 from sci_report_analyzer.ranking.service import (
     VenuePattern,
@@ -1001,19 +1002,6 @@ def test_relation_choices_both_ways():
     assert both[0] == "~track:demo" and "track:demo" in both and len(set(both)) == len(both)
 
 
-def test_track_free_name():
-    assert venues.track_free_name(WIDG_DEMO) == "Conference on Widget Processing (WIDG)"
-    widg = "WIDG (Demonstration) Conference on Widget Processing"  # (its acronym in front)
-    assert venues.track_free_name(widg) == "Conference on Widget Processing (WIDG)"
-    assert venues.track_free_name("WIDG Demo Track") == "WIDG"
-    assert (
-        venues.track_free_name("Proceedings of the Conference on Widgets: System Demonstrations")
-        == "Proceedings of the Conference on Widgets"
-    )
-    assert venues.track_free_name("Tutorials of WIDG") == "WIDG"
-    assert venues.track_free_name("Demo") == "Demo"  # nothing left: unchanged
-
-
 def test_demo_track_merged_into_its_main_venue():
     pid = make_person()
     add_source(
@@ -1044,7 +1032,7 @@ def test_mark_as_track_without_a_main_venue():
     _stats(pid)
     demo = _venue_of("Demo paper")
     venues.set_level(WIDG_DEMO, "conference", "A*")
-    venues.mark_as_track(demo, "demo", venues.track_free_name(WIDG_DEMO))
+    venues.mark_as_track(demo, "demo", tracks.conference_name("demo", WIDG_DEMO))
     with session_scope() as s:
         assert s.get(Venue, demo).name == "Conference on Widget Processing (WIDG)"
         keys = list(s.scalars(select(VenueKey).where(VenueKey.venue_id == demo)))

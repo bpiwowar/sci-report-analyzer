@@ -862,6 +862,97 @@ async def test_tracks_settings(user: User) -> None:
     assert "industry_papers" not in [t.id for t in load_settings().tracks]
 
 
+async def test_track_ids_and_name_rules(user: User) -> None:
+    """A new track's id is shown before it is added (it cannot be changed), unique even
+    among the deleted tracks not saved yet; a track's name rules are edited (marked)."""
+    from sci_report_analyzer.ranking import tracks
+    from sci_report_analyzer.ranking.service import load_settings
+
+    await user.open("/settings?tab=tracks")
+    await user.should_see(marker="track-short")
+    user.find("track-new-name").type("Industry papers")
+    await user.should_see("Its identifier: industry_papers (it cannot be changed later)")
+    user.find("track-add").click()
+    await user.should_see(marker="track-industry_papers")
+    user.find("tracks-save").click()
+    await user.should_see("Tracks saved")
+    user.find("track-delete-industry_papers").click()
+    user.find("track-new-name").type("Industry papers")
+    await user.should_see("Its identifier: industry_papers2 (it cannot be changed later)")
+    # A name rule edited: marked, its default shown; then reset.
+    await user.should_see(marker="track-name-rule-name_demo_part")
+    await user.should_not_see(marker="track-name-rule-reset-name_demo_part")
+    user.find("track-name-replacement-name_demo_part").elements.pop().value = " (main)"
+    await user.should_see(marker="track-name-rule-reset-name_demo_part")
+    await user.should_see("“ACL 2023 (System Demonstrations)” → “ACL 2023 (main)”")
+    user.find("track-add-name-rule-short").click()
+    await user.should_see(marker="track-name-pattern-short_name_1")
+    user.find("track-name-pattern-short_name_1").elements.pop().value = "^Proc\\. "
+    user.find("tracks-save").click()
+    await user.should_see("Tracks saved")
+    st = load_settings()
+    assert "industry_papers" not in [t.id for t in st.tracks]
+    with tracks.using(st.tracks):
+        assert tracks.conference_name("demo", "ACL (Demos)") == "ACL (main)"
+        assert tracks.conference_name("short", "Proc. WIDG") == "WIDG"
+    user.find("track-name-rule-reset-name_demo_part").click()
+    user.find("tracks-save").click()
+    assert tracks.conference_name("demo", "ACL (Demos)") == "ACL"
+
+
+async def test_import_dialog_shows_the_track_mapping(user: User) -> None:
+    """The import dialog maps the file's tracks to the local ones; a local one the file
+    lacks is kept, or removed as chosen."""
+    from sci_report_analyzer import settings_io
+    from sci_report_analyzer.ranking import tracks
+    from sci_report_analyzer.ranking.service import MatchSettings, load_settings, save_settings
+    from sci_report_analyzer.ui.settings import import_dialog
+
+    def add(tid: str, name: str) -> None:
+        st = load_settings()
+        st.tracks.append(tracks.Track(id=tid, names={"en": name}))
+        save_settings(st)
+
+    add("talks", "Talks")
+    data = settings_io.parse_file(settings_io.export_settings().model_dump_json())
+    save_settings(MatchSettings())
+    add("industry", "Industry")
+    await user.open("/settings?tab=io")
+    with user.client.layout:
+        import_dialog(data)
+    await user.should_see(marker="import-track-talks")
+    await user.should_see("added (from the file)")
+    await user.should_see("not in the file (added here)")
+    user.find("import-track-remove-industry").elements.pop().value = True
+    user.find("import-apply").click()
+    await user.should_see("Imported")
+    ids = [t.id for t in load_settings().tracks]
+    assert "talks" in ids and "industry" not in ids
+
+
+async def test_track_filter(user: User) -> None:
+    """The publications panel filters the papers by track (the main track too)."""
+    pid = make_person("Jane Doe")
+    papers = [
+        pub("a", "A main paper", 2023, "Conference on Widget Processing", authors=["Jane Doe"]),
+        pub("d", "A demo paper", 2023, "WIDG 2023 (System Demonstrations)", authors=["Jane Doe"]),
+    ]
+    add_source(pid, "hal", "jd", papers)
+    await user.open(f"/person/{pid}")
+    await user.should_see("A demo paper")
+    (select,) = user.find("track-filter").elements
+    assert list(select.options) == ["main", "demo"]
+    select.value = ["demo"]
+    await user.should_not_see("A main paper")
+    await user.should_see("A demo paper")
+    user.find("track-filter").elements.pop().value = ["main"]
+    await user.should_see("A main paper")
+    await user.should_not_see("A demo paper")
+    await user.open(f"/person/{pid}?tracks=demo")
+    await user.should_see("A demo paper")
+    await user.should_not_see("A main paper")
+
+
 async def test_unsaved_settings(user: User) -> None:
     """The screens with changes are shown in the left panel, saved from there, or
     discarded (each screen's own, or all of them once confirmed)."""
@@ -1355,7 +1446,7 @@ async def test_venue_marked_as_a_demo_track(user: User) -> None:
     user.find("venue-as-track").click()
     await user.should_see(marker="venue-as-track-name")
     (name,) = user.find("venue-as-track-name").elements
-    assert name.value == WIDG  # its track part removed (to edit)
+    assert name.value == WIDG  # from the demo track's name rules (to edit)
     user.find("venue-as-track-ok").click()
     await user.should_see("Marked as the Demo track")
     with session_scope() as s:
