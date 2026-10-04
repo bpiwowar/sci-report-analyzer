@@ -129,7 +129,14 @@ async def test_viewer_page(user: User, monkeypatch, tmp_path):
     pdfs.save(a, PDF, None)
     await user.open(f"/pdf/{a}")
     await user.should_see(marker="pdf-frame")
-    assert "'enableComment', true" in user.client.head_html  # (PDF.js's comments, on)
+    # Its scripts (ui/static, served), configured by the page.
+    from sci_report_analyzer.ui.pdf_viewer import STATIC_URL
+
+    head = user.client.head_html
+    assert f'src="{STATIC_URL}/pdf_viewer.js?v=' in head and "window.vrConfig = {" in head
+    script = await user.http_client.get(f"{STATIC_URL}/pdf_viewer.js")
+    assert script.status_code == 200
+    assert "'enableComment', true" in script.text  # (PDF.js's comments, on)
     await user.should_see(marker="paper-note")  # its tags and notes, next to it
     user.find(marker="paper-new-tag").type("to read").trigger("keydown.enter")
     user.find(marker="paper-note").elements.pop().value = "Read section 3, $x^2$"
@@ -281,3 +288,17 @@ async def test_viewer_side_width(user: User, monkeypatch, tmp_path):
     await user.open(f"/pdf/{a}")
     [side] = user.find(marker="pdf-side").elements
     assert side.style["width"] == "512px"
+
+
+def test_static_scripts_parse():
+    """The scripts of the PDF window and its pane (when node is there to check them)."""
+    import shutil
+    import subprocess
+
+    from sci_report_analyzer.ui.pdf_viewer import STATIC
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("no node")
+    for script in STATIC.glob("*.js"):
+        subprocess.run([node, "--check", str(script)], check=True)
