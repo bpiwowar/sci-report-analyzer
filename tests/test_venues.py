@@ -1104,3 +1104,35 @@ def test_variants_a_rule_matches():
     st = _stats(pid)
     assert {s.venue_id for s in st.values()} == {vid}
     assert st[WIDGETS].track is None and st[f"{WIDGETS} (Demonstrations)"].track == "demo"
+
+
+def test_text_linked_by_hand_is_not_ranked_by_an_approximate_match(monkeypatch):
+    """A wrong conference name (HAL) linked by hand to the paper's venue: its approximate
+    ranking match is another venue's, neither the rank nor a disagreement."""
+    pid = make_person()
+    add_source(pid, "hal", "h", [pub("a", "Paper A", 2012, "Meeting on Wrong Names")])
+    add_source(pid, "dblp", "d", [pub("b", "Paper A", 2012, "Meeting on Right Names")])
+    (a,) = stats(pid).values()
+    right = next(m.venue_id for m in a.members if m.source == "dblp")
+    venues.add_variant(right, "Meeting on Wrong Names")
+    resolve = service.resolve
+
+    async def approximate(raw, *args, **kw):
+        if raw == "Meeting on Wrong Names":  # an approximate match of another venue
+            b = await resolve("Symposium on Timely Rankings", None, "conference")
+            return b.copy(exact=False, score=0.8)
+        return await resolve(raw, *args, **kw)
+
+    monkeypatch.setattr(service, "resolve", approximate)
+    (a,) = stats(pid).values()
+    assert {m.venue_id for m in a.members} == {right}
+    assert not a.disagree and not (a.badge and a.badge.coreRank)
+    assert a.problem_tab == "publication"
+
+
+def test_problem_tab_of_different_venues():
+    pid = make_person()
+    add_source(pid, "hal", "h", [pub("a", "Paper A", 2020, "Venue One", doi="10.1/x")])
+    add_source(pid, "dblp", "d", [pub("b", "Paper A", 2020, "Venue Two", doi="10.1/x")])
+    (a,) = stats(pid).values()
+    assert a.disagree and a.problem_tab == "matching"

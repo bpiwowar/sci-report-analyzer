@@ -211,6 +211,14 @@ class PubStat:
             out.append(_("no longer in any source"))
         return out
 
+    @property
+    def problem_tab(self) -> str:
+        """The details' tab where its problems are settled: venue matching for a venue or
+        a track to pick, else the publication."""
+        if (self.disagree and not self.overridden) or self.track_conflict:
+            return "matching"
+        return "matching" if _("no venue") in self.problems else "publication"
+
 
 def _badge_rank(b: Badge | None, source: str) -> tuple:
     """Sort key: best badge first (manual, ranked exact, score, source priority)."""
@@ -302,6 +310,20 @@ def same_venue(view: MemberView) -> tuple:
     if view.badge and view.badge.recordKey:
         return ("record", view.badge.recordKey)
     return ("venue", view.venue_id)
+
+
+def distinct_venues(views: list[MemberView]) -> list[set[int]]:
+    """The records grouped by venue: those of one venue, or ranked by one ranking record
+    (``same_venue``), are together (a record linked to a venue and ranked like another
+    one joins both)."""
+    groups: list[tuple[set, set[int]]] = []  # (keys, record ids)
+    for v in views:
+        keys, ids = {("venue", v.venue_id), same_venue(v)}, {v.id}
+        for g in [g for g in groups if g[0] & keys]:
+            groups.remove(g)
+            keys, ids = keys | g[0], ids | g[1]
+        groups.append((keys, ids))
+    return [g[1] for g in groups]
 
 
 def paper_tracks(views: list[MemberView]) -> set[str]:
@@ -467,13 +489,17 @@ async def resolve_member(m: SourcePub, mv: MemberView, venues: dict[int, Venue])
     v = venues.get(mv.venue_id) if mv.venue_id else None
     if _has_decision(v):
         return await venue_badge(v, venues=venues)
-    if v is not None and mv.via in ("variant", "pattern", "identifier"):
+    by_hand = v is not None and mv.via in ("variant", "pattern", "identifier")
+    if by_hand:
         b = await service.resolve(v.name, m.issn, m.venue_type)
         if is_ranked(b):
             return b
     if not (m.venue or m.issn):
         return None
-    return await service.resolve(m.venue, m.issn, m.venue_type, source=m.link.source)
+    b = await service.resolve(m.venue, m.issn, m.venue_type, source=m.link.source)
+    # The text belongs to the venue: an approximate match of the text is another venue's
+    # (e.g. a wrong conference name in HAL, linked by hand to the right venue).
+    return None if by_hand and b is not None and not b.exact else b
 
 
 def override_badge(pub: Publication) -> Badge | None:
@@ -801,11 +827,9 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     if m in marks:
                         pos = marks.index(m) + 1  # position found through a name / alias
                         break
-            venue_ids = {
-                same_venue(v)
-                for v in venue_members(views)
-                if not v.archival and v.venue_id and not v.minor
-            }
+            venue_ids = distinct_venues(
+                [v for v in venue_members(views) if not v.archival and v.venue_id and not v.minor]
+            )
             # Different tracks: to be settled by hand (the paper's track, or a source
             # validated), even when a DOI record gives the venue.
             track_conflict = (

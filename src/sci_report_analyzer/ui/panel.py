@@ -1182,7 +1182,8 @@ class PublicationsPanel:
             "click",
             lambda pub=s: open_details(self, pub),
             js_handler=(
-                "(e) => { if (!e.target.closest('a, button, .q-btn, .vr-src, .vr-venue-link'))"
+                "(e) => { if (!e.target.closest("
+                "'a, button, .q-btn, .vr-src, .vr-venue-link, .vr-problems'))"
                 " emit(); }"
             ),
         ).mark(f"pub-{s.id}")
@@ -1194,7 +1195,13 @@ class PublicationsPanel:
                         _("venue or rank set by hand")
                     )
                 if problems := s.problems:
-                    with ui.icon("warning", size="xs", color="orange-8").mark(f"problems-{s.id}"):
+                    # Clicking it opens the details on the tab where they are settled.
+                    with (
+                        ui.icon("warning", size="xs", color="orange-8")
+                        .classes("vr-problems cursor-pointer")
+                        .on("click", lambda pub=s: open_details(self, pub, pub.problem_tab))
+                        .mark(f"problems-{s.id}")
+                    ):
                         ui.tooltip("\n".join(problems)).style("white-space:pre-line")
             if period:
                 starred = self.starred_id in s.period_tags.get(period.id, set())
