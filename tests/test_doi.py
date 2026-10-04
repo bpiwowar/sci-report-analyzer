@@ -8,6 +8,8 @@ from sqlalchemy import func, select
 from sci_report_analyzer import annotations, pubview, sync
 from sci_report_analyzer.db.models import DoiRecord, Publication
 from sci_report_analyzer.db.session import session_scope
+from sci_report_analyzer.ranking.badge import detect_track
+from sci_report_analyzer.ranking.service import service
 from sci_report_analyzer.sources import doi
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -137,27 +139,26 @@ def test_springer_chapter_names_its_conference():
 
 
 def test_venue_text_of_doi_containers():
+    # Kept as the registry gives it: the cleaning rules remove the front matter, the
+    # detection rules find the track in the part it names.
     v = doi.venue_text
-    assert v(
+    text = v(
         "Proceedings of the 55th Annual Meeting of the Association for\n  Computational "
         "Linguistics (Volume 2: Short Papers)"
-    ) == (
-        "Annual Meeting of the Association for Computational Linguistics",
-        "Volume 2: Short Papers",
     )
-    assert v("Proceedings of the Third Conference on Machine Translation: Shared Task Papers") == (
-        "Conference on Machine Translation",
-        "Shared Task Papers",
+    assert text == (
+        "Proceedings of the 55th Annual Meeting of the Association for Computational "
+        "Linguistics (Volume 2: Short Papers)"
     )
-    assert v("2010 Ninth International Conference on Machine Learning and Applications")[0] == (
-        "International Conference on Machine Learning and Applications"
+    assert detect_track(text) == "short"
+    assert service.key(text, "doi") == (
+        "annual meeting of the association for computational linguistics volume short papers"
     )
-    assert (
-        v("Proceedings of the 2024 Joint International Conference on X (LREC-COLING 2024)")[0]
-        == "Joint International Conference on X (LREC-COLING)"
-    )
-    # "Findings of ...: NAACL 2025" is the venue, not a part.
-    assert v("Findings of the Association for Computational Linguistics: NAACL 2025")[1] is None
+    demo = "Proceedings of the 2018 Conference on Widgets: System Demonstrations"
+    assert v(demo) == demo and detect_track(demo) == "demo"
+    assert service.key(demo, "doi") == "conference on widgets system demonstrations"
+    assert service.key("The Journal of Widget Studies", "doi") == "journal of widget studies"
+    assert service.key("Proceedings of Widget Research", "dblp") == "proceedings of widget research"
     assert doi.anthology_acronym("10.18653/v1/2022.acl-long.583") == "ACL"
     assert doi.anthology_acronym("10.18653/v1/p17-2035") == "ACL"
     assert doi.anthology_acronym("10.18653/v1/w18-6403") is None  # workshops vary

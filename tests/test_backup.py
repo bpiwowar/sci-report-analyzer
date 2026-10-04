@@ -141,7 +141,7 @@ def test_language_cleaning_rules_added_to_saved_rules(tmp_path):
     with sqlite3.connect(db) as c:
         value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
     ids = [r["id"] for r in value["norm_rules"]]
-    assert ids == ["ordinalsEn", "ordinalsFr", "custom1"]
+    assert ids == ["proceedingsOf", "leadingThe", "ordinalsEn", "ordinalsFr", "custom1"]
     assert value["min_score"] == 0.7
 
 
@@ -180,7 +180,8 @@ def test_parentheses_rule_dropped_from_saved_rules(tmp_path):
         _migrate(db)
         with sqlite3.connect(db) as c:
             value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
-        assert [r["id"] for r in value["norm_rules"]] == kept
+        ids = [r["id"] for r in value["norm_rules"]]
+        assert [i for i in ids if i not in ("proceedingsOf", "leadingThe")] == kept
 
 
 def test_ordinal_marks_in_saved_rules(tmp_path):
@@ -203,7 +204,10 @@ def test_ordinal_marks_in_saved_rules(tmp_path):
     _migrate(db)
     with sqlite3.connect(db) as c:
         value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
-    assert [r["replacement"] for r in value["norm_rules"]] == ["Zth", "#"]
+    rules = value["norm_rules"]
+    assert [r["replacement"] for r in rules if r["id"].startswith("ordinals")] == ["Zth", "#"]
+    # (Later: the rules for the front matter DOI texts keep, "Proceedings of the", first.)
+    assert [r["id"] for r in rules][:2] == ["proceedingsOf", "leadingThe"]
 
 
 def test_migrations_keep_the_venues_variants_and_links(tmp_path):
