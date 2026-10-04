@@ -2393,6 +2393,9 @@ msgstr "Note dans {period}"
 msgid "Notes"
 msgstr "Notes"
 
+msgid "Notes of the folder"
+msgstr "Notes du dossier"
+
 msgid "Notes on the document"
 msgstr "Notes sur le document"
 
@@ -2523,6 +2526,9 @@ msgstr "PDF supprimé"
 #, python-brace-format
 msgid "Page {page}, {kind}"
 msgstr "Page {page}, {kind}"
+
+msgid "Paper"
+msgstr "Article"
 
 msgid "Paper number"
 msgstr "Numéro d'article"
@@ -3485,6 +3491,9 @@ msgstr "La conférence principale de cet atelier"
 #, python-brace-format
 msgid "The main venue (this one is its {track} track)"
 msgstr "Le canal principal (celui-ci est sa session {track})"
+
+msgid "The notes of the folder were changed in another window"
+msgstr "Les notes du dossier ont été modifiées dans une autre fenêtre"
 
 msgid ""
 "The other sources' venues are then ignored for this paper, also after a "

@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING
 
 from nicegui import ui
 
-from .. import categories, documents, folders, manual, reflist
+from .. import categories, documents, folders, manual, reflist, reports
 from ..i18n import N_, _
 from ..sources.base import SourceError
 from .mdedit import MarkdownEditor, quote
 from .panel import PublicationsPanel
-from .pdf_viewer import changed, watch
+from .pdf_viewer import changed, page_url, watch
 from .pub_details import show_details
 
 if TYPE_CHECKING:
@@ -68,6 +68,7 @@ class Side:
         self.link: Callable[[int, int, list, str], None] | None = None
         # The notes' editors (the selected text quoted into them), the last one used first.
         self.notes: list[MarkdownEditor] = []
+        self.folder_editor: MarkdownEditor | None = None  # (the folder-wide notes, if any)
 
     def attach(self, box: ui.column) -> None:
         self.box = box
@@ -103,6 +104,8 @@ class Side:
 
     async def load(self) -> None:
         await self.host.reload_quietly()
+        if self.folder_editor is not None:  # (its citations, now the papers are known)
+            self.folder_editor.refresh_preview()
 
     def show_paper(self, pub_id: int, header: Callable[[], None] | None = None) -> None:
         """The details of a paper (as in the publications panel), instead of the overview."""
@@ -229,9 +232,42 @@ class Side:
         marks = categories.tints(self.period_id, key, names)
         self.box.client.run_javascript(f"vrDoc.mark({json.dumps(marks)})")
 
-    def quote_tool(self, editor: Callable[[], MarkdownEditor | None]) -> None:
+    def folder_notes(self) -> None:
+        """The notes of the folder (one text for all its documents and papers), if the PDF is
+        in a folder: first in the notes' tab, and where quotes go by default."""
+        if self.folder is None:
+            return
+        from .folder_notes import folder_notes_editor
+
+        folder_id = self.folder[0]
+        self.folder_editor = folder_notes_editor(
+            folder_id,
+            lambda text: (
+                reports.render(
+                    text, reports.note_context(self.stats, reports.citation_keys(self.stats))
+                ).text
+            ),
+            toolbar=lambda: self.quote_tool(lambda: self.folder_editor, first=True),
+        )
+
+    def source_link(self, page: int | None) -> tuple[str, str]:
+        """(short name, url at ``page``) of the PDF shown: where a quote in the folder's notes
+        is from."""
+        kind, key = self.source
+        if kind == "doc":
+            info = documents.info(key)
+            return (info.name if info else _("Document")), f"/doc/{key}" + (
+                f"?page={page}" if page else ""
+            )
+        s = next((x for x in self.stats if x.id == key), None)
+        return short_title(s), page_url(key, self.period_id, page=page)
+
+    def quote_tool(
+        self, editor: Callable[[], MarkdownEditor | None], *, first: bool = False
+    ) -> None:
         """In the toolbar of a note's ``editor`` (made after it: hence a function): quote the
-        selected text there; Q quotes into the note last used."""
+        selected text there; Q quotes into the note last used (``first``: by default, before
+        any is used)."""
 
         def used() -> None:
             if (e := editor()) is not None:
@@ -248,7 +284,7 @@ class Side:
 
         def made() -> None:  # (the note's editor: listed, last; first once used)
             if (e := editor()) is not None:
-                self.notes.append(e)
+                self.notes.insert(0, e) if first else self.notes.append(e)
                 e.box.on("focusin", used)
 
         ui.timer(0, made, once=True)
@@ -270,7 +306,12 @@ class Side:
             )
             return
         page = sel.get("p")
-        editor.insert_block(quote(sel["text"], _("p. {page}").format(page=page) if page else ""))
+        where = _("p. {page}").format(page=page) if page else ""
+        if editor is self.folder_editor:  # (the notes of all: names its source, linked)
+            name, url = self.source_link(page)
+            name = name.replace("[", "(").replace("]", ")")
+            where = f"[{name}, {where}]({url})" if where else f"[{name}]({url})"
+        editor.insert_block(quote(sel["text"], where))
 
     async def find_selection(self) -> None:
         sel = await ui.run_javascript("vrPdf.selection()")
@@ -278,6 +319,17 @@ class Side:
             ui.notify(_("Select the reference (or its title) in the PDF first"), type="warning")
             return
         find_dialog(self, sel["text"], sel.get("p"), sel.get("rects") or [])
+
+
+def short_title(s: PubStat | None, width: int = 40) -> str:
+    """A short name for a paper: first author's surname and year, else a truncated title."""
+    if s is None:
+        return _("Paper")
+    names = (s.authors[0] if s.authors else "").replace(",", " ").split()
+    if names and s.year:
+        return f"{names[-1]} {s.year}" if len(s.authors) < 2 else f"{names[-1]} et al. {s.year}"
+    title = " ".join((s.title or _("(untitled)")).split())
+    return title if len(title) <= width else title[: width - 1] + "…"
 
 
 def bookmarks_section(kind: str, key: int) -> Callable[[], None]:

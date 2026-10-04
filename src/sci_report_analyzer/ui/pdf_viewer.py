@@ -643,6 +643,7 @@ def register() -> None:
         )
         side.attach(box)
         with side.section("notes", "sell", _("Tags and notes")):
+            side.folder_notes()
             tags_box = ui.column().classes("w-full gap-2").mark("pdf-notes")
             with tags_box:
                 ui.spinner()
@@ -921,9 +922,13 @@ def _upload(pub_id: int, period: int | None) -> None:
 # ---- In the panel ---------------------------------------------------------------------------
 
 
-def page_url(pub_id: int, period: int | None = None, *, fetch: bool = False) -> str:
-    """The viewer page of a paper (with the tags and notes of ``period``)."""
-    params = {k: v for k, v in (("fetch", 1 if fetch else None), ("period", period)) if v}
+def page_url(
+    pub_id: int, period: int | None = None, *, fetch: bool = False, page: int | None = None
+) -> str:
+    """The viewer page of a paper (with the tags and notes of ``period``), at ``page``."""
+    params = {
+        k: v for k, v in (("fetch", 1 if fetch else None), ("period", period), ("page", page)) if v
+    }
     return f"/pdf/{pub_id}" + (f"?{urlencode(params)}" if params else "")
 
 

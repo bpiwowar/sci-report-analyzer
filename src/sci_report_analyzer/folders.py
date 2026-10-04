@@ -221,3 +221,16 @@ def folder_of_period(period_id: int | None) -> tuple[int, str] | None:
     with session_scope() as s:
         p = s.get(Period, period_id)
         return (p.folder.id, p.folder.name) if p is not None and p.folder is not None else None
+
+
+def notes_of(folder_id: int) -> str:
+    """The folder-wide notes (Markdown)."""
+    with session_scope() as s:
+        f = s.get(Folder, folder_id)
+        return (f.notes if f else None) or ""
+
+
+def set_notes(folder_id: int, text: str) -> None:
+    with session_scope() as s:
+        if f := s.get(Folder, folder_id):
+            f.notes = text.strip() or None

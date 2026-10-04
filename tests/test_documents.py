@@ -279,21 +279,62 @@ async def test_quote_into_the_notes(user: User, monkeypatch, tmp_path):
     monkeypatch.setattr(MarkdownEditor, "insert_block", lambda self, text: inserted.append(text))
     await user.open(f"/doc/{doc}")
     await user.should_see(marker="doc-note")
-    user.find(marker="note-quote").click()
+    assert len(user.find(marker="note-quote").elements) == 2  # (the folder's notes, the note's)
+    user.find(marker="note-quote").click()  # (the folder's first: names its source)
     for _i in range(50):  # (its JavaScript: once the selection is back)
         if inserted:
             break
         await asyncio.sleep(0.02)
-    assert inserted == ["> Our ranking model beats sparse ones (p. 1)"]
+    assert inserted == [
+        f"> Our ranking model beats sparse ones ([Application, p. 1](/doc/{doc}?page=1))"
+    ]
     # Nothing selected: says so.
     selection = {}
     user.find(marker="note-quote").click()
     await user.should_see("Select the text to quote")
-    # On a paper's PDF: in its notes (the period's too).
+    # On a paper's PDF: in its notes (the period's too, and the folder's).
     pdfs.save(ids["a"], PDF, None)
     await user.open(f"/pdf/{ids['a']}?period={period}")
     await user.should_see(marker="period-note")
-    assert len(user.find(marker="note-quote").elements) == 2
+    assert len(user.find(marker="note-quote").elements) == 3
+
+
+async def test_folder_notes(user: User, monkeypatch, tmp_path):
+    _, period, ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    pdfs.save(ids["a"], PDF, None)
+    folder = folders.folder_of_period(period)[0]
+    selection = {"text": "Deep models rank", "p": 3}
+    user.javascript_rules[re.compile(r"vrPdf\.quoted\(\)")] = lambda _: selection
+    inserted = []
+    monkeypatch.setattr(MarkdownEditor, "insert_block", lambda self, text: inserted.append(text))
+    await user.open(f"/pdf/{ids['a']}?period={period}")
+    await user.should_see(marker="folder-note")
+    user.find(marker="folder-note").elements.pop().value = "Shortlist: **two** papers"
+    await note_saved(user, "folder-note")
+    assert folders.notes_of(folder) == "Shortlist: **two** papers"
+    user.find(marker="note-quote").click()
+    for _i in range(50):
+        if inserted:
+            break
+        await asyncio.sleep(0.02)
+    assert inserted == [
+        f"> Deep models rank ([Deep ranking models for search, p. 3](/pdf/{ids['a']}?period={period}&page=3))"
+    ]
+    # Another window on the same folder shows the saved text.
+    await user.open(f"/doc/{documents.add(period, 'CV.pdf', PDF)}")
+    await user.should_see(marker="folder-note")
+    [other] = user.find(marker="folder-note").elements
+    assert other.value == "Shortlist: **two** papers"
+    # Without a folder: no folder notes.
+    pid = make_person("Zed Alone")
+    add_source(pid, "dblp", "z/1", [pub("z", "Alone paper", 2020, "ECIR")])
+    with session_scope() as s:
+        zid = s.scalar(select(Publication.id).where(Publication.person_id == pid))
+    pdfs.save(zid, PDF, None)
+    await user.open(f"/pdf/{zid}")
+    await user.should_see(marker="paper-note")
+    await user.should_not_see(marker="folder-note")
 
 
 async def test_last_place(user: User, monkeypatch, tmp_path):
@@ -840,3 +881,26 @@ async def test_numbered_citations_two_lists():
     ]
     cites = [m.pub_id for m in documents.find_papers(lines, rows) if m.kind == "cite"]
     assert cites == [ids["Neural"], ids["Sparse"]]
+
+
+async def test_folder_notes_sync(user: User):
+    from sci_report_analyzer.ui import folder_notes
+
+    folder = folders.save_folder(None, "Sync")
+    seen = []
+
+    class Fake:
+        def __init__(self, value):
+            self.value = value
+            self.editor = type("E", (), {"is_deleted": False})()
+
+        def is_dirty(self):
+            return False
+
+        def adopt(self, text):
+            seen.append(text)
+
+    clean, saver, same = Fake("old"), Fake("old"), Fake("new")
+    folder_notes._editors()[folder] = {clean, saver, same}  # (as the registry's sets)
+    folder_notes.saved(folder, "new", saver)
+    assert seen == ["new"]  # (the other one only: not the saver, not the one up to date)

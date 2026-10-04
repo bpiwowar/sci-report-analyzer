@@ -57,9 +57,6 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
 
 - The editor pane in a separate window (e.g. on another screen), kept in sync with the PDF
   window (quotes, positions).
-- One editor per folder, not per document: several documents are annotated, but the notes
-  are a single text. A quote then names its source document explicitly (e.g. its title
-  or a short reference with the page, linking back to the place in that PDF).
 - A citation in the PDF (a reference linked to a paper): shift-click inserts the
   citation (`[@key]`) in the editor at the cursor, instead of opening the paper's
   details (plain click). Hovering a citation shows the possible actions (click: details,
