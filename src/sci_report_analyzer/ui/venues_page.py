@@ -25,7 +25,7 @@ from ..ranking.service import VenuePattern, service
 from ..sources import ADAPTERS
 from . import dnd
 from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
-from .pub_details import VIA_LABEL, venue_rule_dialog
+from .pub_details import MIN_SEARCH, VIA_LABEL, record_results, venue_rule_dialog
 from .theme import (
     badge_details,
     chip_html,
@@ -1455,22 +1455,12 @@ def venue_dialog(
                     results.clear()
                     text = (query.value or "").strip()
                     with results:
-                        if len(text) < 3:
-                            ui.label(_("Type at least 3 characters.")).classes("text-xs text-grey")
+                        if len(text) < MIN_SEARCH:
+                            ui.label(
+                                _("Type at least {n} characters.").format(n=MIN_SEARCH)
+                            ).classes("text-xs text-grey")
                             return
-                        found = service.search(text, 10)
-                        if not found:
-                            ui.label(_("No ranking record found.")).classes("text-xs text-grey")
-                        for i, b in enumerate(found):
-                            with ui.row().classes("items-center gap-2 no-wrap w-full"):
-                                rank_chip(b)
-                                ui.label(b.name).classes("grow")
-                                ui.label(f"{b.source} · {round(b.score * 100)}%").classes(
-                                    "text-xs text-grey"
-                                )
-                                ui.button(_("Use"), on_click=lambda k=b.recordKey: pick(k)).props(
-                                    "dense unelevated color=primary"
-                                ).mark(f"venue-use-{i}")
+                        record_results(service.search(text, 10), pick, "venue-use")
 
                 def open_search(on: bool) -> None:
                     search_box.visible = on
