@@ -206,8 +206,19 @@ def settings_of(folder_id: int) -> int:
 
 def _effective(s) -> dict[int, int | None]:
     """The settings each folder uses (none: neither it nor those above it have some)."""
+    return _effective_of(*_uses(s))
+
+
+def _uses(s) -> tuple[dict[int, int | None], dict[int, int]]:
+    """(each folder's parent, the settings of those having their own)."""
     parent = dict(s.execute(select(Folder.id, Folder.parent_id)).all())
     own = dict(s.execute(select(FolderSettingsUse.folder_id, FolderSettingsUse.settings_id)).all())
+    return parent, own
+
+
+def _effective_of(parent: dict[int, int | None], own: dict[int, int]) -> dict[int, int | None]:
+    """The settings each folder uses, given its parent and the settings of those having their
+    own (see _effective)."""
     out: dict[int, int | None] = {}
     for f in parent:
         seen, g = set(), f
@@ -297,6 +308,89 @@ def use_parent_settings(folder_id: int) -> int:
         before = _effective(s)
         if (use := s.get(FolderSettingsUse, folder_id)) is not None:
             s.delete(use)
+        return _resettle(s, before)
+
+
+def _above(parent: dict[int, int | None], folder_id: int) -> list[int]:
+    """The folders a folder is in, from its parent up."""
+    out, g = [], parent.get(folder_id)
+    while g is not None and g not in out and g != folder_id:
+        out.append(g)
+        g = parent.get(g)
+    return out
+
+
+_NEW = -1  # (the settings a copy would make, before they are)
+
+
+def _moved(parent, own, folder_id: int, target_id: int, *, copy: bool) -> dict[int, int]:
+    """The settings of the folders having their own, once those a folder uses are moved
+    (else, with ``copy``, copied) to another one (see move_settings, copy_settings_to).
+    Refused (``ValueError``): moved to a folder it is not in, copied to itself."""
+    if folder_id not in parent or target_id not in parent:
+        raise ValueError(_("Unknown folder"))
+    if copy:
+        if target_id == folder_id:
+            raise ValueError(_("A folder's settings cannot be copied to itself"))
+        return {**own, target_id: _NEW}
+    above = _above(parent, folder_id)
+    if target_id not in above:
+        raise ValueError(_("Settings move only to a folder it is in"))
+    out = {**own, target_id: _effective_of(parent, own)[folder_id]}
+    for f in [folder_id, *above[: above.index(target_id)]]:  # (they use the target's)
+        out.pop(f, None)
+    return out
+
+
+def affected(folder_id: int, target_id: int, *, copy: bool = False) -> list[str]:
+    """The folders whose settings change when those of a folder are moved (or copied) to
+    another one (their paths; see move_settings, copy_settings_to)."""
+    with session_scope() as s:
+        settings_id(s, folder_id)  # (made if none)
+        parent, own = _uses(s)
+        before = _effective_of(parent, own)
+        after = _effective_of(parent, _moved(parent, own, folder_id, target_id, copy=copy))
+        paths = _paths(s)
+    return sorted(paths[f] for f in parent if before.get(f) != after.get(f))
+
+
+def move_settings(folder_id: int, target_id: int) -> int:
+    """The settings a folder uses become those of a folder it is in (``target_id``, e.g. its
+    parent): the folder, and those between them, then use the target's (their own ones
+    dropped, unless others use them); so do the folders that used the target's (its previous
+    ones dropped, unless others use them). Everyone's excerpts follow (see categories.remap);
+    returns how many categories were added for them. Refused (``ValueError``): to a folder
+    it is not in."""
+    with session_scope() as s:
+        settings_id(s, folder_id)  # (made if none)
+        parent, own = _uses(s)
+        before = _effective_of(parent, own)
+        after = _moved(parent, own, folder_id, target_id, copy=False)
+        for f in set(own) | set(after):
+            use = s.get(FolderSettingsUse, f)
+            if f not in after:
+                s.delete(use)
+            elif use is None:
+                s.add(FolderSettingsUse(folder_id=f, settings_id=after[f]))
+            else:
+                use.settings_id = after[f]
+        return _resettle(s, before)
+
+
+def copy_settings_to(folder_id: int, target_id: int) -> int:
+    """Another folder (``target_id``) gets its own copy of the settings a folder uses (their
+    citations and categories); its people's excerpts, and those of the folders using its
+    settings, are filed in the copy (see categories.remap: the missing categories added).
+    Returns how many were added. Refused (``ValueError``): to itself."""
+    from . import categories
+
+    with session_scope() as s:
+        parent, own = _uses(s)
+        _moved(parent, own, folder_id, target_id, copy=True)  # (checked)
+        before = _effective_of(parent, own)
+        source = settings_id(s, folder_id)
+        citations = dict(s.get(FolderSettings, source).citations or {}) or None
+        categories.copy_settings(s, source, _own_new(s, target_id, citations))
         return _resettle(s, before)
 
 

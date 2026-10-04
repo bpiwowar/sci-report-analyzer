@@ -182,3 +182,65 @@ def test_migration_each_folder_its_own_settings(tmp_path):
     copy = {i: (f, p) for i, f, p in cats[2:]}
     assert filed["Text"] == 2 and copy[filed["Other"]][0] == 2
     assert copy[copy[filed["Other"]][1]] == (2, None)
+
+
+def test_settings_moved_to_the_parent_shared_by_the_subfolders():
+    ann, bob = make_person("Ann Example"), make_person("Bob Sample")
+    top = folders.save_folder(None, "Hiring")
+    sub = folders.save_folder(None, "Session 1", parent_id=top)
+    other = folders.save_folder(None, "Session 2", parent_id=top)
+    deep = folders.save_folder(None, "Interviews", parent_id=sub)
+    folders.use_own_settings(sub)
+    categories.add(top, "Old")
+    reports.save_skeleton(top, "# Old")
+    research = categories.add(sub, "Research")
+    reports.save_skeleton(sub, "# Mine")
+    old = next(n.id for n in categories.tree(other) if n.name == "Old")
+    period = folders.add_person(other, ann)
+    categories.add_excerpt(old, period, "A prize.", 1, [])
+    mine = folders.add_person(deep, bob)
+    categories.add_excerpt(research, mine, "A grant.", 1, [])
+    # Who changes: the parent and the folders using its settings (not those using the moved).
+    assert folders.affected(sub, top) == ["Hiring", "Hiring › Session 2"]
+    with pytest.raises(ValueError):
+        folders.move_settings(top, sub)  # (only to a folder it is in)
+    assert folders.move_settings(sub, top) == 1  # ("Old", for the excerpt filed in it)
+    assert not folders.own_settings(sub) and folders.own_settings(top)
+    assert reports.skeleton(top) == reports.skeleton(other) == "# Mine\n"
+    assert _cats(top) == _cats(other) == _cats(deep) == ["Research", "Old"]
+    assert _filed(period) == [("Old", "A prize.")] and _filed(mine) == [("Research", "A grant.")]
+    assert sorted(folders.sharing(top)) == [
+        "Hiring › Session 1",
+        "Hiring › Session 1 › Interviews",
+        "Hiring › Session 2",
+    ]
+    # To a folder further up: those between them use it too (their own dropped).
+    folders.use_own_settings(sub)
+    folders.use_own_settings(deep)
+    categories.add(deep, "Deep")
+    assert folders.affected(deep, top) == ["Hiring", "Hiring › Session 1", "Hiring › Session 2"]
+    folders.move_settings(deep, top)
+    assert [n.own for n in folders.tree()] == [True, False, False, False]
+    assert "Deep" in _cats(other) and _filed(mine) == [("Research", "A grant.")]
+
+
+def test_settings_copied_to_another_folder():
+    ann = make_person("Ann Example")
+    a = folders.save_folder(None, "A")
+    b = folders.save_folder(None, "B")
+    within = folders.save_folder(None, "Within B", parent_id=b)
+    categories.add(a, "Research")
+    reports.save_skeleton(a, "# From A")
+    teaching = categories.add(b, "Teaching")
+    period = folders.add_person(within, ann)
+    categories.add_excerpt(teaching, period, "A course.", 1, [])
+    with pytest.raises(ValueError):
+        folders.copy_settings_to(a, a)
+    assert folders.affected(a, b, copy=True) == ["B", "B › Within B"]
+    assert folders.copy_settings_to(a, b) == 1  # (Teaching, for the excerpt)
+    assert reports.skeleton(b) == "# From A\n" and _cats(within) == ["Research", "Teaching"]
+    assert _filed(period) == [("Teaching", "A course.")]
+    # A copy: apart from the source's.
+    assert folders.sharing(b) == ["B › Within B"] and _cats(a) == ["Research"]
+    categories.add(b, "Projects")
+    assert "Projects" not in _cats(a)
