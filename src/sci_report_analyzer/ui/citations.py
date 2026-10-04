@@ -11,13 +11,13 @@ from .. import annotations, folders, reports
 from ..i18n import N_, _
 
 TEMPLATES_HELP = N_(
-    "How a paper is cited: `[@key]` followed by the template. `{.notes}`, `{.tags}`, "
-    "`{.full}` (title, venue…) give its entry; otherwise the fields `.number` (the number, "
-    "formatted), `.index` (the bare number), `.title`, `.venue`, `.short-venue` (its "
-    "acronym), `.year`, `.tags`, `.notes` are replaced and the rest kept, a parenthesis "
-    "without a value dropped: `{**#.index** (.short-venue .year)}` gives **#2** (EMNLP "
-    "2026). Empty: the number. A template with a name is used as `.name`, alone "
-    "(`[@key]{.starred}`) or within another one (`{.starred: .notes}`)."
+    "How a paper is cited: `[@key]` followed by the template, in braces. `{notes}`, `{tags}`, "
+    "`{full}` (title, venue…) give its entry; otherwise a text with fields, as in Python: "
+    "`{number}` (the number, formatted), `{index}` (the bare number), `{title}`, `{venue}`, "
+    "`{short-venue}` (its acronym), `{year}`, `{tags}`, `{notes}` are replaced and the rest "
+    "kept, a parenthesis without a value dropped: `{**#{index}** ({short-venue} {year})}` "
+    "gives **#2** (EMNLP 2026). Empty: the number. A template with a name is used as "
+    "`{name}`, alone (`[@key]{starred}`) or within another one (`{{starred}: {notes}}`)."
 )
 
 
@@ -89,7 +89,7 @@ def templates_section() -> None:
         refresh = template_rows(cfg.items, mark="report-template", default=default)
 
     def add() -> None:
-        cfg.items.append(reports.Template(_("New template"), "{.short-venue .year}"))
+        cfg.items.append(reports.Template(_("New template"), "{{short-venue} {year}}"))
         refresh()
 
     def reset() -> None:
@@ -141,7 +141,7 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
                 .classes("w-64")
                 .tooltip(
                     _(
-                        "Their numbers (.index, .number, [@key]): as put from a list, else by "
+                        "Their numbers ({index}, {number}, [@key]): as put from a list, else by "
                         "year; then the other papers as first cited. They are the papers to "
                         "discuss (without: those of the period's years)."
                     )
@@ -185,7 +185,7 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
             refresh = template_rows(own, mark="folder-template", labels=False)
 
         def add() -> None:
-            own.append(reports.Template("", "{.index (.short-venue .year)}", ""))
+            own.append(reports.Template("", "{{index} ({short-venue} {year})}", ""))
             refresh()
 
         def save() -> None:
