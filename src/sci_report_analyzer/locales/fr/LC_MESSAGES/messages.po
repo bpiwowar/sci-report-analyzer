@@ -5370,3 +5370,27 @@ msgstr ""
 
 msgid "Insert the excerpts (kept up to date)"
 msgstr "Insérer les extraits (tenus à jour)"
+
+msgid "Not saved"
+msgstr "Non enregistré"
+
+msgid "Restore them"
+msgstr "Les rétablir"
+
+msgid "Clear the notes"
+msgstr "Effacer les notes"
+
+msgid "Copy my text"
+msgstr "Copier mon texte"
+
+msgid "Reload"
+msgstr "Recharger"
+
+msgid "Clear all the notes of the folder on this person?"
+msgstr "Effacer toutes les notes du dossier sur cette personne ?"
+
+msgid "Not saved: the notes were changed elsewhere since this window loaded them"
+msgstr "Non enregistré : les notes ont été modifiées ailleurs depuis leur chargement dans cette fenêtre"
+
+msgid "Show the notes as saved (the text typed here is lost: copy it first)"
+msgstr "Afficher les notes enregistrées (le texte tapé ici est perdu : copiez-le d'abord)"

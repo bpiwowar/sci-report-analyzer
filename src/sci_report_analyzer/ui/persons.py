@@ -120,7 +120,7 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
             refresh = ui.navigate.reload
             ui.button(icon="edit", on_click=lambda: folder_dialog(current)).props(
                 "flat round dense"
-            ).tooltip(_("Edit the folder"))
+            ).tooltip(_("Edit the folder")).mark("folder-edit")
             ui.button(icon="category", on_click=lambda: categories_dialog(current.id)).props(
                 "flat round dense"
             ).tooltip(_("Categories (where excerpts of the people's documents are filed)")).mark(
@@ -558,7 +558,16 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 ui.button(_("Close"), on_click=menu.close).props("flat")
             with day.add_slot("append"):
                 ui.icon("edit_calendar").on("click", menu.open).classes("cursor-pointer")
-        notes = ui.textarea(_("Notes"), value=f.notes if f else "").classes("w-full")
+        edited = {"notes": f is None}  # (saved only if edited: the copy shown may be stale)
+        notes = (
+            ui.textarea(
+                _("Notes"),
+                value=f.notes if f else "",
+                on_change=lambda: edited.update(notes=True),
+            )
+            .classes("w-full")
+            .mark("folder-own-notes")
+        )
         default = source_settings.default_primary()
         primary = (
             ui.select(
@@ -605,7 +614,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 name.value.strip(),
                 d,
                 hidden.value,
-                notes.value,
+                notes.value if edited["notes"] else ...,
                 primary.value,
             )
             _goto(fid)  # before closing: a closed dialog loses its client

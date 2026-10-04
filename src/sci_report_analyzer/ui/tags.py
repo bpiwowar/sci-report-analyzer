@@ -108,7 +108,7 @@ def tags_dialog(on_change: Callable[[], None]) -> None:
 def note_editor(
     label: str,
     value: str | None,
-    save: Callable[[str], None],
+    save: Callable[[str], bool | None],
     *,
     mark: str,
     mode: str = "edit",
@@ -121,9 +121,10 @@ def note_editor(
     side_tip: str = "",
 ) -> MarkdownEditor:
     """A Markdown note, always open, saved as it is typed (once typing pauses, when the
-    editor is left, and when the page is closed); ``mode``, ``stacked``, ``render``,
-    ``toolbar``, ``side``, ``side_tip``: those of the editor."""
-    state = {"saved": (value or "").strip(), "typed": None, "at": 0.0}
+    editor is left, and when the page is closed); ``save`` returning False: refused (the text
+    is kept as unsaved, until typed again); ``mode``, ``stacked``, ``render``, ``toolbar``,
+    ``side``, ``side_tip``: those of the editor."""
+    state = {"saved": (value or "").strip(), "typed": None, "at": 0.0, "refused": False}
 
     def flush() -> None:
         text = state["typed"]
@@ -132,12 +133,16 @@ def note_editor(
         state["typed"] = None
         text = text.strip()
         if text != state["saved"]:
+            if save(text) is False:
+                state["refused"] = True
+                status.text = _("Not saved")
+                return
             state["saved"] = text
-            save(text)
+        state["refused"] = False
         status.text = _("Saved")
 
     def typed(text: str) -> None:
-        state.update(typed=text, at=time.monotonic())
+        state.update(typed=text, at=time.monotonic(), refused=False)
         status.text = _("Editing…")
 
     def tick() -> None:
@@ -166,12 +171,12 @@ def note_editor(
         )
 
     def adopt(text: str) -> None:  # (saved by another window)
-        state.update(saved=text.strip(), typed=None)
+        state.update(saved=text.strip(), typed=None, refused=False)
         editor.value = text
         state["typed"] = None
         status.text = _("Saved")
 
-    editor.is_dirty = lambda: state["typed"] is not None
+    editor.is_dirty = lambda: state["typed"] is not None or state["refused"]
     editor.adopt = adopt
     box.on("focusout", flush)
     ui.timer(0.5, tick)

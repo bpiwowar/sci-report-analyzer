@@ -82,6 +82,7 @@ class MarkdownEditor:
         # (set by the note editors saving it: unsaved text typed, and a text saved elsewhere)
         self.is_dirty: Callable[[], bool] = lambda: False
         self.adopt: Callable[[str], None] = lambda text: setattr(self, "value", text)
+        self.rebase: Callable[[str], None] = lambda text: None  # (saved elsewhere, as shown)
         self._on_change = on_change
         if fill:
             # (stacked: the editor and the preview share the height; else both as high as it)

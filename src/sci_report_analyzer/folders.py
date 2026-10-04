@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from types import EllipsisType
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -77,15 +78,19 @@ def save_folder(
     name: str,
     day: date | None = None,
     hidden: bool = False,
-    notes: str | None = None,
+    notes: str | EllipsisType | None = ...,
     primary_source: str | None = None,
 ) -> int:
+    """Create or update a folder; ``notes``: its own short text (``...``: left as it is, e.g.
+    not edited in a dialog showing a stale copy)."""
     with session_scope() as s:
         f = s.get(Folder, folder_id) if folder_id else None
         if f is None:
             f = Folder(name=name)
             s.add(f)
-        f.name, f.date, f.hidden, f.notes = name, day, hidden, notes or None
+        f.name, f.date, f.hidden = name, day, hidden
+        if notes is not ...:
+            f.notes = notes or None
         f.primary_source = primary_source
         for p in f.periods:
             p.name = name  # a folder period is named after its folder
@@ -230,7 +235,15 @@ def notes_of(period_id: int) -> str:
         return (p.notes if p else None) or ""
 
 
-def set_notes(period_id: int, text: str) -> None:
+def set_notes(period_id: int, text: str, *, base: str | None = None) -> bool:
+    """Save the notes of a person within a folder; with ``base`` (the notes as the editor
+    loaded them), only if they are still those (else refused: changed elsewhere since, e.g.
+    in another window). Returns whether they were saved."""
     with session_scope() as s:
-        if p := s.get(Period, period_id):
-            p.notes = text.strip() or None
+        p = s.get(Period, period_id)
+        if p is None:
+            return False
+        if base is not None and (p.notes or "").strip() != base.strip():
+            return False
+        p.notes = text.strip() or None
+        return True
