@@ -700,9 +700,10 @@ def viewer_frame(
             ("arrow_back", "back", _("Back (after following a link; also ⌥← or ⌘[)")),
             ("arrow_forward", "forward", _("Forward (also ⌥→ or ⌘])")),
         ):
-            ui.button(icon=icon).props(f"flat dense round color=white id=vr-pdf-{step}").on(
-                "click", js_handler=f"() => vrPdf.app()?.pdfHistory?.{step}()"
-            ).tooltip(tip).mark(f"pdf-{step}")
+            with ui.element("span").tooltip(tip):  # (a button with its own id shows none)
+                ui.button(icon=icon).props(f"flat dense round color=white id=vr-pdf-{step}").on(
+                    "click", js_handler=f"() => vrPdf.app()?.pdfHistory?.{step}()"
+                ).mark(f"pdf-{step}")
         ui.label(title).classes("ellipsis grow min-w-0 font-medium")
         ui.label("").classes("text-sm opacity-80").props("id=vr-pdf-status").mark("pdf-status")
         # (the actions on a selection, greyed out without one: their tooltips on a wrapper, a
@@ -716,14 +717,16 @@ def viewer_frame(
         ui.on("vr-pdf-find", side.find_selection)
         ui.on("vr-pdf-quote", lambda: side.quote())
         # An area (a rectangle) of a page, selected: its text, as a text selection.
-        ui.button(icon="highlight_alt").props("flat dense round color=white id=vr-pdf-area").on(
-            "click", js_handler="() => vrPdf.areaMode()"
-        ).tooltip(
+        with ui.element("span").tooltip(
             _(
-                "Select an area of a page: draw a rectangle, its text is the selection "
-                "(A; also Alt+drag; Escape to leave)"
+                "Select an area of a page (A, or Alt+drag): draw a rectangle on the page, the "
+                "text inside it becomes the selection, to quote (Q), add as an excerpt (E) or "
+                "find its paper (F). Escape to leave."
             )
-        ).mark("pdf-area")
+        ):
+            ui.button(icon="highlight_alt").props("flat dense round color=white id=vr-pdf-area").on(
+                "click", js_handler="() => vrPdf.areaMode()"
+            ).mark("pdf-area")
         if side.folder and side.source[0] == "doc":  # (excerpts: of documents, not papers)
             with ui.element("span").tooltip(
                 _(
@@ -735,14 +738,15 @@ def viewer_frame(
                 ).mark("pdf-excerpt")
             ui.on("vr-pdf-excerpt", side.add_excerpt)
         # (shown: highlighted, as the area mode)
-        ui.button(icon="tune").props("flat dense round color=white id=vr-pdf-params").on(
-            "click", js_handler="() => emitEvent('vr-pdf-params', vrPdf.params())"
-        ).tooltip(
+        with ui.element("span").tooltip(
             _(
                 "Hide or show the options panel of highlighting, text and drawing (colour, "
                 "thickness…): the mode stays on"
             )
-        ).mark("pdf-params")
+        ):
+            ui.button(icon="tune").props("flat dense round color=white id=vr-pdf-params").on(
+                "click", js_handler="() => emitEvent('vr-pdf-params', vrPdf.params())"
+            ).mark("pdf-params")
         ui.on("vr-pdf-params", lambda e: annotations.save_ui_state(HIDE_PARAMS, bool(e.args)))
         ui.button(icon="bookmark_add", on_click=lambda: side.add_bookmark(*bookmarked)).props(
             "flat dense round color=white"
