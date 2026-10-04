@@ -260,7 +260,10 @@ them, each with optional years; one with excerpts (there or below, of anyone in 
 is deleted once they are moved to another one, chosen then. In a document's PDF (a report,
 an application… not a paper's), select a passage (or click a highlight), then ‘add to a
 category’ (header, or the E key): click a category, or type to find it (Enter: the first
-one; a new name creates it, the dialog staying open), with the years it is about and whether
+one; a new name creates it, the dialog staying open), with the years it is about (those found
+in the passage, e.g. “2026-32”: 2026–2032, and taken out of its text when leading it with a
+colon or ending it after one; its crossed-out calendar clears them, the text as selected
+again) and whether
 it shows the person's influence (“rayonnement”) if need be; when it might be an excerpt
 already (similar words, shown with a warning; or found by typing its words), merge it with
 that one instead, keeping its text or only its place (a reference). The categories tab lists

@@ -918,6 +918,44 @@ async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
     )
 
 
+async def test_excerpt_years_from_its_text(user: User, monkeypatch, tmp_path):
+    """The years in a passage (e.g. "2026-32"): its years when added, taken out of its text
+    when leading it (with a colon) or ending it; the clear button empties them (the text as
+    selected again)."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    _viewer(monkeypatch, tmp_path)
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "2026-32: Led the Quokka project", "p": 1, "rects": []}
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker=f"pick-category-{research}")
+    start, end = (user.find(marker=m).elements.pop() for m in ("excerpt-start", "excerpt-end"))
+    assert (start.value, end.value) == (2026, 2032)
+    await user.should_see("“Led the Quokka project”")
+    # Cleared: no years, the text as selected.
+    user.find(marker="excerpt-years-clear").click()
+    assert (start.value, end.value) == (None, None)
+    await user.should_see("“2026-32: Led the Quokka project”")
+    user.find(marker=f"pick-category-{research}").click()
+    await user.should_see("Added to Research")
+    [e] = categories.excerpts(period)
+    assert (e.text, e.start_year, e.end_year) == ("2026-32: Led the Quokka project", None, None)
+    # Ending it (after a colon): taken out too; kept, they are its years.
+    selection["text"] = "Led the Wombat network: 2018-22."
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see("“Led the Wombat network.”")
+    user.find(marker=f"pick-category-{research}").click()
+    await user.should_see("Added to Research")
+    [e2] = [x for x in categories.excerpts(period) if x.id != e.id]
+    assert (e2.text, e2.start_year, e2.end_year) == ("Led the Wombat network.", 2018, 2022)
+
+
 async def test_categories_editor(user: User, monkeypatch, tmp_path):
     from sci_report_analyzer import categories
 
