@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel
 
 from ..i18n import N_, Labels
+from .normalize import safe_compile
 
 
 class DetectionRule(BaseModel):
@@ -212,12 +213,7 @@ def compile_rules(rules: Iterable[DetectionRule]) -> dict[str, re.Pattern[str] |
     patterns = {r.id: r.pattern for r in rules}
     out: dict[str, re.Pattern[str] | None] = {}
     for r in rules:
-        try:
-            out[r.id] = re.compile(
-                _expand(r.pattern, patterns, frozenset({r.id})), re.I if r.ignore_case else 0
-            )
-        except re.error:
-            out[r.id] = None
+        out[r.id] = safe_compile(_expand(r.pattern, patterns, frozenset({r.id})), r.ignore_case)
     return out
 
 
