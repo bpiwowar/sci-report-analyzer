@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from . import contribution, i18n, pdfs, venue_match
 from .authors import fold_name, same_author
+from .db.app_settings import get_setting, set_setting
 from .db.models import (
     AppSetting,
     AuthorCategory,
@@ -953,8 +954,7 @@ PROBLEMS_KEY = "problems.{}"  # AppSetting: years of a person's papers with prob
 
 def _save_problem_years(person_id: int, stats: list[PubStat]) -> None:
     years = sorted((s.year for s in stats if s.problems and not s.hidden), key=lambda y: y or 0)
-    with session_scope() as s:
-        s.merge(AppSetting(key=PROBLEMS_KEY.format(person_id), value={"years": years}))
+    set_setting(PROBLEMS_KEY.format(person_id), {"years": years})
 
 
 def problem_years(person_ids: Iterable[int]) -> dict[int, list[int | None]]:
@@ -1082,14 +1082,11 @@ def _summary_category(cat: Category, kind: str | None, n: int) -> str:
 
 
 def summary_settings() -> dict:
-    with session_scope() as s:
-        row = s.get(AppSetting, SUMMARY_KEY)
-        return dict(row.value or {}) if row else {}
+    return dict(get_setting(SUMMARY_KEY) or {})
 
 
 def save_summary_settings(value: dict) -> None:
-    with session_scope() as s:
-        s.merge(AppSetting(key=SUMMARY_KEY, value=value))
+    set_setting(SUMMARY_KEY, value)
 
 
 # How much a category says in the summary: off (only counted in its kind), its count, its
