@@ -13,14 +13,14 @@ from sqlalchemy import create_engine
 from sci_report_analyzer.db import backup
 from sci_report_analyzer.db import session as db_session
 
-NEXT = "0a1b2c3d4e5f"  # (the revision of the test migration, after the baseline)
+NEXT = "0a1b2c3d4e5f"  # (the revision of the test migration, after the head)
 
-NEXT_SCRIPT = f'''"""A migration for the tests: it copies a table (as SQLite's batch mode does)."""
+NEXT_SCRIPT = '''"""A migration for the tests: it copies a table (as SQLite's batch mode does)."""
 import sqlalchemy as sa
 from alembic import op
 
-revision = "{NEXT}"
-down_revision = "f6b3d8a2c5e9"
+revision = "{next}"
+down_revision = "{head}"
 branch_labels = None
 depends_on = None
 
@@ -38,7 +38,7 @@ def downgrade() -> None:
 
 @pytest.fixture(autouse=True)
 def migrations(tmp_path_factory, monkeypatch) -> Path:
-    """The Alembic scripts with a revision after the current head (the baseline), to test
+    """The Alembic scripts with a revision after the current head, to test
     migrating a database from an older revision."""
     src = db_session.MIGRATIONS_DIR
     root = tmp_path_factory.mktemp("migrations")
@@ -47,7 +47,8 @@ def migrations(tmp_path_factory, monkeypatch) -> Path:
     (root / "versions").mkdir()
     for f in (src / "versions").glob("*.py"):
         shutil.copy(f, root / "versions" / f.name)
-    (root / "versions" / f"{NEXT}_test.py").write_text(NEXT_SCRIPT)
+    head = ScriptDirectory.from_config(_cfg()).get_current_head()
+    (root / "versions" / f"{NEXT}_test.py").write_text(NEXT_SCRIPT.format(next=NEXT, head=head))
     monkeypatch.setattr(db_session, "MIGRATIONS_DIR", root)
     return root
 

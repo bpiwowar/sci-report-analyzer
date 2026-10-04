@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -13,20 +12,21 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from . import venue_match
-from .db.models import AppSetting, Publication, SourceLink, SourcePub, Venue, VenueKey, utcnow
+from .db.app_settings import get_setting, set_setting
+from .db.models import Publication, SourceLink, SourcePub, Venue, VenueKey, utcnow
 from .db.session import session_scope
 from .i18n import _
 from .ranking.badge import (
-    FINDINGS_RE,
     Badge,
     category_of,
     category_order,
     core_rank_at,
-    detect_track,
     edition_year,
 )
 from .ranking.detection import Rule
 from .ranking.kinds import (
+    CONFERENCE_KINDS,
+    JOURNAL_KINDS,
     KINDS,
     VENUE_KINDS,
     WORKSHOP_KINDS,
@@ -36,18 +36,17 @@ from .ranking.kinds import (
     host_text,
     is_edited_volume,
 )
+from .ranking.matcher import issn_key
 from .ranking.normalize import normalize, tokenize
 from .ranking.service import (
     VenuePattern,
     paren_acronym,
     service,
 )
+from .ranking.tracks import detect as detect_track_of
 from .ranking.tracks import track_ids
 from .source_settings import active_links
-
-CONFERENCE_KINDS = ("intl_conference", "natl_conference")
-JOURNAL_KINDS = ("intl_journal", "natl_journal")
-
+from .text import is_acronym, strip_diacritics
 
 _ACRONYM = re.compile(r"[A-Z][A-Za-z0-9&+-]{1,11}")
 
@@ -73,7 +72,7 @@ def auto_short_name(
     conference after "@" or "co-located with": only its own acronym is taken, if any."""
     if badge and not workshop:
         for a in badge.extra.get("aliases") or []:
-            if a and _ACRONYM.fullmatch(a) and sum(c.isupper() for c in a) >= 2:
+            if a and _ACRONYM.fullmatch(a) and is_acronym(a):
                 return a
     for text in texts:
         if workshop and text and (m := _HOST_PART.search(text)):
@@ -158,13 +157,6 @@ def link_venues(pending: dict[int, int | None]) -> None:
                 pub.venue_id = venue_id
 
 
-def _venue_for_raw(session: Session, raw: str) -> Venue:
-    venue = ensure_venue(session, raw)
-    if venue is None:
-        raise ValueError(f"empty venue text: {raw!r}")
-    return venue
-
-
 def _changed(*, rematch: bool = False) -> None:
     """After a venue change; ``rematch`` re-matches the venue texts (the variants or venue
     rules changed). The cached matches are kept: they are those of venue texts (a venue's
@@ -175,33 +167,6 @@ def _changed(*, rematch: bool = False) -> None:
 
 
 # ---- manual venue-level decisions ----------------------------------------------------------
-
-
-def set_correction(raw: str, text: str | None) -> None:
-    """Match every variant of this venue as ``text`` (None clears)."""
-    with session_scope() as s:
-        _venue_for_raw(s, raw).match_text = text or None
-    _changed()
-
-
-def set_level(raw: str, type_: str | None, rank: str | None) -> None:
-    with session_scope() as s:
-        v = _venue_for_raw(s, raw)
-        v.level_type, v.level_rank = (type_, rank) if rank else (None, None)
-    _changed()
-
-
-def set_kind(raw: str, kind: str | None) -> None:
-    with session_scope() as s:
-        v = _venue_for_raw(s, raw)
-        v.kind, v.kind_manual = kind, bool(kind)
-    _changed()
-
-
-def set_record(raw: str, record_key: str | None) -> None:
-    with session_scope() as s:
-        _venue_for_raw(s, raw).record_key = record_key
-    _changed()
 
 
 def update_venue(venue_id: int, **values: Any) -> None:
@@ -443,17 +408,12 @@ def use_venue(
 
 
 def clear_manual(venue_id: int) -> None:
-    update_venue(
-        venue_id,
-        kind=None,
-        hosts=None,
-        joint=None,
-        level_type=None,
-        level_rank=None,
-        record_key=None,
-        match_text=None,
-        short_name=None,
-    )
+    """Erase a venue's manual decisions (``Venue.MANUAL_FIELDS``; its variants stay)."""
+    with session_scope() as s:
+        s.get(Venue, venue_id).clear_manual()
+        s.flush()
+        _rename_joints(s)
+    _changed(rematch=True)
 
 
 # ---- workshops -------------------------------------------------------------------------------
@@ -616,9 +576,7 @@ def set_joint_use(venue_id: int, part_id: int | None) -> None:
 
 
 def _fold(text: str) -> str:
-    return "".join(
-        c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)
-    ).upper()
+    return strip_diacritics(text).upper()
 
 
 _WORD = re.compile(r"[^\W\d_][\w&+]*")
@@ -626,7 +584,7 @@ _WORD = re.compile(r"[^\W\d_][\w&+]*")
 
 def _acronyms(text: str | None) -> set[str]:
     """The words of a text that look like acronyms (two capitals or more), folded."""
-    return {_fold(w) for w in _WORD.findall(text or "") if sum(c.isupper() for c in w) >= 2}
+    return {_fold(w) for w in _WORD.findall(text or "") if is_acronym(w)}
 
 
 def detect_parts(rows: list[VenueRow]) -> dict[int, list[int]]:
@@ -843,7 +801,7 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
             if sp.archival or not sp.link.active:
                 continue
             m = texts.get((sp.link.source, sp.venue))
-            vid = by_issn.get(venue_match.norm_issn(sp.issn) or "") or (m and m.venue_id)
+            vid = by_issn.get(issn_key(sp.issn)) or (m and m.venue_id)
             if vid:
                 by_venue[vid].append(sp)
             if m:
@@ -1045,16 +1003,13 @@ NOT_SAME_KEY = "venues.not_same"
 
 def not_same_pairs() -> set[tuple[int, int]]:
     """Pairs of venues said not to be the same (smallest id first)."""
-    with session_scope() as s:
-        row = s.get(AppSetting, NOT_SAME_KEY)
-        return {(a, b) for a, b in (row.value if row else [])}
+    return {(a, b) for a, b in get_setting(NOT_SAME_KEY, [])}
 
 
 def set_not_same(a: int, b: int) -> None:
     """Never propose to merge these two venues again."""
     pairs = not_same_pairs() | {(min(a, b), max(a, b))}
-    with session_scope() as s:
-        s.merge(AppSetting(key=NOT_SAME_KEY, value=sorted([a, b] for a, b in pairs)))
+    set_setting(NOT_SAME_KEY, sorted([a, b] for a, b in pairs))
 
 
 def merge_proposals(rows: list[VenueRow]) -> list[tuple[VenueRow, VenueRow, float]]:
@@ -1093,7 +1048,6 @@ def merge_proposals(rows: list[VenueRow]) -> list[tuple[VenueRow, VenueRow, floa
 # How another venue relates to one: the same venue, one of its tracks, a joint conference
 # including it or one of its workshops. "~" reverses it: the venue is the other's track…
 
-RELATION_KINDS = ("same", "track", "joint", "workshop")
 # A venue joining two conferences (Settings → Detection rules).
 _JOINT = Rule("joint")
 
@@ -1102,17 +1056,11 @@ def _texts(r: VenueRow) -> list[str]:
     return [r.name, *(ex for _k, ex, *_rest in r.variants if ex)]
 
 
-def _track_word(text: str) -> str | None:
-    if FINDINGS_RE.search(text):
-        return "findings"
-    return detect_track(text)
-
-
 def venue_track(r: VenueRow) -> str | None:
     """The track a venue looks like (Findings, demo…): named by its name or all its texts."""
-    if t := _track_word(r.name):
+    if t := detect_track_of(r.name):
         return t
-    tracks = {_track_word(t) for t in _texts(r)}
+    tracks = {detect_track_of(t) for t in _texts(r)}
     return tracks.pop() if len(tracks) == 1 else None
 
 
@@ -1251,9 +1199,15 @@ def mark_as_track(venue_id: int, track: str, name: str | None = None) -> None:
     _changed(rematch=True)
 
 
-def venue_options() -> dict[int, str]:
+def venue_names() -> dict[int, str]:
+    """The venues' names (by name)."""
     with session_scope() as s:
-        return {v.id: v.name for v in s.scalars(select(Venue).order_by(Venue.name))}
+        return {
+            vid: name for vid, name in s.execute(select(Venue.id, Venue.name).order_by(Venue.name))
+        }
+
+
+venue_options = venue_names  # (its former name)
 
 
 def venue_choices() -> dict[int, str]:
@@ -1374,12 +1328,15 @@ def venue_patterns(venue_id: int) -> list[VenuePattern]:
 
 def save_issns(venue_id: int, issns: list[str]) -> None:
     """The ISSNs identifying a venue (records with one of them belong to it)."""
-    clean = list(dict.fromkeys(i.strip() for i in issns if venue_match.norm_issn(i)))
+    clean: dict[str, str] = {}  # (the same ISSN written twice: once)
+    for i in issns:
+        if key := issn_key(i):
+            clean.setdefault(key, i.strip())
     with session_scope() as s:
         v = s.get(Venue, venue_id)
         ids = {k: val for k, val in (v.identifiers or {}).items() if k != "issn"}
         if clean:
-            ids["issn"] = clean
+            ids["issn"] = list(clean.values())
         v.identifiers = ids or None
     _changed()
 
@@ -1392,11 +1349,6 @@ class PatternEffect:
     before: str | None  # the venue the text belongs to now (None: none)
     after: str | None  # its venue with the rule (None: back to automatic matching)
     conflict: bool = False  # another venue's rule matches it too
-
-
-def venue_names() -> dict[int, str]:
-    with session_scope() as s:
-        return {vid: name for vid, name in s.execute(select(Venue.id, Venue.name))}
 
 
 def pattern_effects(

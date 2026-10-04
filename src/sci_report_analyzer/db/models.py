@@ -8,6 +8,8 @@ from typing import Any, ClassVar
 from sqlalchemy import JSON, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from ..i18n import N_
+
 
 def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
@@ -73,7 +75,6 @@ class SourceLink(Base):
     last_error: Mapped[str | None]
     # idle | running | ok | error
     sync_state: Mapped[str] = mapped_column(String(16), default="idle")
-    sync_started_at: Mapped[datetime | None]
     record_count: Mapped[int | None]
 
     person: Mapped[Person] = relationship(back_populates="links")
@@ -88,6 +89,20 @@ class SourceLink(Base):
         from ..source_settings import enabled
 
         return self.status == "validated" and enabled(self.source)
+
+    # Its update status (``status_label``: its link status, else its sync state), compared in
+    # code in English and translated where shown, with ``_(status)``.
+    STATUS_LABELS: ClassVar[tuple[str, ...]] = (
+        N_("up to date"),
+        N_("updating…"),
+        N_("never synced"),
+        N_("out of date"),
+        N_("not used"),
+        N_("error"),
+        N_("candidate"),
+        N_("validated"),
+        N_("rejected"),
+    )
 
     @property
     def status_label(self) -> str:
@@ -196,20 +211,29 @@ class Publication(Base):
     # Global tags (per-period ones: PeriodTag).
     tags: Mapped[list[Tag]] = relationship(secondary="publication_tag", lazy="selectin")
 
+    # The fields set by hand, with their value once cleared (tags, stars, hidden papers and
+    # manual merges are kept apart).
+    MANUAL_FIELDS: ClassVar[dict[str, Any]] = {
+        "venue_manual": False,
+        "venue_source": None,
+        "rank_override": None,
+        "rank_note": None,
+        "kind_override": None,
+        "track_override": None,
+        "doi_manual": None,
+        "year_override": None,
+        "author_pos_override": None,
+        "note": None,
+    }
+
     @property
     def has_overrides(self) -> bool:
         """Whether something was set by hand (kept when the paper leaves the sources)."""
-        return bool(
-            self.venue_manual
-            or self.venue_source
-            or self.rank_override
-            or self.kind_override
-            or self.track_override
-            or self.year_override
-            or self.author_pos_override is not None
-            or self.note
-            or self.doi_manual
-        )
+        return any(getattr(self, f) not in (v, "") for f, v in self.MANUAL_FIELDS.items())
+
+    def clear_manual(self) -> None:
+        for f, v in self.MANUAL_FIELDS.items():
+            setattr(self, f, v)
 
 
 class Period(Base):
@@ -491,23 +515,6 @@ class PeriodDocument(Base):
     period: Mapped[Period] = relationship(back_populates="documents")
 
 
-class Report(Base):
-    """A report (Markdown) on a person within a period / folder, citing their papers
-    (``[@key]``, see reports.py): those with some tags. Its view is gone, merged into the
-    folder's notes (where it was appended): kept for its data."""
-
-    __tablename__ = "report"
-
-    period_id: Mapped[int] = mapped_column(
-        ForeignKey("period.id", ondelete="CASCADE"), primary_key=True
-    )
-    text: Mapped[str] = mapped_column(default="")
-    tag_ids: Mapped[list[Any]] = mapped_column(default=list)  # the papers to discuss
-    # How a paper's number is written ({n}: the number).
-    number_format: Mapped[str] = mapped_column(default="**#{n}**")
-    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
-
-
 class Thesis(Base):
     __tablename__ = "thesis"
     __table_args__ = (UniqueConstraint("link_id", "thesis_id", "role"),)
@@ -523,7 +530,6 @@ class Thesis(Base):
     status: Mapped[str | None]
     defence_date: Mapped[str | None]
     start_date: Mapped[str | None]
-    discipline: Mapped[str | None]
     institution: Mapped[str | None]
     url: Mapped[str | None]
 
@@ -615,20 +621,36 @@ class Venue(Base):
                 return h.get("venue_id")
         return None
 
+    # The fields set by hand, with their value once cleared (the kind, short name and joint
+    # parts are then found again automatically).
+    MANUAL_FIELDS: ClassVar[dict[str, Any]] = {
+        "kind": None,
+        "kind_manual": False,
+        "level_type": None,
+        "level_rank": None,
+        "record_key": None,
+        "match_text": None,
+        "short_name": None,
+        "short_manual": False,
+        "url": None,
+        "patterns": None,
+        "identifiers": None,
+        "hosts": None,
+        "joint": None,
+    }
+    # (found automatically too: only their flag says they were set by hand)
+    _INFERRED: ClassVar[frozenset[str]] = frozenset({"kind", "level_type", "short_name", "joint"})
+
     @property
     def has_manual(self) -> bool:
-        return bool(
-            self.kind_manual
-            or self.level_rank
-            or self.record_key
-            or self.match_text
-            or self.short_manual
-            or self.url
-            or self.patterns
-            or self.identifiers
-            or self.hosts
-            or bool(self.joint and (self.joint.get("manual") or self.joint.get("use")))
+        j = self.joint or {}
+        return bool(j.get("manual") or j.get("use")) or any(
+            getattr(self, f) for f in self.MANUAL_FIELDS if f not in self._INFERRED
         )
+
+    def clear_manual(self) -> None:
+        for f, v in self.MANUAL_FIELDS.items():
+            setattr(self, f, v)
 
     @property
     def parts(self) -> list[int]:

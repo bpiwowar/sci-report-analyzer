@@ -55,3 +55,49 @@ async def note_status(user, mark: str, text: str = "Saved") -> None:
             return
         await asyncio.sleep(0.1)
     raise AssertionError(f"{mark}: not {text!r}")
+
+
+# ---- venue decisions by venue text, folder settings, citations (the app's are by id) ----------
+
+
+def set_venue(raw: str, **values) -> int:
+    """Set a venue's fields (venues.update_venue), the venue of that text (created if
+    needed)."""
+    from sci_report_analyzer import venues
+
+    with session_scope() as s:
+        vid = venues.ensure_venue(s, raw).id
+    venues.update_venue(vid, **values)
+    return vid
+
+
+def set_correction(raw: str, text: str | None) -> None:
+    """Match the venue of that text as ``text`` (None clears)."""
+    set_venue(raw, match_text=text or None)
+
+
+def set_level(raw: str, type_: str | None, rank: str | None) -> None:
+    set_venue(raw, level_type=type_ if rank else None, level_rank=rank or None)
+
+
+def set_kind(raw: str, kind: str | None) -> None:
+    set_venue(raw, kind=kind)
+
+
+def own_settings(folder_id: int) -> bool:
+    """Whether a folder uses settings of its own (else: its parent's)."""
+    from sci_report_analyzer.db.models import FolderSettingsUse
+
+    with session_scope() as s:
+        return s.get(FolderSettingsUse, folder_id) is not None
+
+
+def uncited(ctx, cited) -> list:
+    """The papers to discuss not cited."""
+    return [p for p in ctx.papers if not cited.get(p.key)]
+
+
+def toggle_star(period_id: int, pub_id: int) -> bool:
+    from sci_report_analyzer import annotations
+
+    return annotations.toggle_tag(pub_id, annotations.starred_tag_id(), period_id)

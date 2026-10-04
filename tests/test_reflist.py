@@ -124,9 +124,6 @@ async def test_tag_numbered_and_report():
     annotations.tag_numbered(
         star, {m.best.pub_id: m.item.number for m in matches if m.best}, period
     )
-    annotations.save_tag_list(
-        pid, star, period, [{"number": 4, "text": "A paper that is not there", "pub_id": None}]
-    )
     rows = await pubview.load_stats(pid)
     numbered = {r.title: r.number_of(star, period) for r in rows if r.tags_in(period)}
     assert numbered == {

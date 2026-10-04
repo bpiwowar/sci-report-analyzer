@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from sqlalchemy import and_, select
 
-from .db.models import AppSetting, Folder, Period, SourceLink
+from .db.app_settings import get_setting, set_setting
+from .db.models import Folder, Period, SourceLink
 from .db.session import session_scope
 
 KEY = "enabled_sources"
@@ -18,9 +19,7 @@ _disabled: frozenset[str] | None = None
 def disabled() -> frozenset[str]:
     global _disabled
     if _disabled is None:
-        with session_scope() as s:
-            row = s.get(AppSetting, KEY)
-            _disabled = frozenset((row.value or {}).get("disabled", [])) if row else frozenset()
+        _disabled = frozenset((get_setting(KEY) or {}).get("disabled", []))
     return _disabled
 
 
@@ -30,8 +29,7 @@ def enabled(source: str) -> bool:
 
 def set_disabled(sources: set[str]) -> None:
     global _disabled
-    with session_scope() as s:
-        s.merge(AppSetting(key=KEY, value={"disabled": sorted(sources)}))
+    set_setting(KEY, {"disabled": sorted(sources)})
     _disabled = None
 
 
@@ -55,14 +53,11 @@ NO_PRIMARY = "none"  # a folder without a primary source (whatever the default)
 
 
 def default_primary() -> str | None:
-    with session_scope() as s:
-        row = s.get(AppSetting, PRIMARY_KEY)
-        return (row.value or {}).get("source") if row else None
+    return (get_setting(PRIMARY_KEY) or {}).get("source")
 
 
 def set_default_primary(source: str | None) -> None:
-    with session_scope() as s:
-        s.merge(AppSetting(key=PRIMARY_KEY, value={"source": source}))
+    set_setting(PRIMARY_KEY, {"source": source})
 
 
 def folder_primary(folder: Folder | None) -> str | None:

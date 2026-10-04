@@ -4,6 +4,7 @@ hand."""
 import asyncio
 import json
 
+import pytest
 from helpers import add_source, make_person, pub
 from sqlalchemy import select
 
@@ -100,9 +101,6 @@ def test_conference_name_from_the_name_rules():
     assert tracks.conference_name("tutorial", "Tutorials of WIDG") == "WIDG"
     assert tracks.conference_name("demo", "Demo") is None  # nothing left
     assert tracks.conference_name("demo", widg) is None  # nothing changed
-    # Settings saved before the name rules: the built-in tracks get their defaults.
-    st = MatchSettings.model_validate({"tracks": [{"id": "demo", "colour": "#000000"}]})
-    assert st.tracks[0].name_rules == tracks.DEFAULTS["demo"].name_rules
     # Edited (origin, and in force once saved); an added track has none.
     st = load_settings()
     demo_track = next(t for t in st.tracks if t.id == "demo")
@@ -206,20 +204,12 @@ def test_import_track_mapping():
     assert [t.id for t in load_settings().tracks][-1] == "industry"
 
 
-def test_import_of_a_file_with_flags():
-    """A file of before tracks: its flags' colours become the tracks' (the other flags are
-    ignored)."""
+def test_files_of_an_older_format_are_refused():
+    """Files of before version 6 (flags, tracks without name rules) no longer import."""
     old = {
         "format": "sci-report-analyzer-settings",
-        "version": 4,
-        "matching": {"min_score": 0.7},
-        "flags": [
-            {"name": "short paper", "colour": "#57606a", "track": "short"},
-            {"name": "to check", "colour": "#ff0000"},
-        ],
+        "version": 5,
+        "matching": {"min_score": 0.7, "tracks": [{"id": "short", "names": {"en": "Short"}}]},
     }
-    data = settings_io.parse_file(json.dumps(old))
-    short = next(t for t in data.matching.tracks if t.id == "short")
-    assert short.colour == "#57606a" and data.matching.min_score == 0.7
-    settings_io.import_settings(data, "replace")
-    assert tracks.colour("short") == "#57606a"
+    with pytest.raises(ValueError, match="older version of the app \\(format 5\\)"):
+        settings_io.parse_file(json.dumps(old))

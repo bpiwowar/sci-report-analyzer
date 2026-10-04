@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from pydantic import BaseModel
 
 from ..i18n import N_, Labels
+from ..text import safe_compile
 from .inforce import InForce, leftmost
-from .normalize import safe_compile
 
 
 class DetectionRule(BaseModel):

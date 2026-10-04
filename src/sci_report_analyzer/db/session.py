@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import logging
-import re
 from collections.abc import Iterator
 from contextlib import contextmanager
-from functools import lru_cache
 from pathlib import Path
 
 from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from .. import config
+from ..text import safe_compile
 from . import backup
 
 logger = logging.getLogger(__name__)
@@ -23,19 +22,11 @@ _engine: Engine | None = None
 _factory: sessionmaker[Session] | None = None
 
 
-@lru_cache(maxsize=512)
-def _compile(pattern: str) -> re.Pattern[str] | None:
-    try:
-        return re.compile(pattern)
-    except re.error:
-        return None
-
-
 def _regexp(pattern: str | None, text: str | None) -> bool:
     """SQLite's ``text REGEXP pattern`` (Python syntax; inline flags such as ``(?i)``)."""
     if pattern is None or text is None:
         return False
-    rx = _compile(pattern)
+    rx = safe_compile(pattern)
     return bool(rx and rx.search(text))
 
 

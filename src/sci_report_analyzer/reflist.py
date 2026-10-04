@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass, field
 
 from .manual import parse_reference
-from .merge import _title_tokens
+from .merge import title_tokens
 from .pubview import PubStat
 from .ranking.service import service
 from .sources.base import normalize_doi
@@ -71,7 +71,8 @@ class Match:
         return c if c and c.score >= service.settings.reflist_match else None
 
 
-def _join(lines: list[str]) -> str:
+def join_wrapped(lines: list[str]) -> str:
+    """Lines as one text, the words broken at their end joined again."""
     text = ""
     for line in (ln.strip() for ln in lines):
         if not line:
@@ -106,12 +107,13 @@ def split_items(text: str) -> list[Item]:
             groups[-1][1].append(line)
     items = []
     for n, group in groups:
-        if t := _join(group):
-            items.append(_item(n, t))
+        if t := join_wrapped(group):
+            items.append(item_of(n, t))
     return items
 
 
-def _item(number: int | None, text: str) -> Item:
+def item_of(number: int | None, text: str) -> Item:
+    """An item of a list (its HAL id, DOI, URL and years found in its text)."""
     item = Item(number, text, years={int(y) for y in _YEAR.findall(text)})
     for u in _URL.findall(text):
         u = u.rstrip(".,;)")
@@ -130,7 +132,8 @@ def _item(number: int | None, text: str) -> Item:
     return item
 
 
-def _ids(r: PubStat) -> tuple[set[str], set[str]]:
+def paper_ids(r: PubStat) -> tuple[set[str], set[str]]:
+    """A paper's HAL ids and DOIs."""
     hal = {m.external_key.lower() for m in r.members if m.source == "hal" and m.external_key}
     hal |= {h for m in r.members if m.url and (h := document_id(m.url))}
     hal = {re.sub(r"v\d+$", "", h) for h in hal}
@@ -138,11 +141,16 @@ def _ids(r: PubStat) -> tuple[set[str], set[str]]:
     return hal, {normalize_doi(d) for d in dois}
 
 
+def title_score(title: frozenset[str], words: frozenset[str]) -> float:
+    """The share of a title's words (``title_tokens``) among an item's; 0 for a short one."""
+    return len(title & words) / len(title) if len(title) >= _MIN_TITLE_TOKENS else 0.0
+
+
 def match(items: list[Item], rows: list[PubStat]) -> list[Match]:
     """Each item's candidates among the papers ``rows``: the one with its HAL id / DOI,
     else those with most of their title words in the item."""
-    ids = {r.id: _ids(r) for r in rows}
-    titles = {r.id: _title_tokens(r.title) for r in rows}
+    ids = {r.id: paper_ids(r) for r in rows}
+    titles = {r.id: title_tokens(r.title) for r in rows}
     out = []
     for item in items:
         cands: dict[int, Candidate] = {}
@@ -151,14 +159,9 @@ def match(items: list[Item], rows: list[PubStat]) -> list[Match]:
             if (item.hal and item.hal in hal) or (item.doi and item.doi in dois):
                 cands[r.id] = Candidate(r.id, r.title, r.year, 1.0, by_id=True)
         if not cands:
-            words = _title_tokens(item.words)
-            suggest = service.settings.reflist_suggest
+            words = title_tokens(item.words)
             for r in rows:
-                t = titles[r.id]
-                if len(t) < _MIN_TITLE_TOKENS:
-                    continue
-                score = len(t & words) / len(t)
-                if score >= suggest:
+                if (score := title_score(titles[r.id], words)) >= service.settings.reflist_suggest:
                     cands[r.id] = Candidate(r.id, r.title, r.year, score)
         ranked = sorted(
             cands.values(),
@@ -190,12 +193,12 @@ async def search(item: Item) -> list[Found]:
     """HAL documents for an item that matches none of the person's papers, best first."""
     from .sources import hal
 
-    words = _title_tokens(item.words)
-    suggest = service.settings.reflist_suggest
+    words = title_tokens(item.words)
     docs = await hal.search_documents(sorted(words))
     out = []
     for d in docs:
-        t = _title_tokens(d["title"])
-        if len(t) >= _MIN_TITLE_TOKENS and (score := len(t & words) / len(t)) >= suggest:
+        if (
+            score := title_score(title_tokens(d["title"]), words)
+        ) >= service.settings.reflist_suggest:
             out.append(Found(d["hal"], d["title"], d["year"], d["authors"], d["url"], score))
     return sorted(out, key=lambda f: (-round(f.score, 2), f.year not in item.years))[:3]

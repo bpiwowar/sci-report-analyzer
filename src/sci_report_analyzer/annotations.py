@@ -7,10 +7,9 @@ from typing import Any
 
 from sqlalchemy import select
 
+from .db.app_settings import get_setting, set_setting
 from .db.models import (
     STARRED,
-    AppSetting,
-    Period,
     PeriodNote,
     PeriodTag,
     Publication,
@@ -18,6 +17,7 @@ from .db.models import (
     Tag,
 )
 from .db.session import session_scope
+from .folders import delete_period, periods, save_period  # noqa: F401  (re-exported)
 
 # ---- tags and notes -------------------------------------------------------------------------
 
@@ -115,23 +115,6 @@ def clear_tag_numbers(tag_id: int, pub_ids: list[int], period_id: int | None = N
     tag_numbered(tag_id, dict.fromkeys(pub_ids), period_id)
 
 
-def _list_key(person_id: int, tag_id: int, period_id: int | None) -> str:
-    return f"ui.reflist.{person_id}.{period_id or 0}.{tag_id}"
-
-
-def tag_list(person_id: int, tag_id: int, period_id: int | None = None) -> list[dict]:
-    """The last list a tag was put from (its items: number, text, the paper's id or None)."""
-    return list(ui_state(_list_key(person_id, tag_id, period_id), []))
-
-
-def save_tag_list(person_id: int, tag_id: int, period_id: int | None, entries: list[dict]) -> None:
-    save_ui_state(_list_key(person_id, tag_id, period_id), entries)
-
-
-def toggle_star(period_id: int, pub_id: int) -> bool:
-    return toggle_tag(pub_id, starred_tag_id(), period_id)
-
-
 def set_note(pub_id: int, text: str | None, period_id: int | None = None) -> None:
     """The paper's note (Markdown), or its note within a period; empty: none."""
     text = (text or "").strip() or None
@@ -147,50 +130,6 @@ def set_note(pub_id: int, text: str | None, period_id: int | None = None) -> Non
             row.text = text
         else:
             s.add(PeriodNote(period_id=period_id, publication_id=pub_id, text=text))
-
-
-def periods(person_id: int, *, include_hidden_folders: bool = False) -> list[Period]:
-    """The person's own periods (by start), then their folder periods (latest folder first)."""
-    from sqlalchemy.orm import selectinload
-
-    from .db.models import Folder
-
-    q = (
-        select(Period)
-        .outerjoin(Folder, Period.folder_id == Folder.id)
-        .where(Period.person_id == person_id)
-        .options(selectinload(Period.folder))
-    )
-    if not include_hidden_folders:
-        q = q.where(Period.folder_id.is_(None) | Folder.hidden.is_(False))
-    with session_scope() as s:
-        items = list(s.scalars(q))
-
-    def key(p: Period) -> tuple:
-        if p.folder is None:
-            return (0, p.start_year or 0, p.id)
-        day = p.folder.date.toordinal() if p.folder.date else 0
-        return (1, -day, p.id)
-
-    return sorted(items, key=key)
-
-
-def save_period(
-    person_id: int, name: str, start: int | None, end: int | None, period_id: int | None = None
-) -> int:
-    with session_scope() as s:
-        p = s.get(Period, period_id) if period_id else Period(person_id=person_id)
-        if period_id is None:
-            s.add(p)
-        p.name, p.start_year, p.end_year = name, start, end
-        s.flush()
-        return p.id
-
-
-def delete_period(period_id: int) -> None:
-    with session_scope() as s:
-        if p := s.get(Period, period_id):
-            s.delete(p)
 
 
 def set_rank_override(
@@ -238,26 +177,16 @@ def set_hidden(pub_id: int, hidden: bool) -> None:
         s.get(Publication, pub_id).hidden = hidden
 
 
-def ui_state(key: str, default: Any = None) -> Any:
-    with session_scope() as s:
-        row = s.get(AppSetting, key)
-        return row.value if row else default
-
-
-def save_ui_state(key: str, value: Any) -> None:
-    with session_scope() as s:
-        s.merge(AppSetting(key=key, value=value))
+# (the UI's names)
+ui_state, save_ui_state = get_setting, set_setting
 
 
 def panel_state(person_id: int) -> dict[str, Any]:
-    with session_scope() as s:
-        row = s.get(AppSetting, f"ui.person.{person_id}")
-        return dict(row.value) if row else {}
+    return dict(get_setting(f"ui.person.{person_id}", {}))
 
 
 def save_panel_state(person_id: int, state: dict[str, Any]) -> None:
-    with session_scope() as s:
-        s.merge(AppSetting(key=f"ui.person.{person_id}", value=state))
+    set_setting(f"ui.person.{person_id}", state)
 
 
 # ---- name aliases (the person and their PhD students) ---------------------------------------
