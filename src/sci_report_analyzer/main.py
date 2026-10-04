@@ -21,7 +21,6 @@ from .ui import (
     pdf_viewer,
     person,
     persons,
-    report,
     settings,
     venues_page,
 )
@@ -47,7 +46,6 @@ def setup() -> None:
     venues_page.register()
     pdf_viewer.register()
     documents_page.register()
-    report.register()
     app.on_startup(lambda: background_tasks.create(datasets.keep_datasets_fresh()))
     app.on_shutdown(_shutdown)
 

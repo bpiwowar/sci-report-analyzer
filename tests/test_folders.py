@@ -139,7 +139,7 @@ def test_primary_source_default_and_folder_override():
     assert source_settings.primary_for(pid) == "hal"
     stats = asyncio.run(pubview.load_stats(pid))
     keys = reports.citation_keys(stats)
-    listed = reports.report_papers(stats, keys, [], None, primary="hal")
+    listed = reports.papers_to_discuss(stats, keys, [], None, primary="hal")
     assert [p.stat.title for p in listed] == ["In HAL"]
     # A folder uses the default, none, or another source.
     fid = folders.save_folder(None, "Committee")

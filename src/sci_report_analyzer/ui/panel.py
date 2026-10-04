@@ -35,7 +35,6 @@ from ..sources import ADAPTERS
 from .pdf_viewer import download_dialog, pdf_button, watch
 from .pub_details import open_details, source_badge
 from .reflist import tag_from_list
-from .report import page_url as report_url
 from .tags import tag_chip, tags_dialog
 from .theme import DIM_OPACITY, NOTE_EXTRAS, author_html, rank_chip, span, stripes, track_chip
 
@@ -372,13 +371,6 @@ class PublicationsPanel:
             ).props("flat round dense").tooltip(
                 _("Summary of the publications shown, by category (to copy)")
             ).mark("summary")
-            if self.period is not None:
-                with ui.link(target=report_url(self.period.id), new_tab=True):
-                    ui.button(icon="history_edu").props("flat round dense").tooltip(
-                        _(
-                            "Report within {period}: Markdown citing the papers (opens a new tab)"
-                        ).format(period=self.period.name)
-                    ).mark("report")
             ui.button(icon="playlist_add_check", on_click=lambda: tag_from_list(self)).props(
                 "flat round dense"
             ).tooltip(_("Tag from a list: find the papers of a pasted list and tag them")).mark(

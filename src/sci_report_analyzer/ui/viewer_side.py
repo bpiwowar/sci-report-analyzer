@@ -79,6 +79,7 @@ class Side:
         # hidden; once back, what the page shows again up to date.
         self.detached = False
         self.on_attach: list[Callable[[], object]] = []
+        self.folder_refresh: Callable[[], None] | None = None  # (their preview and status)
 
     def attach(self, box: ui.column) -> None:
         self.box = box
@@ -119,8 +120,8 @@ class Side:
 
     async def load(self) -> None:
         await self.host.reload_quietly()
-        if self.folder_editor is not None:  # (its citations, now the papers are known)
-            self.folder_editor.refresh_preview()
+        if self.folder_refresh is not None:  # (its citations, now the papers are known)
+            self.folder_refresh()
 
     async def reattached(self) -> None:
         """Back from another window: up to date again (the papers, bookmarks, excerpts, the
@@ -265,34 +266,68 @@ class Side:
         in a folder: in their own tab, and where quotes go by default."""
         if self.folder is None:
             return
+        from .citations import CitationStatus, folder_citations_dialog
         from .folder_notes import folder_notes_editor
 
         folder_id, name = self.folder
         tip = _("Notes of the folder {folder} (all its documents and papers)")
+        status: list[CitationStatus] = []
+
+        def tools() -> None:
+            self.folder_tools()
+            status.append(CitationStatus(lambda: folder_citations_dialog(folder_id, refresh)))
+
+        def render(text: str) -> str:
+            ctx = reports.folder_context(self.stats, self.period_id)
+            out = reports.render(text, ctx)
+            status[0].update(ctx, out)
+            return out.text
+
+        def refresh() -> None:  # (the preview, and the status: also without a preview)
+            render(self.folder_editor.value)
+            self.folder_editor.refresh_preview()
+
         with self.section("folder-notes", "folder_open", tip.format(folder=name), fill=True):
-            self.folder_editor = folder_notes_editor(
-                folder_id,
-                lambda text: reports.render(text, self.note_context()).text,
-                toolbar=self.folder_tools,
+            self.folder_editor = folder_notes_editor(folder_id, render, toolbar=tools)
+            self.folder_editor.editor.on_value_change(
+                lambda: (
+                    render(self.folder_editor.value)
+                    if self.folder_editor.mode.value == "edit"
+                    else None
+                )
             )
+        self.folder_refresh = refresh
+        self.on_render.append(refresh)  # (the papers edited: their tags, notes…)
 
     def folder_tools(self) -> None:
-        """The toolbar of the folder's notes: quote, cite a paper, copy with the references."""
+        """The toolbar of the folder's notes: quote, cite a paper, copy with the references
+        (numbered as the folder says)."""
         self.quote_tool(lambda: self.folder_editor, first=True)
-        self.cite_tools(lambda: self.folder_editor, "folder-note")
+        self.cite_tools(
+            lambda: self.folder_editor,
+            "folder-note",
+            lambda: reports.folder_context(self.stats, self.period_id),
+        )
 
     def note_context(self) -> reports.Context:
         """The papers a note cites, by their keys (for the preview and the copy)."""
         return reports.note_context(self.stats, reports.citation_keys(self.stats))
 
-    def cite_tools(self, editor: Callable[[], MarkdownEditor | None], mark: str) -> None:
+    def cite_tools(
+        self,
+        editor: Callable[[], MarkdownEditor | None],
+        mark: str,
+        context: Callable[[], reports.Context] | None = None,
+    ) -> None:
         """In the toolbar of a note's ``editor``: cite a paper (``[@key]`` at the cursor), and
-        copy the note with its citations numbered and the papers cited listed. The buttons are
-        marked ``{mark}-cite`` and ``{mark}-copy``."""
+        copy the note with its citations numbered and the papers cited listed (``context``: of
+        its citations, by default ``note_context``). The buttons are marked ``{mark}-cite`` and
+        ``{mark}-copy``."""
+        context = context or self.note_context
 
         def copy() -> None:
             if (e := editor()) is not None:
-                ui.clipboard.write(reports.with_references(e.value, self.note_context()))
+                ui.clipboard.write(reports.with_references(e.value, context()))
                 ui.notify(_("Copied (with the references)"))
 
         ui.button(icon="format_quote", on_click=lambda: self.cite_dialog(editor, mark)).props(
