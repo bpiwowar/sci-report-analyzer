@@ -318,6 +318,21 @@ def source_tag(source: str, archival: bool = False, url: str | None = None) -> u
     return tag
 
 
+def refresh_alive(r: ui.refreshable, *args) -> None:
+    """Refresh a module-level refreshable (on every page showing it), skipping the pages
+    that are gone (their client deleted)."""
+
+    def alive(target) -> bool:
+        try:
+            target.container.client  # noqa: B018 - raises once the client was deleted
+        except RuntimeError:
+            return False
+        return not target.container.is_deleted
+
+    r.targets = [t for t in r.targets if alive(t)]
+    r.refresh(*args)
+
+
 def int_or_none(v) -> int | None:
     """An input's integer (a number, or its text), else None (empty, or not a number)."""
     try:

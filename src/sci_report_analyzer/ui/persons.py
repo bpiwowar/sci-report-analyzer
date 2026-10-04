@@ -21,7 +21,7 @@ from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
 from .folders_editor import ALL, folders_tree
 from .person import purge_dialog, remove_from_folder_dialog
-from .theme import STATUS_COLOUR, fmt_dt, frame, source_tag
+from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
 
 def _people() -> list[tuple[Person, int]]:
@@ -114,7 +114,7 @@ def _reports(folder: int, changed) -> None:
 
 def _refresh_if_running() -> None:
     if any_running():
-        _folder_cards.refresh()
+        refresh_alive(_folder_cards)
 
 
 def _goto(folder_id: int) -> None:
@@ -262,7 +262,7 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
             value=list(only),
             multiple=True,
             label=_("Only people tagged"),
-            on_change=lambda e: _folder_cards.refresh(folder_id, tuple(e.value or ())),
+            on_change=lambda e: refresh_alive(_folder_cards, folder_id, tuple(e.value or ())),
         ).props("dense outlined use-chips clearable").classes("w-80").mark(
             f"folder-tag-filter-{folder_id}"
         )
@@ -331,11 +331,11 @@ def _period_editor(member: folders.Member) -> None:
         def save() -> None:
             folders.set_period(
                 member.period_id,
-                int(start.value) if start.value else None,
-                int(end.value) if end.value else None,
+                int_or_none(start.value),
+                int_or_none(end.value),
             )
             menu.close()
-            _folder_cards.refresh()
+            refresh_alive(_folder_cards)
 
         for el in (start, end):
             el.on("keydown.enter", save)
