@@ -10,7 +10,7 @@ from sci_report_analyzer.db.models import DoiRecord, Publication
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.ranking.badge import detect_track
 from sci_report_analyzer.ranking.service import service
-from sci_report_analyzer.sources import doi
+from sci_report_analyzer.sources import base, doi
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FINDINGS = "10.18653/v1/2025.findings-naacl.398"
@@ -104,11 +104,11 @@ def test_throttle_spaces_requests(monkeypatch):
         status_code = 404
 
     class Client:
-        async def get(self, url, **kw):
+        async def request(self, method, url, **kw):
             starts.append(time.monotonic())
             return Res()
 
-    monkeypatch.setattr(doi, "client", lambda: Client())
+    monkeypatch.setattr(base, "client", lambda: Client())
     monkeypatch.setattr(doi, "_throttle", doi._Throttle())
 
     async def run():
