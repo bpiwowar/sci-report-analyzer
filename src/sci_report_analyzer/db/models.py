@@ -8,6 +8,8 @@ from typing import Any, ClassVar
 from sqlalchemy import JSON, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+from ..i18n import N_
+
 
 def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
@@ -87,6 +89,20 @@ class SourceLink(Base):
         from ..source_settings import enabled
 
         return self.status == "validated" and enabled(self.source)
+
+    # Its update status (``status_label``: its link status, else its sync state), compared in
+    # code in English and translated where shown, with ``_(status)``.
+    STATUS_LABELS: ClassVar[tuple[str, ...]] = (
+        N_("up to date"),
+        N_("updating…"),
+        N_("never synced"),
+        N_("out of date"),
+        N_("not used"),
+        N_("error"),
+        N_("candidate"),
+        N_("validated"),
+        N_("rejected"),
+    )
 
     @property
     def status_label(self) -> str:

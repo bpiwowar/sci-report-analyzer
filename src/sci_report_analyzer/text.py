@@ -25,6 +25,11 @@ def ascii_key(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", ascii_fold(text).lower())
 
 
+def is_acronym(word: str) -> bool:
+    """Whether a word looks like an acronym: two capitals or more ("ACL", "SIGIR", "NeurIPS")."""
+    return sum(c.isupper() for c in word) >= 2
+
+
 @lru_cache(maxsize=1024)
 def safe_compile(pattern: str, ignore_case: bool = False) -> re.Pattern[str] | None:
     """A regex compiled (cached); none when invalid."""
