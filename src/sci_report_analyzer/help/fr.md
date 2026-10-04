@@ -192,6 +192,15 @@ articles qui manquent aux sources (par l'identifiant HAL / DOI de l'élément, o
 affiche les articles dans l'ordre de la liste (#3 sur leur étiquette), et la liste 🗒 les numérote et
 se termine par les éléments non trouvés.
 
+**Numéros au sein d'une étiquette** (le rang d'un article dans la liste de l'étiquette) : Alt-cliquez
+sur un numéro (`#3` à côté d'une étiquette sur la ligne d'un article ; dans ses détails, où `#`
+s'affiche quand il n'en a pas, un simple clic aussi) pour le saisir (Entrée ou quitter le champ enregistre, Échap annule, vide
+le retire). Pour ordonner tous les articles d'une étiquette, filtrez sur celle-ci et cliquez sur
+le bouton liste numérotée à côté du filtre « étiquettes » : faites glisser les articles ou
+utilisez leurs flèches ↑ / ↓ (ils sont alors tous numérotés 1, 2… dans le nouvel ordre), saisissez
+un numéro, « Numéroter dans cet ordre » ou « Effacer les numéros ». Les articles sans numéro
+viennent après ceux numérotés (les plus récents d'abord), dans la liste comme dans les citations.
+
 Les notes sont en Markdown, avec **LaTeX** : `$x^2$` en ligne, `$$\sum_i x_i$$` centré sur sa ligne.
 Un saut de ligne est conservé (comme dans Obsidian). Elles sont éditées avec un éditeur Markdown (barre d'outils,
 ⌘B / ⌘I, un aperçu à côté ou à la place).
@@ -215,7 +224,8 @@ Le mode « Articles » de l'éditeur montre, à la place de l'aperçu, les artic
 leurs numéros (rouge tant qu'ils ne sont pas cités, orange : hors des années de la période ;
 un clic le cite, le menu ⋮ avec un modèle), celui sous le curseur mis en évidence, une
 recherche (Entrée cite le premier ; les autres articles de la personne aussi), et « Les citer »
-(ceux pas encore cités). Copier remplace les citations, suivies des références, numérotées
+(ceux pas encore cités) ; les articles de l'étiquette numérotée s'y réordonnent aussi (glissés,
+leurs flèches ↑ / ↓, ou leur numéro Alt-cliqué et saisi), les citations renumérotées. Copier remplace les citations, suivies des références, numérotées
 comme citées.
 
 **PDF** : l'icône PDF à côté d'un titre ouvre le PDF stocké de l'article dans une nouvelle fenêtre (rouge ;

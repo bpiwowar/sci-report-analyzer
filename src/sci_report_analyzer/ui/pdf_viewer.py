@@ -1201,7 +1201,10 @@ async def _side(side: Side, box: ui.column, details_box: ui.column, pub_id: int)
             s,
             state["period"],
             tags,
-            lambda: changed(side.person_id, but=side.host),
+            lambda: (
+                changed(side.person_id, but=side.host),
+                side.folder_refresh and side.folder_refresh(),  # (its citations: numbers…)
+            ),
             manage,
             quote_tool=side.quote_tool,
         )
