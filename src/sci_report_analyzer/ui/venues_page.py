@@ -109,41 +109,43 @@ def _track_picker(
     return chip
 
 
-def _core_history(badge, host: str | None = None) -> None:
-    """A conference's CORE ranks over the editions (e.g. A until 2021, A* since 2023)."""
-    if badge is None or not badge.coreHistory:
-        return
-    with ui.row().classes("items-center gap-1 text-sm").mark("venue-core-history"):
-        ui.label(f"{host}: CORE" if host else "CORE").classes("text-grey")
-        for i, (a, b, rank) in enumerate(core_periods(badge.coreHistory)):
+def _history_row(label: str, periods, mark: str, tip: str) -> None:
+    """A venue's ranks over time (``periods``: (from, to, rank)), e.g. A (2018–2021) → A*."""
+    with ui.row().classes("items-center gap-1 text-sm").mark(mark):
+        ui.label(label).classes("text-grey")
+        for i, (a, b, rank) in enumerate(periods):
             if i:
                 ui.icon("arrow_forward", size="xs", color="grey")
             ui.label(rank or _("unranked")).classes("font-medium")
             ui.label(f"({a}–{b})" if a != b else f"({a})").classes("text-grey")
-        ui.icon("info", size="xs", color="grey").tooltip(
+        ui.icon("info", size="xs", color="grey").tooltip(tip)
+
+
+def _core_history(badge, host: str | None = None) -> None:
+    """A conference's CORE ranks over the editions (e.g. A until 2021, A* since 2023)."""
+    if badge is not None and badge.coreHistory:
+        _history_row(
+            f"{host}: CORE" if host else "CORE",
+            core_periods(badge.coreHistory),
+            "venue-core-history",
             _(
                 "A paper takes the rank of the CORE edition in force in its year (Settings: or "
                 "the latest one)"
-            )
+            ),
         )
 
 
 def _sjr_history(badge) -> None:
     """A journal's Scimago quartiles over the years (e.g. Q2 2015–2019, Q1 2020–2024)."""
-    if badge is None or not badge.sjrHistory:
-        return
-    with ui.row().classes("items-center gap-1 text-sm").mark("venue-sjr-history"):
-        ui.label("Scimago").classes("text-grey")
-        for i, (a, b, q) in enumerate(sjr_periods(badge.sjrHistory)):
-            if i:
-                ui.icon("arrow_forward", size="xs", color="grey")
-            ui.label(q).classes("font-medium")
-            ui.label(f"({a}–{b})" if a != b else f"({a})").classes("text-grey")
-        ui.icon("info", size="xs", color="grey").tooltip(
+    if badge is not None and badge.sjrHistory:
+        _history_row(
+            "Scimago",
+            sjr_periods(badge.sjrHistory),
+            "venue-sjr-history",
             _(
                 "A paper takes the quartile of its year (else of the closest year before); "
                 "years missing: Settings › Data & cache, “Scimago, past years”"
-            )
+            ),
         )
 
 
