@@ -193,10 +193,11 @@ Un saut de ligne est conservé (comme dans Obsidian). Elles sont éditées avec 
 **Rapport** (✒ dans le panneau, une période / un dossier étant choisi ; un nouvel onglet) : un rapport Markdown sur
 la personne, citant ses articles avec la syntaxe de Pandoc : `[@key]` le numéro de l'article (`**#6**`,
 le format peut être modifié), `[@a; @b]` plusieurs, `@key` ses titre, canal, année et catégorie,
-`[@key]{.notes}` avec ses notes, `[@key]{.tags}` avec ses étiquettes (`{.notes .tags}` les deux), et des
-modèles : `[@key]{.short-venue (.year)}` donne `EMNLP (2026)` (champs : `.number`, `.index`
-le numéro seul comme dans `{#.index}`, `.title`, `.venue`, `.short-venue` l'acronyme, `.year`,
-`.tags`, `.notes`, comme dans `{**#.index** (.short-venue .year): .notes}` ; un crochet sans
+`[@key]{notes}` avec ses notes, `[@key]{tags}` avec ses étiquettes (`{notes tags}` les deux), et des
+modèles, avec des champs comme en Python : `[@key]{{short-venue} ({year})}` donne `EMNLP (2026)`
+(champs : `{number}`, `{index}` le numéro seul comme dans `{#{index}}`, `{title}`, `{venue}`,
+`{short-venue}` l'acronyme, `{year}`, `{tags}`, `{notes}`, comme dans
+`{**#{index}** ({short-venue} {year}): {notes}}` ; un crochet sans
 valeur est supprimé). « Citer comme » choisit comment un article est inséré quand on clique dessus dans
 le panneau latéral (ou avec Enter), parmi les modèles définis dans Paramètres → Modèles de rapport. Les
 articles à discuter sont ceux qui ont certaines étiquettes (sinon ceux des années de la période), numérotés selon
