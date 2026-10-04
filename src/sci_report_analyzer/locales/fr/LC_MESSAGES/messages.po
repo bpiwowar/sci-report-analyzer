@@ -1169,6 +1169,9 @@ msgstr "Téléchargement des revues Scimago et de la liste des revues prédatric
 msgid "Drag a venue onto another one to merge it into that one."
 msgstr "Faites glisser un canal sur un autre pour l'y fusionner."
 
+msgid "Drag to resize the side panel"
+msgstr "Faites glisser pour redimensionner le panneau latéral"
+
 msgid ""
 "Drag: onto the top / bottom of a category (before / after it), or its "
 "middle (inside it)"
