@@ -33,6 +33,7 @@ from .db.models import (
     VenueText,
 )
 from .db.session import session_scope
+from .ranking.matcher import issn_key
 from .ranking.normalize import is_non_venue
 from .ranking.service import VenuePattern, service
 
@@ -56,8 +57,7 @@ class TextMatch:
     conflicts: tuple[int, ...] = field(default=())
 
 
-def norm_issn(issn: str | None) -> str | None:
-    return issn.replace("-", "").strip().upper() or None if issn else None
+norm_issn = issn_key  # (its former name)
 
 
 # ---- variants ------------------------------------------------------------------------------
@@ -334,7 +334,7 @@ def issn_venues() -> dict[str, int]:
     with session_scope() as s:
         for v in s.scalars(select(Venue).where(Venue.identifiers.is_not(None))):
             for issn in (v.identifiers or {}).get("issn") or []:
-                if n := norm_issn(issn):
+                if n := issn_key(issn):
                     out.setdefault(n, v.id)
     return out
 
