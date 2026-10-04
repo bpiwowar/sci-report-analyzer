@@ -177,6 +177,7 @@ class DocumentPage:
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
             self.side.categories = categories_section(self.side)
+        self.side.here = lambda: {m.pub_id for m in self.mentions}
         self.side.folder_notes()
         with self.side.section("notes", "sticky_note_2", _("Notes on the document"), fill=True):
             self.note = note_editor(
@@ -187,7 +188,7 @@ class DocumentPage:
                 mode="split",
                 stacked=True,
                 height="14rem",
-                render=lambda text: reports.render(text, self._note_context()).text,
+                render=lambda text: reports.render(text, self.side.note_context()).text,
                 toolbar=self._note_tools,
                 fill=True,
             )
@@ -219,52 +220,9 @@ class DocumentPage:
 
     # ---- The note's citations ([@key], as in reports) ----
 
-    def _note_context(self) -> reports.Context:
-        stats = self.side.stats
-        return reports.note_context(stats, reports.citation_keys(stats))
-
     def _note_tools(self) -> None:
         self.side.quote_tool(lambda: getattr(self, "note", None))
-        ui.button(icon="format_quote", on_click=self._cite).props(
-            "flat dense round size=sm"
-        ).tooltip(_("Cite a paper ([@key], numbered when copied)")).mark("doc-note-cite")
-        ui.button(icon="content_copy", on_click=self._copy_note).props(
-            "flat dense round size=sm"
-        ).tooltip(_("Copy the note, its citations numbered and the papers cited listed")).mark(
-            "doc-note-copy"
-        )
-
-    def _copy_note(self) -> None:
-        ui.clipboard.write(reports.with_references(self.note.value, self._note_context()))
-        ui.notify(_("Copied (with the references)"))
-
-    def _cite(self) -> None:
-        """Pick one of the person's papers (those of the document first): cited at the
-        cursor."""
-        stats = [s for s in self.side.stats if not s.hidden]
-        keys = reports.citation_keys(self.side.stats)
-        here = {m.pub_id for m in self.mentions}
-        stats.sort(key=lambda s: (s.id not in here, -(s.year or 0), (s.title or "").lower()))
-        untitled = _("(untitled)")
-        options = {
-            keys[s.id]: f"{s.title or untitled} ({s.year or '?'})"
-            + (_(" · in the document") if s.id in here else "")
-            for s in stats
-        }
-
-        def chosen(e) -> None:
-            if e.value:
-                dialog.close()
-                self.note.insert(f"[@{e.value}]")
-
-        with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
-            ui.label(_("Cite a paper")).classes("font-medium")
-            ui.select(
-                options, with_input=True, label=_("Title (type to search)"), on_change=chosen
-            ).props("dense outlined autofocus options-dense").classes("w-full").mark(
-                "doc-note-cite-paper"
-            )
-        dialog.open()
+        self.side.cite_tools(lambda: getattr(self, "note", None), "doc-note")
 
     def update(self) -> None:
         """Find the papers again (in the text, once the viewer sent it), list and show them."""

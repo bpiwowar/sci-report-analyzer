@@ -69,6 +69,11 @@ class Side:
         # The notes' editors (the selected text quoted into them), the last one used first.
         self.notes: list[MarkdownEditor] = []
         self.folder_editor: MarkdownEditor | None = None  # (the folder-wide notes, if any)
+        # The papers cited first when citing: those of the PDF shown (a paper: itself; a
+        # document: the page sets those it found in it).
+        self.here: Callable[[], set[int]] = lambda: (
+            {self.source[1]} if self.source[0] == "pub" else set()
+        )
 
     def attach(self, box: ui.column) -> None:
         self.box = box
@@ -251,13 +256,63 @@ class Side:
         with self.section("folder-notes", "folder_open", tip.format(folder=name), fill=True):
             self.folder_editor = folder_notes_editor(
                 folder_id,
-                lambda text: (
-                    reports.render(
-                        text, reports.note_context(self.stats, reports.citation_keys(self.stats))
-                    ).text
-                ),
-                toolbar=lambda: self.quote_tool(lambda: self.folder_editor, first=True),
+                lambda text: reports.render(text, self.note_context()).text,
+                toolbar=self.folder_tools,
             )
+
+    def folder_tools(self) -> None:
+        """The toolbar of the folder's notes: quote, cite a paper, copy with the references."""
+        self.quote_tool(lambda: self.folder_editor, first=True)
+        self.cite_tools(lambda: self.folder_editor, "folder-note")
+
+    def note_context(self) -> reports.Context:
+        """The papers a note cites, by their keys (for the preview and the copy)."""
+        return reports.note_context(self.stats, reports.citation_keys(self.stats))
+
+    def cite_tools(self, editor: Callable[[], MarkdownEditor | None], mark: str) -> None:
+        """In the toolbar of a note's ``editor``: cite a paper (``[@key]`` at the cursor), and
+        copy the note with its citations numbered and the papers cited listed. The buttons are
+        marked ``{mark}-cite`` and ``{mark}-copy``."""
+
+        def copy() -> None:
+            if (e := editor()) is not None:
+                ui.clipboard.write(reports.with_references(e.value, self.note_context()))
+                ui.notify(_("Copied (with the references)"))
+
+        ui.button(icon="format_quote", on_click=lambda: self.cite_dialog(editor, mark)).props(
+            "flat dense round size=sm"
+        ).tooltip(_("Cite a paper ([@key], numbered when copied)")).mark(f"{mark}-cite")
+        ui.button(icon="content_copy", on_click=copy).props("flat dense round size=sm").tooltip(
+            _("Copy the note, its citations numbered and the papers cited listed")
+        ).mark(f"{mark}-copy")
+
+    def cite_dialog(self, editor: Callable[[], MarkdownEditor | None], mark: str) -> None:
+        """Pick one of the person's papers (those of the PDF first): cited at the cursor."""
+        stats = [s for s in self.stats if not s.hidden]
+        keys = reports.citation_keys(self.stats)
+        here = self.here()
+        stats.sort(key=lambda s: (s.id not in here, -(s.year or 0), (s.title or "").lower()))
+        untitled = _("(untitled)")
+        options = {
+            keys[s.id]: f"{s.title or untitled} ({s.year or '?'})"
+            + (_(" · in the document") if s.id in here else "")
+            for s in stats
+        }
+
+        def chosen(e) -> None:
+            if e.value:
+                dialog.close()
+                if (target := editor()) is not None:
+                    target.insert(f"[@{e.value}]")
+
+        with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
+            ui.label(_("Cite a paper")).classes("font-medium")
+            ui.select(
+                options, with_input=True, label=_("Title (type to search)"), on_change=chosen
+            ).props("dense outlined autofocus options-dense").classes("w-full").mark(
+                f"{mark}-cite-paper"
+            )
+        dialog.open()
 
     def tab_of(self, editor: MarkdownEditor) -> str:
         """The tab a notes' editor is in."""
