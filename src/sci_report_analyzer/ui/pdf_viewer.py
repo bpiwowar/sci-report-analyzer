@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from .viewer_side import Side
 
 NO_CONFIRM = "ui.pdf.no_confirm"  # AppSetting: download without asking first
+HIDE_PARAMS = "ui.pdf.hide_params"  # AppSetting: the editing tools without their options
 _no_confirm: bool | None = None  # (cached NO_CONFIRM)
 
 _TYPES = {
@@ -44,7 +45,7 @@ _TYPES = {
 _SCRIPT = """
 <script>
 window.vrPdf = {
-  url: %(url)s, texts: %(texts)s, saving: false, saved: null,
+  url: %(url)s, texts: %(texts)s, saving: false, saved: null, hideParams: %(hide)s,
   win() {
     const f = document.getElementById('vr-pdf-frame');
     return f && f.contentWindow;
@@ -327,6 +328,16 @@ window.vrPdf = {
     const now = a.pdfViewer.annotationEditorMode;
     a.eventBus.dispatch('switchannotationeditormode', {source: this, mode: now === m ? 0 : m});
   },
+  // The options of the editing tools (colour, thickness…: highlight, text, drawing), shown
+  // under their buttons while in their mode: hidden or shown again (the mode stays on; PDF.js
+  // has no option for it). (An image's, adding it: always shown.)
+  params(hide) {
+    this.hideParams = hide === undefined ? !this.hideParams : hide;
+    this.win()?.document.body.classList.toggle('vr-no-params', this.hideParams);
+    const b = document.getElementById('vr-pdf-params');
+    if (b) b.style.background = this.hideParams ? '' : 'rgba(255, 255, 255, 0.3)';
+    return this.hideParams;
+  },
   // Highlight the selected text (else: the highlighting mode, on or off).
   highlight() {
     const ui = this.app()?.pdfViewer?._layerProperties?.annotationEditorUIManager;
@@ -451,8 +462,11 @@ document.addEventListener('webviewerloaded', (e) => {
     #secondaryDownload, #viewBookmark, #viewBookmarkSeparator, #editorSignature,
     #imageAltTextSettings, #imageAltTextSettingsSeparator, #documentProperties
     { display: none !important; }
-    .vr-area-mode .page, .vr-area-mode .page * { cursor: crosshair !important; }`;
+    .vr-area-mode .page, .vr-area-mode .page * { cursor: crosshair !important; }
+    .vr-no-params :is(#editorHighlightParamsToolbar, #editorInkParamsToolbar,
+      #editorFreeTextParamsToolbar) { display: none !important; }`;
   w.document.head.appendChild(style);
+  vrPdf.params(vrPdf.hideParams);
   w.PDFViewerApplication.initializedPromise.then(() => {
     const a = w.PDFViewerApplication;
     // (the shortcuts in the editing buttons' tooltips)
@@ -633,7 +647,12 @@ def viewer_frame(
         "failed": _("Not saved: {error}"),
     }
     ui.add_css(MARKDOWN_CSS)
-    ui.add_head_html(_SCRIPT % {"url": json.dumps(file_url), "texts": json.dumps(texts)} + script)
+    hide = bool(annotations.ui_state(HIDE_PARAMS, False))
+    ui.add_head_html(
+        _SCRIPT
+        % {"url": json.dumps(file_url), "texts": json.dumps(texts), "hide": json.dumps(hide)}
+        + script
+    )
     with ui.row().classes("w-full items-center no-wrap gap-2 px-3 py-1 bg-primary text-white"):
         ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
         for icon, step, tip in (
@@ -673,6 +692,16 @@ def viewer_frame(
                     "flat dense round color=white id=vr-pdf-excerpt"
                 ).mark("pdf-excerpt")
             ui.on("vr-pdf-excerpt", side.add_excerpt)
+        # (shown: highlighted, as the area mode)
+        ui.button(icon="tune").props("flat dense round color=white id=vr-pdf-params").on(
+            "click", js_handler="() => emitEvent('vr-pdf-params', vrPdf.params())"
+        ).tooltip(
+            _(
+                "Hide or show the options panel of highlighting, text and drawing (colour, "
+                "thickness…): the mode stays on"
+            )
+        ).mark("pdf-params")
+        ui.on("vr-pdf-params", lambda e: annotations.save_ui_state(HIDE_PARAMS, bool(e.args)))
         ui.button(icon="bookmark_add", on_click=lambda: side.add_bookmark(*bookmarked)).props(
             "flat dense round color=white"
         ).tooltip(_("Bookmark this place, named after the selected text if any (B)")).mark(

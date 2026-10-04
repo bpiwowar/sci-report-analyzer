@@ -12,6 +12,7 @@ from sci_report_analyzer import annotations, pdfs, pubview, sync
 from sci_report_analyzer.db.models import Publication
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.sources.base import FetchResult
+from sci_report_analyzer.ui import pdf_viewer
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
 
@@ -128,6 +129,12 @@ async def test_viewer_page(user: User, monkeypatch, tmp_path):
     pdfs.save(a, PDF, None)
     await user.open(f"/pdf/{a}")
     await user.should_see(marker="pdf-frame")
+    # The editing tools' options panel: shown, until hidden (remembered).
+    await user.should_see(marker="pdf-params")
+    assert "hideParams: false" in user.client.head_html
+    annotations.save_ui_state(pdf_viewer.HIDE_PARAMS, True)
+    await user.open(f"/pdf/{a}")
+    assert "hideParams: true" in user.client.head_html
     await user.should_see(marker="paper-note")  # its tags and notes, next to it
     user.find(marker="paper-new-tag").type("to read").trigger("keydown.enter")
     user.find(marker="paper-note").elements.pop().value = "Read section 3, $x^2$"

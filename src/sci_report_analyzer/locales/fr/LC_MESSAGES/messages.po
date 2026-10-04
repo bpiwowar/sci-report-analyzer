@@ -1398,6 +1398,13 @@ msgid "Hide a misattributed / irrelevant record"
 msgstr "Masquer une notice mal attribuée / non pertinente"
 
 msgid ""
+"Hide or show the options panel of highlighting, text and drawing (colour,"
+" thickness…): the mode stays on"
+msgstr ""
+"Masquer ou afficher le panneau d’options du surlignage, du texte et du "
+"dessin (couleur, épaisseur…) : le mode reste actif"
+
+msgid ""
 "Holds the database (people, publications, venues, settings) and the "
 "stored PDFs."
 msgstr ""
