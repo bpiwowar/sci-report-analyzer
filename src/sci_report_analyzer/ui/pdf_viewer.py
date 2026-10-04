@@ -5,8 +5,11 @@ and a paper's details next to the PDF."""
 
 from __future__ import annotations
 
+import inspect
 import json
-from typing import TYPE_CHECKING
+import re
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 from weakref import WeakSet
 
@@ -29,6 +32,7 @@ NO_CONFIRM = "ui.pdf.no_confirm"  # AppSetting: download without asking first
 HIDE_PARAMS = "ui.pdf.hide_params"  # AppSetting: the editing tools without their options
 SIDE_WIDTH = "ui.pdf.side_width"  # AppSetting: the width (px) of the side column
 SIDE_DEFAULT, SIDE_MIN = 384, 240
+PANE_TOKEN = re.compile(r"[a-z0-9]{1,40}")  # (of a PDF window, its side panel elsewhere)
 _no_confirm: bool | None = None  # (cached NO_CONFIRM)
 
 _TYPES = {
@@ -376,6 +380,8 @@ window.vrPdf = {
     if (b) b.style.background = this.hideParams ? '' : 'rgba(255, 255, 255, 0.3)';
     return this.hideParams;
   },
+  // What an excerpt is made of: the selected text, else the highlight clicked.
+  excerpted() { return this.selection() || this.highlighted(); },
   // Highlight the selected text (else: the highlighting mode, on or off).
   highlight() {
     const ui = this.app()?.pdfViewer?._layerProperties?.annotationEditorUIManager;
@@ -390,10 +396,10 @@ window.vrPdf = {
     d: () => vrPdf.mode(15),  // (drawing)
     i: () => vrPdf.mode(13),  // (an image)
     a: () => vrPdf.areaMode(),
-    e: () => document.getElementById('vr-pdf-excerpt') && emitEvent('vr-pdf-excerpt'),
-    b: () => emitEvent('vr-pdf-bookmark'),
-    f: () => emitEvent('vr-pdf-find'),  // (without a selection: says so)
-    q: () => emitEvent('vr-pdf-quote'),  // (into the note last used)
+    e: () => document.getElementById('vr-pdf-excerpt') && vrPane.emit('vr-pdf-excerpt'),
+    b: () => vrPane.emit('vr-pdf-bookmark'),
+    f: () => vrPane.emit('vr-pdf-find'),  // (without a selection: says so)
+    q: () => vrPane.emit('vr-pdf-quote'),  // (into the note last used)
   },
   key(ev) {
     if (ev.key === 'Escape' && (this.area || this.areaOn)) {
@@ -409,6 +415,62 @@ window.vrPdf = {
   },
 };
 document.addEventListener('keydown', (ev) => vrPdf.key(ev));
+// The side panel in another window (the pane, e.g. on another screen): the two windows talk
+// through a channel of the browser, named after a token of this one (kept when it is
+// reloaded). This one answers the pane's questions (the selection, where the reader is), goes
+// where it says and draws what it sends (vrDoc); its shortcuts and links act in the pane.
+window.vrPane = {
+  token: null, channel: null, away: false,  // (away: the side panel in the pane)
+  start() {
+    const key = 'vr-pane:' + location.pathname;
+    try { this.token = sessionStorage.getItem(key); } catch (e) {}
+    if (!this.token) {
+      this.token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      try { sessionStorage.setItem(key, this.token); } catch (e) {}
+    }
+    if (!window.BroadcastChannel || this.channel) return;
+    this.channel = new BroadcastChannel('vr-pane-' + this.token);
+    this.channel.onmessage = (ev) => this.got(ev.data || {});
+    this.post({kind: 'hello'});  // (a pane still open, after a reload: the panel stays there)
+    window.addEventListener('pagehide', () => this.post({kind: 'bye'}));
+  },
+  post(m) { if (this.channel) this.channel.postMessage({...m, from: 'pdf'}); },
+  got(m) {
+    if (m.from !== 'pane') return;
+    if (m.kind === 'hello' || m.kind === 'here') {
+      if (m.kind === 'hello') this.post({kind: 'here'});
+      this.leave();
+    } else if (m.kind === 'bye') this.back();
+    else if (m.kind === 'go') vrPdf.go(m.p, m.y);
+    else if (m.kind === 'area') vrPdf.areaMode();
+    else if (m.kind === 'ask') {
+      const asked = ['selection', 'highlighted', 'excerpted', 'location', 'quoted'];
+      let result = null;
+      try { if (asked.includes(m.what)) result = vrPdf[m.what](); } catch (e) {}
+      this.post({kind: 'answer', id: m.id, result});
+    } else if (m.kind === 'doc' && ['mark', 'show'].includes(m.what)) vrDoc[m.what](m.arg);
+  },
+  // The header's button (the window opened from the click, else blocked as a pop-up): the
+  // side panel in the pane, or back here.
+  toggle() {
+    if (this.away) { this.post({kind: 'close'}); this.back(); return; }
+    if (!this.channel) return;
+    const u = new URL(location.href);
+    u.hash = ''; u.searchParams.delete('page'); u.searchParams.set('pane', this.token);
+    const side = document.getElementById('vr-pdf-side');
+    const width = Math.max(480, Math.round(1.2 * (side ? side.offsetWidth : 0)));
+    const features = `popup,width=${width},height=${Math.round(screen.availHeight * 0.9)}`;
+    if (window.open(u.href, 'vr-pane-' + this.token, features)) this.leave();
+  },
+  leave() { if (!this.away) { this.away = true; emitEvent('vr-pane', true); } },
+  back() { if (this.away) { this.away = false; emitEvent('vr-pane', false); } },
+  // An event of the side panel (a shortcut, a link clicked): to the pane while it has the
+  // panel (``both``: here too).
+  emit(name, args, both) {
+    if (this.away) this.post({kind: 'emit', name, args});
+    if (!this.away || both) emitEvent(name, args);
+  },
+};
 // The papers found in a document (links), and the excerpts filed in categories: drawn on
 // the pages.
 window.vrDoc = {
@@ -462,7 +524,7 @@ window.vrDoc = {
         });
         mark.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
-          emitEvent('vr-doc-paper', {i: l.i, cite: e.shiftKey});
+          vrPane.emit('vr-doc-paper', {i: l.i, cite: e.shiftKey});
         });
         pv.div.appendChild(mark);
       });
@@ -546,6 +608,99 @@ window.addEventListener('beforeunload', (e) => {
 </script>
 """
 
+# The side panel in its own window (the pane): what its tabs ask of the PDF (vrPdf, vrDoc) goes
+# to the PDF window, through the channel of the browser named after its token (see vrPane
+# there); the actions of the PDF window's shortcuts and links come from it.
+_PANE_SCRIPT = """
+<script>
+window.vrPane = {
+  token: %(token)s, texts: %(texts)s, channel: null, asked: 0, waiting: {}, done: false,
+  start() {
+    if (!window.BroadcastChannel) { this.status(this.texts.closed); return; }
+    if (this.channel) return;
+    this.channel = new BroadcastChannel('vr-pane-' + this.token);
+    this.channel.onmessage = (ev) => this.got(ev.data || {});
+    this.post({kind: 'hello'});
+    window.addEventListener('pagehide', () => this.post({kind: 'bye'}));
+  },
+  post(m) { if (this.channel) this.channel.postMessage({...m, from: 'pane'}); },
+  got(m) {
+    if (m.from !== 'pdf' || this.done) return;
+    if (m.kind === 'hello') { this.post({kind: 'here'}); this.status(''); }
+    else if (m.kind === 'here') this.status('');
+    else if (m.kind === 'bye') this.status(this.texts.closed);
+    else if (m.kind === 'close') this.back();
+    else if (m.kind === 'emit') emitEvent(m.name, m.args);
+    else if (m.kind === 'answer' && this.waiting[m.id]) this.waiting[m.id](m.result);
+  },
+  // A question to the PDF window (one of vrPdf's: the selection…): its answer, else null.
+  ask(what) {
+    const id = ++this.asked;
+    return new Promise((resolve) => {
+      const done = (result) => { delete this.waiting[id]; resolve(result); };
+      this.waiting[id] = done;
+      setTimeout(() => this.waiting[id] && done(null), 700);
+      this.post({kind: 'ask', id, what});
+    });
+  },
+  // The side panel back in the PDF window (this one closed, if the browser lets it).
+  back() {
+    this.post({kind: 'bye'});
+    this.done = true;
+    this.status(this.texts.back);
+    window.close();
+  },
+  status(text) {
+    const e = document.getElementById('vr-pane-status');
+    if (e) e.textContent = text;
+  },
+};
+window.vrPdf = {
+  go(p, y) { vrPane.post({kind: 'go', p, y}); },
+  areaMode() { vrPane.post({kind: 'area'}); },
+  selection() { return vrPane.ask('selection'); },
+  highlighted() { return vrPane.ask('highlighted'); },
+  excerpted() { return vrPane.ask('excerpted'); },
+  location() { return vrPane.ask('location'); },
+  // Selected in the PDF, else on this page (but in a note's editor).
+  async quoted() {
+    const sel = await vrPane.ask('quoted');
+    if (sel && sel.text) return sel;
+    const s = window.getSelection(), text = s && !s.isCollapsed ? s.toString().trim() : '';
+    const n = s && s.anchorNode, at = n && (n.nodeType === 1 ? n : n.parentElement);
+    return text && !(at && at.closest('.cm-editor')) ? {text, p: null} : null;
+  },
+};
+window.vrDoc = {
+  mark(x) { vrPane.post({kind: 'doc', what: 'mark', arg: x}); },
+  show(x) { vrPane.post({kind: 'doc', what: 'show', arg: x}); },
+};
+// A link (e.g. a quote's, in the notes) to the PDF shown: there, in the PDF window; to another
+// page: in a new one (this window kept for the side panel).
+document.addEventListener('click', (ev) => {
+  const a = ev.target.closest && ev.target.closest('a[href]');
+  if (!a || ev.defaultPrevented || a.target === '_blank') return;
+  const u = new URL(a.href, location.href);
+  if (u.origin !== location.origin || u.hash === '#') return;
+  ev.preventDefault();
+  const page = parseInt(u.searchParams.get('page'));
+  if (u.pathname === location.pathname && page) vrPdf.go(page, null);
+  else window.open(u.href, '_blank');
+}, true);
+// The PDF window's shortcuts on the selection, here too (but when typing).
+document.addEventListener('keydown', (ev) => {
+  const name = {q: 'vr-pdf-quote', e: 'vr-pdf-excerpt', b: 'vr-pdf-bookmark', f: 'vr-pdf-find'}[
+    ev.key];
+  if (!name || ev.ctrlKey || ev.metaKey || ev.altKey || ev.repeat) return;
+  if (name === 'vr-pdf-excerpt' && !document.getElementById('vr-pdf-excerpt')) return;
+  const t = ev.target;
+  if (t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select')))) return;
+  ev.preventDefault();
+  emitEvent(name);
+});
+</script>
+"""
+
 
 def _panels() -> dict[int, WeakSet[PublicationsPanel]]:
     """Person id -> their open publications panels, reloaded when a viewer window changes
@@ -616,7 +771,11 @@ def register() -> None:
 
     @ui.page("/pdf/{pub_id}")
     def pdf_page(
-        pub_id: int, fetch: bool = False, period: int | None = None, page: int | None = None
+        pub_id: int,
+        fetch: bool = False,
+        period: int | None = None,
+        page: int | None = None,
+        pane: str | None = None,
     ) -> None:
         found = _title(pub_id)
         ui.page_title(f"{found[0] if found else 'PDF'} · SciReport Analyzer")
@@ -640,6 +799,7 @@ def register() -> None:
             side,
             ("pub", pub_id),
             page=page,
+            pane=pane,
         )
         side.attach(box)
         side.folder_notes()
@@ -653,6 +813,7 @@ def register() -> None:
                 ui.spinner()
         with side.section("bookmarks", "bookmarks", _("Bookmarks")):
             side.bookmarks = bookmarks_section("pub", pub_id)
+        side.on_attach.append(lambda: _side(side, tags_box, details_box, pub_id))
         ui.timer(0.05, lambda: _side(side, tags_box, details_box, pub_id), once=True)
 
 
@@ -677,10 +838,14 @@ def viewer_frame(
     bookmarked: tuple[str, int],
     script: str = "",
     page: int | None = None,
+    pane: str | None = None,
 ) -> ui.column:
     """The page of a stored PDF: a header (back to ``home``, saving, bookmarks, finding the
     paper of a selection), PDF.js (opened at ``page``, else where it was last read), and the
-    side column (returned)."""
+    side column (returned). With ``pane`` (the token of a PDF window): only the side column,
+    in its own window, kept in sync with that one."""
+    if pane and PANE_TOKEN.fullmatch(pane):
+        return _pane_frame(title, home, side, bookmarked, pane)
     texts = {
         "saving": _("Saving…"),
         "saved": _("Saved at {time}"),
@@ -711,9 +876,9 @@ def viewer_frame(
         with ui.element("span").tooltip(
             _("Find the paper of the selected text, e.g. a reference (F)")
         ):
-            ui.button(icon="manage_search", on_click=side.find_selection).props(
-                "flat dense round color=white id=vr-pdf-find"
-            ).mark("pdf-find")
+            ui.button(
+                icon="manage_search", on_click=_here(side, "vr-pdf-find", side.find_selection)
+            ).props("flat dense round color=white id=vr-pdf-find").mark("pdf-find")
         ui.on("vr-pdf-find", side.find_selection)
         ui.on("vr-pdf-quote", lambda: side.quote())
         # An area (a rectangle) of a page, selected: its text, as a text selection.
@@ -733,9 +898,9 @@ def viewer_frame(
                     "Add the selected text (or the highlight clicked) to a category of {folder} (E)"
                 ).format(folder=side.folder[1])
             ):
-                ui.button(icon="playlist_add", on_click=side.add_excerpt).props(
-                    "flat dense round color=white id=vr-pdf-excerpt"
-                ).mark("pdf-excerpt")
+                ui.button(
+                    icon="playlist_add", on_click=_here(side, "vr-pdf-excerpt", side.add_excerpt)
+                ).props("flat dense round color=white id=vr-pdf-excerpt").mark("pdf-excerpt")
             ui.on("vr-pdf-excerpt", side.add_excerpt)
         # (shown: highlighted, as the area mode)
         with ui.element("span").tooltip(
@@ -748,11 +913,12 @@ def viewer_frame(
                 "click", js_handler="() => emitEvent('vr-pdf-params', vrPdf.params())"
             ).mark("pdf-params")
         ui.on("vr-pdf-params", lambda e: annotations.save_ui_state(HIDE_PARAMS, bool(e.args)))
-        ui.button(icon="bookmark_add", on_click=lambda: side.add_bookmark(*bookmarked)).props(
-            "flat dense round color=white"
-        ).tooltip(_("Bookmark this place, named after the selected text if any (B)")).mark(
-            "pdf-bookmark"
-        )
+        ui.button(
+            icon="bookmark_add",
+            on_click=_here(side, "vr-pdf-bookmark", lambda: side.add_bookmark(*bookmarked)),
+        ).props("flat dense round color=white").tooltip(
+            _("Bookmark this place, named after the selected text if any (B)")
+        ).mark("pdf-bookmark")
         ui.on("vr-pdf-bookmark", lambda: side.add_bookmark(*bookmarked))
         ui.button(_("Save"), icon="save").props("flat dense color=white").on(
             "click", js_handler="() => vrPdf.save(true)"
@@ -761,7 +927,22 @@ def viewer_frame(
             ui.button(icon="download").props("flat dense round color=white").tooltip(
                 _("Download a copy")
             )
-        ui.button(icon="view_sidebar", on_click=lambda: box.set_visibility(not box.visible)).props(
+        ui.button(icon="open_in_new").props("flat dense round color=white").on(
+            "click", js_handler="() => vrPane.toggle()"
+        ).tooltip(
+            _(
+                "Show the side panel (notes, excerpts, bookmarks…) in another window, e.g. on "
+                "another screen; again: back here"
+            )
+        ).mark("pdf-pane")
+
+        def toggle_side() -> None:
+            if side.detached:  # (in another window: back here)
+                ui.run_javascript("vrPane.toggle()")
+            else:
+                box.set_visibility(not box.visible)
+
+        ui.button(icon="view_sidebar", on_click=toggle_side).props(
             "flat dense round color=white"
         ).tooltip(_("Side panel (notes, bookmarks, papers)")).mark("pdf-toggle-notes")
     src = f"/pdfjs/web/viewer.html?file={file_url}%3Fv%3D{version}"
@@ -772,11 +953,10 @@ def viewer_frame(
         ui.element("iframe").props(f'id=vr-pdf-frame src="{src}"').classes("grow").style(
             "height:calc(100vh - 40px); border:0"
         ).mark("pdf-frame")
-        ui.element("div").props("id=vr-pdf-splitter").classes(
-            "shrink-0 bg-grey-4 hover:bg-primary"
-        ).style("width:5px; cursor:col-resize; height:calc(100vh - 40px)").tooltip(
-            _("Drag to resize the side panel")
-        ).mark("pdf-splitter")
+        splitter = ui.element("div").props("id=vr-pdf-splitter")
+        splitter.classes("shrink-0 bg-grey-4 hover:bg-primary").style(
+            "width:5px; cursor:col-resize; height:calc(100vh - 40px)"
+        ).tooltip(_("Drag to resize the side panel")).mark("pdf-splitter")
         width = max(SIDE_MIN, int(annotations.ui_state(SIDE_WIDTH, SIDE_DEFAULT) or SIDE_DEFAULT))
         box = (
             ui.column()
@@ -789,6 +969,81 @@ def viewer_frame(
             "vr-pdf-side-width",
             lambda e: annotations.save_ui_state(SIDE_WIDTH, max(SIDE_MIN, int(e.args))),
         )
+
+    async def detached(e) -> None:  # (the side panel in another window, or back)
+        side.detached = bool(e.args)
+        box.set_visibility(not side.detached)
+        splitter.set_visibility(not side.detached)
+        if not side.detached:
+            await side.reattached()
+
+    ui.on("vr-pane", detached)
+    ui.timer(0, lambda: ui.run_javascript("vrPane.start()"), once=True)  # (once connected)
+    return box
+
+
+def _here(side: Side, event: str, act: Callable[[], Any]) -> Callable[[], Awaitable[None]]:
+    """A header action on the selection (``event``: its shortcut's), done in the pane while
+    the side panel is in another window."""
+
+    async def run() -> None:
+        if side.detached:
+            ui.run_javascript(f"vrPane.emit({json.dumps(event)})")
+        elif inspect.isawaitable(done := act()):
+            await done
+
+    return run
+
+
+def _pane_frame(
+    title: str, home: tuple[str, str], side: Side, bookmarked: tuple[str, int], token: str
+) -> ui.column:
+    """The side column of a PDF window (its ``token``) in a window of its own (e.g. on
+    another screen): a header (the actions on the PDF's selection, the way back), the column
+    (returned)."""
+    ui.page_title(_("{title} · side panel").format(title=title))
+    ui.add_css(MARKDOWN_CSS)
+    texts = {
+        "closed": _("The PDF window is closed"),
+        "back": _("The side panel is back in the PDF window: this one can be closed"),
+    }
+    ui.add_head_html(_PANE_SCRIPT % {"token": json.dumps(token), "texts": json.dumps(texts)})
+    with ui.row().classes("w-full items-center no-wrap gap-2 px-3 py-1 bg-primary text-white"):
+        ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
+        ui.label(title).classes("ellipsis grow min-w-0 font-medium")
+        ui.label("").classes("text-sm opacity-80").props("id=vr-pane-status").mark("pane-status")
+        ui.button(icon="manage_search", on_click=side.find_selection).props(
+            "flat dense round color=white"
+        ).tooltip(_("Find the paper of the selected text, e.g. a reference (F)")).mark("pdf-find")
+        ui.on("vr-pdf-find", side.find_selection)
+        ui.on("vr-pdf-quote", lambda: side.quote())
+        if side.folder and side.source[0] == "doc":
+            with ui.element("span").tooltip(
+                _(
+                    "Add the selected text (or the highlight clicked) to a category of {folder} (E)"
+                ).format(folder=side.folder[1])
+            ):  # (its id: the E shortcut is on)
+                ui.button(icon="playlist_add", on_click=side.add_excerpt).props(
+                    "flat dense round color=white id=vr-pdf-excerpt"
+                ).mark("pdf-excerpt")
+            ui.on("vr-pdf-excerpt", side.add_excerpt)
+        ui.button(icon="bookmark_add", on_click=lambda: side.add_bookmark(*bookmarked)).props(
+            "flat dense round color=white"
+        ).tooltip(_("Bookmark this place, named after the selected text if any (B)")).mark(
+            "pdf-bookmark"
+        )
+        ui.on("vr-pdf-bookmark", lambda: side.add_bookmark(*bookmarked))
+        ui.button(icon="close_fullscreen").props("flat dense round color=white").on(
+            "click", js_handler="() => vrPane.back()"
+        ).tooltip(_("Back into the PDF window (closes this one)")).mark("pane-back")
+    box = (
+        ui.column()
+        .classes("w-full p-3 gap-2 overflow-auto")
+        .style("height:calc(100vh - 40px)")
+        .props("id=vr-pdf-side")
+        .mark("pdf-side")
+    )
+    ui.timer(0, lambda: ui.run_javascript("vrPane.start()"), once=True)  # (once connected)
     return box
 
 

@@ -68,7 +68,7 @@ Object.assign(window.vrDoc, {
       });
       if (!res.ok) throw new Error(await res.text());
       vrPdf.status('');
-      emitEvent('vr-doc-text');
+      vrPane.emit('vr-doc-text', null, true);
     } catch (e) { vrPdf.status(this.texts.failed.replace('{error}', e.message)); }
   },
 });
@@ -115,7 +115,7 @@ def register() -> None:
         return PlainTextResponse("ok")
 
     @ui.page("/doc/{doc_id}")
-    def doc_page(doc_id: int, page: int | None = None) -> None:
+    def doc_page(doc_id: int, page: int | None = None, pane: str | None = None) -> None:
         d = documents.info(doc_id)
         ui.page_title(f"{d.name if d else _('Document')} · SciReport Analyzer")
         ui.query(".nicegui-content").classes("p-0 gap-0")
@@ -125,7 +125,7 @@ def register() -> None:
         if not pdfs.has_viewer():
             _install()
             return
-        DocumentPage(d, page)
+        DocumentPage(d, page, pane)
 
 
 def _install() -> None:
@@ -147,7 +147,10 @@ def _install() -> None:
 class DocumentPage:
     """A document, its papers (found, or linked by hand), bookmarks and note."""
 
-    def __init__(self, d: documents.DocInfo, page: int | None = None) -> None:
+    def __init__(
+        self, d: documents.DocInfo, page: int | None = None, pane: str | None = None
+    ) -> None:
+        """``pane``: only the side column, in its own window (see viewer_frame)."""
         self.d = d
         self.mentions: list[documents.Mention] = []
         file = documents.file_of(d.id)
@@ -173,6 +176,7 @@ class DocumentPage:
                 ),
             },
             page=page,
+            pane=pane,
         )
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
@@ -209,6 +213,7 @@ class DocumentPage:
             self.papers = ui.column().classes("w-full gap-1").mark("doc-papers")
             with self.papers:
                 ui.spinner()
+        self.side.on_attach.append(self._note_again)
         ui.on("vr-doc-text", self.update)
         ui.on("vr-doc-paper", self.clicked)
         ui.timer(0.05, self._load, once=True)
@@ -217,6 +222,12 @@ class DocumentPage:
         await self.side.load()
         self.side.refresh_excerpts()
         self.note.refresh_preview()
+
+    def _note_again(self) -> None:
+        """The note as saved (edited in another window meanwhile)."""
+        d = documents.info(self.d.id)
+        if d is not None and not self.note.is_dirty():
+            self.note.adopt(d.note or "")
 
     # ---- The note's citations ([@key], as in reports) ----
 

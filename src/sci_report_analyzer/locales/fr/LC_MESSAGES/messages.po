@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 13:43+0200\n"
+"POT-Creation-Date: 2026-10-04 14:04+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -605,6 +605,9 @@ msgstr "Retour"
 
 msgid "Back (after following a link; also ⌥← or ⌘[)"
 msgstr "Retour (après avoir suivi un lien ; aussi ⌥← ou ⌘[)"
+
+msgid "Back into the PDF window (closes this one)"
+msgstr "Retour dans la fenêtre du PDF (ferme celle-ci)"
 
 msgid "Back to automatic"
 msgstr "Revenir à l'automatique"
@@ -3238,6 +3241,13 @@ msgstr "Afficher toutes les années"
 msgid "Show how the text was cleaned and matched"
 msgstr "Montrer comment le texte a été nettoyé et rapproché"
 
+msgid ""
+"Show the side panel (notes, excerpts, bookmarks…) in another window, e.g."
+" on another screen; again: back here"
+msgstr ""
+"Afficher le panneau latéral (notes, extraits, signets…) dans une autre "
+"fenêtre, par exemple sur un autre écran ; à nouveau : retour ici"
+
 msgid "Shown again"
 msgstr "Réaffiché"
 
@@ -3442,6 +3452,9 @@ msgstr ""
 msgid "The PDF is not shown yet"
 msgstr "Le PDF n'est pas encore affiché"
 
+msgid "The PDF window is closed"
+msgstr "La fenêtre du PDF est fermée"
+
 msgid "The catch-all role is unknown"
 msgstr "Le rôle par défaut est inconnu"
 
@@ -3578,6 +3591,11 @@ msgstr ""
 
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
+
+msgid "The side panel is back in the PDF window: this one can be closed"
+msgstr ""
+"Le panneau latéral est revenu dans la fenêtre du PDF : celle-ci peut être"
+" fermée"
 
 msgid "The source's normalization rules apply to the text"
 msgstr "Les règles de normalisation de la source s'appliquent au texte"
@@ -5121,6 +5139,10 @@ msgstr "{text} : reconnu, mais dans « {venue} »"
 #, python-brace-format
 msgid "{tip} — click to list them"
 msgstr "{tip} — cliquer pour les lister"
+
+#, python-brace-format
+msgid "{title} · side panel"
+msgstr "{title} · panneau latéral"
 
 #, python-brace-format
 msgid ""

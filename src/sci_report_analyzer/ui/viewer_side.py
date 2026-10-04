@@ -3,6 +3,7 @@ publications panel), bookmarks, and the paper of a selection."""
 
 from __future__ import annotations
 
+import inspect
 import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -74,6 +75,10 @@ class Side:
         self.here: Callable[[], set[int]] = lambda: (
             {self.source[1]} if self.source[0] == "pub" else set()
         )
+        # In another window (the pane: see pdf_viewer.viewer_frame) meanwhile, its tabs here
+        # hidden; once back, what the page shows again up to date.
+        self.detached = False
+        self.on_attach: list[Callable[[], object]] = []
 
     def attach(self, box: ui.column) -> None:
         self.box = box
@@ -116,6 +121,17 @@ class Side:
         await self.host.reload_quietly()
         if self.folder_editor is not None:  # (its citations, now the papers are known)
             self.folder_editor.refresh_preview()
+
+    async def reattached(self) -> None:
+        """Back from another window: up to date again (the papers, bookmarks, excerpts, the
+        page's own: e.g. its notes, edited there)."""
+        await self.load()
+        if self.bookmarks:
+            self.bookmarks()
+        self.refresh_excerpts()
+        for f in self.on_attach:
+            if inspect.isawaitable(done := f()):
+                await done
 
     def show_paper(self, pub_id: int, header: Callable[[], None] | None = None) -> None:
         """The details of a paper (as in the publications panel), instead of the overview."""
@@ -170,7 +186,7 @@ class Side:
                 type="warning",
             )
             return
-        sel = await ui.run_javascript("vrPdf.selection() || vrPdf.highlighted()")
+        sel = await ui.run_javascript("vrPdf.excerpted()")
         if not sel or not (sel.get("text") or "").strip():
             ui.notify(
                 _("Select the text to file (or an area with text, or click a highlight) first"),
