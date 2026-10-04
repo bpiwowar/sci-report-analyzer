@@ -81,7 +81,8 @@ Venue ranks come from third-party data, credited here and in the app (Settings â
 - **JCR** impact factors are Clarivate's and are not distributed: import your own export.
 
 See [`src/sci_report_analyzer/data/README.md`](src/sci_report_analyzer/data/README.md) for the
-files and their terms.
+files and their terms, and [`docs/json-formats.md`](docs/json-formats.md) for the JSON formats
+(settings file, ranking datasets).
 
 ## Licence
 

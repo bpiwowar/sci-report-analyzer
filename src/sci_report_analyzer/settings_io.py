@@ -4,6 +4,9 @@ A settings file holds the matching settings (sources, thresholds, normalization 
 venue-kind settings), the venues with manual decisions (kind, level, ranking record, search
 text, variants, venue rules, identifiers), flag definitions and optionally imported JCR
 rows. People, publications and their annotations are never part of an import.
+
+The format (fields, versioning, import modes): ``docs/json-formats.md``. Bump ``VERSION`` and
+update it when a field changes.
 """
 
 from __future__ import annotations

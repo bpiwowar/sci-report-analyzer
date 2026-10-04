@@ -16,6 +16,8 @@ Not shipped:
   Inclusion in it is an indication, not a verdict.
 - **JCR** impact factors belong to Clarivate: users import their own export.
 
+Their format: [`docs/json-formats.md`](../../../docs/json-formats.md#ranking-records).
+
 ## Citations
 
 > SCImago, (n.d.). SJR — SCImago Journal & Country Rank [Portal]. Retrieved from
