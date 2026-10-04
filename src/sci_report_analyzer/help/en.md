@@ -194,7 +194,8 @@ A line break is kept (as in Obsidian). They are edited with a Markdown editor (t
 
 **Citations in the folder notes** (the folder tab next to a PDF): the person's notes within
 the folder cite their papers with Pandoc's syntax: `[@key]` the paper's number, `[@a; @b]`
-several, `@key` its title, venue, year and category, `[@key]{.notes}` with its notes,
+or `[@a, @b]` several (each with the template, as in `[@a, @b]{.notes}`, also written
+without brackets: `@a, @b{.notes}`), `@key` its title, venue, year and category, `[@key]{.notes}` with its notes,
 `[@key]{.tags}` with its tags (`{.notes .tags}` both), and templates:
 `[@key]{.short-venue (.year)}` gives `EMNLP (2026)` (fields: `.number` the number as the
 folder writes it, `.index` the bare number as in `{**#.index**}`, `.title`, `.venue`,

@@ -194,7 +194,8 @@ Un saut de ligne est conservé (comme dans Obsidian). Elles sont éditées avec 
 
 **Citations dans les notes du dossier** (l'onglet du dossier à côté d'un PDF) : les notes
 de la personne dans le dossier citent ses articles avec la syntaxe de Pandoc : `[@key]` le
-numéro de l'article, `[@a; @b]` plusieurs, `@key` ses titre, canal, année et catégorie,
+numéro de l'article, `[@a; @b]` ou `[@a, @b]` plusieurs (chacun avec le modèle, comme dans
+`[@a, @b]{.notes}`, aussi écrit sans crochets : `@a, @b{.notes}`), `@key` ses titre, canal, année et catégorie,
 `[@key]{.notes}` avec ses notes, `[@key]{.tags}` avec ses étiquettes (`{.notes .tags}` les
 deux), et des modèles : `[@key]{.short-venue (.year)}` donne `EMNLP (2026)` (champs :
 `.number` le numéro tel que le dossier l'écrit, `.index` le numéro seul comme dans

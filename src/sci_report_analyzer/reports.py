@@ -1,8 +1,9 @@
 """Citing a person's papers in Markdown (the notes of a folder, of a document…) with Pandoc's
 syntax, substituted when shown or copied.
 
-- ``[@key]`` (or ``[@a; @b]``, ``[see @a, p. 3]``): the paper's number (``**#6**``,
-  see ``number_format``; a listed paper's, ``listed_format``);
+- ``[@key]`` (or ``[@a; @b]``, ``[@a, @b]``, ``[see @a, p. 3]``): the paper's number
+  (``**#6**``, see ``number_format``; a listed paper's, ``listed_format``); several keys
+  with a template (below) each cited with it, also without brackets: ``@a, @b{.notes}``;
 - ``@key``, or ``[@key]{.full}``: its number, title, venue, year and category;
 - ``[@key]{.notes}``: that, then its notes; ``[@key]{.tags}``: with its tags (#tags), and
   ``[@key]{.notes .tags}`` both;
@@ -47,7 +48,15 @@ _KEY = r"\w+(?:[:.#$%&+?<>~/-]\w+)*"
 _BRACKET = re.compile(
     r"\[(?P<body>[^\[\]]*?(?<![\w@])-?@" + _KEY + r"[^\[\]]*)\](?:\{(?P<attrs>[^{}\n]*)\})?"
 )
+# Without brackets, keys followed by their classes (``@a, @b{.notes}``): as [@a, @b]{.notes}
+_BARE = re.compile(
+    r"(?<![\w@\[])(?P<body>@" + _KEY + r"(?:[ \t]*,[ \t]*@" + _KEY + r")*)"
+    r"\{(?P<attrs>[^{}\n]*)\}"
+)
+_CITATION = re.compile(f"{_BRACKET.pattern}|{_BARE.pattern.replace('?P<', '?P<bare_')}")
 _ITEM = re.compile(r"(?P<pre>.*?)(?<![\w@])-?@(?P<key>" + _KEY + r")(?P<post>.*)", re.S)
+# The items of a citation: split at ";", and at "," before a key ([@a, @b], not [@a, p. 3]).
+_SEPARATOR = re.compile(r";|,(?=\s*-?@" + _KEY + r")")
 _INTEXT = re.compile(r"(?<![\w@\[])@(?P<key>" + _KEY + r")")
 # Code (fenced blocks, spans) is left as is.
 _CODE = re.compile(r"(```.*?(?:```|$)|`[^`\n]*`)", re.S)
@@ -386,11 +395,13 @@ def render(text: str, ctx: Context) -> Rendered:
         return len(_LIST_ITEM.match(line).group(0)) if line.strip() else len(line)
 
     def bracket(src: str, m: re.Match) -> str:
-        attrs = parse_attrs(m.group("attrs") or "")
+        bare = m.group("body") is None  # (@a, @b{.notes})
+        body, attrs = m.group("bare_body", "bare_attrs") if bare else m.group("body", "attrs")
+        attrs = parse_attrs(attrs or "")
         if attrs is None:
-            return m.group(0)
+            return _INTEXT.sub(intext, m.group(0)) if bare else m.group(0)
         parts = []
-        for item in m.group("body").split(";"):
+        for item in _SEPARATOR.split(body):
             im = _ITEM.fullmatch(item)
             if im is None:
                 parts.append(item.strip())
@@ -412,7 +423,7 @@ def render(text: str, ctx: Context) -> Rendered:
 
     def prose(src: str) -> str:
         pieces, last = [], 0
-        for m in _BRACKET.finditer(src):
+        for m in _CITATION.finditer(src):
             pieces.append(_INTEXT.sub(intext, src[last : m.start()]))
             pieces.append(bracket(src, m))
             last = m.end()
