@@ -25,6 +25,16 @@ TOOLS = [
 ]
 
 MODES = {"edit": N_("Edit"), "split": N_("Split"), "preview": N_("Preview")}
+MODE_ICONS = {"edit": "edit_note", "split": "vertical_split", "preview": "visibility"}
+
+
+class _ModeToggle(ui.toggle):
+    """The editor's modes, as icons (their name on hover)."""
+
+    def _update_options(self) -> None:
+        super()._update_options()
+        for option, key in zip(self._props["options"], self._values, strict=True):
+            option.update(icon=MODE_ICONS[key], label="", attrs={"title": _(MODES[key])})
 
 
 def quote(text: str, where: str = "") -> str:
@@ -64,7 +74,7 @@ class MarkdownEditor:
             # (stacked: the editor and the preview share the height; else both as high as it)
             height = "0" if stacked else "100%"
         with ui.column().classes("w-full gap-1" + (" grow min-h-0" if fill else "")) as self.box:
-            with ui.row().classes("w-full items-center gap-0"):
+            with ui.row().classes("w-full items-center gap-0 vr-tools"):
                 for icon, tip, kind, args in TOOLS:
                     ui.button(
                         icon=icon,
@@ -78,12 +88,8 @@ class MarkdownEditor:
                 if toolbar:
                     toolbar()
                 self.mode = (
-                    ui.toggle(
-                        {k: _(v) for k, v in MODES.items()},
-                        value=mode,
-                        on_change=lambda: self._layout(),
-                    )
-                    .props("dense flat no-caps size=sm")
+                    _ModeToggle(list(MODES), value=mode, on_change=lambda: self._layout())
+                    .props("dense flat size=sm")
                     .tooltip(_("Edit, edit beside the preview, or the preview only"))
                 )
                 if mark:
