@@ -39,6 +39,7 @@ from ..ranking.service import load_settings, save_settings, service
 from ..sources import ADAPTERS
 from . import scimago_years, unsaved
 from .colours import ColourInput
+from .dialogs import actions, confirm, transient_dialog
 from .theme import fmt_dt, frame, level_hint, level_options, track_chip
 
 # The settings, in groups: (group, [(tab, label)]).
@@ -735,8 +736,8 @@ def _reset_automatic_section() -> None:
         )
     ).classes("text-sm text-grey")
 
-    def confirm() -> None:
-        with ui.dialog() as dlg, ui.card():
+    def confirm_reset() -> None:
+        with transient_dialog() as (dlg, _card):
             ui.label(_("Clear out the automatic settings of all papers?")).classes("font-medium")
             ui.label(
                 _(
@@ -755,18 +756,13 @@ def _reset_automatic_section() -> None:
                     ).format(venues=r["venues"], texts=r["texts"]),
                     type="positive",
                 )
-                dlg.close()
 
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                ui.button(_("Clear out"), on_click=ok).props("color=negative").mark(
-                    "reset-automatic-confirm"
-                )
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+            actions(dlg, _("Clear out"), ok, danger=True, mark="reset-automatic-confirm")
 
     ui.button(
-        _("Clear out automatic settings for all papers"), icon="delete_sweep", on_click=confirm
+        _("Clear out automatic settings for all papers"),
+        icon="delete_sweep",
+        on_click=confirm_reset,
     ).props("color=negative outline").mark("reset-automatic")
 
     ui.label(_("Manual decisions")).classes("text-lg mt-4")
@@ -781,7 +777,7 @@ def _reset_automatic_section() -> None:
 
     def confirm_manual() -> None:
         n = venue_match.manual_counts()
-        with ui.dialog() as dlg, ui.card():
+        with transient_dialog() as (dlg, _card):
             ui.label(_("Clear manual decisions?")).classes("font-medium")
             on_venues = ui.checkbox(
                 _(
@@ -799,9 +795,9 @@ def _reset_automatic_section() -> None:
             ).mark("clear-manual-papers")
             ui.label(_("This cannot be undone.")).classes("text-sm text-negative")
 
-            def ok() -> None:
+            def ok() -> bool | None:
                 if not (on_venues.value or on_papers.value):
-                    return
+                    return False
                 r = venue_match.clear_manual(venues=on_venues.value, papers=on_papers.value)
                 ui.notify(
                     _(
@@ -810,15 +806,8 @@ def _reset_automatic_section() -> None:
                     ).format(venues=r["venues"], papers=r["papers"]),
                     type="positive",
                 )
-                dlg.close()
 
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                ui.button(_("Clear"), on_click=ok).props("color=negative").mark(
-                    "clear-manual-confirm"
-                )
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+            actions(dlg, _("Clear"), ok, danger=True, mark="clear-manual-confirm")
 
     ui.button(_("Clear manual decisions…"), icon="restart_alt", on_click=confirm_manual).props(
         "color=negative outline"
@@ -877,28 +866,27 @@ def _data_dir_section(refresh) -> None:
                 "From the next start, the app will use a copy of the current data. Restart the "
                 "app to switch; the current directory is left as it is."
             )
-        with ui.dialog() as dlg, ui.card():
-            ui.label(_("Use {path}?").format(path=dest)).classes("text-lg")
-            ui.label(what)
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
 
-                def ok() -> None:
-                    try:
-                        datadir.use_data_dir(dest, copy=copy.value)
-                    except (OSError, sqlite3.Error) as e:
-                        ui.notify(
-                            _("Could not use {path}: {error}").format(path=dest, error=e),
-                            type="negative",
-                        )
-                        return
-                    ui.notify(_("Restart the app to use {path}").format(path=dest), type="positive")
-                    refresh()
-                    dlg.close()
+        def ok() -> bool | None:
+            try:
+                datadir.use_data_dir(dest, copy=copy.value)
+            except (OSError, sqlite3.Error) as e:
+                ui.notify(
+                    _("Could not use {path}: {error}").format(path=dest, error=e),
+                    type="negative",
+                )
+                return False
+            ui.notify(_("Restart the app to use {path}").format(path=dest), type="positive")
+            refresh()
 
-                ui.button(_("Use it"), on_click=ok).props("color=primary").mark("data-dir-confirm")
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+        confirm(
+            what,
+            _("Use it"),
+            ok,
+            danger=False,
+            title=_("Use {path}?").format(path=dest),
+            mark="data-dir-confirm",
+        )
 
     with ui.row().classes("gap-2"):
         ui.button(_("Change location…"), icon="folder_open", on_click=change).mark(
@@ -1885,8 +1873,7 @@ def import_dialog(data: settings_io.SettingsFile) -> None:
     choice: dict[str, bool] = {c.id: True for c in conflicts}  # True = take imported
     mapping = settings_io.track_mapping(data)
     remove: set[str] = set()  # the local tracks the file lacks, removed
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
-        ui.label(_("Import settings")).classes("text-lg")
+    with transient_dialog(_("Import settings"), width="w-full max-w-3xl") as (dlg, _card):
         ui.label(
             _("{venues} venues · {tracks} tracks").format(
                 venues=len(data.venues), tracks=len(data.matching.tracks)
@@ -1964,9 +1951,5 @@ def import_dialog(data: settings_io.SettingsFile) -> None:
                 ),
                 type="positive",
             )
-            dlg.close()
 
-        with ui.row().classes("justify-end w-full"):
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Import"), on_click=apply).mark("import-apply")
-    dlg.open()
+        actions(dlg, _("Import"), apply, mark="import-apply")

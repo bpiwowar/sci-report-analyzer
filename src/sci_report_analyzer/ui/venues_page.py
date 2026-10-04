@@ -24,6 +24,7 @@ from ..ranking.badge import (
 from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
 from ..ranking.service import VenuePattern, service
 from ..sources import ADAPTERS
+from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .pub_details import VIA_LABEL, venue_rule_dialog
 from .theme import (
     badge_details,
@@ -249,8 +250,7 @@ def _new_venue_dialog(
     """Add a venue by hand; ``on_added(venue id, created)`` (False: one has this name).
     ``joint``: it can be a joint conference (its conferences in order, then no name needed)."""
     parts: list[int | None] = []
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-        ui.label(_("Add a venue")).classes("text-lg font-medium")
+    with transient_dialog(_("Add a venue"), width="w-full max-w-xl") as (dlg, _card):
         name = ui.input(_("Name")).classes("w-full").mark("venue-add-name")
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
             short = ui.input(_("Short name (acronym)")).classes("w-48").mark("venue-add-short")
@@ -312,7 +312,7 @@ def _new_venue_dialog(
                     on_click=lambda: (parts.append(None), lines.refresh()),
                 ).props("dense flat size=sm").mark("venue-add-part-add")
 
-        def ok() -> None:
+        def ok() -> bool | None:
             text = (name.value or "").strip()
             chosen = [p for p in parts if p]
             if not text and len(chosen) < 2:
@@ -322,19 +322,14 @@ def _new_venue_dialog(
                     else _("Give the venue a name"),
                     type="warning",
                 )
-                return
+                return False
             vid, created = venues.add_venue(
                 text, kind_select.value, (short.value or "").strip(), url.value, chosen
             )
             ui.notify(_("Venue added") if created else _("A venue already has this name"))
-            dlg.close()
             on_added(vid, created)
 
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Add"), icon="add", on_click=ok).mark("venue-add-confirm")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+        actions(dlg, _("Add"), ok, icon="add", mark="venue-add-confirm")
 
 
 def _conflicts(view: _View) -> None:
@@ -359,7 +354,7 @@ def _conflicts(view: _View) -> None:
 def _conflict_dialog(view: _View) -> None:
     """One problem at a time: merge the venues, or keep the text in one of them."""
     state = {"i": 0, "changed": False}
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-2xl"):
+    with transient_dialog(width="w-full max-w-2xl") as (dlg, _card):
         body = ui.column().classes("w-full gap-2")
 
     def close() -> None:
@@ -448,8 +443,6 @@ def _conflict_dialog(view: _View) -> None:
                 ).props("flat dense").mark("conflict-skip")
 
     show()
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
 
 
 def _proposals_dialog(view: _View) -> None:
@@ -458,7 +451,7 @@ def _proposals_dialog(view: _View) -> None:
     it, one of its workshops; guessed), or say they are not the same."""
     proposals = venues.merge_proposals(view.rows)
     state = {"i": 0, "changed": False}
-    with view.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
+    with view.dialogs, transient_dialog(width="w-full max-w-3xl") as (dlg, _card):
         body = ui.column().classes("w-full gap-2")
 
     def close() -> None:
@@ -634,8 +627,6 @@ def _proposals_dialog(view: _View) -> None:
                 ).props("flat dense").mark("proposal-skip")
 
     show()
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
 
 
 @dataclass
@@ -1130,10 +1121,8 @@ def papers_dialog(row: venues.VenueRow, *, people: bool = False) -> None:
     by_person: dict[int, list[venues.VenuePaper]] = {}
     for p in papers:
         by_person.setdefault(p.person_id, []).append(p)
-    with (
-        ui.dialog() as dlg,
-        ui.card().classes("w-full max-w-3xl").style("max-height: 90vh; overflow-y: auto"),
-    ):
+    with transient_dialog(width="w-full max-w-3xl") as (dlg, card):
+        card.style("max-height: 90vh; overflow-y: auto")
         with ui.row().classes("w-full items-center justify-between no-wrap"):
             what = (
                 ngettext("{n} person", "{n} people", len(by_person)).format(n=len(by_person))
@@ -1159,8 +1148,6 @@ def papers_dialog(row: venues.VenueRow, *, people: bool = False) -> None:
                         ).mark(f"venue-paper-{p.id}")
                         if p.hidden:
                             ui.label(_("hidden")).classes("text-xs text-grey")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
 
 
 # Reopens the venue a dialog was opened from.
@@ -1207,12 +1194,8 @@ def venue_dialog(
             "match_text": v.match_text or "",
             "issns": ", ".join((v.identifiers or {}).get("issn") or []),
         }
-    with (
-        ui.dialog() as dlg,
-        ui.card()
-        .classes("w-full max-w-4xl vr-details")
-        .style("max-height: 90vh; overflow-y: auto"),
-    ):
+    with transient_dialog(width="w-full max-w-4xl vr-details") as (dlg, card):
+        card.style("max-height: 90vh; overflow-y: auto")
         # Related venues open next to this dialog (deleted once closed).
         parent = dlg.parent_slot.parent
 
@@ -1839,8 +1822,6 @@ def venue_dialog(
             ).props("flat color=negative")
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(_("Save"), on_click=save).mark("venue-save")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
 
 
 def _relation_label(relation: str) -> str:
@@ -1923,20 +1904,19 @@ def _related_strip(
         if relation == "same":
             _confirm_merge(row, group, finish)
             return
-        with ui.dialog() as dlg, ui.card().classes("min-w-96"):
-            ui.label(_relation_label(relation)).classes("text-lg font-medium")
-            ui.label(_relation_sentence(row, group, relation)).classes("text-sm")
 
-            def ok() -> None:
-                kept = venues.relate_venues(row.id, [r.id for r in group], relation)
-                dlg.close()
-                finish(kept)
+        def ok() -> None:
+            finish(venues.relate_venues(row.id, [r.id for r in group], relation))
 
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                ui.button(_("Apply"), icon="check", on_click=ok).mark("venue-relate-confirm")
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+        confirm(
+            _relation_sentence(row, group, relation),
+            _("Apply"),
+            ok,
+            danger=False,
+            title=_relation_label(relation),
+            width="min-w-96",
+            mark="venue-relate-confirm",
+        )
 
     def unrelated(group: list[venues.VenueRow], line) -> None:
         for r in group:
@@ -1988,8 +1968,7 @@ def _confirm_merge(
         short = f" [{r.short_name}]" if r.short_name else ""
         return f"{r.name}{short} — {KINDS[r.kind]} ({_papers(r.publications)})"
 
-    with ui.dialog() as dlg, ui.card().classes("min-w-96"):
-        ui.label(_("Merge venues")).classes("text-lg font-medium")
+    with transient_dialog(_("Merge venues"), width="min-w-96") as (dlg, _card):
         view = ui.column().classes("w-full")
 
         def show() -> None:
@@ -2015,7 +1994,6 @@ def _confirm_merge(
             target = state["target"]
             name, short, kind = names.values(target)
             venues.merge_venues(target.id, [r.id for r in state["others"]], name, short, kind)
-            dlg.close()
             finish(target.id)
 
         show()
@@ -2026,9 +2004,9 @@ def _confirm_merge(
                 ).mark("venue-merge-swap")
             ui.space()
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Merge"), icon="merge", on_click=ok).mark("venue-merge-confirm")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+            ui.button(_("Merge"), icon="merge", on_click=ok_handler(dlg, ok)).mark(
+                "venue-merge-confirm"
+            )
 
 
 class _MergeNames:
@@ -2110,10 +2088,9 @@ def _relate_dialog(row: venues.VenueRow, other: venues.VenueRow, merged) -> None
     """Say what ``row`` is for ``other`` (the same venue, its demo track, a workshop…), the
     relation guessed from their texts to start with."""
     guess = venues.guess_relation(row, other)
-    with ui.dialog() as dlg, ui.card().classes("min-w-96"):
-        ui.label(_("What is this venue for “{name}”?").format(name=other.name)).classes(
-            "text-lg font-medium"
-        )
+    with transient_dialog(
+        _("What is this venue for “{name}”?").format(name=other.name), width="min-w-96"
+    ) as (dlg, _card):
         colours = tracks.colours()
         rel = (
             ui.select(
@@ -2134,7 +2111,7 @@ def _relate_dialog(row: venues.VenueRow, other: venues.VenueRow, merged) -> None
             )
 
         def ok() -> None:
-            dlg.close()
+            dlg.close()  # (first: the merge's dialog is not within this one)
             if rel.value == "same":
                 _confirm_merge(row, [other], merged, swappable=True)
             else:
@@ -2145,8 +2122,6 @@ def _relate_dialog(row: venues.VenueRow, other: venues.VenueRow, merged) -> None
         with ui.row().classes("w-full justify-end"):
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(_("Apply"), icon="check", on_click=ok).mark("venue-relate-ok")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
 
 
 def _track_box(row: venues.VenueRow, merged) -> None:
@@ -2162,12 +2137,11 @@ def _track_box(row: venues.VenueRow, merged) -> None:
         btn = ui.button(_("Mark as a track…"), icon="label").props("dense flat no-caps")
         btn.mark("venue-as-track")
 
-    def confirm() -> None:
+    def as_track() -> None:
         label = tracks.name(track.value)
-        with ui.dialog() as dlg, ui.card().classes("min-w-96"):
-            ui.label(_("This venue is a {track} track").format(track=label)).classes(
-                "text-lg font-medium"
-            )
+        with transient_dialog(
+            _("This venue is a {track} track").format(track=label), width="min-w-96"
+        ) as (dlg, _card):
             ui.label(
                 _(
                     "All its texts are marked as the {track} track: its papers show as such. "
@@ -2186,17 +2160,12 @@ def _track_box(row: venues.VenueRow, merged) -> None:
 
             def ok() -> None:
                 venues.mark_as_track(row.id, track.value, (name.value or "").strip() or None)
-                dlg.close()
                 ui.notify(_("Marked as the {track} track").format(track=label))
                 merged(row.id)
 
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                ui.button(_("Apply"), icon="check", on_click=ok).mark("venue-as-track-ok")
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+            actions(dlg, _("Apply"), ok, icon="check", mark="venue-as-track-ok")
 
-    btn.on_click(confirm)
+    btn.on_click(as_track)
 
 
 def _merge_tab(row: venues.VenueRow, all_rows: list[venues.VenueRow], merged) -> None:
@@ -2258,11 +2227,11 @@ def _merge_tab(row: venues.VenueRow, all_rows: list[venues.VenueRow], merged) ->
                     ).mark(f"venue-merge-relate-{i}")
                     ui.link(_("open"), f"/venues?focus={r.id}", new_tab=True).classes("text-xs")
 
-    def confirm() -> None:
+    def merge_picked() -> None:
         by_id = {r.id: r for r in all_rows}
         _confirm_merge(row, [by_id[v] for v in sorted(picked) if v in by_id], merged)
 
-    merge_btn.on_click(confirm)
+    merge_btn.on_click(merge_picked)
     query.on_value_change(lambda _e: show())
     show()
     update_btn()

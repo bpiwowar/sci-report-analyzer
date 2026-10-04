@@ -31,6 +31,7 @@ from ..sync import (
     suggested_orcid,
     sync_link,
 )
+from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .documents_page import documents_view
 from .folder_notes import NOTES_TIP, notes_url
 from .panel import PublicationsPanel, period_label
@@ -167,12 +168,15 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
             ).props("flat round color=negative").tooltip(
                 _("Purge: remove all papers and re-sync")
             ).mark("purge-person")
-            ui.button(icon="edit", on_click=lambda: edit.open()).props("flat round")
-            ui.button(icon="delete", on_click=lambda: confirm.open()).props(
+            ui.button(icon="edit", on_click=lambda: _edit_dialog(person)).props("flat round")
+            ui.button(icon="delete", on_click=lambda: _delete_dialog(person)).props(
                 "flat round color=negative"
             )
+    return tabs
 
-    with ui.dialog() as edit, ui.card().classes("w-96"):
+
+def _edit_dialog(person: Person) -> None:
+    with transient_dialog(width="w-96") as (edit, _card):
         name = ui.input(_("Name"), value=person.name).classes("w-full")
         aff = ui.input(_("Affiliation"), value=person.affiliation or "").classes("w-full")
         orcid = (
@@ -188,11 +192,11 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
         )
         notes = ui.textarea(_("Notes"), value=person.notes or "").classes("w-full")
 
-        def save() -> None:
+        def save() -> bool | None:
             value = normalize_orcid(orcid.value)
             if orcid.value.strip() and value is None:
                 ui.notify(_("Not an ORCID (e.g. 0000-0002-1825-0097)"), type="warning")
-                return
+                return False
             with session_scope() as s:
                 p = s.get(Person, person.id)
                 p.name, p.affiliation = name.value.strip(), aff.value.strip() or None
@@ -201,24 +205,20 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
             set_orcid(person.id, value)  # and rescore the candidates
             ui.navigate.reload()
 
-        with ui.row().classes("justify-end w-full"):
-            ui.button(_("Cancel"), on_click=edit.close).props("flat")
-            ui.button(_("Save"), on_click=save)
+        actions(edit, _("Save"), save)
 
-    with ui.dialog() as confirm, ui.card():
-        ui.label(
-            _("Delete {name} and all their data (tags, stars, periods)?").format(name=person.name)
-        )
-        with ui.row().classes("justify-end w-full"):
-            ui.button(_("Cancel"), on_click=confirm.close).props("flat")
 
-            def delete() -> None:
-                with session_scope() as s:
-                    s.delete(s.get(Person, person.id))
-                ui.navigate.to("/")
+def _delete_dialog(person: Person) -> None:
+    def delete() -> None:
+        with session_scope() as s:
+            s.delete(s.get(Person, person.id))
+        ui.navigate.to("/")
 
-            ui.button(_("Delete"), color="negative", on_click=delete)
-    return tabs
+    confirm(
+        _("Delete {name} and all their data (tags, stars, periods)?").format(name=person.name),
+        _("Delete"),
+        delete,
+    )
 
 
 def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
@@ -226,7 +226,7 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
     from ..sync import purge, purge_counts
 
     n = purge_counts(person_ids)
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
+    with transient_dialog(width="w-full max-w-xl") as (dlg, _card):
         with ui.row().classes("items-center gap-2 no-wrap"):
             ui.icon("warning", size="lg", color="negative")
             ui.label(_("Purge the papers of {who}?").format(who=who)).classes("text-xl font-medium")
@@ -265,10 +265,10 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
             .mark("purge-word")
         )
 
-        def ok() -> None:
+        def ok() -> bool | None:
             if (word.value or "").strip().upper() != "PURGE":
                 ui.notify(_("Type PURGE to confirm"), type="warning")
-                return
+                return False
             purge(person_ids)
             for pid in person_ids:
                 start_sync(pid)
@@ -282,15 +282,15 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
             )
             if after:
                 after()
-            dlg.close()  # last: a closed dialog is deleted, with its UI context
 
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Purge and re-sync"), icon="delete_forever", on_click=ok).props(
-                "color=negative"
-            ).mark("purge-confirm")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+        actions(
+            dlg,
+            _("Purge and re-sync"),
+            ok,
+            danger=True,
+            icon="delete_forever",
+            mark="purge-confirm",
+        )
 
 
 @ui.refreshable
@@ -527,7 +527,7 @@ def _validated_card(person_id: int, ln: SourceLink) -> None:
             ).classes("text-sm text-grey")
         ui.space()
         if ln.source == "scholar":
-            _scholar_upload(person_id, ln)
+            _scholar_upload(ln)
         ui.button(
             icon="sync", on_click=lambda i=ln.id: background_tasks.create(_sync_one(person_id, i))
         ).props("flat round dense").tooltip(_("Sync this source"))
@@ -538,9 +538,14 @@ def _validated_card(person_id: int, ln: SourceLink) -> None:
         ui.label(ln.last_error).classes("text-negative text-sm -mt-2 ml-4")
 
 
-def _scholar_upload(person_id: int, ln: SourceLink) -> None:
-    with ui.dialog() as dlg, ui.card():
-        ui.label(_("Upload a saved Google Scholar profile page")).classes("text-lg")
+def _scholar_upload(ln: SourceLink) -> None:
+    ui.button(icon="upload_file", on_click=lambda: _scholar_dialog(ln)).props(
+        "flat round dense"
+    ).tooltip(_("Upload a saved profile page"))
+
+
+def _scholar_dialog(ln: SourceLink) -> None:
+    with transient_dialog(_("Upload a saved Google Scholar profile page")) as (dlg, _card):
         ui.markdown(
             _(
                 "Open the profile, click **Show more** until every paper is listed, then "
@@ -548,7 +553,7 @@ def _scholar_upload(person_id: int, ln: SourceLink) -> None:
             )
         )
 
-        async def handle(e) -> None:
+        async def handle(e) -> bool:
             html = await e.file.text()
             sid = profile_id_from_html(html)
             if sid and sid != ln.external_id:
@@ -558,24 +563,23 @@ def _scholar_upload(person_id: int, ln: SourceLink) -> None:
                     ),
                     type="warning",
                 )
-                return
+                return False
             result = parse_profile(html, [ln.display_name or ""])
             if not result.publications:
                 ui.notify(_("No publications found in this page"), type="warning")
-                return
+                return False
             finish_link(ln.id, result)
             n = len(result.publications)
             ui.notify(
                 ngettext("Imported {n} publications", "Imported {n} publications", n).format(n=n)
             )
             _refresh(sources_list)
-            dlg.close()
             _refresh(stale_banner)
+            return True
 
-        ui.upload(on_upload=handle, auto_upload=True, max_files=1).props('accept=".html,.htm"')
-    ui.button(icon="upload_file", on_click=dlg.open).props("flat round dense").tooltip(
-        _("Upload a saved profile page")
-    )
+        ui.upload(on_upload=ok_handler(dlg, handle), auto_upload=True, max_files=1).props(
+            'accept=".html,.htm"'
+        )
 
 
 def _candidate_card(
@@ -817,10 +821,9 @@ def remove_from_folder_dialog(folder_id: int, person_id: int, done) -> None:
 
     def remove(keep: bool) -> None:
         folders.remove_person(folder_id, person_id, keep=keep)
-        dlg.close()
         done()
 
-    with ui.dialog() as dlg, ui.card().classes("w-[32rem]"):
+    with transient_dialog(width="w-[32rem]") as (dlg, _card):
         ui.label(
             _(
                 "Remove from the folder: keep the person's stars, tags, notes, documents and "
@@ -829,12 +832,14 @@ def remove_from_folder_dialog(folder_id: int, person_id: int, done) -> None:
         )
         with ui.row().classes("justify-end w-full"):
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Delete the data"), color="negative", on_click=lambda: remove(False)).props(
-                "flat"
-            ).mark("remove-delete")
-            ui.button(_("Keep as a period"), on_click=lambda: remove(True)).mark("remove-keep")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+            ui.button(
+                _("Delete the data"),
+                color="negative",
+                on_click=ok_handler(dlg, lambda: remove(False)),
+            ).props("flat").mark("remove-delete")
+            ui.button(_("Keep as a period"), on_click=ok_handler(dlg, lambda: remove(True))).mark(
+                "remove-keep"
+            )
 
 
 def _int(v) -> int | None:

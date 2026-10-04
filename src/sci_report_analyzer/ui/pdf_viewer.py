@@ -21,6 +21,7 @@ from .. import annotations, documents, livereload, pdfs, pdftext
 from ..db.models import Publication
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
+from .dialogs import transient_dialog
 from .theme import MARKDOWN_CSS
 
 if TYPE_CHECKING:
@@ -1344,8 +1345,10 @@ def _open_js(pub_id: int, period: int | None) -> str:
 
 
 def confirm_download(panel: PublicationsPanel, s: PubStat) -> None:
-    with panel.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-        ui.label(_("Download the PDF?")).classes("text-lg font-medium")
+    with (
+        panel.dialogs,
+        transient_dialog(_("Download the PDF?"), width="w-full max-w-xl") as (dlg, _card),
+    ):
         ui.label(s.title or _("(untitled)")).classes("font-medium")
         with ui.column().classes("gap-0 text-sm"):
             for url in s.pdf_urls:
@@ -1376,16 +1379,16 @@ def confirm_download(panel: PublicationsPanel, s: PubStat) -> None:
             ui.button(_("Download and open"), icon="download").on(
                 "click", go, js_handler=_open_js(s.id, panel.period_id)
             ).mark("pdf-download-ok")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
 
 
 def download_dialog(panel: PublicationsPanel, rows: list[PubStat]) -> None:
     """Download the open-access PDFs of the papers shown (those without one yet)."""
     todo = [s for s in rows if not s.pdf and can_download(s)]
     stored = sum(1 for s in rows if s.pdf)
-    with panel.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-2xl"):
-        ui.label(_("Download the PDFs")).classes("text-lg font-medium")
+    with (
+        panel.dialogs,
+        transient_dialog(_("Download the PDFs"), width="w-full max-w-2xl") as (dlg, _card),
+    ):
         ui.label(
             _(
                 "{todo} of the {total} papers shown have an open-access link or a DOI and no "
@@ -1433,5 +1436,3 @@ def download_dialog(panel: PublicationsPanel, rows: list[PubStat]) -> None:
             start = ui.button(_("Download"), icon="download", on_click=run).mark("pdf-batch-ok")
             if not todo:
                 start.disable()
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()

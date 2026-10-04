@@ -16,6 +16,7 @@ from typing import Any
 from nicegui import ui
 
 from ..i18n import _
+from .dialogs import actions, transient_dialog
 
 # How often the screens are checked for changes (seconds).
 CHECK_EVERY = 0.4
@@ -155,20 +156,20 @@ class Edits:
         dirty = self.dirty()
         if not dirty:
             return
-        with ui.dialog() as dlg, ui.card():
+        with transient_dialog() as (dlg, _card):
             ui.label(_("Discard the unsaved changes?")).classes("font-medium")
             ui.label(", ".join(_(s.label) for s in dirty)).classes("text-sm")
 
             def ok() -> None:
                 for s in dirty:
                     s.discard()
-                dlg.close()
                 ui.notify(_("Changes discarded"))
 
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Keep them"), on_click=dlg.close).props("flat")
-                ui.button(_("Discard"), on_click=ok).props("color=negative").mark(
-                    "settings-cancel-confirm"
-                )
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+            actions(
+                dlg,
+                _("Discard"),
+                ok,
+                danger=True,
+                mark="settings-cancel-confirm",
+                cancel=_("Keep them"),
+            )

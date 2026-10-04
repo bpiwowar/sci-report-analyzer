@@ -11,6 +11,7 @@ from .. import annotations, folders, reports
 from ..i18n import N_, _
 from . import unsaved
 from .categories_editor import shared_note
+from .dialogs import ok_handler, transient_dialog
 
 TEMPLATES_HELP = N_(
     "How a paper is cited: `[@key]` followed by the template. `{.notes}`, `{.tags}`, "
@@ -133,8 +134,9 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
     own = reports.folder_templates(folder_id)
     general = reports.load_templates().names
     tags = {t.id: ("⏱ " if t.per_period else "") + t.name for t in annotations.all_tags()}
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-4xl"):
-        ui.label(_("Citations in the notes of {folder}").format(folder=name)).classes("text-lg")
+    with transient_dialog(
+        _("Citations in the notes of {folder}").format(folder=name), width="w-full max-w-4xl"
+    ) as (dlg, _card):
         shared_note(folder_id)
         with ui.row().classes("w-full items-start gap-3"):
             tag = (
@@ -259,18 +261,17 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
             own.append(reports.Template("", "{.index (.short-venue .year)}", ""))
             refresh()
 
-        def save() -> None:
+        def save() -> bool | None:
             try:
                 reports.save_folder_templates(folder_id, own)
             except ValueError as e:
                 ui.notify(str(e), type="negative")
-                return
+                return False
             reports.save_numbering(
                 folder_id,
                 reports.Numbering(tag.value or None, fmt.value or "", listed.value or ""),
             )
             reports.save_skeleton(folder_id, skeleton.value or "")
-            dlg.close()
             ui.notify(_("Saved"), type="positive")
             if on_saved:
                 on_saved()
@@ -281,9 +282,9 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
             )
             ui.space()
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Save"), icon="save", on_click=save).mark("folder-citations-save")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+            ui.button(_("Save"), icon="save", on_click=ok_handler(dlg, save)).mark(
+                "folder-citations-save"
+            )
 
 
 # ---- Whether the notes cite the papers --------------------------------------------------------

@@ -17,6 +17,7 @@ from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
 from ..sync import discover, is_syncing, start_sync
 from .categories_editor import categories_dialog
+from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
 from .folders_editor import ALL, folders_tree
 from .person import purge_dialog, remove_from_folder_dialog
@@ -187,28 +188,23 @@ def _sync(person_ids: list[int] | None) -> None:
 
 
 def _add_dialog(current: folders.FolderView | None) -> None:
-    with ui.dialog() as dialog, ui.card().classes("w-96"):
-        ui.label(
-            _("Add a person to “{folder}”").format(folder=current.name)
-            if current
-            else _("Add a person")
-        ).classes("text-lg")
+    title = (
+        _("Add a person to “{folder}”").format(folder=current.name)
+        if current
+        else _("Add a person")
+    )
+    with transient_dialog(title, width="w-96") as (dialog, _card):
         name = ui.input(_("Full name")).classes("w-full").props("autofocus")
         aff = ui.input(_("Affiliation (optional, helps matching)")).classes("w-full")
 
-        async def ok() -> None:
+        async def ok() -> bool:
             if not name.value.strip():
-                return
-            # Before closing: a closed dialog is deleted, with the context its UI calls need.
+                return False
             await _create(name.value, aff.value, current.id if current else None)
-            dialog.close()
+            return True
 
-        name.on("keydown.enter", ok)
-        with ui.row().classes("justify-end w-full"):
-            ui.button(_("Cancel"), on_click=dialog.close).props("flat")
-            ui.button(_("Add & search sources"), on_click=ok)
-    dialog.on_value_change(lambda e: None if e.value else dialog.delete())
-    dialog.open()
+        name.on("keydown.enter", ok_handler(dialog, ok))
+        actions(dialog, _("Add & search sources"), ok)
 
 
 # ---- a folder ------------------------------------------------------------------------------
@@ -424,27 +420,23 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
         if not ids:
             ui.notify(_("Select people first"), type="warning")
             return
-        with ui.dialog() as dlg, ui.card():
-            ui.label(
-                ngettext(
-                    "Delete {n} person(s) and all their data (sources, publications, "
-                    "tags, stars, periods)?",
-                    "Delete {n} person(s) and all their data (sources, publications, "
-                    "tags, stars, periods)?",
-                    len(ids),
-                ).format(n=len(ids))
-            )
-            with ui.row().classes("justify-end w-full"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
 
-                def confirm() -> None:
-                    folders.delete_people(ids)
-                    ui.navigate.reload()
-                    dlg.close()
+        def ok() -> None:
+            folders.delete_people(ids)
+            ui.navigate.reload()
 
-                ui.button(_("Delete"), color="negative", on_click=confirm).mark("confirm-delete")
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+        confirm(
+            ngettext(
+                "Delete {n} person(s) and all their data (sources, publications, "
+                "tags, stars, periods)?",
+                "Delete {n} person(s) and all their data (sources, publications, "
+                "tags, stars, periods)?",
+                len(ids),
+            ).format(n=len(ids)),
+            _("Delete"),
+            ok,
+            mark="confirm-delete",
+        )
 
     add_btn.on_click(add)
     del_btn.on_click(delete)
@@ -574,8 +566,10 @@ def _tags_editor(member: folders.Member, options: list[str]) -> None:
 
 
 def folder_dialog(f: folders.FolderView | None) -> None:
-    with ui.dialog() as dlg, ui.card().classes("w-96"):
-        ui.label(_("New folder") if f is None else _("Edit folder")).classes("text-lg")
+    with transient_dialog(_("New folder") if f is None else _("Edit folder"), width="w-96") as (
+        dlg,
+        _card,
+    ):
         name = ui.input(_("Name"), value=f.name if f else "").classes("w-full").mark("folder-name")
         with ui.input(_("Date"), value=f.date.isoformat() if f and f.date else "").classes(
             "w-full"
@@ -627,14 +621,14 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 _("The numbered papers (a tag), the number's format, the folder's templates")
             ).mark("folder-citations")
 
-        def save() -> None:
+        def save() -> bool | None:
             if not name.value.strip():
-                return
+                return False
             try:
                 d = date.fromisoformat(day.value) if day.value else None
             except ValueError:
                 ui.notify(_("Invalid date (YYYY-MM-DD)"), type="warning")
-                return
+                return False
             fid = folders.save_folder(
                 f.id if f else None,
                 name.value.strip(),
@@ -643,20 +637,16 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 notes.value if edited["notes"] else ...,
                 primary.value,
             )
-            _goto(fid)  # before closing: a closed dialog loses its client
-            dlg.close()
+            _goto(fid)
 
         def delete() -> None:
             folders.delete_folder(f.id)
             _goto(ALL)
-            dlg.close()
 
         with ui.row().classes("justify-end w-full"):
             if f is not None:
-                ui.button(_("Delete"), on_click=delete).props("flat color=negative").tooltip(
-                    _("Deletes the folder and its periods (people are kept)")
-                )
+                ui.button(_("Delete"), on_click=ok_handler(dlg, delete)).props(
+                    "flat color=negative"
+                ).tooltip(_("Deletes the folder and its periods (people are kept)"))
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Save"), on_click=save).mark("folder-save")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+            ui.button(_("Save"), on_click=ok_handler(dlg, save)).mark("folder-save")
