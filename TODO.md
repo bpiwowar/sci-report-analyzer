@@ -33,3 +33,8 @@ longer matches them.
 - Migration: a paper flagged with a track gets that track as its override, the flags'
   colours become the tracks' colours, flags without a track become tags; then the flag
   tables are dropped.
+
+## PDF: excerpts and PDF.js highlights
+
+When adding an excerpt from text already highlighted with PDF.js, remove that PDF.js
+highlight so that the two don't conflict (overlapping marks).
