@@ -294,7 +294,10 @@ date). Optionally, the influence excerpts are only in the Rayonnement section (t
 (nested as these, one level below), and taken out of their categories (one left empty is
 left out): the folder's settings (“Rayonnement excerpts only in the Rayonnement section”)
 for its notes and the copy, or one block with `[]{.excerpts .nested-influence}` (and
-`[]{.excerpts .flat-influence}` as by default).
+`[]{.excerpts .flat-influence}` as by default). Each category can have a text of its own for
+the person (Markdown, e.g. a summary of its items; its pencil, on hover, in the categories
+tab, or a click on the text): put after its heading, before its items (nested, that of a
+category left empty goes under its subsection of the Rayonnement section).
 
 **Folders** (Reports page) group people, e.g. for a hiring committee: a folder has a name,
 a date and can be hidden. Each person has their **own period** in each of their folders
