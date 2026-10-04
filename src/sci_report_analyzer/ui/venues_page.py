@@ -1543,6 +1543,22 @@ def _relation_label(relation: str) -> str:
     }[kind]
 
 
+def _this_label(relation: str) -> str:
+    """What the open venue is, for a venue searched (``relation``: how that one relates to
+    the open one, see ``venues.guess_relation``)."""
+    kind, _sep, track = relation.partition(":")
+    track = TRACK_LABEL.get(track, track)
+    return {
+        "same": _("The same venue (merged into this one)"),
+        "~track": _("This venue is its {track} track").format(track=track),
+        "track": _("Its main venue (it is this venue's {track} track)").format(track=track),
+        "~joint": _("A joint conference including it"),
+        "joint": _("A part of it (it is a joint conference including this venue)"),
+        "~workshop": _("One of its workshops"),
+        "workshop": _("Its main conference (it is a workshop of this venue)"),
+    }[kind]
+
+
 def _secondary_label(relation: str) -> str:
     """What the secondary venue of a pair is, for the primary one."""
     kind, _sep, track = relation.partition(":")
@@ -1773,8 +1789,103 @@ class _MergeNames:
         )
 
 
+def _relate_dialog(row: venues.VenueRow, other: venues.VenueRow, merged) -> None:
+    """Say what ``row`` is for ``other`` (the same venue, its demo track, a workshop…), the
+    relation guessed from their texts to start with."""
+    guess = venues.guess_relation(row, other)
+    with ui.dialog() as dlg, ui.card().classes("min-w-96"):
+        ui.label(_("What is this venue for “{name}”?").format(name=other.name)).classes(
+            "text-lg font-medium"
+        )
+        rel = (
+            ui.select(
+                {k: _this_label(k) for k in venues.relation_choices(guess, both=True)},
+                value=guess,
+            )
+            .props("dense outlined")
+            .classes("w-full")
+            .mark("venue-relate-choice")
+        )
+        sentence = ui.label().classes("text-sm")
+
+        def show() -> None:
+            sentence.text = (
+                _("“{other}” is merged into “{name}”.").format(other=other.name, name=row.name)
+                if rel.value == "same"
+                else _relation_sentence(row, [other], rel.value)
+            )
+
+        def ok() -> None:
+            dlg.close()
+            if rel.value == "same":
+                _confirm_merge(row, [other], merged, swappable=True)
+            else:
+                merged(venues.relate_venues(row.id, [other.id], rel.value))
+
+        rel.on_value_change(lambda _e: show())
+        show()
+        with ui.row().classes("w-full justify-end"):
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Apply"), icon="check", on_click=ok).mark("venue-relate-ok")
+    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
+    dlg.open()
+
+
+def _track_box(row: venues.VenueRow, merged) -> None:
+    """No main venue to merge into: this venue is a track (demo…) of its conference, all its
+    texts marked so, renamed (its track part removed) to stand for the conference."""
+    guess = venues.venue_track(row)
+    with ui.row().classes("w-full items-center gap-2 no-wrap mt-2"):
+        ui.label(_("No main venue? This venue is a track of its conference:")).classes(
+            "text-sm grow"
+        )
+        track = (
+            ui.select(dict(TRACK_LABEL.items()), value=guess or "demo")
+            .props("dense outlined")
+            .classes("w-36")
+            .mark("venue-as-track-choice")
+        )
+        btn = ui.button(_("Mark as a track…"), icon="label").props("dense flat no-caps")
+        btn.mark("venue-as-track")
+
+    def confirm() -> None:
+        label = TRACK_LABEL.get(track.value, track.value)
+        with ui.dialog() as dlg, ui.card().classes("min-w-96"):
+            ui.label(_("This venue is a {track} track").format(track=label)).classes(
+                "text-lg font-medium"
+            )
+            ui.label(
+                _(
+                    "All its texts are marked as the {track} track: its papers show as such. "
+                    "It stays the venue of its conference, renamed to its conference's name."
+                ).format(track=label)
+            ).classes("text-sm")
+            name = (
+                ui.input(_("Name of the conference"), value=venues.track_free_name(row.name))
+                .props("dense")
+                .classes("w-full")
+                .tooltip(_("The former names stay variants, so their texts keep matching"))
+                .mark("venue-as-track-name")
+            )
+
+            def ok() -> None:
+                venues.mark_as_track(row.id, track.value, (name.value or "").strip() or None)
+                dlg.close()
+                ui.notify(_("Marked as the {track} track").format(track=label))
+                merged(row.id)
+
+            with ui.row().classes("w-full justify-end"):
+                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+                ui.button(_("Apply"), icon="check", on_click=ok).mark("venue-as-track-ok")
+        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
+        dlg.open()
+
+    btn.on_click(confirm)
+
+
 def _merge_tab(row: venues.VenueRow, all_rows: list[venues.VenueRow], merged) -> None:
-    """Search other venues (similar ones suggested) and merge them into this one."""
+    """Search other venues (similar ones suggested) and merge them into this one, or say
+    what this venue is for one (its demo track…); or mark this venue as a track."""
     ui.label(
         _(
             "Merged venues become variants of this one: their texts, rules, ISSNs and papers "
@@ -1822,6 +1933,13 @@ def _merge_tab(row: venues.VenueRow, all_rows: list[venues.VenueRow], merged) ->
                     ui.label(
                         f"{r.short_name or ''} · {KIND_SHORT[r.kind]} · {_papers(r.publications)}"
                     ).classes("text-xs text-grey")
+                    ui.button(
+                        _("This venue is…"),
+                        icon="link",
+                        on_click=lambda r=r: _relate_dialog(row, r, merged),
+                    ).props("dense flat no-caps size=sm color=primary").tooltip(
+                        _("Its demo track, one of its workshops…")
+                    ).mark(f"venue-merge-relate-{i}")
                     ui.link(_("open"), f"/venues?focus={r.id}", new_tab=True).classes("text-xs")
 
     def confirm() -> None:
@@ -1832,3 +1950,4 @@ def _merge_tab(row: venues.VenueRow, all_rows: list[venues.VenueRow], merged) ->
     query.on_value_change(lambda _e: show())
     show()
     update_btn()
+    _track_box(row, merged)
