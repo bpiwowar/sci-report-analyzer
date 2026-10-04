@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import contextlib
 import logging
 from pathlib import Path
 
 from nicegui import app, background_tasks, ui
 
-from . import config, i18n, livereload, stop, venue_match
+from . import config, i18n, livereload, old_reports, stop, venue_match
 from .db import backup
 from .db.session import init_engine
 from .ranking import datasets
@@ -39,6 +40,11 @@ def setup() -> None:
     reset_running_states()
     i18n.load_language()
     venue_match.refresh()
+    if old_reports.pending():  # (once, after the migration asking for it)
+        try:
+            asyncio.run(old_reports.migrate())
+        except Exception:  # (left for the next start)
+            logger.exception("Could not move the old reports into the folders' notes")
     persons.register()
     person.register()
     settings.register()

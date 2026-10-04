@@ -3294,6 +3294,9 @@ msgstr "Séparer en un canal d'atelier dont ce canal est la conférence principa
 msgid "Split into its own venue"
 msgstr "Séparer en un canal distinct"
 
+msgid "Starred papers"
+msgstr "Articles étoilés"
+
 msgid "Start"
 msgstr "Début"
 
