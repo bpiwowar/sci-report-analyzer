@@ -69,3 +69,7 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
   the tag whose papers are numbered (`.index` = the paper's number among the "starred"
   ones, in my case) and the number's format (e.g. `**#{index}**`), instead of a global
   setting.
+- Citation templates defined in general and per folder (a folder's definition overrides
+  the general one), and usable inside other templates: e.g. `.starred` =
+  `.index (.short-venue .year)`, where `.index` is itself expanded (the paper's index
+  among the folder's starred papers, as set above).
