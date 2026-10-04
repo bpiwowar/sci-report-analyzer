@@ -220,10 +220,12 @@ class Side:
             document_id=key if kind == "doc" else None,
             publication_id=key if kind == "pub" else None,
         )
-        if why := categories.merge_excerpts(new, lead.id, ref_only=ref_only):
-            ui.notify(why, type="warning")
-        else:
-            ui.notify(_("Merged with the excerpt"))
+        why = categories.merge_excerpts(new, lead.id, ref_only=ref_only)
+        with self.box:  # (not the picker's dialog, closed: its elements are gone)
+            if why:
+                ui.notify(why, type="warning")
+            else:
+                ui.notify(_("Merged with the excerpt"))
         self.refresh_excerpts()
 
     def refresh_excerpts(self) -> None:
