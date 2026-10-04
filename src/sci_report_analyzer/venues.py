@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -45,6 +44,7 @@ from .ranking.service import (
 )
 from .ranking.tracks import track_ids
 from .source_settings import active_links
+from .text import strip_diacritics
 
 CONFERENCE_KINDS = ("intl_conference", "natl_conference")
 JOURNAL_KINDS = ("intl_journal", "natl_journal")
@@ -578,9 +578,7 @@ def set_joint_use(venue_id: int, part_id: int | None) -> None:
 
 
 def _fold(text: str) -> str:
-    return "".join(
-        c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c)
-    ).upper()
+    return strip_diacritics(text).upper()
 
 
 _WORD = re.compile(r"[^\W\d_][\w&+]*")

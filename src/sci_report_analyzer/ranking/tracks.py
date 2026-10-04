@@ -18,7 +18,6 @@ regexes) give from its name, if any.
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -26,6 +25,7 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from ..i18n import language
+from ..text import ascii_fold
 
 FINDINGS_ID = "findings"
 # A publication's track override meaning "the main track" (no satellite track): see
@@ -264,7 +264,7 @@ def completed(tracks: Iterable[Track]) -> list[Track]:
 
 def new_id(name: str, taken: Iterable[str]) -> str:
     """An id for a new track named ``name`` ("Industry papers" → "industry_papers")."""
-    ascii_ = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    ascii_ = ascii_fold(name)
     base = re.sub(r"[^a-z0-9]+", "_", ascii_.lower()).strip("_") or "track"
     taken = {*taken, MAIN}
     out, n = base, 1

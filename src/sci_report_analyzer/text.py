@@ -2,10 +2,23 @@
 
 from __future__ import annotations
 
+import re
 import unicodedata
+
+_COMBINING = re.compile("[̀-ͯ]")
+
+
+def strip_diacritics(text: str) -> str:
+    """Accents stripped ("Névéol": "Neveol"); the other characters kept ("ð", "张")."""
+    return _COMBINING.sub("", unicodedata.normalize("NFD", text))
 
 
 def ascii_fold(text: str) -> str:
-    """The text in ASCII: accents stripped, other non-ASCII characters dropped ("Névéol":
-    "Neveol", "Guðmundsson": "Gumundsson"); case and punctuation kept."""
+    """The text in ASCII: accents stripped, compatibility forms decomposed ("ﬁ": "fi"), the
+    other non-ASCII characters dropped ("Guðmundsson": "Gumundsson"); case kept."""
     return unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+
+
+def ascii_key(text: str) -> str:
+    """Lowercase ASCII letters and digits only ("Kronland-Martinet": "kronlandmartinet")."""
+    return re.sub(r"[^a-z0-9]+", "", ascii_fold(text).lower())

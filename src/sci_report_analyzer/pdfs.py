@@ -8,7 +8,6 @@ import io
 import logging
 import re
 import shutil
-import unicodedata
 import zipfile
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -24,6 +23,7 @@ from .db.session import session_scope
 from .files import atomic_write
 from .sources import PRIORITY
 from .sources.base import client, contact_email, normalize_doi
+from .text import ascii_fold
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +79,7 @@ async def install_viewer() -> None:
 
 
 def _slug(title: str | None) -> str:
-    text = unicodedata.normalize("NFKD", title or "").encode("ascii", "ignore").decode()
-    return re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-")[:60] or "paper"
+    return re.sub(r"[^A-Za-z0-9]+", "-", ascii_fold(title or "")).strip("-")[:60] or "paper"
 
 
 def file_of(pub_id: int) -> Path | None:
