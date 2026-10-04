@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from ..i18n import N_, Labels
 from .badge import Badge
+from .detection import Rule
 
 KINDS: dict[str, str] = Labels(
     {
@@ -89,45 +90,13 @@ NO_VENUE_KINDS = ("book", "chapter", "thesis")
 # Conference-like kinds (a paper in them is in "proceedings"; levels are CORE ranks).
 CONFERENCE_LIKE = ("intl_conference", "natl_conference", *WORKSHOP_KINDS)
 
-# A workshop: "Workshop on ...", "Trustworthy AI @ ACM Multimedia", "... co-located with
-# ...". Its rank is that of its main conference.
-WORKSHOP_RE = re.compile(
-    r"\bworkshops?\b|\bateliers?\b|(?-i:(?<=\w)\s*@\s*(?=[A-Z]))|\bco-located\b"
-    r"|\bin conjunction with\b",
-    re.I,
-)
-# The main conference named in a workshop text ("X @ SIGIR 2021", "co-located with ECIR").
-_HOST_RE = re.compile(
-    r"(?-i:(?<=\w)\s*@\s*)(?P<a>[^,:;()]+)|(?:co-located|in conjunction) with (?:the )?"
-    r"(?P<b>[^,:;()]+)",
-    re.I,
-)
-
-
-# Shared tasks and evaluation campaigns (SemEval, TREC, CLEF labs, NTCIR...): their working
-# notes. A venue mixing them with research papers (WMT, BioNLP's "Workshop and Shared
-# Task") is not one: its papers' titles tell.
-SHARED_TASK_VENUE_RE = re.compile(
-    r"\bworking notes\b|\bsemantic evaluations?\b|\bText REtrieval Conference\b"
-    r"|\bevaluation campaigns?\b|\bbenchmarking initiative\b"
-    r"|\bForum for Information Retrieval Evaluation\b"
-    r"|(?-i:\b(?:SemEval|TREC|NTCIR|MediaEval|ImageCLEF|LifeCLEF)\b)",
-    re.I,
-)
-_CAMPAIGNS = (
-    r"SemEval|TREC|NTCIR|MediaEval|WMT|IWSLT|CLEF|ImageCLEF|LifeCLEF|BioASQ|CheckThat!?"
-    r"|eRisk|Touché|FIRE|DEFT|GermEval|IberLEF|EvaLatin|MIREX"
-)
-# A participant's or an organiser's paper: "X at SemEval-2017 Task 12: ...", "Findings of
-# the WMT 2018 ... Shared Task", "Overview of the CLEF eHealth Evaluation Lab 2016",
-# "... Notebook for the ImageCLEF Lab at CLEF 2025".
-SHARED_TASK_TITLE_RE = re.compile(
-    r"\bshared[- ]tasks?\b|\bnotebook for the\b|\b(?:evaluation|benchmarking) (?:lab|campaign)s?\b"
-    rf"|(?-i:\b(?:{_CAMPAIGNS})(?:[- ]?(?:19|20)\d{{2}}\b|\s+Task\s*\d))"
-    rf"|(?:\bat|@)\s+(?:the\s+)?(?-i:(?:{_CAMPAIGNS})\b)"
-    r"|^\s*(?:an\s+)?overview\s+of\b.*\b(?:lab|track|task|challenge)\b",
-    re.I,
-)
+# The regexes deciding a kind (Settings → Detection rules; defaults in ``detection``).
+# A workshop's rank is that of its main conference.
+WORKSHOP_RE = Rule("workshop")
+_HOST_RE = Rule("workshop_host")
+# Shared tasks and evaluation campaigns: their venues, and their papers' titles.
+SHARED_TASK_VENUE_RE = Rule("shared_task_venue")
+SHARED_TASK_TITLE_RE = Rule("shared_task_title")
 
 
 def host_text(venue: str | None) -> str | None:
@@ -135,7 +104,7 @@ def host_text(venue: str | None) -> str | None:
     m = _HOST_RE.search(venue or "")
     if not m:
         return None
-    return (m.group("a") or m.group("b") or "").strip() or None
+    return next((g.strip() for g in m.groups() if g and g.strip()), None)
 
 
 DEFAULT_NATIONAL_KEYWORDS = [
@@ -173,16 +142,8 @@ DEFAULT_INTERNATIONAL_KEYWORDS = [
     "Springer",
 ]
 
-_CONFERENCE_RE = re.compile(
-    r"\b(conf(erence)?|symposium|workshops?|proceedings|proc\.|meeting|congress|colloquium|"
-    r"conférence|colloque|journées|atelier|rencontres|forum|summit)\b",
-    re.I,
-)
-_JOURNAL_RE = re.compile(
-    r"\b(journal|transactions|trans\.|revue|letters|review|magazine|annals|bulletin|"
-    r"quarterly|j\.)\b",
-    re.I,
-)
+_CONFERENCE_RE = Rule("conference")
+_JOURNAL_RE = Rule("journal")
 # Document types (DBLP / HAL / OpenAlex / ORCID) that are neither papers in a conference
 # nor in a journal.
 # Edited volumes: proceedings, edited books (DBLP, HAL, Crossref).

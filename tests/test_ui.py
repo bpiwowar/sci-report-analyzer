@@ -132,6 +132,7 @@ async def test_period_filter(user: User) -> None:
         "rules-en",
         "rules-fr",
         "kinds",
+        "detection",
         "flags",
         "data",
         "keys",
@@ -768,6 +769,29 @@ async def test_norm_rules_save(user: User) -> None:
     await user.should_see("Cleaning rules saved")
     rules = [r for r in load_settings().norm_rules if r.language is None]
     assert rules[0].pattern == r"^Proc\. " and rules[0].id == "custom1"
+
+
+async def test_detection_rules(user: User) -> None:
+    """A detection rule is edited (its default shown), previewed, saved and reset."""
+    from sci_report_analyzer.ranking.detection import DEFAULTS
+    from sci_report_analyzer.ranking.service import load_settings
+
+    def workshop() -> str:
+        return next(r for r in load_settings().detection_rules if r.id == "workshop").pattern
+
+    await user.open("/settings?tab=detection")
+    await user.should_see("Detection rules")
+    await user.should_see("Shared task paper")
+    user.find("detect-try-venue").type("Seminar on Foo @ ECIR")
+    await user.should_see("main conference: “ECIR”")
+    user.find("detect-pattern-workshop").elements.pop().value = r"\bseminars?\b"
+    await user.should_see("default: " + DEFAULTS["workshop"].pattern + " [ignore case]")
+    user.find("detect-save").click()
+    await user.should_see("Detection rules saved")
+    assert workshop() == r"\bseminars?\b"
+    user.find("detect-reset-workshop").click()
+    user.find("detect-save").click()
+    assert workshop() == DEFAULTS["workshop"].pattern
 
 
 async def test_language_cleaning_rules(user: User) -> None:

@@ -8,7 +8,7 @@ from typing import Any
 
 from ..authors import name_key
 from ..i18n import _
-from ..ranking.badge import detect_track
+from ..ranking.badge import FINDINGS_RE, detect_track
 from ..ranking.kinds import WORKSHOP_RE
 from ..ranking.normalize import is_non_venue, normalize
 from .base import (
@@ -96,7 +96,7 @@ def dblp_venue(published_in: str | None, streams: list[str], series: list[str]) 
     satellite = published_in and (
         detect_track(published_in)
         or WORKSHOP_RE.search(published_in)
-        or re.search(r"\bfindings\b", published_in, re.I)
+        or FINDINGS_RE.search(published_in)
     )
     if satellite and stream and _is_the_event(published_in, stream):
         satellite = False

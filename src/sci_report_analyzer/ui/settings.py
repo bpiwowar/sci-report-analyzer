@@ -25,9 +25,9 @@ from .. import (
 from ..db.models import JcrRecord
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
-from ..ranking import datasets
-from ..ranking.badge import SOURCE_LABELS, TOGGLABLE_SOURCES, TRACK_LABEL
-from ..ranking.kinds import KINDS
+from ..ranking import datasets, detection
+from ..ranking.badge import FINDINGS_RE, SOURCE_LABELS, TOGGLABLE_SOURCES, TRACK_LABEL, detect_track
+from ..ranking.kinds import KINDS, WORKSHOP_RE, KindEvidence, detect_kind, host_text
 from ..ranking.normalize import NormRule, apply_rules, default_rules, normalize
 from ..ranking.service import load_settings, save_settings, service
 from ..sources import ADAPTERS
@@ -50,6 +50,7 @@ NAV = (
             (None, N_("Language-specific"), 1),
             *((f"rules-{lang}", name, 2) for lang, name in i18n.LANGUAGES.items()),
             ("kinds", N_("Venue kinds"), 0),
+            ("detection", N_("Detection rules"), 0),
         ),
     ),
     (N_("Annotations"), (("flags", N_("Flags, tags & categories"), 0),)),
@@ -69,6 +70,7 @@ PANELS = {
     "rules": lambda: rules_tab(),
     **{f"rules-{lang}": (lambda lang=lang: rules_tab(lang)) for lang in i18n.LANGUAGES},
     "kinds": lambda: kinds_tab(),
+    "detection": lambda: detection_tab(),
     "flags": lambda: flags_tab(),
     "contribution": lambda: contribution_tab(),
     "reports": lambda: report_templates_tab(),
@@ -1266,6 +1268,144 @@ def kinds_tab() -> None:
         ui.notify(_("Saved"), type="positive")
 
     ui.button(_("Save"), icon="save", on_click=save).classes("mt-2")
+
+
+# ---- detection rules -----------------------------------------------------------------------
+
+
+def _try_detection(st, venue: str, title: str) -> str:
+    """What the rules in force detect in a venue text and a paper title."""
+    ev = KindEvidence(venue or None, title=title or None)
+    kind = detect_kind(
+        None,
+        ev,
+        national_keywords=st.national_keywords,
+        international_keywords=st.international_keywords,
+        unknown_scope=st.unknown_scope,
+    )
+    out = [_("kind: {kind}").format(kind=KINDS.get(kind, kind))]
+    if track := detect_track(venue) or ("findings" if FINDINGS_RE.search(venue) else None):
+        out.append(_("track: {track}").format(track=TRACK_LABEL.get(track, track)))
+    if WORKSHOP_RE.search(venue) and (host := host_text(venue)):
+        out.append(_("main conference: “{host}”").format(host=host))
+    if detection.regex("joint").search(venue):
+        out.append(_("joint conference"))
+    return " · ".join(out)
+
+
+def detection_tab() -> None:
+    st = load_settings()
+    ui.label(_("Detection rules")).classes("text-lg")
+    ui.label(
+        _(
+            "Python regular expressions classifying the venues and papers when no decision "
+            "was made by hand: shared tasks, workshops and their main conference, conference "
+            "or journal, tracks, joint conferences. {rule:campaigns} in a pattern stands for "
+            "the pattern of the rule with that id; (?-i:…) makes a part case-sensitive. Each "
+            "rule shows its default when changed."
+        )
+    ).classes("text-grey text-sm")
+    rules = {r.id: r.model_copy() for r in st.detection_rules}
+
+    def compiled() -> dict:
+        return detection.compile_rules(rules.values())
+
+    # Live preview with the rules as edited (saved or not).
+    with ui.row().classes("items-center gap-2 w-full"):
+        venue = (
+            ui.input(_("Try a venue text"), placeholder="Trustworthy AI @ ACM Multimedia 2024")
+            .props("dense outlined clearable debounce=300")
+            .classes("grow")
+            .mark("detect-try-venue")
+        )
+        title = (
+            ui.input(_("and a paper title"), placeholder="Team Foo at SemEval-2017 Task 12")
+            .props("dense outlined clearable debounce=300")
+            .classes("grow")
+            .mark("detect-try-title")
+        )
+    result = ui.label().classes("font-mono text-sm").mark("detect-result")
+
+    def preview(_e=None) -> None:
+        if not (venue.value or title.value):
+            result.text = ""
+            return
+        with detection.using(rules.values()):
+            result.text = _try_detection(st, venue.value or "", title.value or "")
+
+    venue.on_value_change(preview)
+    title.on_value_change(preview)
+
+    def examples(d: detection.DetectionDefault) -> None:
+        rx = compiled()[d.id]
+        if rx is None:
+            ui.label(_("invalid regex")).classes("text-negative text-xs")
+            return
+        for ex in d.examples:
+            m = rx.search(ex)
+            text = f"{'✓' if m else '✗'} “{ex}”"
+            if m and m.lastindex:
+                text += " → “{}”".format(next((g for g in m.groups() if g), "").strip())
+            ui.label(text).classes("text-xs font-mono " + ("text-grey" if m else "text-negative"))
+
+    def card(d: detection.DetectionDefault) -> None:
+        r = rules[d.id]
+
+        @ui.refreshable
+        def body() -> None:
+            with ui.row().classes("items-center gap-2 w-full no-wrap"):
+                ui.label(_(d.name)).classes("font-bold w-48 shrink-0")
+                ui.input(
+                    _("pattern"), value=r.pattern, on_change=lambda e: (shown.refresh(), preview())
+                ).bind_value(r, "pattern").props("dense outlined debounce=300").classes(
+                    "grow font-mono"
+                ).mark(f"detect-pattern-{d.id}")
+                ui.checkbox(
+                    _("ignore case"),
+                    value=r.ignore_case,
+                    on_change=lambda e: (shown.refresh(), preview()),
+                ).bind_value(r, "ignore_case")
+                ui.button(icon="restart_alt", on_click=reset).props("flat round dense").tooltip(
+                    _("Reset to the default")
+                ).mark(f"detect-reset-{d.id}")
+            shown()
+
+        @ui.refreshable
+        def shown() -> None:
+            with ui.column().classes("gap-0 pl-52 w-full"):
+                ui.label(_(d.description)).classes("text-xs text-grey")
+                if (r.pattern, r.ignore_case) != (d.pattern, d.ignore_case):
+                    case = " " + _("[ignore case]") if d.ignore_case else ""
+                    ui.label(_("default: {pattern}").format(pattern=d.pattern + case)).classes(
+                        "text-xs text-grey font-mono break-all"
+                    )
+                examples(d)
+
+        def reset() -> None:
+            r.pattern, r.ignore_case = d.pattern, d.ignore_case
+            body.refresh()
+            preview()
+
+        with ui.column().classes("w-full gap-1 border rounded p-2"):
+            body()
+
+    for group, label in detection.DETECTION_GROUPS.items():
+        ui.label(label).classes("text-md font-bold mt-3")
+        for d in detection.DEFAULT_DETECTION_RULES:
+            if d.group == group:
+                card(d)
+
+    def save() -> None:
+        bad = [_(detection.DEFAULTS[k].name) for k, rx in compiled().items() if rx is None]
+        if bad:
+            ui.notify(_("Invalid rule: {names}").format(names=", ".join(bad)), type="negative")
+            return
+        new = load_settings()
+        new.detection_rules = list(rules.values())
+        save_settings(new)
+        ui.notify(_("Detection rules saved"), type="positive")
+
+    ui.button(_("Save the rules"), icon="save", on_click=save).classes("mt-2").mark("detect-save")
 
 
 # ---- import / export -----------------------------------------------------------------------

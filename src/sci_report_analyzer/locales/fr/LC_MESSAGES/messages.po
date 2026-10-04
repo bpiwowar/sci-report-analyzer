@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 10:58+0200\n"
+"POT-Creation-Date: 2026-10-04 11:25+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -179,6 +179,15 @@ msgstr ""
 "personnes ayant un profil validé sur cette source ; un dossier peut en "
 "utiliser une autre."
 
+msgid ""
+"A paper title saying it is a participant's or an organiser's paper of a "
+"shared task: the paper is a shared task paper, whatever its venue (unless"
+" a journal)."
+msgstr ""
+"Un titre d'article disant que c'est l'article d'un participant ou d'un "
+"organisateur d'une campagne d'évaluation : l'article est un article de "
+"campagne d'évaluation, quel que soit son canal (sauf une revue)."
+
 msgid "A part of it (it is a joint conference including this venue)"
 msgstr "Une de ses parties (c'est une conférence jointe incluant ce canal)"
 
@@ -225,6 +234,54 @@ msgstr ""
 "d'après les acronymes de ses textes. Ses articles prennent le niveau "
 "commun à ses conférences ; s'ils diffèrent, celui que vous choisissez "
 "(sinon le plus bas). Un niveau fixé à la main ci-dessous prime."
+
+msgid ""
+"A venue text joining two conferences (its parts are then looked for among"
+" the venues)."
+msgstr ""
+"Un texte de canal joignant deux conférences (ses parties sont alors "
+"cherchées parmi les canaux)."
+
+msgid ""
+"A venue text naming a Findings volume (ACL's, EMNLP's…): ranked apart "
+"from the main conference."
+msgstr ""
+"Un texte de canal nommant un volume Findings (d'ACL, d'EMNLP…) : classé à"
+" part de la conférence principale."
+
+msgid ""
+"A venue text naming a conference, when neither the rankings nor the "
+"sources say whether it is a conference or a journal."
+msgstr ""
+"Un texte de canal nommant une conférence, quand ni les classements ni les"
+" sources ne disent si c'est une conférence ou une revue."
+
+msgid "A venue text naming a demo track."
+msgstr "Un texte de canal nommant une session de démonstrations."
+
+msgid "A venue text naming a journal (after the conference rule)."
+msgstr "Un texte de canal nommant une revue (après la règle des conférences)."
+
+msgid "A venue text naming a short paper track."
+msgstr "Un texte de canal nommant une session d'articles courts."
+
+msgid "A venue text naming a tutorial track."
+msgstr "Un texte de canal nommant une session de tutoriels."
+
+msgid ""
+"A venue text naming a workshop (ranked as its main conference): “Workshop"
+" on…”, “X @ SIGIR”, “co-located with…”."
+msgstr ""
+"Un texte de canal nommant un atelier (classé comme sa conférence "
+"principale) : « Workshop on… », « X @ SIGIR », « co-located with… »."
+
+msgid ""
+"A venue text naming an evaluation campaign or its working notes: its "
+"papers are shared task papers (unranked), unless in a journal."
+msgstr ""
+"Un texte de canal nommant une campagne d'évaluation ou ses notes de "
+"travail : ses articles sont des articles de campagne d'évaluation (non "
+"classés), sauf dans une revue."
 
 msgid "A workshop of this venue"
 msgstr "Un atelier de ce canal"
@@ -785,6 +842,9 @@ msgstr "Conférence"
 msgid "Conference (CORE)"
 msgstr "Conférence (CORE)"
 
+msgid "Conference or journal"
+msgstr "Conférence ou revue"
+
 msgid "Conferences"
 msgstr "Conférences"
 
@@ -992,8 +1052,17 @@ msgstr "Supprime le dossier et ses périodes (les personnes sont conservées)"
 msgid "Demo"
 msgstr "Démo"
 
+msgid "Demo track"
+msgstr "Session de démonstrations"
+
 msgid "Details"
 msgstr "Détails"
+
+msgid "Detection rules"
+msgstr "Règles de détection"
+
+msgid "Detection rules saved"
+msgstr "Règles de détection enregistrées"
 
 msgid "Discard: not this person (won't be suggested again)"
 msgstr "Écarter : ce n'est pas cette personne (ne sera plus proposé)"
@@ -1134,6 +1203,15 @@ msgstr ""
 "Vide : d'après les sources / les noms de la personne ; 0 : l'ordre n'a "
 "pas d'importance (p. ex. actes édités)"
 
+msgid "Empty: inferred (ranking record acronym, venue texts)"
+msgstr "Vide : déduit (acronyme de l'entrée de classement, textes du canal)"
+
+#, python-brace-format
+msgid "Empty: inferred (ranking record acronym, venue texts): “{short}”"
+msgstr ""
+"Vide : déduit (acronyme de l'entrée de classement, textes du canal) : « "
+"{short} »"
+
 msgid "Empty: texts of every source"
 msgstr "Vide : textes de toutes les sources"
 
@@ -1162,6 +1240,9 @@ msgid ""
 msgstr ""
 "Estimé : {n} ans avant la soutenance (theses.fr ne donne le début que des"
 " thèses en cours)"
+
+msgid "Evaluation campaigns"
+msgstr "Campagnes d'évaluation"
 
 msgid "Event"
 msgstr "Événement"
@@ -1272,6 +1353,9 @@ msgstr "Trouver les articles"
 
 msgid "Find the papers first"
 msgstr "Trouvez d'abord les articles"
+
+msgid "Findings"
+msgstr "Findings"
 
 msgid "Findings track (host conference rank)"
 msgstr "Session Findings (rang de la conférence hôte)"
@@ -1631,6 +1715,12 @@ msgstr ""
 "Les données JCR sont propriétaires : exportez un CSV depuis Clarivate et "
 "importez-le ici (les colonnes nom de revue, ISSN, facteur d’impact et "
 "quartile sont détectées)."
+
+msgid "Joint conference"
+msgstr "Conférence conjointe"
+
+msgid "Joint conferences"
+msgstr "Conférences conjointes"
 
 msgid "Joint venue"
 msgstr "Canal conjoint"
@@ -2082,6 +2172,9 @@ msgstr "Non"
 
 msgid "No PDF stored for this paper."
 msgstr "Aucun PDF stocké pour cet article."
+
+msgid "No acronym"
+msgstr "Pas d'acronyme"
 
 msgid "No candidate"
 msgstr "Aucun candidat"
@@ -2645,6 +2738,22 @@ msgstr ""
 "sur la page Canaux ou depuis les détails d’un article)."
 
 #, python-brace-format
+msgid ""
+"Python regular expressions classifying the venues and papers when no "
+"decision was made by hand: shared tasks, workshops and their main "
+"conference, conference or journal, tracks, joint conferences. "
+"{rule:campaigns} in a pattern stands for the pattern of the rule with "
+"that id; (?-i:…) makes a part case-sensitive. Each rule shows its default"
+" when changed."
+msgstr ""
+"Expressions régulières Python classant les canaux et les articles quand "
+"aucune décision n'a été prise à la main : campagnes d'évaluation, "
+"ateliers et leur conférence principale, conférence ou revue, sessions, "
+"conférences conjointes. {rule:campaigns} dans un motif représente le "
+"motif de la règle de cet identifiant ; (?-i:…) rend une partie sensible à"
+" la casse. Chaque règle modifiée affiche sa valeur par défaut."
+
+#, python-brace-format
 msgid "Quartile {quartile}"
 msgstr "Quartile {quartile}"
 
@@ -2667,10 +2776,12 @@ msgstr "Citation"
 msgid "Quote its text too"
 msgstr "Citer aussi son texte"
 
-msgid "Quote the text selected in the PDF (or the highlight clicked), with its page (Q)"
-msgstr ""
-"Citer le texte sélectionné dans le PDF (ou le surlignage cliqué), avec sa "
+msgid ""
+"Quote the text selected in the PDF (or the highlight clicked), with its "
 "page (Q)"
+msgstr ""
+"Citer le texte sélectionné dans le PDF (ou le surlignage cliqué), avec sa"
+" page (Q)"
 
 msgid "Rank"
 msgstr "Rang"
@@ -2802,6 +2913,9 @@ msgstr "Rapport · {person} · {period}"
 
 msgid "Reports"
 msgstr "Rapports"
+
+msgid "Reset to the default"
+msgstr "Revenir à la valeur par défaut"
 
 msgid "Reset to the defaults"
 msgstr "Revenir aux valeurs par défaut"
@@ -3011,7 +3125,9 @@ msgstr ""
 "Sélectionnez d'abord le texte à classer (ou une zone avec du texte, ou "
 "cliquez sur un surlignage)"
 
-msgid "Select the text to quote (or an area with text, or click a highlight) first"
+msgid ""
+"Select the text to quote (or an area with text, or click a highlight) "
+"first"
 msgstr ""
 "Sélectionnez d'abord le texte à citer (ou une zone avec du texte, ou "
 "cliquez sur un surlignage)"
@@ -3051,6 +3167,12 @@ msgstr "Campagne d'éval."
 msgid "Shared task / evaluation campaign"
 msgstr "Campagne d'évaluation (shared task)"
 
+msgid "Shared task paper"
+msgstr "Article de campagne d'évaluation"
+
+msgid "Shared task venue"
+msgstr "Canal de campagne d'évaluation"
+
 msgid "Shared tasks"
 msgstr "Campagnes d'évaluation"
 
@@ -3065,6 +3187,9 @@ msgstr "Nom court (acronyme)"
 
 msgid "Short names"
 msgstr "Noms courts"
+
+msgid "Short paper track"
+msgstr "Session d'articles courts"
 
 msgid "Show"
 msgstr "Afficher"
@@ -3311,12 +3436,28 @@ msgstr ""
 "Les anciens noms restent des variantes, leurs textes sont donc toujours "
 "reconnus"
 
+msgid ""
+"The main conference a workshop text names: the text of the first group "
+"that matches (suggested as the workshop's host)."
+msgstr ""
+"La conférence principale que nomme le texte d'un atelier : le texte du "
+"premier groupe qui correspond (suggéré comme hôte de l'atelier)."
+
 msgid "The main conference of this workshop"
 msgstr "La conférence principale de cet atelier"
 
 #, python-brace-format
 msgid "The main venue (this one is its {track} track)"
 msgstr "Le canal principal (celui-ci est sa session {track})"
+
+#, python-brace-format
+msgid ""
+"The names of the evaluation campaigns, used by the shared task paper rule"
+" as {rule:campaigns} (case-sensitive there)."
+msgstr ""
+"Les noms des campagnes d'évaluation, utilisés par la règle des articles "
+"de campagne d'évaluation sous la forme {rule:campaigns} (sensibles à la "
+"casse là)."
 
 msgid ""
 "The other sources' venues are then ignored for this paper, also after a "
@@ -3473,6 +3614,9 @@ msgid_plural "This removes, for {n} person(s):"
 msgstr[0] "Cela supprime, pour {n} personne :"
 msgstr[1] "Cela supprime, pour {n} personnes :"
 
+msgid "This venue has no acronym: none is inferred"
+msgstr "Ce canal n'a pas d'acronyme : aucun n'est déduit"
+
 msgid "This venue has no paper any more"
 msgstr "Ce canal n'a plus d'article"
 
@@ -3521,11 +3665,17 @@ msgstr "Session enregistrée"
 msgid "Track: {why}"
 msgstr "Session : {why}"
 
+msgid "Tracks"
+msgstr "Sessions"
+
 msgid "Try a venue text"
 msgstr "Essayer un texte de canal de publication"
 
 msgid "Tutorial"
 msgstr "Tutoriel"
+
+msgid "Tutorial track"
+msgstr "Session de tutoriels"
 
 msgid "Two roles have the same name"
 msgstr "Deux rôles ont le même nom"
@@ -3659,6 +3809,9 @@ msgstr "Valider"
 
 msgid "Validate for this paper"
 msgstr "Valider pour cet article"
+
+msgid "Validate the inferred acronym (set it by hand)"
+msgstr "Valider l'acronyme déduit (le fixer à la main)"
 
 msgid "Validated sources"
 msgstr "Sources validées"
@@ -3811,9 +3964,15 @@ msgstr ""
 "ex. TALN) en en tenant compte. Les mots-clés nationaux l’emportent sur "
 "les internationaux."
 
+msgid "Workshop"
+msgstr "Atelier"
+
 #, python-brace-format
 msgid "Workshop {category}"
 msgstr "Atelier {category}"
+
+msgid "Workshop's main conference"
+msgstr "Conférence principale d'un atelier"
 
 #, python-brace-format
 msgid "Workshop: the rank of its main conference in {year}, “{host}”"
@@ -3874,6 +4033,9 @@ msgstr "le reconnaît aussi"
 
 msgid "amber (the default)"
 msgstr "ambre (par défaut)"
+
+msgid "and a paper title"
+msgstr "et un titre d'article"
 
 msgid "any source"
 msgstr "toute source"
@@ -3952,6 +4114,10 @@ msgstr "corrigé"
 #, python-brace-format
 msgid "default level of “{kind}” (Settings → Venue kinds)"
 msgstr "niveau par défaut de « {kind} » (Paramètres → Types de canaux)"
+
+#, python-brace-format
+msgid "default: {pattern}"
+msgstr "par défaut : {pattern}"
 
 msgid "defended"
 msgstr "soutenue"
@@ -4110,9 +4276,16 @@ msgstr ""
 msgid "its year"
 msgstr "son année"
 
+msgid "joint conference"
+msgstr "conférence conjointe"
+
 #, python-brace-format
 msgid "key: “{key}”"
 msgstr "clé : « {key} »"
+
+#, python-brace-format
+msgid "kind: {kind}"
+msgstr "type : {kind}"
 
 #, python-brace-format
 msgid "last sync {when}"
@@ -4135,6 +4308,10 @@ msgstr "local : {value}"
 
 msgid "main conference of the workshop"
 msgstr "conférence principale de l'atelier"
+
+#, python-brace-format
+msgid "main conference: “{host}”"
+msgstr "conférence principale : « {host} »"
 
 msgid "manual"
 msgstr "manuel"

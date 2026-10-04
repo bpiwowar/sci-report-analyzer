@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import quote
 
 from ..i18n import N_, Labels, _
+from .detection import Rule
 from .matcher import Record, record_key
 
 SOURCES = ("scimago", "core", "jcr", "openalex", "predatory", "manual", "archival")
@@ -349,11 +350,9 @@ TRACK_LABEL = Labels(
 )
 # Workshops are a venue kind (ranked as their main conference), not a track.
 TRACK_ORDER = ("findings", "tutorial", "demo", "short")
-_TRACK_RE = (
-    (re.compile(r"\btutorials?\b", re.I), "tutorial"),
-    (re.compile(r"\b(?:demos?|demonstrations?)\b", re.I), "demo"),
-    (re.compile(r"\bshort papers?\b", re.I), "short"),
-)
+# Their regexes (Settings → Detection rules), tried in this order.
+_TRACK_RE = tuple((Rule(f"track_{t}"), t) for t in ("tutorial", "demo", "short"))
+FINDINGS_RE = Rule("track_findings")
 
 
 def detect_track(venue: str | None) -> str | None:

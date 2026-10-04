@@ -17,6 +17,7 @@ from .db.models import AppSetting, Publication, SourceLink, SourcePub, Venue, Ve
 from .db.session import session_scope
 from .i18n import _
 from .ranking.badge import (
+    FINDINGS_RE,
     TRACK_ORDER,
     Badge,
     category_of,
@@ -25,6 +26,7 @@ from .ranking.badge import (
     detect_track,
     edition_year,
 )
+from .ranking.detection import Rule
 from .ranking.kinds import (
     KINDS,
     VENUE_KINDS,
@@ -1028,14 +1030,8 @@ def merge_proposals(rows: list[VenueRow]) -> list[tuple[VenueRow, VenueRow, floa
 # including it or one of its workshops. "~" reverses it: the venue is the other's track…
 
 RELATION_KINDS = ("same", "track", "joint", "workshop")
-_FINDINGS = re.compile(r"\bfindings\b", re.I)
-# Two conferences joined by "and" ("… Conference on X and the International Joint Conference
-# on Y"); IJCAI, a single "International Joint Conference", is not one.
-_JOINT = re.compile(
-    r"\b(?:conference|symposium|meeting|workshop)\b.*\band\b(?:\s+the)?\b.*"
-    r"\b(?:conference|symposium|meeting|workshop)\b",
-    re.I,
-)
+# A venue joining two conferences (Settings → Detection rules).
+_JOINT = Rule("joint")
 
 
 def _texts(r: VenueRow) -> list[str]:
@@ -1043,7 +1039,7 @@ def _texts(r: VenueRow) -> list[str]:
 
 
 def _track_word(text: str) -> str | None:
-    if _FINDINGS.search(text):
+    if FINDINGS_RE.search(text):
         return "findings"
     return detect_track(text)
 
