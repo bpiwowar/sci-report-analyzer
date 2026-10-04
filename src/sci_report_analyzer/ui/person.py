@@ -93,7 +93,7 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
         with frame(_("Not found")):
             ui.label(_("Unknown person"))
         return
-    # The folder the person is seen from: that of the period, else the People page's one.
+    # The folder the person is seen from: that of the period, else the Reports page's one.
     state_period = period or annotations.panel_state(person_id).get("period_id")
     folder = folders.folder_of_period(state_period)
     if folder is None:
