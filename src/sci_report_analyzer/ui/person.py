@@ -35,7 +35,7 @@ from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .documents_page import documents_view
 from .folder_notes import NOTES_TIP, notes_url
 from .panel import PublicationsPanel, period_label
-from .theme import STATUS_COLOUR, fmt_dt, frame, source_tag
+from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, source_tag
 
 
 def _refresh(r) -> None:
@@ -698,7 +698,9 @@ def periods_view(person_id: int, on_change) -> None:
                 ui.label(f"★ {len(p.stars)}").classes("text-amber-8")
 
                 def save(pid=p.id, n=name, a=start, b=end) -> None:
-                    annotations.save_period(person_id, n.value, _int(a.value), _int(b.value), pid)
+                    annotations.save_period(
+                        person_id, n.value, int_or_none(a.value), int_or_none(b.value), pid
+                    )
                     ui.notify(_("Period saved"))
                     on_change()
 
@@ -719,7 +721,9 @@ def periods_view(person_id: int, on_change) -> None:
         def add() -> None:
             if not name.value:
                 return
-            annotations.save_period(person_id, name.value, _int(start.value), _int(end.value))
+            annotations.save_period(
+                person_id, name.value, int_or_none(start.value), int_or_none(end.value)
+            )
             name.value = ""
             listing.refresh()
             on_change()
@@ -776,7 +780,7 @@ def folders_section(person_id: int, on_change) -> None:
                 )
 
                 def save(pid=p.id, a=start, b=end, t=tags) -> None:
-                    folders.set_period(pid, _int(a.value), _int(b.value))
+                    folders.set_period(pid, int_or_none(a.value), int_or_none(b.value))
                     folders.set_tags(pid, t.value or [])
                     ui.notify(_("Period saved"))
                     on_change()
@@ -840,10 +844,6 @@ def remove_from_folder_dialog(folder_id: int, person_id: int, done) -> None:
             ui.button(_("Keep as a period"), on_click=ok_handler(dlg, lambda: remove(True))).mark(
                 "remove-keep"
             )
-
-
-def _int(v) -> int | None:
-    return int(v) if v not in (None, "") else None
 
 
 # ---- theses --------------------------------------------------------------------------------

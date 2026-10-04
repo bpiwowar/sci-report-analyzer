@@ -20,6 +20,7 @@ from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
 from .pub_details import show_details
 from .reflist import tag_from_list
+from .theme import int_or_none
 
 ui.add_css(
     ".vr-drop { outline: 2px dashed #ffa000; outline-offset: 1px; }"
@@ -744,9 +745,6 @@ def excerpt_properties(
     """The fields of an excerpt's years and influence flag; returns their values (the
     keywords of categories.add_excerpt / update_excerpt)."""
 
-    def year(v: float | None) -> int | None:
-        return int(v) if v else None
-
     with ui.row().classes("items-center gap-2"):
         start_in = ui.number(_("From (year)"), value=start, format="%d").props("dense outlined")
         start_in.classes("w-32").mark("excerpt-start")
@@ -757,8 +755,8 @@ def excerpt_properties(
         ui.icon("public", size="xs", color="teal").classes("-ml-2")
 
     return lambda: {
-        "start": year(start_in.value),
-        "end": year(end_in.value),
+        "start": int_or_none(start_in.value),
+        "end": int_or_none(end_in.value),
         "influence": bool(flag.value),
     }
 
