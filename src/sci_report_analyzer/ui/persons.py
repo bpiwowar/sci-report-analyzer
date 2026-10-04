@@ -7,43 +7,22 @@ from datetime import date
 from html import escape
 
 from nicegui import background_tasks, ui
-from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 
-from .. import annotations, folders, manual, pubview, source_settings
-from ..db.models import Person, Publication
-from ..db.session import session_scope
+from .. import annotations, folders, manual, persons, pubview, source_settings
+from ..db.models import Person
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
-from ..sync import discover, is_syncing, start_sync
+from ..sync import any_running, discover, is_syncing, start_sync
 from .categories_editor import categories_dialog
+from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
 from .folders_editor import ALL, folders_tree
 from .person import purge_dialog, remove_from_folder_dialog
-from .theme import STATUS_COLOUR, fmt_dt, frame, source_tag
-
-
-def _people() -> list[tuple[Person, int]]:
-    with session_scope() as s:
-        counts = dict(
-            s.execute(
-                select(Publication.person_id, func.count())
-                .where(Publication.missing.is_(False))
-                .group_by(Publication.person_id)
-            ).all()
-        )
-        people = list(
-            s.scalars(select(Person).options(selectinload(Person.links)).order_by(Person.name))
-        )
-        return [(p, counts.get(p.id, 0)) for p in people]
+from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
 
 async def _create(name: str, affiliation: str, folder_id: int | None = None) -> None:
-    with session_scope() as s:
-        person = Person(name=name.strip(), affiliation=affiliation.strip() or None)
-        s.add(person)
-        s.flush()
-        pid = person.id
+    pid = persons.create(name, affiliation)
     if folder_id:
         folders.add_person(folder_id, pid)
     ui.notify(_("Searching sources for {name}…").format(name=name))
@@ -112,8 +91,8 @@ def _reports(folder: int, changed) -> None:
 
 
 def _refresh_if_running() -> None:
-    if _any_running():
-        _folder_cards.refresh()
+    if any_running():
+        refresh_alive(_folder_cards)
 
 
 def _goto(folder_id: int) -> None:
@@ -174,41 +153,36 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
 
 def _sync(person_ids: list[int] | None) -> None:
     started = 0
-    for person, _status in _people():
+    for person, _status in persons.people_with_counts():
         if person_ids is not None and person.id not in person_ids:
             continue
         if any(ln.is_stale or ln.sync_state == "error" for ln in person.links):
             started += start_sync(person.id, only_stale=True)
     ui.notify(
-        ngettext("Started {n} sync(s)", "Started {n} sync(s)", started).format(n=started)
+        ngettext("Started {n} sync", "Started {n} syncs", started).format(n=started)
         if started
         else _("Everything is up to date")
     )
 
 
 def _add_dialog(current: folders.FolderView | None) -> None:
-    with ui.dialog() as dialog, ui.card().classes("w-96"):
-        ui.label(
-            _("Add a person to “{folder}”").format(folder=current.name)
-            if current
-            else _("Add a person")
-        ).classes("text-lg")
+    title = (
+        _("Add a person to “{folder}”").format(folder=current.name)
+        if current
+        else _("Add a person")
+    )
+    with transient_dialog(title, width="w-96") as (dialog, _card):
         name = ui.input(_("Full name")).classes("w-full").props("autofocus")
         aff = ui.input(_("Affiliation (optional, helps matching)")).classes("w-full")
 
-        async def ok() -> None:
+        async def ok() -> bool:
             if not name.value.strip():
-                return
-            # Before closing: a closed dialog is deleted, with the context its UI calls need.
+                return False
             await _create(name.value, aff.value, current.id if current else None)
-            dialog.close()
+            return True
 
-        name.on("keydown.enter", ok)
-        with ui.row().classes("justify-end w-full"):
-            ui.button(_("Cancel"), on_click=dialog.close).props("flat")
-            ui.button(_("Add & search sources"), on_click=ok)
-    dialog.on_value_change(lambda e: None if e.value else dialog.delete())
-    dialog.open()
+        name.on("keydown.enter", ok_handler(dialog, ok))
+        actions(dialog, _("Add & search sources"), ok)
 
 
 # ---- a folder ------------------------------------------------------------------------------
@@ -266,11 +240,11 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
             value=list(only),
             multiple=True,
             label=_("Only people tagged"),
-            on_change=lambda e: _folder_cards.refresh(folder_id, tuple(e.value or ())),
+            on_change=lambda e: refresh_alive(_folder_cards, folder_id, tuple(e.value or ())),
         ).props("dense outlined use-chips clearable").classes("w-80").mark(
             f"folder-tag-filter-{folder_id}"
         )
-    people = {p.id: (p, n) for p, n in _people()}
+    everyone = {p.id: (p, n) for p, n in persons.people_with_counts()}
     years = pubview.problem_years(m.person_id for m in f.members)
     problems = {
         m.person_id: pubview.count_in_period(years[m.person_id], m.start_year, m.end_year)
@@ -280,16 +254,16 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
     if total := sum(problems.values()):
         ui.label(
             ngettext(
-                "{n} paper(s) with problems in the people's periods",
-                "{n} paper(s) with problems in the people's periods",
+                "{n} paper with problems in the people's periods",
+                "{n} papers with problems in the people's periods",
                 total,
             ).format(n=total)
         ).classes("text-sm text-orange-9").tooltip(_(_PROBLEMS_TIP)).mark("folder-problems")
     with ui.grid(columns="repeat(auto-fill, minmax(340px, 1fr))").classes("w-full"):
         for m in f.members:
-            if m.person_id in people and set(only) <= set(m.tags):
+            if m.person_id in everyone and set(only) <= set(m.tags):
                 _card(
-                    *people[m.person_id],
+                    *everyone[m.person_id],
                     member=m,
                     folder_id=f.id,
                     problems=problems.get(m.person_id),
@@ -335,11 +309,11 @@ def _period_editor(member: folders.Member) -> None:
         def save() -> None:
             folders.set_period(
                 member.period_id,
-                int(start.value) if start.value else None,
-                int(end.value) if end.value else None,
+                int_or_none(start.value),
+                int_or_none(end.value),
             )
             menu.close()
-            _folder_cards.refresh()
+            refresh_alive(_folder_cards)
 
         for el in (start, end):
             el.on("keydown.enter", save)
@@ -424,34 +398,26 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
         if not ids:
             ui.notify(_("Select people first"), type="warning")
             return
-        with ui.dialog() as dlg, ui.card():
-            ui.label(
-                ngettext(
-                    "Delete {n} person(s) and all their data (sources, publications, "
-                    "tags, stars, periods)?",
-                    "Delete {n} person(s) and all their data (sources, publications, "
-                    "tags, stars, periods)?",
-                    len(ids),
-                ).format(n=len(ids))
-            )
-            with ui.row().classes("justify-end w-full"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
 
-                def confirm() -> None:
-                    folders.delete_people(ids)
-                    ui.navigate.reload()
-                    dlg.close()
+        def ok() -> None:
+            folders.delete_people(ids)
+            ui.navigate.reload()
 
-                ui.button(_("Delete"), color="negative", on_click=confirm).mark("confirm-delete")
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+        confirm(
+            ngettext(
+                "Delete {n} person and all their data (sources, publications, "
+                "tags, stars, periods)?",
+                "Delete {n} people and all their data (sources, publications, "
+                "tags, stars, periods)?",
+                len(ids),
+            ).format(n=len(ids)),
+            _("Delete"),
+            ok,
+            mark="confirm-delete",
+        )
 
     add_btn.on_click(add)
     del_btn.on_click(delete)
-
-
-def _any_running() -> bool:
-    return any(is_syncing(p.id) for p, _st in _people())
 
 
 def _card(
@@ -481,7 +447,7 @@ def _card(
         with ui.row().classes("items-center justify-between w-full"):
             ui.label(person.name).classes("text-lg font-medium")
             ui.label(
-                ngettext("{n} publications", "{n} publications", n_pubs).format(n=n_pubs)
+                ngettext("{n} publication", "{n} publications", n_pubs).format(n=n_pubs)
             ).classes("text-grey text-sm")
         if person.affiliation:
             ui.label(person.affiliation).classes("text-sm text-grey -mt-2")
@@ -505,14 +471,14 @@ def _card(
             if pending:
                 ui.badge(
                     ngettext(
-                        "{n} candidate(s) to review", "{n} candidate(s) to review", len(pending)
+                        "{n} candidate to review", "{n} candidates to review", len(pending)
                     ).format(n=len(pending)),
                     color="orange",
                 )
             if stale:
                 ui.badge(
                     ngettext(
-                        "{n} source(s) not up to date", "{n} source(s) not up to date", len(stale)
+                        "{n} source not up to date", "{n} sources not up to date", len(stale)
                     ).format(n=len(stale)),
                     color="warning",
                 )
@@ -520,7 +486,7 @@ def _card(
                 ui.badge(_("syncing…"), color="info")
             if problems:
                 ui.badge(
-                    ngettext("{n} problem(s)", "{n} problem(s)", problems).format(n=problems),
+                    ngettext("{n} problem", "{n} problems", problems).format(n=problems),
                     color="orange-8",
                 ).classes("cursor-pointer").on(
                     "click.stop", lambda: ui.navigate.to(f"{url}?problems=1")
@@ -574,8 +540,10 @@ def _tags_editor(member: folders.Member, options: list[str]) -> None:
 
 
 def folder_dialog(f: folders.FolderView | None) -> None:
-    with ui.dialog() as dlg, ui.card().classes("w-96"):
-        ui.label(_("New folder") if f is None else _("Edit folder")).classes("text-lg")
+    with transient_dialog(_("New folder") if f is None else _("Edit folder"), width="w-96") as (
+        dlg,
+        _card,
+    ):
         name = ui.input(_("Name"), value=f.name if f else "").classes("w-full").mark("folder-name")
         with ui.input(_("Date"), value=f.date.isoformat() if f and f.date else "").classes(
             "w-full"
@@ -627,14 +595,14 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 _("The numbered papers (a tag), the number's format, the folder's templates")
             ).mark("folder-citations")
 
-        def save() -> None:
+        def save() -> bool | None:
             if not name.value.strip():
-                return
+                return False
             try:
                 d = date.fromisoformat(day.value) if day.value else None
             except ValueError:
                 ui.notify(_("Invalid date (YYYY-MM-DD)"), type="warning")
-                return
+                return False
             fid = folders.save_folder(
                 f.id if f else None,
                 name.value.strip(),
@@ -643,20 +611,25 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 notes.value if edited["notes"] else ...,
                 primary.value,
             )
-            _goto(fid)  # before closing: a closed dialog loses its client
-            dlg.close()
+            _goto(fid)
 
         def delete() -> None:
-            folders.delete_folder(f.id)
-            _goto(ALL)
-            dlg.close()
+            close_then(
+                dlg,
+                lambda: confirm(
+                    _("Delete the folder “{folder}” and its periods? Its people are kept.").format(
+                        folder=f.name
+                    ),
+                    _("Delete"),
+                    lambda: (folders.delete_folder(f.id), _goto(ALL)),
+                    mark="folder-delete-ok",
+                ),
+            )
 
         with ui.row().classes("justify-end w-full"):
             if f is not None:
                 ui.button(_("Delete"), on_click=delete).props("flat color=negative").tooltip(
                     _("Deletes the folder and its periods (people are kept)")
-                )
+                ).mark("folder-delete")
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Save"), on_click=save).mark("folder-save")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+            ui.button(_("Save"), on_click=ok_handler(dlg, save)).mark("folder-save")

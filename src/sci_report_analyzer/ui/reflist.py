@@ -11,6 +11,7 @@ from .. import annotations, manual, reflist
 from ..i18n import _, ngettext
 from ..reflist import Match
 from ..sources.base import SourceError
+from .dialogs import transient_dialog
 
 if TYPE_CHECKING:
     from .panel import PublicationsPanel
@@ -30,7 +31,7 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
     }
     state: dict = {"matches": [], "chosen": {}, "found": {}}
 
-    with panel.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-5xl"):
+    with panel.dialogs, transient_dialog(width="w-full max-w-5xl") as (dlg, _card):
         with ui.row().classes("w-full items-center justify-between"):
             ui.label(_("Tag from a list")).classes("text-lg font-medium")
             ui.button(icon="close", on_click=dlg.close).props("flat round")
@@ -222,18 +223,16 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
         with panel.dialogs:
             ui.notify(
                 ngettext(
-                    "“{tag}” put on {n} papers (not shown: {hidden})",
+                    "“{tag}” put on {n} paper (not shown: {hidden})",
                     "“{tag}” put on {n} papers (not shown: {hidden})",
                     len(numbers),
                 ).format(tag=chosen.name, n=len(numbers), hidden=panel.not_shown(rest))
                 if rest
                 else ngettext(
-                    "“{tag}” put on {n} papers", "“{tag}” put on {n} papers", len(numbers)
+                    "“{tag}” put on {n} paper", "“{tag}” put on {n} papers", len(numbers)
                 ).format(tag=chosen.name, n=len(numbers)),
                 type="warning" if rest else None,
             )
 
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
     if text.strip():
         find()

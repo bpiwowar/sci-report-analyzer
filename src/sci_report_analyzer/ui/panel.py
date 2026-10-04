@@ -22,23 +22,36 @@ from ..pubview import (
     PubStat,
     Sel,
     category_list,
+    coauthor_counts,
     load_stats,
     match_sels,
     pick_sel,
+    role_shares,
     save_summary_settings,
     summary_lines,
     summary_settings,
     year_bin_defs,
+    year_counts,
 )
 from ..ranking import tracks
 from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR
 from ..ranking.kinds import KIND_SHORT
 from ..sources import ADAPTERS
+from .dialogs import actions, ok_handler, transient_dialog
 from .pdf_viewer import changed, download_dialog, pdf_button, watch
 from .pub_details import open_details, source_badge
 from .reflist import tag_from_list
 from .tags import save_number, tag_chip, tag_order_dialog, tags_dialog
-from .theme import DIM_OPACITY, NOTE_EXTRAS, author_html, rank_chip, span, stripes, track_chip
+from .theme import (
+    DIM_OPACITY,
+    NOTE_EXTRAS,
+    author_html,
+    int_or_none,
+    rank_chip,
+    span,
+    stripes,
+    track_chip,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +59,6 @@ DISCLAIMER = N_(
     "These rankings rate the venue (journal / conference), not the quality or impact "
     "of any individual paper."
 )
-
-
-def _int(v: str | None) -> int | None:
-    try:
-        return int(v) if v not in (None, "") else None
-    except ValueError:
-        return None
 
 
 def encode_sels(sels: list[Sel]) -> str:
@@ -95,6 +101,17 @@ def on_chart_click(chart: ui.echart, handler: Callable[[str, int, dict[str, bool
 
 
 MULTI_TIP = N_("Shift-click: add to the selection (or remove) · Alt-click: only this one")
+
+# The summary's table of detail levels: hovering a cell highlights its column and row headers.
+_HL = "{background:var(--q-primary);color:white !important;border-radius:4px}"
+ui.add_css(
+    "".join(
+        f'.vr-sum:has(.vr-sum-cell[data-col="{level}"]:hover) .vr-sum-col[data-col="{level}"]{_HL}'
+        for level in SUMMARY_DETAILS
+    )
+    + f".vr-sum-line:has(.vr-sum-cell:hover) .vr-sum-row{_HL}",
+    shared=True,
+)
 
 
 class PublicationsPanel:
@@ -149,17 +166,13 @@ class PublicationsPanel:
             self.period_id = state["period_id"]
             self.tag_filter = self._saved_tags(state)
             self._apply_period()
-        self.owner_names: list[str] = []
         # Filters from the URL (so that a reload gives back the same view).
         self.base_url = f"/person/{person_id}"
         self.url_extra: dict[str, str] = {}
         self._from_query(query or {})
 
     def _saved_tags(self, state: dict) -> list[int]:
-        if "tag_filter" in state:
-            return self._known_tags(state["tag_filter"])
-        # Earlier: a "starred only" switch.
-        return [self.starred_id] if state.get("starred_only") else []
+        return self._known_tags(state.get("tag_filter", []))
 
     def _known_tags(self, ids) -> list[int]:
         """The tags that can filter: global ones, and per-period ones with a period."""
@@ -170,21 +183,21 @@ class PublicationsPanel:
 
     def _from_query(self, q: dict[str, str]) -> None:
         if "tags" in q:
-            self.tag_filter = self._known_tags(_int(x) for x in q["tags"].split(","))
+            self.tag_filter = self._known_tags(int_or_none(x) for x in q["tags"].split(","))
         elif "starred" in q and self.period_id:  # earlier links
             self.tag_filter = [self.starred_id] if q["starred"] == "1" else []
         self.track_filter = [t for t in q.get("tracks", "").split(",") if t]
         if "from" in q:
-            self.lo = _int(q["from"])
+            self.lo = int_or_none(q["from"])
         if "to" in q:
-            self.hi = _int(q["to"])
+            self.hi = int_or_none(q["to"])
         self.text = q.get("q", "")
         self.hide_preprints = q.get("nopre") == "1"
         self.show_hidden = q.get("hidden") == "1"
         self.problems_only = q.get("problems") == "1"
         self.manual_only = q.get("manual") == "1"
-        self.venue_filter = _int(q.get("venue", "")) or None
-        self.open_pub = _int(q.get("pub", "")) or None
+        self.venue_filter = int_or_none(q.get("venue", "")) or None
+        self.open_pub = int_or_none(q.get("pub", "")) or None
         self.sels = decode_sels(q.get("sel"))
 
     def url_params(self) -> dict[str, str]:
@@ -422,10 +435,10 @@ class PublicationsPanel:
         with ui.row().classes("w-full items-center gap-3"):
             n = (
                 ngettext(
-                    "{n} of {total} publications", "{n} of {total} publications", len(filtered)
+                    "{n} of {total} publication", "{n} of {total} publications", len(filtered)
                 ).format(n=len(conditioned), total=len(filtered))
                 if self.sels
-                else ngettext("{n} publications", "{n} publications", len(filtered)).format(
+                else ngettext("{n} publication", "{n} publications", len(filtered)).format(
                     n=len(filtered)
                 )
             )
@@ -471,7 +484,7 @@ class PublicationsPanel:
             ).classes("w-48").tooltip(_("Period of interest"))
 
             def set_year(which: str, v) -> None:
-                setattr(self, which, int(v) if v not in (None, "") else None)
+                setattr(self, which, int_or_none(v))
                 self.sels = []
                 self.render()
 
@@ -692,9 +705,9 @@ class PublicationsPanel:
             for name, count in pending.most_common():
                 with ui.row().classes("items-center gap-2"):
                     span(author_html(name, "owner?", None))
-                    ui.label(
-                        ngettext("{n} paper(s)", "{n} paper(s)", count).format(n=count)
-                    ).classes("text-xs text-grey")
+                    ui.label(ngettext("{n} paper", "{n} papers", count).format(n=count)).classes(
+                        "text-xs text-grey"
+                    )
 
                     def accept(n=name) -> None:
                         annotations.add_alias(self.person_id, n)
@@ -711,8 +724,10 @@ class PublicationsPanel:
 
     def _add_publication(self) -> None:
         """A paper the sources miss, by its DOI or its HAL id (or their URLs)."""
-        with self.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-            ui.label(_("Add a publication")).classes("text-lg font-medium")
+        with (
+            self.dialogs,
+            transient_dialog(_("Add a publication"), width="w-full max-w-xl") as (dlg, _card),
+        ):
             ui.label(
                 _(
                     "Its record is fetched and merged with the other sources' (listed in the "
@@ -731,27 +746,23 @@ class PublicationsPanel:
             busy = ui.spinner(size="sm")
             busy.visible = False
 
-            async def add() -> None:
+            async def add() -> bool:
                 if busy.visible:
-                    return
+                    return False
                 busy.visible = True
                 try:
                     title = await manual.add_publication(self.person_id, ref.value or "")
                 except ValueError as e:
                     ui.notify(str(e), type="warning")
-                    return
+                    return False
                 finally:
                     busy.visible = False
                 ui.notify(_("Added: {title}").format(title=title))
-                dlg.close()
                 await self.reload()
+                return True
 
-            ref.on("keydown.enter", add)
-            with ui.row().classes("w-full justify-end items-center"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                ui.button(_("Add"), icon="add", on_click=add).mark("add-publication-ok")
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+            ref.on("keydown.enter", ok_handler(dlg, add))
+            actions(dlg, _("Add"), add, icon="add", mark="add-publication-ok")
 
     def _summary(self, rows: list[PubStat]) -> None:
         """The publications shown, by kind of venue and category with their venues and years.
@@ -761,15 +772,16 @@ class PublicationsPanel:
         cats = category_list(rows)
         saved = summary_settings()
         off_kinds = set(saved.get("off_kinds", []))
-        # Earlier settings: unticked categories, and a switch for the years.
+        # (earlier settings: a switch for the years)
         default = "years" if saved.get("years", True) else "list"
-        levels = {k: "off" for k in saved.get("off_categories", [])}
-        levels.update(saved.get("details") or {})
+        levels = dict(saved.get("details") or {})
         for c in cats:
             levels.setdefault(c.key, default)
         other = _("Other")
-        with self.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
-            ui.label(_("Summary")).classes("text-lg font-medium")
+        with (
+            self.dialogs,
+            transient_dialog(_("Summary"), width="w-full max-w-3xl") as (dlg, _card),
+        ):
             with ui.row().classes("w-full items-center gap-1"):
                 ui.label(_("Kinds:")).classes("text-sm text-grey w-24")
                 kind_boxes = {
@@ -792,20 +804,6 @@ class PublicationsPanel:
 
             @ui.refreshable
             def detail_table() -> None:
-                # Hovering a cell highlights its column and row headers.
-                hl = "{background:var(--q-primary);color:white !important;border-radius:4px}"
-                ui.add_css(
-                    "".join(
-                        f'.vr-sum:has(.vr-sum-cell[data-col="{level}"]:hover) '
-                        f'.vr-sum-col[data-col="{level}"]{hl}'
-                        for level in SUMMARY_DETAILS
-                    )
-                    + "".join(
-                        f'.vr-sum:has(.vr-sum-cell[data-row="{i}"]:hover) '
-                        f'.vr-sum-row[data-row="{i}"]{hl}'
-                        for i in range(len(cats))
-                    )
-                )
                 with ui.grid(columns=f"auto repeat({len(SUMMARY_DETAILS)}, 6rem)").classes(
                     "vr-sum gap-x-2 gap-y-0 items-center text-sm"
                 ):
@@ -814,21 +812,23 @@ class PublicationsPanel:
                         ui.label(label).classes("vr-sum-col text-center text-grey").props(
                             f"data-col={level}"
                         )
-                    for i, c in enumerate(cats):
+                    for c in cats:
                         n = sum(r.category.key == c.key for r in rows)
-                        span(
-                            f'<i style="display:inline-block;width:10px;height:10px;'
-                            f'background:{c.colour};margin-right:4px"></i>'
-                            f"{escape(c.label)} ({n})"
-                        ).classes("vr-sum-row px-1").props(f"data-row={i}")
-                        for level in SUMMARY_DETAILS:
-                            chosen = levels[c.key] == level
-                            ui.label("✅" if chosen else "·").classes(
-                                "vr-sum-cell text-center cursor-pointer rounded hover:bg-grey-3"
-                                + ("" if chosen else " text-grey-5")
-                            ).props(f"data-row={i} data-col={level}").on(
-                                "click", lambda c=c, level=level: pick(c.key, level)
-                            ).mark(f"summary-cat-{c.key}-{level}")
+                        # (a row: its cells in the grid, the hovered one found by :has())
+                        with ui.element("div").classes("vr-sum-line").style("display:contents"):
+                            span(
+                                f'<i style="display:inline-block;width:10px;height:10px;'
+                                f'background:{c.colour};margin-right:4px"></i>'
+                                f"{escape(c.label)} ({n})"
+                            ).classes("vr-sum-row px-1")
+                            for level in SUMMARY_DETAILS:
+                                chosen = levels[c.key] == level
+                                ui.label("✅" if chosen else "·").classes(
+                                    "vr-sum-cell text-center cursor-pointer rounded hover:bg-grey-3"
+                                    + ("" if chosen else " text-grey-5")
+                                ).props(f"data-col={level}").on(
+                                    "click", lambda c=c, level=level: pick(c.key, level)
+                                ).mark(f"summary-cat-{c.key}-{level}")
 
             def pick(key: str, level: str) -> None:
                 levels[key] = level
@@ -899,8 +899,6 @@ class PublicationsPanel:
                 ).props("flat dense")
                 ui.button(_("Close"), on_click=dlg.close).props("flat dense")
             fill()
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
 
     def _distribution(self, rows: list[PubStat], cats, sels: list[Sel]) -> None:
         total = len(rows)
@@ -958,38 +956,38 @@ class PublicationsPanel:
         if len(set(years)) < 2:
             return
         bins = year_bin_defs(years)
+        counts = year_counts(rows, bins)
         chosen = {x.label for x in sels if x.facet == "year"}
         series = []
         for c in cats:
-            data = []
-            for label, lo, hi in bins:
-                n = sum(
-                    1
-                    for s in rows
-                    if s.category.key == c.key and s.year is not None and lo <= s.year <= hi
-                )
-                dim = chosen and label not in chosen
-                data.append({"value": n, "itemStyle": {"opacity": DIM_OPACITY if dim else 1}})
-            if any(d["value"] for d in data):
-                item = {"color": c.colour}
-                if c.striped:
-                    item["decal"] = {
-                        "symbol": "rect",
-                        "dashArrayX": [1, 0],
-                        "dashArrayY": [2, 4],
-                        "rotation": 0.8,
-                        "color": c.stripe if c.track else "rgba(255,255,255,0.45)",
-                    }
-                series.append(
-                    {
-                        "name": c.label,
-                        "type": "bar",
-                        "stack": "y",
-                        "data": data,
-                        "itemStyle": item,
-                        "emphasis": {"focus": "none"},
-                    }
-                )
+            if not any(line := counts.get(c.key, [])):
+                continue
+            data = [
+                {
+                    "value": n,
+                    "itemStyle": {"opacity": DIM_OPACITY if chosen and label not in chosen else 1},
+                }
+                for (label, _lo, _hi), n in zip(bins, line, strict=True)
+            ]
+            item = {"color": c.colour}
+            if c.striped:
+                item["decal"] = {
+                    "symbol": "rect",
+                    "dashArrayX": [1, 0],
+                    "dashArrayY": [2, 4],
+                    "rotation": 0.8,
+                    "color": c.stripe if c.track else "rgba(255,255,255,0.45)",
+                }
+            series.append(
+                {
+                    "name": c.label,
+                    "type": "bar",
+                    "stack": "y",
+                    "data": data,
+                    "itemStyle": item,
+                    "emphasis": {"focus": "none"},
+                }
+            )
         chart = (
             ui.echart(
                 {
@@ -1059,9 +1057,7 @@ class PublicationsPanel:
         with ui.column().classes("w-1/2"):
             if not with_authors:
                 return
-            counts: dict[int, int] = {}
-            for n in with_authors:
-                counts[min(n, HIST_CAP)] = counts.get(min(n, HIST_CAP), 0) + 1
+            counts = coauthor_counts(rows)
             avg = sum(with_authors) / len(with_authors)
             self._hist(
                 _("Co-authors per paper · avg {avg} ({n})").format(
@@ -1076,33 +1072,20 @@ class PublicationsPanel:
     def _contributions(self, rows: list[PubStat], sels: list[Sel]) -> None:
         """The person's role in the papers (first author, contributor… last author), overall
         and by years: shares of the papers of each column."""
-        known = [s for s in rows if s.contribution]
+        cfg = contribution.load_config()
+        shares = role_shares(rows, [r.key for r in cfg.roles])
         with ui.column().classes("w-1/2 gap-0").mark("contributions"):
-            if not known:
+            if shares is None:
                 return
             chosen = [x for x in sels if x.facet == "contribution"]
-            years = [s.year for s in known if s.year is not None]
-            bins = year_bin_defs(years) if len(set(years)) > 1 else []
-            columns = [(_("All"), None, None), *bins]
-            totals = [
-                sum(lo is None or (s.year is not None and lo <= s.year <= hi) for s in known)
-                for _label, lo, hi in columns
-            ]
-            cfg = contribution.load_config()
+            columns = [(_("All"), None, None), *shares.bins]
             series = []
             for key, label, colour in ((r.key, r.label, r.colour) for r in cfg.roles):
-                counts = [
-                    sum(
-                        s.contribution == key
-                        and (lo is None or (s.year is not None and lo <= s.year <= hi))
-                        for s in known
-                    )
-                    for _label, lo, hi in columns
-                ]
+                counts = shares.counts[key]
                 if not counts[0]:
                     continue
                 data = []
-                for (_label, lo, _hi), n, total in zip(columns, counts, totals, strict=True):
+                for (_label, lo, _hi), n, total in zip(columns, counts, shares.totals, strict=True):
                     picked = any(x.key == key and x.lo == (lo or 0) for x in chosen)
                     data.append(
                         {
@@ -1121,15 +1104,11 @@ class PublicationsPanel:
                         "data": data,
                     }
                 )
-            share = {
-                k: round(100 * sum(s.contribution in keys for s in known) / len(known))
-                for k, keys in (("first", ("sole", "first")), ("last", ("last",)))
-            }
             chart = ui.echart(
                 {
                     "title": {
                         "text": _("Contribution role ({n}) · first {first}% · last {last}%").format(
-                            n=len(known), first=share["first"], last=share["last"]
+                            n=shares.totals[0], first=shares.first, last=shares.last
                         ),
                         "textStyle": {"fontSize": 13},
                     },

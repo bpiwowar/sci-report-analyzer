@@ -13,9 +13,8 @@ from ..ranking.badge import (
     LEVEL_HELP,
     OTHER_COLOUR,
     UNRANKED_COLOUR,
-    text_colour,
 )
-from .theme import frame, span
+from .theme import chip_html, frame, span
 
 HELP_DIR = Path(__file__).parent.parent / "help"
 
@@ -39,14 +38,10 @@ def register() -> None:
                 for _key, label, colour in BASE_CATEGORIES:
                     level = label.removeprefix("CORE ")
                     with ui.row().classes("items-center gap-2 no-wrap"):
-                        style = f"background:{colour};color:{text_colour(colour)}"
-                        span(f'<span class="vr-chip" style="{style}">{label}</span>')
+                        span(chip_html(label, colour))
                         ui.label(LEVEL_HELP.get(level, "")).classes("text-sm")
                 with ui.row().classes("items-center gap-2 no-wrap"):
-                    span(
-                        f'<span class="vr-chip" style="background:{OTHER_COLOUR}">'
-                        f"{_('other')}</span>"
-                    )
+                    span(chip_html(_("other"), OTHER_COLOUR))
                     ui.label(
                         _(
                             "Matched a venue without a usable rank (e.g. a Scimago entry "
@@ -54,9 +49,6 @@ def register() -> None:
                         )
                     ).classes("text-sm")
                 with ui.row().classes("items-center gap-2 no-wrap"):
-                    span(
-                        f'<span class="vr-chip" style="background:{UNRANKED_COLOUR};'
-                        f'color:#000">{_("not ranked")}</span>'
-                    )
+                    span(chip_html(_("not ranked"), UNRANKED_COLOUR))
                     ui.label(_("No match in the ranking datasets.")).classes("text-sm")
             ui.markdown(after)

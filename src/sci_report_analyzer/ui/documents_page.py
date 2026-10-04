@@ -13,9 +13,11 @@ from nicegui import app, ui
 
 from .. import annotations, documents, pdfs, reports
 from ..i18n import N_, Labels, _
+from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
 from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
+from .theme import DEFAULT_COLOUR, bare_page
 from .viewer_side import Side, bookmarks_section, categories_section
 
 # Extracts the document's lines of text (sent once, to find its papers in), and shows the
@@ -118,8 +120,7 @@ def register() -> None:
     @ui.page("/doc/{doc_id}")
     def doc_page(doc_id: int, page: int | None = None, pane: str | None = None) -> None:
         d = documents.info(doc_id)
-        ui.page_title(f"{d.name if d else _('Document')} · SciReport Analyzer")
-        ui.query(".nicegui-content").classes("p-0 gap-0")
+        bare_page(d.name if d else _("Document"))
         if d is None or documents.file_of(doc_id) is None:
             ui.label(_("No such document")).classes("p-4")
             return
@@ -259,7 +260,7 @@ class DocumentPage:
                 "kind": m.kind,
                 "pdf": bool(by_id[m.pub_id].pdf),
                 "title": self.side.cite_hint(by_id[m.pub_id]),
-                "colour": "#cf222e" if by_id[m.pub_id].pdf else "#0969da",
+                "colour": "#cf222e" if by_id[m.pub_id].pdf else DEFAULT_COLOUR,
             }
             for i, m in enumerate(self.mentions)
         ]
@@ -451,35 +452,27 @@ def _doc_row(d: documents.DocView, refresh) -> None:
             ui.button(icon="download").props("flat dense round size=sm").tooltip(_("Download"))
 
         def rename() -> None:
-            with ui.dialog() as dlg, ui.card().classes("w-96"):
+            with transient_dialog(width="w-96") as (dlg, _card):
                 name = ui.input(_("Name"), value=d.name).classes("w-full").mark("document-name")
 
                 def ok() -> None:
                     documents.rename(d.id, name.value)
-                    dlg.close()
                     refresh()
 
-                name.on("keydown.enter", ok)
-                with ui.row().classes("w-full justify-end"):
-                    ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                    ui.button(_("Rename"), on_click=ok).mark("document-rename-ok")
-            dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-            dlg.open()
+                name.on("keydown.enter", ok_handler(dlg, ok))
+                actions(dlg, _("Rename"), ok, mark="document-rename-ok")
 
         def delete() -> None:
-            with ui.dialog() as dlg, ui.card():
-                ui.label(_("Delete “{name}”, with its annotations and notes?").format(name=d.name))
+            def ok() -> None:
+                documents.remove(d.id)
+                refresh()
 
-                def ok() -> None:
-                    documents.remove(d.id)
-                    dlg.close()
-                    refresh()
-
-                with ui.row().classes("w-full justify-end"):
-                    ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                    ui.button(_("Delete"), color="negative", on_click=ok).mark("document-delete-ok")
-            dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-            dlg.open()
+            confirm(
+                _("Delete “{name}”, with its annotations and notes?").format(name=d.name),
+                _("Delete"),
+                ok,
+                mark="document-delete-ok",
+            )
 
         ui.button(icon="edit", on_click=rename).props("flat dense round size=sm").mark(
             f"document-rename-{d.id}"
