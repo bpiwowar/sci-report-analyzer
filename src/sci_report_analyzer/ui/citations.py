@@ -147,9 +147,11 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
                 .classes("w-64")
                 .tooltip(
                     _(
-                        "Their numbers (.index, .number, [@key]): as put from a list, else by "
-                        "year; the other papers apart, from 1, as first cited. They are the "
-                        "papers to discuss (without: those of the period's years)."
+                        "Their numbers (.index, .number, [@key]): their numbers within the tag "
+                        "(put from a list, or set by hand: Alt-click a #number, or order the "
+                        "tag's papers), else by year; the other papers apart, from 1, as first "
+                        "cited. They are the papers to discuss (without: those of the period's "
+                        "years)."
                     )
                 )
                 .mark("folder-number-tag")

@@ -777,7 +777,7 @@ def _notes_tab(panel: PublicationsPanel, s: PubStat, done) -> None:
         s,
         panel.period,
         panel.tags,
-        lambda: background_tasks.create(panel.reload()),
+        panel.papers_changed,
         manage_tags,
     )
 

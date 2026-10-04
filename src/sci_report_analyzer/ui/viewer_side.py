@@ -337,8 +337,13 @@ class Side:
                     lambda: reports.load_templates(folder_id),
                     period_id,
                     mark="folder-papers",
+                    on_numbers=numbers_changed,
                 )
             )
+
+        def numbers_changed() -> None:  # (reordered in the pane: here and elsewhere)
+            refresh()
+            changed(self.host.person_id, but=self.host)
 
         def shown() -> bool:
             return bool(pane) and self.folder_editor.mode.value == "side"
