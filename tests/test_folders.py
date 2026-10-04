@@ -41,8 +41,6 @@ def test_folder_membership_and_periods():
 
 
 def test_folder_stars_are_per_person_and_folder():
-    from helpers import add_source, pub
-
     a = make_person("Ann")
     add_source(a, "dblp", "x/1", [pub("p", "A paper by Ann", 2021, authors=["Ann"])])
     pub_id = annotations_pub(a)
@@ -56,8 +54,6 @@ def test_folder_stars_are_per_person_and_folder():
 
 
 def test_tags_global_and_per_period():
-    from helpers import add_source, pub
-
     from sci_report_analyzer import pubview
 
     a = make_person("Ann")

@@ -54,4 +54,4 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = ["live: hits real remote APIs (run with -m live)"]
-addopts = "-m 'not live'"
+addopts = "-m 'not live' --strict-markers"

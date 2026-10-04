@@ -1,8 +1,6 @@
 import asyncio
-import json
-from pathlib import Path
 
-from helpers import add_source, make_person, pub
+from helpers import add_source, load_fixture, make_person, pub
 from sqlalchemy import func, select
 
 from sci_report_analyzer import annotations, pubview, sync
@@ -12,13 +10,12 @@ from sci_report_analyzer.ranking.badge import detect_track
 from sci_report_analyzer.ranking.service import service
 from sci_report_analyzer.sources import doi
 
-FIXTURES = Path(__file__).parent / "fixtures"
 FINDINGS = "10.18653/v1/2025.findings-naacl.398"
 SIGIR = "10.1145/3404835.3462812"
 
 
 def _fixture(name):
-    return json.loads((FIXTURES / f"doi_{name}.json").read_text())
+    return load_fixture(f"doi_{name}.json")
 
 
 def _registry(monkeypatch, calls=None):

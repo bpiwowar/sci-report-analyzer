@@ -3,7 +3,7 @@
 import asyncio
 
 import pytest
-from helpers import add_source, make_person, note_saved, pub
+from helpers import PDF, add_source, make_person, note_status, pub
 from nicegui import ElementFilter, ui
 from nicegui.testing import User
 from sqlalchemy import select
@@ -15,8 +15,6 @@ from sci_report_analyzer.sources.base import FetchResult
 from sci_report_analyzer.ui import pdf_viewer
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
-
-PDF = b"%PDF-1.4\n% a tiny test file\n%%EOF\n"
 
 
 def _person() -> tuple[int, int, dict[str, int]]:
@@ -114,13 +112,9 @@ def test_merge_and_cleanup():
     assert not pb.exists() and pdfs.stored(pid) == {a: False}
 
 
-async def test_viewer_page(user: User, monkeypatch, tmp_path):
+async def test_viewer_page(user: User, fake_viewer):
     pid, _, ids = _person()
     a = ids["Deep ranking for search"]
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
 
     await user.open(f"/pdf/{a}")
     await user.should_see("No PDF stored for this paper.")
@@ -133,7 +127,7 @@ async def test_viewer_page(user: User, monkeypatch, tmp_path):
     await user.should_see(marker="paper-note")  # its tags and notes, next to it
     user.find(marker="paper-new-tag").type("to read").trigger("keydown.enter")
     user.find(marker="paper-note").elements.pop().value = "Read section 3, $x^2$"
-    await note_saved(user, "paper-note")
+    await note_status(user, "paper-note")
     await user.should_see(kind=ui.markdown)
     rows = {r.id: r for r in await pubview.load_stats(pid)}
     tag = next(t for t in annotations.all_tags() if t.name == "to read")
@@ -157,16 +151,12 @@ async def test_viewer_page(user: User, monkeypatch, tmp_path):
     await user.should_not_see(marker="side-tab-categories")
 
 
-async def test_viewer_restart_notice(user: User, monkeypatch, tmp_path):
+async def test_viewer_restart_notice(user: User, monkeypatch, fake_viewer):
     """With --live-reload: a new version of the code, offered in the viewer's header too."""
     from sci_report_analyzer import livereload
 
     _, _, ids = _person()
     a = ids["Deep ranking for search"]
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
     pdfs.save(a, PDF, None)
     monkeypatch.setattr(livereload, "enabled", True)
     monkeypatch.setattr(livereload, "changed", {"ui/pdf_viewer.py"})
@@ -180,13 +170,9 @@ async def test_viewer_restart_notice(user: User, monkeypatch, tmp_path):
     await user.should_see("New version available (1 file changed)")
 
 
-async def test_viewer_details(user: User, monkeypatch, tmp_path):
+async def test_viewer_details(user: User, fake_viewer):
     _, _, ids = _person()
     a = ids["Deep ranking for search"]
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
     pdfs.save(a, PDF, None)
 
     await user.open(f"/pdf/{a}")
@@ -242,8 +228,6 @@ async def _shown(user: User, marker: str) -> bool:
 
 
 async def test_viewer_changes_reach_the_panel(user: User):
-    from sci_report_analyzer.ui import pdf_viewer
-
     pid, _, ids = _person()
     a = ids["Deep ranking for search"]
     await user.open(f"/person/{pid}")
@@ -264,13 +248,9 @@ async def test_viewer_changes_reach_the_panel(user: User):
         raise AssertionError("not shown as annotated")
 
 
-async def test_viewer_side_width(user: User, monkeypatch, tmp_path):
+async def test_viewer_side_width(user: User, fake_viewer):
     _, _, ids = _person()
     a = ids["Deep ranking for search"]
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
     pdfs.save(a, PDF, None)
 
     await user.open(f"/pdf/{a}")
