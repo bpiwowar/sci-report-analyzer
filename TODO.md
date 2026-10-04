@@ -24,6 +24,11 @@ track) conflicts with it: never save a rule in conflict with variants. Ask the u
 remove those variants (they take the rule's track), or edit the regex so that it no
 longer matches them.
 
+## PDF viewer: the restart notice
+
+With `--live-reload`, the "restart" offer (a new version of the code) must also show on
+the PDF viewer page (it does not there now), e.g. in its header bar.
+
 ## PDF: excerpts and PDF.js highlights
 
 When adding an excerpt from text already highlighted with PDF.js, remove that PDF.js
