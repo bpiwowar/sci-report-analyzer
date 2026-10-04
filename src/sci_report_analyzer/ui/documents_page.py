@@ -13,6 +13,7 @@ from nicegui import app, ui
 
 from .. import annotations, documents, pdfs, reports
 from ..i18n import N_, Labels, _
+from .folder_notes import NOTES_TIP, notes_url
 from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
 from .viewer_side import Side, bookmarks_section, categories_section
@@ -404,6 +405,14 @@ def documents_view(person_id: int) -> None:
                     ui.label(p.name).classes("font-medium")
                     if p.folder and p.folder.hidden:
                         ui.badge(_("hidden"), color="grey")
+                    if p.folder:
+                        ui.button(
+                            _("Notes and excerpts"),
+                            icon="edit_note",
+                            on_click=lambda pid=p.id: ui.navigate.to(notes_url(pid)),
+                        ).props("flat dense no-caps").tooltip(_(NOTES_TIP)).mark(
+                            f"documents-notes-{p.id}"
+                        )
                 for d in docs.get(p.id, []):
                     _doc_row(d, listing.refresh)
                 if not docs.get(p.id):

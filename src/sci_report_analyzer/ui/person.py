@@ -33,6 +33,7 @@ from ..sync import (
     sync_link,
 )
 from .documents_page import documents_view
+from .folder_notes import NOTES_TIP, notes_url
 from .panel import PublicationsPanel, period_label
 from .theme import STATUS_COLOUR, fmt_dt, frame, source_tag
 
@@ -139,13 +140,28 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
     with ui.row().classes("w-full items-center justify-between gap-2"):
         with ui.column().classes("gap-0"):
             if folder:
-                with (
-                    ui.link(target=f"/?folder={folder[0]}")
-                    .classes("flex items-center gap-1 text-sm no-underline")
-                    .mark("folder-title")
-                ):
-                    ui.icon("folder", color="amber-8")
-                    ui.label(folder[1])
+                with ui.row().classes("items-center gap-1 no-wrap"):
+                    with (
+                        ui.link(target=f"/?folder={folder[0]}")
+                        .classes("flex items-center gap-1 text-sm no-underline")
+                        .mark("folder-title")
+                    ):
+                        ui.icon("folder", color="amber-8")
+                        ui.label(folder[1])
+                    if period_id := next(
+                        (
+                            p.id
+                            for p in annotations.periods(person.id, include_hidden_folders=True)
+                            if p.folder_id == folder[0]
+                        ),
+                        None,
+                    ):
+                        ui.button(
+                            icon="edit_note",
+                            on_click=lambda: ui.navigate.to(notes_url(period_id)),
+                        ).props("flat dense round size=sm").tooltip(_(NOTES_TIP)).mark(
+                            "person-folder-notes"
+                        )
             ui.label(person.name).classes("text-2xl")
             if person.affiliation:
                 ui.label(person.affiliation).classes("text-grey")

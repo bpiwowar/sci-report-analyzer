@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 17:02+0200\n"
+"POT-Creation-Date: 2026-10-04 17:18+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -139,6 +139,9 @@ msgstr ""
 
 msgid "A folder cannot go within itself"
 msgstr "Un dossier ne peut pas aller en lui-même"
+
+msgid "A folder's settings cannot be copied to itself"
+msgstr "Les réglages d'un dossier ne peuvent pas être copiés sur lui-même"
 
 msgid "A folder's template needs a name"
 msgstr "Un modèle de dossier doit avoir un nom"
@@ -883,6 +886,17 @@ msgid "Clear the notes"
 msgstr "Effacer les notes"
 
 msgid ""
+"Click a folder to show it. Drag a folder onto another one to put it "
+"within it (onto its top or bottom: next to it). A folder uses the "
+"settings of the folder it is in (its categories, the citations in its "
+"notes: all of them), or its own ones: see its menu."
+msgstr ""
+"Cliquez sur un dossier pour l'afficher. Glissez un dossier sur un autre "
+"pour le mettre dedans (sur son haut ou son bas : à côté). Un dossier "
+"utilise les réglages du dossier où il est (ses catégories, les citations "
+"dans ses notes : tous), ou les siens : voir son menu."
+
+msgid ""
 "Click a name to say who it is: the person, one of their PhD students, or "
 "a co-author category (e.g. international collaborators). Bold: the person"
 " · purple: PhD students · pale italic purple: former PhD students (paper "
@@ -962,6 +976,9 @@ msgstr "Copier"
 msgid "Copy a name:"
 msgstr "Copier un nom :"
 
+msgid "Copy its settings to…"
+msgstr "Copier ses réglages vers…"
+
 msgid "Copy my text"
 msgstr "Copier mon texte"
 
@@ -973,6 +990,10 @@ msgstr "Copier les extraits, en Markdown"
 
 msgid "Copy the note, its citations numbered and the papers cited listed"
 msgstr "Copier la note, ses citations numérotées et la liste des articles cités"
+
+#, python-brace-format
+msgid "Copy the settings of “{folder}”"
+msgstr "Copier les réglages de « {folder} »"
 
 msgid "Copy those of"
 msgstr "Copier celles de"
@@ -1222,16 +1243,6 @@ msgstr "Téléchargement du PDF…"
 msgid "Downloading the Scimago journals and the predatory list…"
 msgstr "Téléchargement des revues Scimago et de la liste des revues prédatrices…"
 
-msgid ""
-"Drag a folder onto another one to put it within it (onto its top or "
-"bottom: next to it). A folder uses the settings of the folder it is in "
-"(its categories, the citations in its notes: all of them), or its own "
-"ones."
-msgstr ""
-"Glissez un dossier sur un autre pour le mettre dedans (sur son haut ou "
-"son bas : à côté). Un dossier utilise les réglages du dossier où il est "
-"(ses catégories, les citations dans ses notes : tous), ou les siens."
-
 msgid "Drag a venue onto another one to merge it into that one."
 msgstr "Faites glisser un canal sur un autre pour l'y fusionner."
 
@@ -1357,11 +1368,11 @@ msgstr "Événement"
 
 msgid ""
 "Every person, with the folders they are in: select people to delete them "
-"or to put them in a folder. Pick a folder above to work with it."
+"or to put them in a folder. Pick a folder in the tree to work with it."
 msgstr ""
 "Toutes les personnes, avec leurs dossiers : sélectionnez des personnes "
 "pour les supprimer ou les mettre dans un dossier. Choisissez un dossier "
-"ci-dessus pour travailler dessus."
+"dans l’arbre pour travailler dessus."
 
 msgid ""
 "Every venue seen in the validated sources. A source's venue text belongs "
@@ -1786,9 +1797,6 @@ msgstr ""
 msgid "Italic (⌘/Ctrl-I)"
 msgstr "Italique (⌘/Ctrl-I)"
 
-msgid "Its categories and the citations in its notes"
-msgstr "Ses catégories et les citations dans ses notes"
-
 msgid ""
 "Its conferences, in order: without a name, it is named after them (its "
 "acronym too, with dashes, e.g. CORIA-TALN)."
@@ -1813,11 +1821,11 @@ msgstr "Son canal principal (c'est la session {track} de ce canal)"
 msgid "Its name, to use it as .name (optional)"
 msgstr "Son nom, pour l'utiliser comme .nom (facultatif)"
 
+msgid "Its own settings"
+msgstr "Ses propres réglages"
+
 msgid "Its own settings: a copy of its parent's"
 msgstr "Ses propres réglages : une copie de ceux de son parent"
-
-msgid "Its parent's settings"
-msgstr "Les réglages de son parent"
 
 msgid ""
 "Its quotes, joined; edited, it is the text of the group (its excerpts: "
@@ -2194,6 +2202,16 @@ msgstr "Peut-être déjà un extrait ({n}) : fusionner avec lui ?"
 msgid "Minimum match confidence"
 msgstr "Confiance minimale de l’appariement"
 
+msgid "Move"
+msgstr "Déplacer"
+
+msgid "Move its settings to…"
+msgstr "Déplacer ses réglages vers…"
+
+#, python-brace-format
+msgid "Move the settings of “{folder}”"
+msgstr "Déplacer les réglages de « {folder} »"
+
 msgid "Move them to"
 msgstr "Les déplacer vers"
 
@@ -2202,6 +2220,13 @@ msgstr "Déplacer vers une catégorie"
 
 msgid "Move to another category"
 msgstr "Déplacer vers une autre catégorie"
+
+msgid "Move to…"
+msgstr "Déplacer vers…"
+
+#, python-brace-format
+msgid "Move “{folder}” to"
+msgstr "Déplacer « {folder} » vers"
 
 msgid "Move, then delete"
 msgstr "Déplacer, puis supprimer"
@@ -2351,6 +2376,9 @@ msgstr "Aucun extrait n'a ces mots"
 msgid "No folder yet"
 msgstr "Aucun dossier pour l'instant"
 
+msgid "No folder's settings change"
+msgstr "Les réglages d'aucun dossier ne changent"
+
 msgid "No item in the text"
 msgstr "Aucun élément dans le texte"
 
@@ -2482,6 +2510,9 @@ msgstr "Pas un canal conjoint"
 msgid "Not a joint venue (on saving)."
 msgstr "Pas un canal conjoint (à l'enregistrement)."
 
+msgid "Not a person within a folder"
+msgstr "Pas une personne dans un dossier"
+
 msgid "Not an ORCID (e.g. 0000-0002-1825-0097)"
 msgstr "Ce n'est pas un ORCID (p. ex. 0000-0002-1825-0097)"
 
@@ -2557,6 +2588,16 @@ msgstr "Note dans {period}"
 
 msgid "Notes"
 msgstr "Notes"
+
+msgid "Notes and excerpts"
+msgstr "Notes et extraits"
+
+msgid ""
+"Notes and excerpts in the folder: the person's notes, their excerpts by "
+"category (also next to their PDFs)"
+msgstr ""
+"Notes et extraits dans le dossier : les notes sur la personne, ses "
+"extraits par catégorie (aussi à côté de ses PDF)"
 
 msgid "Notes of the folder"
 msgstr "Notes du dossier"
@@ -2693,9 +2734,6 @@ msgstr ""
 
 msgid "Override"
 msgstr "Remplacer"
-
-msgid "Own settings"
-msgstr "Ses propres réglages"
 
 msgid "Own thesis"
 msgstr "Thèse personnelle"
@@ -3093,11 +3131,17 @@ msgstr "{id} retiré"
 msgid "Rename"
 msgstr "Renommer"
 
+msgid "Rename the folder"
+msgstr "Renommer le dossier"
+
 #, python-brace-format
 msgid "Renamed: “{name}” stays a variant, so its texts keep matching."
 msgstr ""
 "Renommé : « {name} » reste une variante, ses textes sont donc toujours "
 "reconnus."
+
+msgid "Rename…"
+msgstr "Renommer…"
 
 msgid "Replace all current matching settings"
 msgstr "Remplacer tous les paramètres d’appariement actuels"
@@ -3371,6 +3415,9 @@ msgstr "Paramètres"
 
 msgid "Settings file (.json)"
 msgstr "Fichier de paramètres (.json)"
+
+msgid "Settings move only to a folder it is in"
+msgstr "Les réglages ne se déplacent que vers un dossier où il est"
 
 msgid "Settings → API keys"
 msgstr "Paramètres → Clés d’API"
@@ -3694,6 +3741,31 @@ msgstr ""
 msgid "The first rule that matches:"
 msgstr "La première règle qui s'applique :"
 
+msgid ""
+"The folder gets its own copy of these settings (its categories, the "
+"citations in its notes); its people's excerpts, and those of the folders "
+"using its settings, go to the categories of the same names there (added "
+"if missing)."
+msgstr ""
+"Le dossier reçoit sa propre copie de ces réglages (ses catégories, les "
+"citations dans ses notes) ; les extraits de ses personnes, et ceux des "
+"dossiers utilisant ses réglages, vont dans les catégories de mêmes noms "
+"(ajoutées si elles manquent)."
+
+#, python-brace-format
+msgid ""
+"The folder then uses these settings (its categories, the citations in its"
+" notes), as do the folders that used its own, and “{folder}” (with those "
+"between them) uses them from it. Settings no folder uses any more are "
+"dropped; excerpts go to the categories of the same names (added if "
+"missing)."
+msgstr ""
+"Le dossier utilise alors ces réglages (ses catégories, les citations dans"
+" ses notes), comme les dossiers qui utilisaient les siens, et « {folder} "
+"» (avec ceux entre les deux) les utilise depuis lui. Les réglages "
+"qu'aucun dossier n'utilise plus sont supprimés ; les extraits vont dans "
+"les catégories de mêmes noms (ajoutées si elles manquent)."
+
 msgid "The former names stay variants, so their texts keep matching"
 msgstr ""
 "Les anciens noms restent des variantes, leurs textes sont donc toujours "
@@ -3816,6 +3888,10 @@ msgstr ""
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
 
+#, python-brace-format
+msgid "The settings of these folders change: {folders}"
+msgstr "Les réglages de ces dossiers changent : {folders}"
+
 msgid "The side panel is back in the PDF window: this one can be closed"
 msgstr ""
 "Le panneau latéral est revenu dans la fenêtre du PDF : celle-ci peut être"
@@ -3854,11 +3930,6 @@ msgstr "Le texte du groupe (modifiez-le avec son crayon)"
 
 msgid "The track's identifier (in the exported settings)"
 msgstr "L'identifiant de la session (dans les paramètres exportés)"
-
-msgid "The tree of folders: nest, move and rename them; their settings"
-msgstr ""
-"L'arbre des dossiers : les imbriquer, les déplacer, les renommer ; leurs "
-"réglages"
 
 #, python-brace-format
 msgid "The validated profiles give the ORCID {orcid}."
@@ -4088,6 +4159,9 @@ msgstr "{token} inattendu en colonne {column}"
 msgid "Unhide"
 msgstr "Réafficher"
 
+msgid "Unknown folder"
+msgstr "Dossier inconnu"
+
 msgid "Unknown person"
 msgstr "Personne inconnue"
 
@@ -4134,6 +4208,12 @@ msgstr "Utiliser"
 
 msgid "Use it"
 msgstr "L’utiliser"
+
+msgid "Use its parent's settings"
+msgstr "Utiliser les réglages de son parent"
+
+msgid "Use settings of its own (a copy)"
+msgstr "Utiliser ses propres réglages (une copie)"
 
 msgid "Use the conferences found in its texts"
 msgstr "Utiliser les conférences trouvées dans ses textes"
@@ -4844,6 +4924,9 @@ msgstr "non utilisé"
 msgid "note (optional)"
 msgstr "note (facultative)"
 
+msgid "notes and excerpts in the folder"
+msgstr "notes et extraits dans le dossier"
+
 #, python-brace-format
 msgid "off-period ({year})"
 msgstr "hors période ({year})"
@@ -5171,10 +5254,6 @@ msgid "{message} (applied everywhere)"
 msgstr "{message} (appliqué partout)"
 
 #, python-brace-format
-msgid "{name} (hidden)"
-msgstr "{name} (masqué)"
-
-#, python-brace-format
 msgid "{name} — {status} (last sync {when})"
 msgstr "{name} — {status} (dernière synchronisation {when})"
 
@@ -5395,6 +5474,10 @@ msgstr ""
 #, python-brace-format
 msgid "{path}  (from {origin})"
 msgstr "{path}  (d’après {origin})"
+
+#, python-brace-format
+msgid "{person} · {folder}"
+msgstr "{person} · {folder}"
 
 #, python-brace-format
 msgid "{role} author"

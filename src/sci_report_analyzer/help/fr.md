@@ -273,21 +273,32 @@ section « Rayonnement » ; l'icône de badge nomme les documents, par exempl
 « Application ») ;
 le bouton ❝ du rapport les insère, par catégorie.
 
-Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
+Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers
-(définie dans son onglet Périodes), avec ses propres étoiles, étiquettes et notes ; ouvrir une personne depuis un
+(définie dans son onglet Périodes), avec ses propres étoiles, étiquettes et notes ; ouvrir une personne depuis un
 dossier sélectionne celle-ci. Retirer une personne d'un dossier (✕ sur sa carte, ou dans son onglet Périodes)
 garde cette période, avec ses données, comme l'une de ses propres périodes, ou la supprime.
+Le bouton 📝 de la carte d'une personne (aussi à côté du nom du dossier sur sa page, et dans son onglet Documents)
+ouvre ses **notes et extraits dans le dossier** sur une page à part, comme à côté de ses PDF : pour les écrire, ou
+voir ses extraits par catégorie, sans ouvrir de document (par exemple quand elle n'en a aucun).
 
-Les dossiers peuvent être **dans d'autres dossiers** : le bouton **Dossiers** de la page Rapports les montre
-en arbre (repliable), pour les renommer, en ajouter un dans un autre et les déplacer (glisser un dossier sur un
-autre, ou choisir où il est dans son menu « Dans »). Un dossier utilise les **réglages** du dossier où il est, ou
-les siens : tous, ses catégories et les citations dans ses notes (l'étiquette numérotée, les formats des numéros,
-ses modèles, les notes de départ). Choisir ses propres réglages part d'une copie de ceux de son parent ; revenir à
-ceux de son parent supprime les siens (sauf si d'autres dossiers les utilisent), les extraits de ses personnes
-allant dans les catégories de mêmes noms (ajoutées si elles manquent), comme quand un dossier utilisant les
-réglages de son parent est déplacé. Un dossier mis au premier niveau garde les réglages qu'il utilisait ; les
-dialogues des catégories et des citations disent quand d'autres dossiers utilisent les mêmes.
+Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre** à sa gauche
+(au-dessus, sur un écran étroit), repliable ; un clic sur un dossier l'affiche (ses personnes, les dossiers qu'il
+contient), « Toutes les personnes (nettoyage) » chaque personne. Glissez un dossier sur un autre pour le mettre
+dedans (sur son haut ou son bas : à côté), ou sur « Déposer ici » pour le premier niveau. Le menu ⋮ de chaque
+dossier le renomme, ajoute un dossier dedans, le déplace (« Déplacer vers… ») et choisit ses réglages. Un dossier
+utilise les **réglages** du dossier où il est, ou les siens (une icône dans l'arbre) : tous, ses catégories et les
+citations dans ses notes (l'étiquette numérotée, les formats des numéros, ses modèles, les notes de départ).
+Choisir ses propres réglages part d'une copie de ceux de son parent ; revenir à ceux de son parent supprime les
+siens (sauf si d'autres dossiers les utilisent), les extraits de ses personnes allant dans les catégories de mêmes
+noms (ajoutées si elles manquent), comme quand un dossier utilisant les réglages de son parent est déplacé.
+**Déplacer ses réglages vers…** donne les réglages qu'utilise un dossier à un dossier où il est (par exemple son
+parent, pour que tous les dossiers qu'il contient les partagent) : le dossier (et ceux entre les deux) utilise
+alors ceux de la cible, comme les dossiers qui utilisaient les anciens réglages de la cible (supprimés, sauf si
+d'autres les utilisent). **Copier ses réglages vers…** donne à n'importe quel autre dossier sa propre copie. Les
+deux nomment les dossiers dont les réglages changent avant de le faire, les extraits suivant comme ci-dessus. Un
+dossier mis au premier niveau garde les réglages qu'il utilisait ; les dialogues des catégories et des citations
+disent quand d'autres dossiers utilisent les mêmes.
 
 **Catégories de coauteurs** (par exemple « Collaborateurs int. ») : cliquez sur le nom d'un coauteur dans les
 détails d'une publication pour le placer dans une catégorie (ou pour indiquer qu'il s'agit de la personne ou de l'un de

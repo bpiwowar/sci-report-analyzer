@@ -627,44 +627,121 @@ async def test_folders_tree_editor(user: User) -> None:
     # Its categories: its parent's (shared).
     user.find(marker="folder-categories").click()
     await user.should_see(marker="settings-shared", content="Shared with Hiring")
-    user.find(marker="folders-tree").click()
+    # The tree, on the page: a click shows a folder; All people too.
     await user.should_see(marker=f"folder-node-{sub}")
-    # Collapsed, then shown again.
+    user.find(marker=f"folder-node-{prize}").trigger("click")
+    await user.should_see(marker="people-title", content="Prize")
+    user.find(marker="folder-all").trigger("click")
+    await user.should_see(marker="people-table")
+    await user.open(f"/?folder={sub}")
+    # Collapsed, then shown again (sticky).
     user.find(marker=f"folder-toggle-{top}").click()
+    await user.should_not_see(marker=f"folder-node-{sub}")
+    await user.open(f"/?folder={prize}")
     await user.should_not_see(marker=f"folder-node-{sub}")
     user.find(marker=f"folder-toggle-{top}").click()
     await user.should_see(marker=f"folder-node-{sub}")
-    # Renamed in place.
-    user.find(marker=f"folder-tree-name-{sub}").clear().type("Session 2026").trigger(
-        "keydown.enter"
-    )
+    # Renamed (its menu).
+    user.find(marker=f"folder-rename-{sub}").click()
+    user.find(marker="folder-rename-input").clear().type("Session 2026")
+    user.find(marker="folder-rename-ok").click()
+    await user.should_see(marker=f"folder-tree-name-{sub}", content="Session 2026")
     assert [n.path for n in folders.tree() if n.id == sub] == ["Hiring › Session 2026"]
     # Its own settings (a copy of its parent's), then its parent's again (once confirmed).
-    user.find(marker=f"folder-settings-{sub}").elements.pop().value = "own"
-    assert folders.own_settings(sub) and [n.name for n in categories.tree(sub)] == ["Research"]
+    user.find(marker=f"folder-settings-{sub}").click()
     await user.should_see("Its own settings: a copy of its parent's")
-    user.find(marker=f"folder-settings-{sub}").elements.pop().value = "parent"
+    assert folders.own_settings(sub) and [n.name for n in categories.tree(sub)] == ["Research"]
+    await user.should_see(marker=f"folder-own-{sub}")
+    user.find(marker=f"folder-settings-{sub}").click()
     user.find(marker="folder-settings-confirm").click()
-    assert not folders.own_settings(sub)
     await user.should_see(marker=f"folder-shared-{sub}")
-    # Moved: with the "In" menu, dragged onto a folder, then onto the top level.
+    assert not folders.own_settings(sub)
+    # Moved: with its "Move to" menu, dragged onto a folder, then onto the top level.
+    user.find(marker=f"folder-move-{sub}").click()
     user.find(marker=f"folder-parent-{sub}").elements.pop().value = prize
     assert [n.parent_id for n in folders.tree() if n.id == sub] == [prize]
     user.find(marker=f"folder-node-{top}").trigger("drop", {"id": sub, "where": "inside"})
     user.find(marker=f"folder-node-{top}").trigger("drop", {"id": top, "where": "inside"})
     assert [n.parent_id for n in folders.tree() if n.id == sub] == [top]
+    await user.should_see(marker=f"folder-node-{sub}")
     user.find(marker=f"folder-node-{sub}").trigger("drop", {"id": top, "where": "inside"})
     await user.should_see("A folder cannot go within itself")
     user.find(marker="folder-drop-top").trigger("drop", {"id": sub})
     assert [(n.parent_id, n.own) for n in folders.tree() if n.id == sub] == [(None, True)]
-    # A folder within another one, added.
+    # A folder within another one, added: shown.
+    await user.should_see(marker=f"folder-sub-{prize}")
     user.find(marker=f"folder-sub-{prize}").click()
-    await user.should_see(marker="folder-tree-name-4")
+    await user.should_see(marker="people-title", content="Prize › New folder")
     assert [(n.path, n.own) for n in folders.tree() if n.id == 4] == [("Prize › New folder", False)]
     # The folder's page lists those within it.
     await user.open(f"/?folder={prize}")
     user.find(marker="subfolder-4").click()
     await user.should_see(marker="people-title", content="Prize › New folder")
+
+
+async def test_folder_settings_moved_and_copied_from_the_tree(user: User) -> None:
+    from sci_report_analyzer import categories, folders
+
+    top = folders.save_folder(None, "Hiring")
+    sub = folders.save_folder(None, "Session 1", parent_id=top)
+    other = folders.save_folder(None, "Session 2", parent_id=top)
+    prize = folders.save_folder(None, "Prize")
+    folders.use_own_settings(sub)
+    categories.add(sub, "Research")
+    await user.open(f"/?folder={sub}")
+    # Moved to its parent: the folders whose settings change named first.
+    user.find(marker=f"folder-move-settings-{sub}").click()
+    await user.should_see(marker="folder-settings-affected", content="Hiring, Hiring › Session 2")
+    await user.should_see(marker=f"folder-own-{sub}")
+    user.find(marker="folder-settings-apply").click()
+    await user.should_not_see(marker=f"folder-own-{sub}")
+    assert not folders.own_settings(sub)
+    assert [n.name for n in categories.tree(other)] == ["Research"]
+    # Copied to another folder (chosen in the dialog).
+    user.find(marker=f"folder-copy-settings-{other}").click()
+    await user.should_see(marker="folder-settings-target")
+    user.find(marker="folder-settings-target").elements.pop().value = prize
+    await user.should_see(marker="folder-settings-affected", content="Prize")
+    user.find(marker="folder-settings-apply").click()
+    for _i in range(50):
+        if [n.name for n in categories.tree(prize)] == ["Research"]:
+            break
+        await asyncio.sleep(0.02)
+    assert [n.name for n in categories.tree(prize)] == ["Research"]
+    assert folders.sharing(prize) == []
+
+
+async def test_folder_notes_without_a_document(user: User) -> None:
+    from sci_report_analyzer import categories, folders
+
+    pid = _seed()
+    fid = folders.save_folder(None, "Hiring committee")
+    period = folders.add_person(fid, pid, 2020, 2024)
+    research = categories.add(fid, "Research")
+    categories.add_excerpt(research, period, "Led a project.", 1, [])
+    # From the person's card in the folder.
+    await user.open(f"/?folder={fid}")
+    user.find(marker=f"notes-{period}").click()
+    await user.should_see(marker="folder-note")
+    await user.should_see(marker="notes-person", content="Jane Doe")
+    user.find(marker="folder-note").elements.pop().value = "Strong **candidate**"
+    await note_saved(user, "folder-note")
+    assert folders.notes_of(period) == "Strong **candidate**"
+    await user.should_not_see(marker="note-quote")  # (no PDF to quote from)
+    # Their excerpts, by category.
+    user.find(marker="side-tab-categories").click()
+    await user.should_see("Led a project.")
+    # From the person's page, and their Documents tab (no document).
+    await user.open(f"/person/{pid}/{period}")
+    user.find(marker="person-folder-notes").click()
+    await user.should_see(marker="folder-note")
+    await user.open(f"/person/{pid}?tab=documents")
+    await user.should_see("No document")
+    user.find(marker=f"documents-notes-{period}").click()
+    await user.should_see(marker="folder-note")
+    # Not a person within a folder.
+    await user.open("/notes/999")
+    await user.should_see(marker="notes-not-found")
 
 
 async def test_remove_from_folder_keeping_or_deleting_data(user: User) -> None:

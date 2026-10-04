@@ -58,7 +58,9 @@ class Side:
     def __init__(self, person_id: int, period_id: int | None, source: tuple[str, int]) -> None:
         self.person_id = person_id
         self.period_id = period_id
-        self.source = source  # ("doc", document id) or ("pub", paper id): the PDF shown
+        # ("doc", document id) or ("pub", paper id): the PDF shown; ("notes", 0): none (the
+        # person's notes and excerpts in the folder, on their own page)
+        self.source = source
         # The folder of the period, whose categories excerpts are filed in.
         self.folder = folders.folder_of_period(period_id)
         self.on_render: list[Callable[[], None]] = []
@@ -114,6 +116,10 @@ class Side:
         self.back()
         self.box.set_visibility(True)
         self.tab_bar.value = name
+
+    @property
+    def has_pdf(self) -> bool:
+        return self.source[0] in ("doc", "pub")
 
     @property
     def stats(self) -> list[PubStat]:
@@ -338,7 +344,8 @@ class Side:
     def folder_tools(self) -> None:
         """The toolbar of the folder's notes: quote, cite a paper, copy with the references
         (numbered as the folder says), insert a block (the publications, the excerpts)."""
-        self.quote_tool(lambda: self.folder_editor, first=True)
+        if self.has_pdf:
+            self.quote_tool(lambda: self.folder_editor, first=True)
         self.cite_tools(
             lambda: self.folder_editor,
             "folder-note",
