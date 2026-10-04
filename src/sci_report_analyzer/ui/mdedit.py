@@ -53,6 +53,9 @@ class MarkdownEditor:
         editor (else beside it); ``fill``: the height left in its (flex) column, rather than
         ``height``."""
         self._render = render or (lambda t: t)
+        # (set by the note editors saving it: unsaved text typed, and a text saved elsewhere)
+        self.is_dirty: Callable[[], bool] = lambda: False
+        self.adopt: Callable[[str], None] = lambda text: setattr(self, "value", text)
         self._on_change = on_change
         if fill:
             height = "100%"

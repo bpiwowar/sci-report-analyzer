@@ -156,6 +156,15 @@ def note_editor(
             render=render,
             toolbar=toolbar,
         )
+
+    def adopt(text: str) -> None:  # (saved by another window)
+        state.update(saved=text.strip(), typed=None)
+        editor.value = text
+        state["typed"] = None
+        status.text = _("Saved")
+
+    editor.is_dirty = lambda: state["typed"] is not None
+    editor.adopt = adopt
     box.on("focusout", flush)
     ui.timer(0.5, tick)
     ui.context.client.on_disconnect(flush)
