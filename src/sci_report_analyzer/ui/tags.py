@@ -16,6 +16,9 @@ from .mdedit import MarkdownEditor
 from .theme import chip_style, chip_text, span
 
 DEFAULT_COLOUR = "#0969da"
+# A note is saved once typing pauses for NOTE_IDLE seconds (checked every NOTE_TICK).
+NOTE_IDLE = 1.0
+NOTE_TICK = 0.5
 
 
 def tag_chip(t: Tag, number: int | None = None) -> None:
@@ -143,7 +146,7 @@ def note_editor(
         status.text = _("Editing…")
 
     def tick() -> None:
-        if state["typed"] is not None and time.monotonic() - state["at"] > 1.0:
+        if state["typed"] is not None and time.monotonic() - state["at"] > NOTE_IDLE:
             flush()
 
     with ui.column().classes("w-full gap-0" + (" grow min-h-0" if fill else "")) as box:
@@ -176,7 +179,7 @@ def note_editor(
     editor.is_dirty = lambda: state["typed"] is not None or state["refused"]
     editor.adopt = adopt
     box.on("focusout", flush)
-    ui.timer(0.5, tick)
+    ui.timer(NOTE_TICK, tick)
     ui.context.client.on_disconnect(flush)
     return editor
 

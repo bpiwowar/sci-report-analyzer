@@ -122,4 +122,9 @@ def fresh_db(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pdfs, "ROOT", tmp_path / "pdfs")
     monkeypatch.setattr(pdfs, "unpaywall", no_unpaywall)
+    # Notes saved sooner once typing pauses (still after a tick: "Editing…" is seen).
+    from sci_report_analyzer.ui import tags
+
+    monkeypatch.setattr(tags, "NOTE_IDLE", 0.2)
+    monkeypatch.setattr(tags, "NOTE_TICK", 0.05)
     yield
