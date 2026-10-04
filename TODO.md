@@ -14,3 +14,7 @@ Saving the preferences is easy to forget (each screen has its own save button).
 
 In a venue's "Matching (rules and variants)", turn a variant into a venue rule (a regex,
 prefilled from its cleaned text, to edit) so that its near variants match too.
+
+The variants the rule matches are then redundant: remove them automatically when the
+rule is saved (and when any venue rule is edited), with a short message ("3 variants now
+matched by the rule were removed").
