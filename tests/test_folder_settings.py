@@ -57,6 +57,7 @@ def test_own_settings_start_from_a_copy_and_excerpts_follow():
     reports.save_skeleton(top, "# Start")
     period = folders.add_person(sub, ann)
     categories.add_excerpt(projects, period, "Led a project.", 1, [])
+    categories.set_section_text(period, research, "Some research.")  # (without excerpts)
     folders.use_own_settings(sub)
     assert own_settings(sub) and folders.sharing(sub) == []
     assert _cats(sub) == _cats(top) and reports.skeleton(sub) == "# Start\n"
@@ -64,6 +65,8 @@ def test_own_settings_start_from_a_copy_and_excerpts_follow():
     assert e.category_id != projects and _filed(period) == [
         ("Research › Projects", "Led a project.")
     ]
+    [mine] = [n.id for n in categories.tree(sub) if n.path == "Research"]
+    assert categories.section_texts(period) == {mine: "Some research."}  # (its text follows)
     # Its own settings now: changing them leaves the parent's alone.
     categories.add(sub, "Teaching")
     reports.save_skeleton(sub, "# Mine")
@@ -79,6 +82,7 @@ def test_own_settings_start_from_a_copy_and_excerpts_follow():
         ("Teaching", "Taught a course."),
     ]
     assert categories.excerpts(period)[0].category_id == projects
+    assert categories.section_texts(period) == {research: "Some research."}
 
 
 def test_moving_and_deleting_folders():

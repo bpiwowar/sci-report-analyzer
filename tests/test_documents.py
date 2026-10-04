@@ -11,8 +11,8 @@ from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
 from sqlalchemy import select
 
-from sci_report_analyzer import documents, folders, pdfs, pubview
-from sci_report_analyzer.db.models import Publication
+from sci_report_analyzer import documents, folders, pdfs, pubview, reports
+from sci_report_analyzer.db.models import Publication, SectionText
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.ui.mdedit import MarkdownEditor, quote
 
@@ -715,6 +715,72 @@ def test_nested_influence():
     assert out.startswith("# Dossier\n\n## Recherche") and "\n### Rayonnement\n" not in out
     assert "## Rayonnement\n\n- Prix Andromède." in out
     assert "\n### Comités et sociétés savantes\n" in out
+
+
+def test_section_texts():
+    """A text per category and person (Markdown, e.g. a summary): after the heading of its
+    section; nested, that of a section left out in the Rayonnement section."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    teaching = categories.add(folder, "Enseignement")
+    research = categories.add(folder, "Recherche")
+    projects = categories.add(folder, "Projets", research)
+    empty = categories.add(folder, "Divers")
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    categories.add_excerpt(teaching, period, "Cours de Zorglub.", 1, [], document_id=doc)
+    led = categories.add_excerpt(projects, period, "Projet Nébuleuse.", 2, [], document_id=doc)
+    categories.update_excerpt(led, influence=True)
+    # Stored (trimmed; blank: removed), by person.
+    assert (
+        categories.section_texts(period) == {} and categories.section_text(period, teaching) == ""
+    )
+    categories.set_section_text(period, teaching, "  Deux **cours**.\n")
+    categories.set_section_text(period, research, "Une recherche active.")
+    categories.set_section_text(period, projects, "Un projet.")
+    categories.set_section_text(period, empty, "Rien.")
+    assert categories.section_text(period, teaching) == "Deux **cours**."
+    categories.set_section_text(period, research, "Une recherche *très* active.")
+    assert categories.section_texts(period)[research] == "Une recherche *très* active."
+    # After the heading, before the items (a section left out: its text too).
+    assert categories.markdown(folder, period, nested=False) == (
+        "## Enseignement\n\nDeux **cours**.\n\n- Cours de Zorglub. %% Dossier, p. 1 %%\n\n"
+        "## Recherche\n\nUne recherche *très* active.\n\n### Projets\n\nUn projet.\n\n"
+        "- Projet Nébuleuse. %% Dossier, p. 2 %%\n\n"
+        "## Rayonnement\n\n- **Recherche › Projets**\n  - Projet Nébuleuse. %% Dossier, p. 2 %%\n"
+    )
+    # Nested: the sections left out (all their excerpts taken out), their texts in the
+    # Rayonnement section.
+    assert categories.markdown(folder, period, nested=True) == (
+        "## Enseignement\n\nDeux **cours**.\n\n- Cours de Zorglub. %% Dossier, p. 1 %%\n\n"
+        "## Rayonnement\n\n"
+        "### Recherche\n\nUne recherche *très* active.\n\n#### Projets\n\nUn projet.\n\n"
+        "- Projet Nébuleuse. %% Dossier, p. 2 %%\n"
+    )
+    # A section kept: its text stays there.
+    categories.add_excerpt(projects, period, "Projet Comète.", 3, [], document_id=doc)
+    out = categories.markdown(folder, period, nested=True)
+    assert "## Recherche\n\nUne recherche *très* active.\n\n### Projets\n\nUn projet.\n\n" in out
+    assert "### Recherche\n\n#### Projets\n\n- Projet Nébuleuse." in out
+    # In the notes, through the block.
+    ctx = reports.folder_context([], period)
+    assert "## Enseignement\n\nDeux **cours**.\n" in reports.render("[]{.excerpts}", ctx).text
+    # Moved with the excerpts (after the text there), deleted with the category.
+    assert categories.move_excerpts(research, teaching) == 2
+    assert categories.section_texts(period) == {
+        teaching: "Deux **cours**.\n\nUne recherche *très* active.\n\nUn projet.",
+        empty: "Rien.",
+    }
+    assert categories.delete(empty)
+    assert list(categories.section_texts(period)) == [teaching]
+    categories.set_section_text(period, teaching, " ")
+    assert categories.section_texts(period) == {}
+    # Deleted with the person's period.
+    categories.set_section_text(period, teaching, "Encore.")
+    folders.delete_period(period)
+    with session_scope() as s:
+        assert s.scalars(select(SectionText)).all() == []
 
 
 def test_category_colours():
