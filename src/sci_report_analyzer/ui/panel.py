@@ -149,7 +149,6 @@ class PublicationsPanel:
             self.period_id = state["period_id"]
             self.tag_filter = self._saved_tags(state)
             self._apply_period()
-        self.owner_names: list[str] = []
         # Filters from the URL (so that a reload gives back the same view).
         self.base_url = f"/person/{person_id}"
         self.url_extra: dict[str, str] = {}

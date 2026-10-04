@@ -13,10 +13,9 @@ from sqlalchemy.orm import selectinload
 from .. import annotations, folders, manual, theses
 from ..db.models import Person, SourceLink, Thesis
 from ..db.session import session_scope
-from ..i18n import N_, _, ngettext
+from ..i18n import _, ngettext
 from ..source_settings import active_links
 from ..sources import ADAPTERS
-from ..sources.base import SourceError
 from ..sources.scholar import parse_profile, profile_id_from_html
 from ..sources.thesesfr import ROLE_LABELS
 from ..sync import (
@@ -36,20 +35,6 @@ from .documents_page import documents_view
 from .folder_notes import NOTES_TIP, notes_url
 from .panel import PublicationsPanel, period_label
 from .theme import STATUS_COLOUR, fmt_dt, frame, source_tag
-
-# Shown with _(): the update statuses of a source (SourceLink.status_label, the keys of
-# STATUS_COLOUR).
-_DISPLAYED = (
-    N_("up to date"),
-    N_("updating…"),
-    N_("error"),
-    N_("never synced"),
-    N_("out of date"),
-    N_("not used"),
-    N_("candidate"),
-    N_("rejected"),
-    N_("validated"),
-)
 
 
 def _refresh(r) -> None:
@@ -1111,4 +1096,4 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
             table.on("outcome", save_outcome)
 
 
-__all__ = ["SourceError", "register"]
+__all__ = ["register"]
