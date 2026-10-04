@@ -24,16 +24,6 @@ track) conflicts with it: never save a rule in conflict with variants. Ask the u
 remove those variants (they take the rule's track), or edit the regex so that it no
 longer matches them.
 
-## Tracks replace flags (in progress)
-
-- Tracks as editable definitions (Settings): a name, a colour used across the interface
-  (variant and paper chips, categories, distribution, reports), an order and their
-  matching rules (the track detection rules, by language, default / edited / added).
-- No more flags: a manual track override per paper (automatic / main track / a track).
-- Migration: a paper flagged with a track gets that track as its override, the flags'
-  colours become the tracks' colours, flags without a track become tags; then the flag
-  tables are dropped.
-
 ## PDF: excerpts and PDF.js highlights
 
 When adding an excerpt from text already highlighted with PDF.js, remove that PDF.js
