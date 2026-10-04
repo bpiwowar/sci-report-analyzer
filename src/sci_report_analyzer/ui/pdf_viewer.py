@@ -22,6 +22,7 @@ from ..db.models import Publication
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
 from .dialogs import transient_dialog
+from .theme import APP_NAME, bare_page
 
 if TYPE_CHECKING:
     from ..pubview import PubStat
@@ -892,8 +893,7 @@ def register() -> None:
         pane: str | None = None,
     ) -> None:
         found = _title(pub_id)
-        ui.page_title(f"{found[0] if found else 'PDF'} · SciReport Analyzer")
-        ui.query(".nicegui-content").classes("p-0 gap-0")
+        bare_page(found[0] if found else "PDF")
         if found is None:
             ui.label(_("No such paper")).classes("p-4")
             return
@@ -907,7 +907,7 @@ def register() -> None:
         side = Side(person_id, period, ("pub", pub_id))
         box = viewer_frame(
             title,
-            ("SciReport Analyzer", f"/person/{person_id}"),
+            (APP_NAME, f"/person/{person_id}"),
             f"/pdf-file/{pub_id}",
             int(file.stat().st_mtime) if file else 0,
             side,

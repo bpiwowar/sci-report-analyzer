@@ -17,6 +17,7 @@ from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
 from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
+from .theme import bare_page
 from .viewer_side import Side, bookmarks_section, categories_section
 
 # Extracts the document's lines of text (sent once, to find its papers in), and shows the
@@ -119,8 +120,7 @@ def register() -> None:
     @ui.page("/doc/{doc_id}")
     def doc_page(doc_id: int, page: int | None = None, pane: str | None = None) -> None:
         d = documents.info(doc_id)
-        ui.page_title(f"{d.name if d else _('Document')} · SciReport Analyzer")
-        ui.query(".nicegui-content").classes("p-0 gap-0")
+        bare_page(d.name if d else _("Document"))
         if d is None or documents.file_of(doc_id) is None:
             ui.label(_("No such document")).classes("p-4")
             return

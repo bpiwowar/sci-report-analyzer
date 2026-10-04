@@ -45,6 +45,8 @@ STATUS_COLOUR = {
     "rejected": "grey",
 }
 
+APP_NAME = "SciReport Analyzer"
+
 # Opacity of the items not selected in a chart: faint, not to be confused with the selection.
 DIM_OPACITY = 0.12
 
@@ -107,10 +109,10 @@ ui.add_css(CSS, shared=True)  # (every page: also the PDF windows)
 
 @contextmanager
 def frame(title: str) -> Iterator[None]:
-    ui.page_title(f"{title} · SciReport Analyzer")
+    ui.page_title(f"{title} · {APP_NAME}")
     with ui.header().classes("items-center justify-between py-1"):
         with ui.row().classes("items-center gap-4"):
-            ui.link("SciReport Analyzer", "/").classes("text-white text-lg font-bold no-underline")
+            ui.link(APP_NAME, "/").classes("text-white text-lg font-bold no-underline")
             ui.link(_("Reports"), "/").classes("text-white no-underline")
             ui.link(_("Venues"), "/venues").classes("text-white no-underline")
             ui.link(_("Settings"), "/settings").classes("text-white no-underline")
@@ -138,6 +140,12 @@ def frame(title: str) -> Iterator[None]:
                 )
                 ui.link(_("Settings → API keys"), "/settings?tab=keys")
         yield
+
+
+def bare_page(title: str) -> None:
+    """A page without the frame (e.g. a PDF window): its title, no padding."""
+    ui.page_title(f"{title} · {APP_NAME}")
+    ui.query(".nicegui-content").classes("p-0 gap-0")
 
 
 def language_menu() -> None:
