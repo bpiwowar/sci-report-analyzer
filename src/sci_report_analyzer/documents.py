@@ -20,6 +20,7 @@ from .authors import name_key
 from .db.app_settings import delete_setting, get_setting, set_setting
 from .db.models import Period, PeriodDocument, utcnow
 from .db.session import session_scope
+from .files import atomic_write
 from .i18n import _
 from .pdfs import PdfError, _slug, is_pdf, pdf_dir
 from .ranking.normalize import normalize
@@ -51,15 +52,8 @@ def add(period_id: int, name: str, data: bytes) -> int:
         s.add(doc)
         s.flush()
         doc.path = f"{SUBDIR}/{period.person_id}/{doc.id}-{_slug(name)}.pdf"
-        _write(pdf_dir() / doc.path, data)
+        atomic_write(pdf_dir() / doc.path, data)
         return doc.id
-
-
-def _write(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".part")
-    tmp.write_bytes(data)
-    tmp.replace(path)  # (never a half-written file)
 
 
 def save(doc_id: int, data: bytes) -> None:
@@ -70,7 +64,7 @@ def save(doc_id: int, data: bytes) -> None:
         doc = s.get(PeriodDocument, doc_id)
         if doc is None:
             raise PdfError(_("no such document"))
-        _write(pdf_dir() / doc.path, data)
+        atomic_write(pdf_dir() / doc.path, data)
         doc.edited_at = utcnow()
 
 

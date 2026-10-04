@@ -21,6 +21,7 @@ from sqlalchemy.orm import selectinload
 from . import config
 from .db.models import PeriodDocument, Publication, PublicationPdf, SourcePub, utcnow
 from .db.session import session_scope
+from .files import atomic_write
 from .sources import PRIORITY
 from .sources.base import client, contact_email, normalize_doi
 
@@ -116,10 +117,7 @@ def save(pub_id: int, data: bytes, origin: str | None, *, edited: bool = False) 
         row = s.get(PublicationPdf, pub_id)
         rel = row.path if row else f"{pub.person_id}/{pub_id}-{_slug(pub.title)}.pdf"
         path = pdf_dir() / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".part")
-        tmp.write_bytes(data)
-        tmp.replace(path)  # (never a half-written file)
+        atomic_write(path, data)
         if row is None:
             s.add(PublicationPdf(publication_id=pub_id, path=rel, origin=origin))
         elif edited:

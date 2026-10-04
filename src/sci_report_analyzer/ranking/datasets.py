@@ -30,6 +30,7 @@ from typing import Any
 import httpx
 
 from .. import config
+from ..files import atomic_write
 from .matcher import Record
 from .normalize import normalize
 
@@ -130,10 +131,7 @@ async def refresh_journals(*, force: bool = False) -> bool:
     if not isinstance(records, list) or not records:
         raise ValueError("the Scimago journals downloaded are empty")
     merged = merge_journals(_load(path), records)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(merged, ensure_ascii=False))
-    tmp.replace(path)
+    atomic_write(path, json.dumps(merged, ensure_ascii=False))
     if etag := res.headers.get("etag"):
         etag_path.write_text(etag)
     logger.info("Scimago journals updated: %d journals", len(merged))
@@ -260,11 +258,8 @@ def import_scimago(text: str, year: int) -> int:
     data = load_imported_scimago()
     journals = merge_scimago(data["journals"], year, records)
     path = scimago_import_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
     years = sorted({*data["years"], year})
-    tmp.write_text(json.dumps({"years": years, "journals": journals}, ensure_ascii=False))
-    tmp.replace(path)
+    atomic_write(path, json.dumps({"years": years, "journals": journals}, ensure_ascii=False))
     return len(records)
 
 
@@ -319,10 +314,7 @@ async def refresh_predatory(*, force: bool = False) -> bool:
             records += predatory_records(res.text)
     if not records:
         raise ValueError("the predatory list is empty")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(records))
-    tmp.replace(path)
+    atomic_write(path, json.dumps(records))
     logger.info("Predatory list updated: %d entries", len(records))
     return True
 
