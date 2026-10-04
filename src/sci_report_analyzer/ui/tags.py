@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from html import escape
 from typing import Any
 
 from nicegui import ui
@@ -15,17 +14,14 @@ from ..i18n import _
 from .colours import ColourInput
 from .dialogs import confirm, transient_dialog
 from .mdedit import MarkdownEditor
-from .theme import DEFAULT_COLOUR, chip_style, chip_text, span
+from .theme import DEFAULT_COLOUR, chip_html, chip_style, span
 
 
 def tag_chip(t: Tag, number: int | None = None) -> None:
     """A tag, with the paper's number in the list it was put from."""
     n = f" #{number}" if number is not None else ""
     kind = _("tag within the period") if t.per_period else _("tag")
-    span(
-        f'<span class="vr-chip" style="background:{t.colour};color:{chip_text(t.colour)}">'
-        f"{'⏱ ' if t.per_period else ''}{escape(t.name)}{n}</span>"
-    ).tooltip(
+    span(chip_html(f"{'⏱ ' if t.per_period else ''}{t.name}{n}", t.colour)).tooltip(
         _("{tag}, number {number} in its list").format(tag=kind, number=number) if n else kind
     )
 
