@@ -82,6 +82,8 @@ CSS = """
             transparent 3px 7px); }
 """
 MARKDOWN_CSS = """
+/* The editors' toolbars: tight buttons, so that they all fit on a narrow side panel. */
+.vr-tools .q-btn { padding:2px; min-width:0; min-height:0; }
 /* Markdown headings at text scale, told apart by bullets: # •, ## ••, ### •••…
    (doubled class: wins over NiceGUI's 3rem h1). */
 .nicegui-markdown.nicegui-markdown :is(h1, h2, h3, h4, h5, h6) {
