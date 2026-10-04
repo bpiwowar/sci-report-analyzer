@@ -9,11 +9,16 @@ from sci_report_analyzer.ranking.normalize import (
     LANGUAGE_RULES,
     PREFIX_RULES,
     apply_rules,
-    clean_venue,
     normalize,
     tokenize,
     without_ordinal_marks,
 )
+
+
+def clean_venue(segment: str | None) -> str:
+    """A venue text cleaned with the default rules."""
+    return apply_rules(segment, DEFAULT_NORM_RULES)
+
 
 GOLDEN = load_fixture("golden_cases.json.gz")
 # Cleaned differently on purpose: the reference leaves "èmes" of a plural French ordinal.

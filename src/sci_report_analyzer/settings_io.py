@@ -192,6 +192,17 @@ def _track_text(t: tracks.Track) -> str:
 
 _SCALARS = (
     "min_score",
+    "conference_alt_score",
+    "predatory_min_score",
+    "openalex_score",
+    "merge_title_jaccard",
+    "merge_year_slack",
+    "unreliable_venue_sources",
+    "reflist_match",
+    "reflist_suggest",
+    "venue_merge_score",
+    "venue_similar_score",
+    "former_student_after",
     "national_keywords",
     "international_keywords",
     "unknown_scope",

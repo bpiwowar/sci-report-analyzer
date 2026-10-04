@@ -49,8 +49,18 @@ def test_defaults():
     # Saved settings without the rules (or some of them) get the defaults.
     st = MatchSettings.model_validate({"detection_rules": [{"id": "joint", "pattern": "x"}]})
     assert [r.id for r in st.detection_rules] == [d.id for d in DEFAULT_DETECTION_RULES]
-    assert st.detection_rules[-1].pattern == "x"
+    assert next(r for r in st.detection_rules if r.id == "joint").pattern == "x"
     assert MatchSettings.model_validate({}).detection_rules == MatchSettings().detection_rules
+    # One saved with a former default takes the current one.
+    former = detection.FORMER_DEFAULTS["conference"][0]
+    st = MatchSettings.model_validate(
+        {"detection_rules": [{"id": "conference", "pattern": former}]}
+    )
+    conference = next(r for r in st.detection_rules if r.id == "conference")
+    assert conference.pattern == detection.DEFAULTS["conference"].pattern
+    assert conference.pattern != former
+    assert detection.Rule("conference").search("Proc. Foo")
+    assert detection.Rule("journal").search("J. Foo")
 
 
 def test_rule_references():

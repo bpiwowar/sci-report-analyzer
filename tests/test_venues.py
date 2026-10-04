@@ -411,11 +411,11 @@ def test_workshop_ranked_as_its_main_conference():
     # The main conference's rank in CORE2018 (in force in 2019), in its own category.
     assert (ws.badge.coreRank, ws.badge.coreEdition) == ("B", "CORE2018")
     assert ws.category.key == "workshop:b" and ws.category.label == "Workshop CORE B"
-    assert ws.category.workshop and ws.host_id == host
+    assert ws.category.workshop and ws.host_name == "Symposium on Timely Rankings"
 
     venues.save_hosts(wid, [{"venue_id": host, "from": 2020, "to": None}])
     ws = _stats(pid)["Workshop paper"]
-    assert ws.badge is None and ws.host_id is None  # not its main conference in 2019
+    assert ws.badge is None and ws.host_name is None  # not its main conference in 2019
 
 
 def test_workshop_takes_host_edition_like_its_papers():
@@ -879,12 +879,18 @@ def test_possible_author_says_why():
 
 
 def test_french_workshops_ranked_by_their_main_conference():
-    from sci_report_analyzer.pubview import _fr_category
+    from sci_report_analyzer import i18n
+    from sci_report_analyzer.pubview import _summary_category
     from sci_report_analyzer.ranking.badge import Category
 
     cat = Category("ws:a", "Workshop CORE A", "#000", "a", workshop=True)
-    assert _fr_category(cat, "intl_workshop", 3) == "dans une conf. CORE A"
-    assert _fr_category(cat, "intl_conference", 3) == "Atelier CORE A"
+    with i18n.using("fr"):
+        assert _summary_category(cat, "intl_workshop", 3) == "3 dans une conf. CORE A"
+        assert _summary_category(cat, "intl_conference", 3) == "3 Atelier CORE A"
+        assert _summary_category(cat, None, 1) == "1 Atelier CORE A"
+        unranked = Category("unranked", "unranked", "#000", "unranked")
+        assert _summary_category(unranked, None, 2) == "2 non classés"
+    assert _summary_category(cat, "intl_workshop", 3) == "3 CORE A"
 
 
 def test_venue_choices_show_acronyms_first():
