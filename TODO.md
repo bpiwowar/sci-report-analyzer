@@ -29,6 +29,7 @@ erased the rest.
      starting notes: `Folder.citations`);
   2. the excerpt categories.
 - Rename "People" to "Reports" in the UI.
+- A tree editor of the folders (collapsible): nest, move, rename them.
 
 ## Settings: saving
 
