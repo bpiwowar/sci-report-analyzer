@@ -9,6 +9,7 @@ from nicegui import ui
 
 from .. import categories, folders
 from ..i18n import _, ngettext
+from .colours import ColourMenu
 
 # Drag and drop: where a category is dropped (onto the top / middle / bottom of another).
 _WHERE = (
@@ -97,12 +98,9 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                         .tooltip(_("The colour of its excerpts (their tint on the PDFs)"))
                         .mark(f"category-colour-{n.id}")
                     ):
-                        picker = ui.color_picker(
-                            on_pick=lambda e, n=n: (categories.set_colour(n.id, e.color), done())
-                        ).set_color(n.colour)
-                        picker.q_color.props["palette"] = categories.PALETTE
-                        picker.q_color.props["default-view"] = "palette"
-                        picker.q_color.mark(f"category-colour-pick-{n.id}")
+                        ColourMenu(
+                            lambda c, n=n: (categories.set_colour(n.id, c), done()), n.colour
+                        ).swatches.mark(f"category-colour-pick-{n.id}")
                     title = (
                         ui.input(value=n.name)
                         .props("dense borderless")

@@ -11,6 +11,7 @@ from nicegui import ui
 from .. import annotations
 from ..db.models import Tag
 from ..i18n import _
+from .colours import ColourInput
 from .mdedit import MarkdownEditor
 from .theme import chip_style, chip_text, span
 
@@ -44,7 +45,7 @@ def tags_section(on_change: Callable[[], None] | None = None) -> None:
             with ui.row().classes("items-center gap-2"):
                 name = ui.input(_("Name"), value=t.name).props("dense").mark(f"tag-name-{t.id}")
                 colour = (
-                    ui.color_input(_("Colour"), value=t.colour, preview=True)
+                    ColourInput(_("Colour"), value=t.colour)
                     .props("dense")
                     .classes("w-36")
                     .mark(f"tag-colour-{t.id}")
@@ -79,11 +80,7 @@ def tags_section(on_change: Callable[[], None] | None = None) -> None:
     listing()
     with ui.row().classes("items-center gap-2 mt-2"):
         name = ui.input(_("New tag")).props("dense").mark("new-tag-name")
-        colour = (
-            ui.color_input(_("Colour"), value=DEFAULT_COLOUR, preview=True)
-            .props("dense")
-            .classes("w-36")
-        )
+        colour = ColourInput(_("Colour"), value=DEFAULT_COLOUR).props("dense").classes("w-36")
         per_period = ui.checkbox(_("within a period")).mark("new-tag-period")
 
         def add() -> None:

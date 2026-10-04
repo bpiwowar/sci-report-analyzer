@@ -38,6 +38,7 @@ from ..ranking.normalize import (
 from ..ranking.service import load_settings, save_settings, service
 from ..sources import ADAPTERS
 from . import scimago_years, unsaved
+from .colours import ColourInput
 from .theme import badge_details, fmt_dt, frame, level_hint, level_options, rank_chip, track_chip
 
 # The settings, in groups: (group, [(tab, label, depth)]); a tab of None is a heading
@@ -160,9 +161,8 @@ def contribution_tab() -> None:
         for i, r in enumerate(cfg.roles):
             used = r.key == cfg.fallback or any(x.role == r.key for x in cfg.rules)
             with ui.row().classes("items-center gap-2 no-wrap").mark(f"contribution-role-{i}"):
-                ui.color_input(
+                ColourInput(
                     value=r.colour,
-                    preview=True,
                     on_change=lambda e, r=r: setattr(r, "colour", e.value),
                 ).props("dense outlined").classes("w-32")
                 ui.input(
@@ -721,11 +721,7 @@ def author_categories_section() -> None:
         for c in annotations.author_categories():
             with ui.row().classes("items-center gap-2"):
                 name = ui.input(_("Name"), value=c.name).props("dense")
-                colour = (
-                    ui.color_input(_("Colour"), value=c.colour, preview=True)
-                    .props("dense")
-                    .classes("w-36")
-                )
+                colour = ColourInput(_("Colour"), value=c.colour).props("dense").classes("w-36")
                 ui.button(
                     icon="save",
                     on_click=lambda cid=c.id, n=name, col=colour: (
@@ -744,11 +740,7 @@ def author_categories_section() -> None:
     listing()
     with ui.row().classes("items-center gap-2 mt-2"):
         name = ui.input(_("New category")).props("dense")
-        colour = (
-            ui.color_input(_("Colour"), value="#0969da", preview=True)
-            .props("dense")
-            .classes("w-36")
-        )
+        colour = ColourInput(_("Colour"), value="#0969da").props("dense").classes("w-36")
         ui.button(
             _("Add"),
             on_click=lambda: (
@@ -1711,11 +1703,9 @@ def tracks_tab() -> None:
                     ).bind_value(t.names, lang).props("dense outlined").classes("w-40").mark(
                         f"track-name-{t.id}-{lang}"
                     )
-                ui.color_input(
-                    _("Colour"), value=t.colour, preview=True, on_change=changed
-                ).bind_value(t, "colour").props("dense").classes("w-36").mark(
-                    f"track-colour-{t.id}"
-                )
+                ColourInput(_("Colour"), value=t.colour, on_change=changed).bind_value(
+                    t, "colour"
+                ).props("dense").classes("w-36").mark(f"track-colour-{t.id}")
                 with ui.row().classes("items-center gap-1 no-wrap shrink-0"):
                     status()
                 ui.space()

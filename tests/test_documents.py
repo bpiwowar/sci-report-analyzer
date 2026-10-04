@@ -960,7 +960,7 @@ async def test_categories_editor(user: User, monkeypatch, tmp_path):
     user.find(marker=f"category-influence-{research}").click()
     assert [n.influence for n in categories.tree(folder)] == [False, True, False]
     # A colour (that of its excerpts), picked.
-    user.find(marker=f"category-colour-pick-{teaching}").trigger("change", "#2196f3")
+    user.find(marker=f"category-colour-pick-{teaching}").trigger("click", "#2196f3")
     assert categories.tree(folder)[0].colour == "#2196f3"
     # Not deleted with excerpts there (or below): moved first.
     new = categories.tree(folder)[2].id
