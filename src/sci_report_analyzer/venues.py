@@ -1013,7 +1013,7 @@ def similar_venues(
             texts = [r.name, r.short_name or "", *(ex or k for k, ex, *_rest in r.variants)]
             if not any(q in normalize(t) for t in texts):
                 continue
-        elif score < 0.3:
+        elif score < service.settings.venue_similar_score:
             continue
         out.append((r, score))
     out.sort(key=lambda t: (-t[1], -t[0].publications))
@@ -1041,7 +1041,6 @@ def _family(kind: str) -> str:
 
 
 NOT_SAME_KEY = "venues.not_same"
-PROPOSAL_SCORE = 0.5
 
 
 def not_same_pairs() -> set[tuple[int, int]]:
@@ -1082,7 +1081,7 @@ def merge_proposals(rows: list[VenueRow]) -> list[tuple[VenueRow, VenueRow, floa
                 if related(a, b):
                     continue
                 score = _similarity(a, toks[a.id], b, toks[b.id])
-                if score >= PROPOSAL_SCORE:
+                if score >= service.settings.venue_merge_score:
                     keep, other = sorted((a, b), key=lambda r: (-r.publications, r.id))
                     out.append((keep, other, score))
     out.sort(key=lambda t: (-t[2], -(t[0].publications + t[1].publications)))
@@ -1185,6 +1184,7 @@ def suggest_related(
         if (min(r.id, row.id), max(r.id, row.id)) not in not_same and not related(row, r)
     ][:limit]
     groups: list[tuple[list[VenueRow], str]] = []
+    merge_score = service.settings.venue_merge_score
     for r in found:
         rel = guess_relation(row, r)
         toks = _row_tokens(r)
@@ -1194,7 +1194,7 @@ def suggest_related(
                 for g, grel in groups
                 if grel == rel
                 and rel != "same"
-                and all(_similarity(r, toks, o, _row_tokens(o)) >= PROPOSAL_SCORE for o in g)
+                and all(_similarity(r, toks, o, _row_tokens(o)) >= merge_score for o in g)
             ),
             None,
         )
