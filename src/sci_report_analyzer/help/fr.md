@@ -271,11 +271,21 @@ section « Rayonnement » ; l'icône de badge nomme les documents, par exempl
 « Application ») ;
 le bouton ❝ du rapport les insère, par catégorie.
 
-Les **dossiers** (page Personnes) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
+Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers
 (définie dans son onglet Périodes), avec ses propres étoiles, étiquettes et notes ; ouvrir une personne depuis un
 dossier sélectionne celle-ci. Retirer une personne d'un dossier (✕ sur sa carte, ou dans son onglet Périodes)
 garde cette période, avec ses données, comme l'une de ses propres périodes, ou la supprime.
+
+Les dossiers peuvent être **dans d'autres dossiers** : le bouton **Dossiers** de la page Rapports les montre
+en arbre (repliable), pour les renommer, en ajouter un dans un autre et les déplacer (glisser un dossier sur un
+autre, ou choisir où il est dans son menu « Dans »). Un dossier utilise les **réglages** du dossier où il est, ou
+les siens : tous, ses catégories et les citations dans ses notes (l'étiquette numérotée, les formats des numéros,
+ses modèles, les notes de départ). Choisir ses propres réglages part d'une copie de ceux de son parent ; revenir à
+ceux de son parent supprime les siens (sauf si d'autres dossiers les utilisent), les extraits de ses personnes
+allant dans les catégories de mêmes noms (ajoutées si elles manquent), comme quand un dossier utilisant les
+réglages de son parent est déplacé. Un dossier mis au premier niveau garde les réglages qu'il utilisait ; les
+dialogues des catégories et des citations disent quand d'autres dossiers utilisent les mêmes.
 
 **Catégories de coauteurs** (par exemple « Collaborateurs int. ») : cliquez sur le nom d'un coauteur dans les
 détails d'une publication pour le placer dans une catégorie (ou pour indiquer qu'il s'agit de la personne ou de l'un de

@@ -270,11 +270,22 @@ p. 12 %%`, then their years; those showing influence also listed, by category, i
 “Application”);
 the report's ❝ button inserts them, by category.
 
-**Folders** (People page) group people, e.g. for a hiring committee: a folder has a name,
+**Folders** (Reports page) group people, e.g. for a hiring committee: a folder has a name,
 a date and can be hidden. Each person has their **own period** in each of their folders
 (set in their Periods tab), with its own stars, tags and notes; opening a person from a
 folder selects it. Removing a person from a folder (✕ on their card, or in their Periods
 tab) either keeps that period, with its data, as one of their own periods, or deletes it.
+
+Folders can be **within other folders**: the **Folders** button of the Reports page shows
+them as a tree (collapsible), to rename them, add one within another, and move them (drag
+a folder onto another one, or choose where it is in its "In" menu). A folder uses the
+**settings** of the folder it is in, or its own ones: all of them, its categories and the
+citations in its notes (the numbered tag, the number formats, its templates, the starting
+notes). Choosing its own settings starts from a copy of its parent's; going back to its
+parent's drops its own (unless other folders use them), its people's excerpts going to the
+categories of the same names there (added if missing), as when a folder using its parent's
+settings is moved. A folder moved to the top level keeps the settings it used; the
+categories and citations dialogs say when other folders use the same ones.
 
 **Co-author categories** (e.g. "Intl. collaborators"): click a co-author's name in a
 publication's details to put them in a category (or to say they are the person or one of
