@@ -33,6 +33,9 @@ def quote(text: str, where: str = "") -> str:
     return "> " + " ".join(text.split()) + (f" ({where})" if where else "")
 
 
+_SHARE = "; flex:1 1 0; min-height:6rem"  # (a stacked editor and preview, sharing the height)
+
+
 class MarkdownEditor:
     def __init__(
         self,
@@ -58,7 +61,8 @@ class MarkdownEditor:
         self.adopt: Callable[[str], None] = lambda text: setattr(self, "value", text)
         self._on_change = on_change
         if fill:
-            height = "100%"
+            # (stacked: the editor and the preview share the height; else both as high as it)
+            height = "0" if stacked else "100%"
         with ui.column().classes("w-full gap-1" + (" grow min-h-0" if fill else "")) as self.box:
             with ui.row().classes("w-full items-center gap-0"):
                 for icon, tip, kind, args in TOOLS:
@@ -102,14 +106,17 @@ class MarkdownEditor:
                         on_change=lambda e: self._changed(e.value),
                     )
                     .classes("w-full border rounded")
-                    .style(f"height:{height}; font-size:0.875rem")
+                    .style(
+                        f"height:{height}; font-size:0.875rem"
+                        + (_SHARE if fill and stacked else "")
+                    )
                 )
                 if mark:
                     self.editor.mark(mark)
                 self.preview = (
                     ui.markdown(extras=NOTE_EXTRAS)
                     .classes("w-full vr-note overflow-auto border rounded px-3")
-                    .style(f"height:{height}")
+                    .style(f"height:{height}" + (_SHARE if fill and stacked else ""))
                 )
         self._layout()
         self._sync_scroll()

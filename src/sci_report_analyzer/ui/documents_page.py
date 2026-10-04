@@ -177,7 +177,7 @@ class DocumentPage:
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
             self.side.categories = categories_section(self.side)
-        with self.side.section("notes", "sticky_note_2", _("Notes on the document")):
+        with self.side.section("notes", "sticky_note_2", _("Notes on the document"), fill=True):
             self.side.folder_notes()
             self.note = note_editor(
                 _("Note (on the document)"),

@@ -59,6 +59,7 @@ def folder_notes_editor(
         height="14rem",
         render=render,
         toolbar=toolbar,
+        fill=True,
     )
     holder.append(editor)
     _editors().setdefault(folder_id, WeakSet()).add(editor)
