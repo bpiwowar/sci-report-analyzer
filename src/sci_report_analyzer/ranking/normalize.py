@@ -142,10 +142,6 @@ def is_non_venue(norm: str) -> bool:
     return norm.split(" ")[0] in ARCHIVAL
 
 
-def _caps(token: str) -> int:
-    return len(re.findall(r"[A-Z]", token))
-
-
 @lru_cache(maxsize=256)
 def _compile(pattern: str, replacement: str, ignore_case: bool) -> re.Pattern[str] | None:
     """A rule's regex, its word lists (``{ordinals:fr}``) expanded; none if invalid."""
@@ -321,8 +317,6 @@ DEFAULT_NORM_RULES: tuple[NormRule, ...] = (
     ),
 )
 
-DEFAULT_RULE_IDS = tuple(r.id for r in DEFAULT_NORM_RULES)
-
 _MULTISPACE = re.compile(r"\s{2,}")
 
 
@@ -339,12 +333,3 @@ def apply_rules(segment: str | None, rules: Iterable[NormRule], source: str | No
         if rule.applies_to(source):
             v = rule.apply(v)
     return _MULTISPACE.sub(" ", v).strip()
-
-
-def clean_venue(segment: str | None) -> str:
-    """Clean a venue text with the default rules.
-
-    ``"Nature methods, 2019"`` → ``"Nature methods"``; word qualifiers are kept so
-    ``"ECCV 2018 workshops"`` stays ``"ECCV workshops"``.
-    """
-    return apply_rules(segment, DEFAULT_NORM_RULES)
