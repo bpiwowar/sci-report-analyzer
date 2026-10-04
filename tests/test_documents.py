@@ -676,8 +676,7 @@ def test_categories_and_markdown():
     assert [v.id for v in categories.similar_excerpts(period, "Wrote", "elsewhere")] == [later]
     categories.set_group_text(later, " ")
     assert categories.excerpts(period, grouped=True)[0].group_text is None
-    categories.update_excerpt(later, start=2019, end=2020, colour="#4caf50")
-    assert categories.excerpts(period, grouped=True)[0].colour == "#4caf50"
+    categories.update_excerpt(later, start=2019, end=2020)
     # Ordered within the category (a group with it), taken out of a group, the lead removed.
     y = categories.add_excerpt(teaching, period, "Supervised.", 3, [], document_id=doc)
     categories.place_excerpt(y, e.id, "before")
@@ -686,7 +685,53 @@ def test_categories_and_markdown():
     assert [v.id for v in categories.excerpts(period, grouped=True)] == [y, later, x]
     categories.remove_excerpt(later)
     lead = next(v for v in categories.excerpts(period, grouped=True) if v.id == e.id)
-    assert (lead.colour, lead.years, lead.members) == ("#4caf50", "2019–2020", [])
+    assert (lead.years, lead.members) == ("2019–2020", [])
+
+
+def test_category_colours():
+    """Each category has a colour (the palette's, in turn; changed): that of its excerpts,
+    tinted in it on the PDFs."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    teaching = categories.add(folder, "Teaching")
+    projects = categories.add(folder, "Projects", research)
+    p = categories.PALETTE
+    assert [n.colour for n in categories.tree(folder)] == [p[0], p[2], p[1]]
+    categories.set_colour(research, "#123456")
+    assert categories.tree(folder)[0].colour == "#123456"
+    doc = documents.add(period, "Application.pdf", PDF)
+    led = categories.add_excerpt(
+        projects, period, "Led a project.", 2, [[1, 2, 3, 4]], document_id=doc
+    )
+    taught = categories.add_excerpt(teaching, period, "Taught.", 1, [[1, 2, 3, 4]], document_id=doc)
+    names = {n.id: n.path for n in categories.tree(folder)}
+    assert [(t["category"], t["colour"]) for t in categories.tints(period, doc, names)] == [
+        ("Research › Projects", categories.PALETTE[2]),
+        ("Teaching", categories.PALETTE[1]),
+    ]
+    # Merged: the group takes the category, its colour with it; moved: the new one's.
+    categories.merge_excerpts(taught, led)
+    assert {t["colour"] for t in categories.tints(period, doc, names)} == {categories.PALETTE[2]}
+    categories.split_excerpt(taught)
+    categories.move_excerpt(taught, research)
+    by_id = {e.id: e.colour for e in categories.excerpts(period)}
+    assert by_id == {led: categories.PALETTE[2], taught: "#123456"}
+    # None: the default; a new one takes the first free colour of the palette.
+    categories.set_colour(research, None)
+    assert categories.tree(folder)[0].colour == categories.DEFAULT_COLOUR
+    other = categories.add(folder, "Other")
+    assert (
+        next(n.colour for n in categories.tree(folder) if n.id == other) == (categories.PALETTE[0])
+    )
+    # Copied with the categories.
+    second = folders.save_folder(None, "Second committee")
+    categories.copy_tree(folder, second)
+    assert [n.colour for n in categories.tree(second)] == [
+        n.colour for n in categories.tree(folder)
+    ]
 
 
 async def test_excerpt_from_an_area(user: User, monkeypatch, tmp_path):
@@ -742,12 +787,13 @@ async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
     await user.should_see(marker=f"pick-category-{research}")
     user.find(marker="excerpt-start").elements.pop().value = 2020  # (its properties)
     user.find(marker="excerpt-influence").click()
-    user.find(marker="excerpt-colour-2196f3").click()
     user.find(marker=f"pick-category-{research}").click()
     await user.should_see("Added to Research")
     [e] = categories.excerpts(period)
     assert e.category_id == research and e.page == 1 and e.document_id == doc
-    assert (e.start_year, e.end_year, e.influence, e.colour) == (2020, None, True, "#2196f3")
+    assert (e.start_year, e.end_year, e.influence) == (2020, None, True)
+    assert e.colour == categories.tree(folder)[0].colour  # (its category's)
+    await user.should_see(marker=f"category-dot-{research}")
     await user.should_see(marker=f"excerpt-{e.id}")
     # A new category, typed in the picker: created (the picker stays open), then picked.
     user.find(marker="pdf-excerpt").click()
@@ -873,6 +919,9 @@ async def test_categories_editor(user: User, monkeypatch, tmp_path):
     user.find(marker=f"category-influence-{teaching}").click()
     user.find(marker=f"category-influence-{research}").click()
     assert [n.influence for n in categories.tree(folder)] == [False, True, False]
+    # A colour (that of its excerpts), picked.
+    user.find(marker=f"category-colour-pick-{teaching}").trigger("change", "#2196f3")
+    assert categories.tree(folder)[0].colour == "#2196f3"
     # Not deleted with excerpts there (or below): moved first.
     new = categories.tree(folder)[2].id
     categories.add_excerpt(new, period, "Filed below.", 1, [], document_id=doc)

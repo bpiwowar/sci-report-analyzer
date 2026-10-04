@@ -290,7 +290,8 @@ class Folder(Base):
 class Category(Base):
     """A category of a folder's grid (e.g. "Research", and under it "Projects"), in order:
     excerpts of its people's documents are filed in it. Its years (optional) are those it
-    is about; one can gather the excerpts showing influence (``influence``)."""
+    is about; one can gather the excerpts showing influence (``influence``). Its colour is
+    that of its excerpts (their tint on the PDFs)."""
 
     __tablename__ = "category"
 
@@ -306,6 +307,7 @@ class Category(Base):
     # The folder's "rayonnement" (at most one): the excerpts flagged "influence" in the
     # other categories are listed in it too.
     influence: Mapped[bool] = mapped_column(default=False, server_default="0")
+    colour: Mapped[str | None] = mapped_column(String(16))  # (none: the default tint)
 
 
 class Excerpt(Base):
@@ -335,7 +337,6 @@ class Excerpt(Base):
     start_year: Mapped[int | None]
     end_year: Mapped[int | None]
     influence: Mapped[bool] = mapped_column(default=False, server_default="0")
-    colour: Mapped[str | None] = mapped_column(String(16))  # (none: the default tint)
     position: Mapped[int] = mapped_column(default=0, server_default="0")  # (in its category)
     # Merged with others: the excerpt leading the group (its category, years… are the
     # group's), else none.
