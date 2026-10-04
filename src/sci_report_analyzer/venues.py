@@ -112,12 +112,21 @@ def normalize_url(text: str | None) -> str | None:
 
 
 def add_venue(
-    name: str, kind: str, short_name: str | None = None, url: str | None = None
+    name: str,
+    kind: str,
+    short_name: str | None = None,
+    url: str | None = None,
+    parts: list[int] | None = None,
 ) -> tuple[int, bool]:
     """A venue created by hand, matching its name (``(id, False)``: a venue already has
-    this name as one of its texts)."""
+    this name as one of its texts); ``parts``: a joint venue's conferences, in order (no
+    name: theirs, see joint_name)."""
+    parts = list(dict.fromkeys(int(p) for p in parts or [] if p))
+    auto = bool(parts) and not name.strip()
     with session_scope() as s:
-        key = service.key(name)
+        if auto:
+            name = joint_name(s, parts)
+        key = None if auto else service.key(name)
         if key and (vk := s.get(VenueKey, key)) is not None:
             return vk.venue_id, False
         v = Venue(
@@ -127,6 +136,9 @@ def add_venue(
             short_name=short_name or None,
             short_manual=bool(short_name),
             url=normalize_url(url),
+            joint={"parts": parts, "manual": True, "use": None, "auto_name": auto}
+            if parts
+            else None,
         )
         s.add(v)
         s.flush()
@@ -196,7 +208,8 @@ def update_venue(venue_id: int, **values: Any) -> None:
     rematch = False
     with session_scope() as s:
         v = s.get(Venue, venue_id)
-        if values.get("name") and values["name"] != v.name:
+        renamed = bool(values.get("name")) and values["name"] != v.name
+        if renamed and not _auto_named(v):
             # The name was usually derived from a venue text: keep matching that text.
             key = service.key(v.name)
             if key and s.get(VenueKey, key) is None:
@@ -208,6 +221,10 @@ def update_venue(venue_id: int, **values: Any) -> None:
             v.short_manual = bool(values["short_name"])  # (none: inferred again)
         if "kind" in values:
             v.kind_manual = bool(values["kind"])
+        if renamed and v.joint:  # (named by hand, no longer after its conferences)
+            v.joint = {**v.joint, "auto_name": False}
+        s.flush()
+        _rename_joints(s)
     _changed(rematch=rematch)
 
 
@@ -537,19 +554,57 @@ def split_as_workshop(key: str) -> int:
 # ---- joint venues -----------------------------------------------------------------------------
 
 
-def set_joint_parts(venue_id: int, parts: list[int] | None) -> None:
-    """A joint venue's parts, set by hand (an empty list: not a joint venue); None goes back
-    to the parts found automatically."""
+def set_joint_parts(
+    venue_id: int, parts: list[int] | None, *, auto_name: bool | None = None
+) -> None:
+    """A joint venue's parts, set by hand, in order (an empty list: not a joint venue); None
+    goes back to the parts found automatically. ``auto_name``: whether its name is that of
+    its parts (see joint_name; None: as before)."""
     with session_scope() as s:
         v = s.get(Venue, venue_id)
+        was = _auto_named(v)
+        auto = was if auto_name is None else auto_name
+        use = (v.joint or {}).get("use")
         if parts is None:
-            use = (v.joint or {}).get("use")
-            v.joint = {"parts": [], "manual": False, "use": use} if use else None
+            # (those found automatically so far kept, until found again)
+            cur = [] if (v.joint or {}).get("manual") else v.parts
+            v.joint = {"parts": cur, "manual": False, "use": use} if cur or use or auto else None
         else:
             parts = list(dict.fromkeys(int(p) for p in parts if p and int(p) != venue_id))
-            use = (v.joint or {}).get("use")
             v.joint = {"parts": parts, "manual": True, "use": use if use in parts else None}
-    _changed()
+        if v.joint and auto:
+            v.joint["auto_name"] = True
+        if auto and not was:  # (its name, usually a venue text, keeps matching)
+            key = service.key(v.name)
+            if key and s.get(VenueKey, key) is None:
+                s.add(VenueKey(key=key, venue_id=v.id, manual=True, example=v.name))
+        s.flush()
+        _rename_joints(s)
+    _changed(rematch=True)
+
+
+def joint_name(s: Session, parts: list[int]) -> str:
+    """The name of a joint venue from its conferences', in order ("A / B")."""
+    names = [v.name for p in parts if (v := s.get(Venue, p)) is not None]
+    return " / ".join(names)
+
+
+def joint_short(parts: list[int], venues: dict[int, Venue]) -> str | None:
+    """The acronym of a joint venue from its conferences', in order ("CORIA-TALN"); none
+    when one has no acronym."""
+    shorts = [venues[p].short_name if p in venues else None for p in parts]
+    return "-".join(shorts) if shorts and all(shorts) else None
+
+
+def _auto_named(v: Venue) -> bool:
+    return bool(v.parts and (v.joint or {}).get("auto_name"))
+
+
+def _rename_joints(s: Session) -> None:
+    """The joint venues named after their conferences get their current names."""
+    for v in s.scalars(select(Venue).where(Venue.joint.is_not(None))):
+        if _auto_named(v) and (name := joint_name(s, v.parts)) and name != v.name:
+            v.name = name
 
 
 def set_joint_use(venue_id: int, part_id: int | None) -> None:
@@ -616,13 +671,19 @@ def _store_parts(venues: list[Venue], found: dict[int, list[int]]) -> bool:
             continue
         parts = found.get(v.id, [])
         if parts != (j.get("parts") or []):
-            use = j.get("use")
-            changed[v.id] = {"parts": parts, "manual": False, "use": use} if parts or use else None
+            use, auto = j.get("use"), j.get("auto_name")
+            changed[v.id] = (
+                {"parts": parts, "manual": False, "use": use, "auto_name": bool(auto)}
+                if parts or use or auto
+                else None
+            )
     if changed:
         with session_scope() as s:
             for vid, joint in changed.items():
                 if (v := s.get(Venue, vid)) is not None and not (v.joint or {}).get("manual"):
                     v.joint = joint
+            s.flush()
+            _rename_joints(s)
         for v in venues:
             if v.id in changed:
                 v.joint = changed[v.id]
@@ -876,7 +937,7 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
         if v.short_manual or light:
             row.short_name = v.short_name
         else:
-            row.short_name = auto_short_name(
+            row.short_name = (v.parts and joint_short(v.parts, by_id)) or auto_short_name(
                 badge,
                 [*(t for t, _n in row.raw_examples.most_common()), v.name],
                 workshop=row.kind in WORKSHOP_KINDS,

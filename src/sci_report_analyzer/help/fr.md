@@ -117,7 +117,9 @@ les acronymes de deux conférences ou plus est constitué de celles-ci (sa page 
 elles peuvent être modifiées à la main). Ses articles prennent le niveau que ses conférences ont en commun ; lorsqu'ils
 diffèrent, le canal est listé dans l'onglet **Conférences multiples**, où vous choisissez le niveau de quelle
 conférence utiliser (d'ici là, le plus bas). Un niveau fixé à la main sur le canal ou
-l'article l'emporte, comme toujours.
+l'article l'emporte, comme toujours. Un canal conjoint peut aussi être ajouté à la main (**Ajouter un canal**,
+« Une conférence conjointe ») : laissé sans nom, il est nommé d'après ses conférences dans leur ordre (« A / B »),
+et son acronyme joint les leurs par des tirets (CORIA-TALN).
 
 Tout peut être décidé à la main, **pour le canal** (par défaut) ou **pour un seul article** (cochez
 « Seulement pour cet article ») : lier un article à un autre canal, fixer son type, choisir une

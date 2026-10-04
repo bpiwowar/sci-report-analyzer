@@ -1257,6 +1257,40 @@ async def test_add_a_venue(user: User) -> None:
         assert s.get(Venue, v.id).url == "https://wmt.example.org/2026"
 
 
+async def test_add_a_joint_venue_without_a_name(user: User) -> None:
+    """A joint conference needs no name: its conferences', in order (changed in its dialog,
+    saved with the venue)."""
+    from sci_report_analyzer import venues
+    from sci_report_analyzer.db.models import Venue
+    from sci_report_analyzer.db.session import session_scope
+
+    one, _new = venues.add_venue("Meeting on Pottery", "natl_conference", "MOP")
+    two, _new = venues.add_venue("Meeting on Weaving", "natl_conference", "MOW")
+    await user.open("/venues")
+    user.find("venue-add").click()
+    await user.should_see(marker="venue-add-joint")
+    user.find("venue-add-joint").click()
+    for i, vid in enumerate((two, one)):
+        user.find("venue-add-part-add").click()
+        await user.should_see(marker=f"venue-add-part-{i}")
+        user.find(f"venue-add-part-{i}").elements.pop().value = vid
+    user.find("venue-add-confirm").click()
+    with session_scope() as s:
+        v = s.query(Venue).filter_by(name="Meeting on Weaving / Meeting on Pottery")
+        joint = v.one().id
+    await user.should_see(marker="venue-parts-edit")
+    user.find("venue-parts-edit").click()
+    await user.should_see(marker="venue-part-down-0")
+    user.find("venue-part-down-0").click()
+    user.find("venue-save").click()
+    with session_scope() as s:
+        v = s.get(Venue, joint)
+        assert v.parts == [one, two]
+        assert v.name == "Meeting on Pottery / Meeting on Weaving"
+    rows = {r.id: r for r in await venues.venue_rows(only={joint})}
+    assert rows[joint].short_name == "MOP-MOW"
+
+
 async def test_doi_record_on_hover(user: User) -> None:
     from pathlib import Path
 
@@ -1805,7 +1839,7 @@ async def test_workshop_main_conference_editor(user: User) -> None:
     user.find("venue-host-add").click()
     await user.should_see(marker="venue-host-select-0")
     user.find("venue-host-select-0").elements.pop().value = host
-    user.find("venue-hosts-save").click()
+    user.find("venue-save").click()  # (saved with the venue)
     with session_scope() as s:
         assert s.get(Venue, wid).hosts == [{"venue_id": host, "from": None, "to": None}]
         wname, hname = s.get(Venue, wid).name, s.get(Venue, host).name
@@ -2138,6 +2172,7 @@ async def test_joint_venue_level_explained_and_chosen(user: User) -> None:
     await user.open(f"/venues?focus={joint}")
     await user.should_see("chosen among its conferences", marker="venue-record")
     user.find("venue-parts-none").click()
+    user.find("venue-save").click()
     with session_scope() as s:
         assert s.get(Venue, joint).joint["parts"] == []
 

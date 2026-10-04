@@ -117,7 +117,9 @@ the acronyms of two conferences or more is made of them (its venue page shows th
 they can be changed by hand). Its papers take the level its conferences share; when they
 differ, the venue is listed in the **Multiple conferences** tab, where you choose which
 conference's level to use (until then, the lowest). A level set by hand on the venue or the
-paper wins, as always.
+paper wins, as always. A joint venue can also be added by hand (**Add a venue**, "A joint
+conference"): left without a name, it is named after its conferences in their order ("A / B"),
+and its acronym joins theirs with dashes (CORIA-TALN).
 
 Everything can be decided by hand, **for the venue** (the default) or **for one paper** (tick
 "Only for this paper"): link a paper to another venue, set its kind, pick a

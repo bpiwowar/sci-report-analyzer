@@ -240,11 +240,15 @@ def _add_venue_dialog(view: _View) -> None:
         background_tasks.create(show())
 
     with view.dialogs:
-        _new_venue_dialog(added)
+        _new_venue_dialog(added, joint=True)
 
 
-def _new_venue_dialog(on_added: Callable[[int, bool], None], kind: str = "intl_conference") -> None:
-    """Add a venue by hand; ``on_added(venue id, created)`` (False: one has this name)."""
+def _new_venue_dialog(
+    on_added: Callable[[int, bool], None], kind: str = "intl_conference", *, joint: bool = False
+) -> None:
+    """Add a venue by hand; ``on_added(venue id, created)`` (False: one has this name).
+    ``joint``: it can be a joint conference (its conferences in order, then no name needed)."""
+    parts: list[int | None] = []
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
         ui.label(_("Add a venue")).classes("text-lg font-medium")
         name = ui.input(_("Name")).classes("w-full").mark("venue-add-name")
@@ -265,14 +269,62 @@ def _new_venue_dialog(on_added: Callable[[int, bool], None], kind: str = "intl_c
                 "venue to match other texts."
             )
         ).classes("text-xs text-grey")
+        if joint:
+            with (
+                ui.expansion(_("A joint conference"), icon="join_inner")
+                .classes("w-full")
+                .mark("venue-add-joint")
+            ):
+                ui.label(
+                    _(
+                        "Its conferences, in order: without a name, it is named after them "
+                        "(its acronym too, with dashes, e.g. CORIA-TALN)."
+                    )
+                ).classes("text-xs text-grey")
+                options = venues.venue_choices()
+
+                def move(i: int, j: int) -> None:
+                    parts[i], parts[j] = parts[j], parts[i]
+                    lines.refresh()
+
+                @ui.refreshable
+                def lines() -> None:
+                    for i, pid in enumerate(parts):
+                        with ui.row().classes("items-center gap-2 no-wrap w-full"):
+                            ui.label(f"{i + 1}.").classes("text-sm text-grey w-5")
+                            _venue_select(
+                                options, pid, lambda e, i=i: parts.__setitem__(i, e.value)
+                            ).classes("grow").mark(f"venue-add-part-{i}")
+                            up = ui.button(icon="arrow_upward", on_click=lambda i=i: move(i, i - 1))
+                            up.props("flat round dense size=sm").set_enabled(i > 0)
+                            down = ui.button(
+                                icon="arrow_downward", on_click=lambda i=i: move(i, i + 1)
+                            )
+                            down.props("flat round dense size=sm").set_enabled(i < len(parts) - 1)
+                            ui.button(
+                                icon="delete", on_click=lambda i=i: (parts.pop(i), lines.refresh())
+                            ).props("flat round dense size=sm")
+
+                lines()
+                ui.button(
+                    _("Add a conference"),
+                    icon="add",
+                    on_click=lambda: (parts.append(None), lines.refresh()),
+                ).props("dense flat size=sm").mark("venue-add-part-add")
 
         def ok() -> None:
             text = (name.value or "").strip()
-            if not text:
-                ui.notify(_("Give the venue a name"), type="warning")
+            chosen = [p for p in parts if p]
+            if not text and len(chosen) < 2:
+                ui.notify(
+                    _("Give the venue a name (or the conferences of a joint one)")
+                    if joint
+                    else _("Give the venue a name"),
+                    type="warning",
+                )
                 return
             vid, created = venues.add_venue(
-                text, kind_select.value, (short.value or "").strip(), url.value
+                text, kind_select.value, (short.value or "").strip(), url.value, chosen
             )
             ui.notify(_("Venue added") if created else _("A venue already has this name"))
             dlg.close()
@@ -736,16 +788,19 @@ def _venue_select(options: dict[int, str], value: int | None, on_change) -> ui.s
     return sel.props("dense outlined")
 
 
-def _joint_editor(row: venues.VenueRow, finish, go) -> None:
-    """A joint venue's parts (found automatically or set by hand), and the level it takes."""
+def _joint_editor(row: venues.VenueRow, finish, go) -> Callable[[], list[int] | None]:
+    """A joint venue's parts (found automatically or set by hand, in order), and the level it
+    takes; returns what gives the parts to save with the venue (``...``: unchanged)."""
     options = {vid: name for vid, name in venues.venue_choices().items() if vid != row.id}
-    parts = [pid for pid, *_rest in row.parts]
+    parts: list[int | None] = [pid for pid, *_rest in row.parts]
+    state = {"changed": False, "auto": False}  # ("auto": back to those found automatically)
     ui.label(_("Joint venue")).classes("font-medium mt-2")
     ui.label(
         _(
             "A venue made of several conferences (e.g. CORIA-TALN), found from the acronyms "
             "of its texts. Its papers take the level its conferences share; when they "
-            "differ, the one you choose (else the lowest). A level set by hand below wins."
+            "differ, the one you choose (else the lowest). A level set by hand below wins. "
+            "Without a name, it is named after its conferences, in order."
         )
     ).classes("text-xs text-grey")
 
@@ -767,6 +822,18 @@ def _joint_editor(row: venues.VenueRow, finish, go) -> None:
                     "dense flat size=sm no-caps color=primary"
                 ).mark(f"venue-part-use-{pid}")
 
+    def edit(change: Callable[[], object]) -> None:
+        change()
+        state.update(changed=True, auto=False)
+        lines.refresh()
+
+    def move(i: int, j: int) -> None:
+        parts[i], parts[j] = parts[j], parts[i]
+
+    def select(i: int, value: int | None) -> None:
+        parts[i] = value
+        state.update(changed=True, auto=False)
+
     with (
         ui.expansion(
             _("Change the conferences") if parts else _("Make it a joint venue"), icon="edit"
@@ -777,52 +844,72 @@ def _joint_editor(row: venues.VenueRow, finish, go) -> None:
 
         @ui.refreshable
         def lines() -> None:
+            if state["auto"]:
+                ui.label(_("The conferences found in its texts (on saving).")).classes(
+                    "text-sm text-grey"
+                )
+                return
+            if state["changed"] and not any(parts):
+                ui.label(_("Not a joint venue (on saving).")).classes("text-sm text-grey")
             for i, pid in enumerate(parts):
                 with ui.row().classes("items-center gap-2 no-wrap w-full"):
-                    _venue_select(
-                        options, pid, lambda e, i=i: parts.__setitem__(i, e.value)
-                    ).classes("grow").mark(f"venue-part-select-{i}")
-                    ui.button(
-                        icon="delete", on_click=lambda i=i: (parts.pop(i), lines.refresh())
+                    ui.label(f"{i + 1}.").classes("text-sm text-grey w-5")
+                    _venue_select(options, pid, lambda e, i=i: select(i, e.value)).classes(
+                        "grow"
+                    ).mark(f"venue-part-select-{i}")
+                    up = ui.button(
+                        icon="arrow_upward", on_click=lambda i=i: edit(lambda: move(i, i - 1))
                     ).props("flat round dense size=sm")
+                    up.tooltip(_("Before")).mark(f"venue-part-up-{i}")
+                    up.set_enabled(i > 0)
+                    down = ui.button(
+                        icon="arrow_downward", on_click=lambda i=i: edit(lambda: move(i, i + 1))
+                    ).props("flat round dense size=sm")
+                    down.tooltip(_("After")).mark(f"venue-part-down-{i}")
+                    down.set_enabled(i < len(parts) - 1)
+                    ui.button(icon="delete", on_click=lambda i=i: edit(lambda: parts.pop(i))).props(
+                        "flat round dense size=sm"
+                    )
 
         lines()
 
-        def save(value: list[int] | None) -> None:
-            venues.set_joint_parts(row.id, value)
-            ui.notify(_("Conferences saved"), type="positive")
-            finish()
-
         with ui.row().classes("items-center gap-2"):
             ui.button(
-                _("Add a conference"),
-                icon="add",
-                on_click=lambda: (parts.append(None), lines.refresh()),
+                _("Add a conference"), icon="add", on_click=lambda: edit(lambda: parts.append(None))
             ).props("dense flat size=sm").mark("venue-part-add")
 
             def new_part(vid: int, _created: bool) -> None:
                 options.update(_new_choice(vid))
-                parts.append(vid)
-                lines.refresh()
+                edit(lambda: parts.append(vid))
 
             ui.button(
                 _("New venue"), icon="add_circle", on_click=lambda: _new_venue_dialog(new_part)
             ).props("dense flat size=sm").tooltip(
                 _("Add a venue not in the list, as a conference of this one")
             ).mark("venue-part-new")
-            ui.button(_("Save"), icon="save", on_click=lambda: save([p for p in parts if p])).props(
-                "dense unelevated size=sm color=primary"
-            ).mark("venue-parts-save")
             if parts:
-                ui.button(_("Not a joint venue"), on_click=lambda: save([])).props(
+                ui.button(_("Not a joint venue"), on_click=lambda: edit(parts.clear)).props(
                     "dense flat size=sm"
                 ).tooltip(_("A single conference: its texts name others too")).mark(
                     "venue-parts-none"
                 )
             if row.parts_manual:
-                ui.button(_("Automatic"), on_click=lambda: save(None)).props(
-                    "dense flat size=sm"
-                ).tooltip(_("Use the conferences found in its texts")).mark("venue-parts-auto")
+
+                def automatic() -> None:
+                    state.update(changed=True, auto=True)
+                    lines.refresh()
+
+                ui.button(_("Automatic"), on_click=automatic).props("dense flat size=sm").tooltip(
+                    _("Use the conferences found in its texts")
+                ).mark("venue-parts-auto")
+        ui.label(_("Saved with the venue.")).classes("text-xs text-grey")
+
+    def value() -> list[int] | None:
+        if not state["changed"]:
+            return ...
+        return None if state["auto"] else [p for p in parts if p]
+
+    return value
 
 
 def _table(
@@ -957,8 +1044,9 @@ _ROW_SLOT = """
 """
 
 
-def _hosts_editor(row: venues.VenueRow, finish, go) -> None:
-    """A workshop's main conferences (with years), which give its papers their rank."""
+def _hosts_editor(row: venues.VenueRow, go) -> Callable[[], list[dict] | None]:
+    """A workshop's main conferences (with years), which give its papers their rank; returns
+    what gives them to save with the venue (``...``: unchanged)."""
     options = {vid: name for vid, name in venues.venue_choices().items() if vid != row.id}
     hosts = [{"venue_id": h[0], "from": h[2], "to": h[3]} for h in row.hosts]
     ui.label(_("Main conference")).classes("font-medium mt-2")
@@ -1023,14 +1111,9 @@ def _hosts_editor(row: venues.VenueRow, finish, go) -> None:
                 _("Found in the workshop's venue texts")
             ).mark("venue-host-suggest")
 
-        def save() -> None:
-            venues.save_hosts(row.id, [h for h in hosts if h["venue_id"]])
-            ui.notify(_("Main conferences saved"), type="positive")
-            finish()
-
-        ui.button(_("Save main conferences"), icon="save", on_click=save).props(
-            "dense unelevated size=sm color=primary"
-        ).mark("venue-hosts-save")
+    ui.label(_("Saved with the venue.")).classes("text-xs text-grey")
+    before = [dict(h) for h in hosts if h["venue_id"]]
+    return lambda: ... if (now := [h for h in hosts if h["venue_id"]]) == before else now
 
 
 def _open_button(go, venue_id: int, mark: str) -> None:
@@ -1110,8 +1193,9 @@ def venue_dialog(
         v = s.get(Venue, row.id, options=[selectinload(Venue.keys)])
         if v is None:
             return
+        auto_name = bool(v.parts and (v.joint or {}).get("auto_name"))
         state = {
-            "name": v.name,
+            "name": "" if auto_name else v.name,
             "short_name": (v.short_name or "") if v.short_manual else "",
             "no_short": v.short_manual and not v.short_name,
             "url": v.url or "",
@@ -1175,7 +1259,17 @@ def venue_dialog(
                 "flat dense no-caps"
             ).mark("venue-back")
         with ui.row().classes("w-full items-center justify-between no-wrap"):
-            name = ui.input(_("Name"), value=state["name"]).classes("grow").mark("venue-name")
+            name = (
+                ui.input(
+                    _("Name"),
+                    value=state["name"],
+                    placeholder=row.name if auto_name else None,
+                )
+                .classes("grow")
+                .mark("venue-name")
+            )
+            if row.parts:
+                name.tooltip(_("Empty: named after its conferences, in order"))
             inferred = None if row.short_manual else row.short_name
             short = (
                 ui.input(
@@ -1208,13 +1302,14 @@ def venue_dialog(
             )
             short.bind_enabled_from(no_short, "value", lambda v: not v)
             ui.button(icon="close", on_click=dlg.close).props("flat round")
-        ui.label(
-            _("Renamed: “{name}” stays a variant, so its texts keep matching.").format(
-                name=row.name
+        if not auto_name:
+            ui.label(
+                _("Renamed: “{name}” stays a variant, so its texts keep matching.").format(
+                    name=row.name
+                )
+            ).classes("text-xs text-grey").bind_visibility_from(
+                name, "value", lambda v: (v or "").strip() not in ("", row.name)
             )
-        ).classes("text-xs text-grey").bind_visibility_from(
-            name, "value", lambda v: (v or "").strip() not in ("", row.name)
-        )
         with ui.row().classes("w-full items-center gap-1 no-wrap"):
             url = (
                 ui.input(_("Website"), value=state["url"], placeholder="https://…")
@@ -1260,7 +1355,7 @@ def venue_dialog(
                 )
                 hosts_box = ui.column().classes("w-full gap-1")
                 with hosts_box:
-                    _hosts_editor(row, finish, go)
+                    hosts_value = _hosts_editor(row, go)
                 hosts_box.bind_visibility_from(
                     kind,
                     "value",
@@ -1268,7 +1363,7 @@ def venue_dialog(
                 )
                 joint_box = ui.column().classes("w-full gap-1")
                 with joint_box:
-                    _joint_editor(row, finish, go)
+                    parts_value = _joint_editor(row, finish, go)
                 joint_box.bind_visibility_from(
                     kind,
                     "value",
@@ -1708,9 +1803,17 @@ def venue_dialog(
                 _merge_tab(row, all_rows, merged)
 
         def save() -> None:
+            typed = (name.value or "").strip()
+            parts, hosts = parts_value(), hosts_value()
+            joint = bool([pid for pid, *_rest in row.parts] if parts is ... else parts)
+            if parts is None:  # (back to the parts found in its texts: those it has so far)
+                joint = bool(row.parts) and not row.parts_manual
+            auto = joint and not typed
+            if hosts is not ...:
+                venues.save_hosts(row.id, hosts)
             venues.update_venue(
                 row.id,
-                name=name.value.strip() or row.name,
+                **({} if auto else {"name": typed or row.name}),
                 short_name=None if no_short.value else (short.value or "").strip() or None,
                 short_manual=no_short.value or bool((short.value or "").strip()),
                 url=venues.normalize_url(url.value),
@@ -1722,6 +1825,11 @@ def venue_dialog(
             )
             if issns.value != state["issns"]:
                 venues.save_issns(row.id, [i for i in (issns.value or "").split(",") if i.strip()])
+            # (after the name: one typed is no longer that of its conferences)
+            if parts is not ... or auto != auto_name:
+                if parts is ...:
+                    parts = None if not row.parts_manual else [pid for pid, *_r in row.parts]
+                venues.set_joint_parts(row.id, parts, auto_name=auto)
             finish()
 
         with ui.row().classes("justify-end w-full"):
