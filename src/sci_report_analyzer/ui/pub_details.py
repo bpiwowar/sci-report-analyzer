@@ -42,6 +42,7 @@ from . import scimago_years
 from .colours import ColourInput
 from .dialogs import actions, close, confirm, ok_handler, transient_dialog
 from .theme import (
+    DEFAULT_COLOUR,
     author_html,
     badge_details,
     int_or_none,
@@ -1230,7 +1231,7 @@ def _new_category(name: str, act) -> None:
             .classes("w-full")
             .mark("category-name")
         )
-        colour = ColourInput(_("Colour"), value="#0969da").classes("w-full")
+        colour = ColourInput(_("Colour"), value=DEFAULT_COLOUR).classes("w-full")
 
         def save() -> bool | None:
             if not cname.value.strip():

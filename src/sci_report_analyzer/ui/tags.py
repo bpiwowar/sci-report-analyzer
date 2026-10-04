@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from html import escape
+from typing import Any
 
 from nicegui import ui
 
@@ -14,9 +15,7 @@ from ..i18n import _
 from .colours import ColourInput
 from .dialogs import confirm, transient_dialog
 from .mdedit import MarkdownEditor
-from .theme import chip_style, chip_text, span
-
-DEFAULT_COLOUR = "#0969da"
+from .theme import DEFAULT_COLOUR, chip_style, chip_text, span
 
 
 def tag_chip(t: Tag, number: int | None = None) -> None:
@@ -31,71 +30,111 @@ def tag_chip(t: Tag, number: int | None = None) -> None:
     )
 
 
-def tags_section(on_change: Callable[[], None] | None = None) -> None:
-    """Every tag: rename, recolour, delete (the built-in "starred" is kept)."""
+def colour_list_editor(
+    load: Callable[[], list],
+    save: Callable[[Any, str, str], object],
+    add: Callable[[str, str, bool], object],
+    *,
+    mark: str,
+    delete: Callable[[Any], object],
+    delete_message: Callable[[Any], str],
+    can_delete: Callable[[Any], bool] = lambda _item: True,
+    delete_tip: str | None = None,
+    note: Callable[[Any], str] | None = None,
+    new_label: str,
+    new_option: str | None = None,
+    on_change: Callable[[], None] | None = None,
+) -> None:
+    """Named, coloured items (e.g. the tags) from ``load``: each renamed, recoloured
+    (``save``) or deleted once confirmed (``delete_message``); a new one added (``add``,
+    with ``new_option``'s checkbox, if any). ``note``: shown next to an item; ``mark``: of
+    the fields (``{mark}-name-{id}``…, ``new-{mark}-name``…)."""
 
     def changed() -> None:
         listing.refresh()
         if on_change:
             on_change()
 
+    def confirm_delete(item) -> None:
+        confirm(
+            delete_message(item),
+            _("Delete"),
+            lambda: (delete(item), changed()),
+            mark=f"{mark}-delete-ok",
+        )
+
     @ui.refreshable
     def listing() -> None:
-        tags = annotations.all_tags()
-        for t in tags:
+        for item in load():
             with ui.row().classes("items-center gap-2"):
-                name = ui.input(_("Name"), value=t.name).props("dense").mark(f"tag-name-{t.id}")
+                name = (
+                    ui.input(_("Name"), value=item.name)
+                    .props("dense")
+                    .mark(f"{mark}-name-{item.id}")
+                )
                 colour = (
-                    ColourInput(_("Colour"), value=t.colour)
+                    ColourInput(_("Colour"), value=item.colour)
                     .props("dense")
                     .classes("w-36")
-                    .mark(f"tag-colour-{t.id}")
+                    .mark(f"{mark}-colour-{item.id}")
                 )
-                ui.label(_("within a period") if t.per_period else _("global")).classes(
-                    "text-sm text-grey w-28"
-                )
+                if note:
+                    ui.label(note(item)).classes("text-sm text-grey w-28")
 
-                def save(tid=t.id, n=name, c=colour) -> None:
+                def store(item=item, n=name, c=colour) -> None:
                     if n.value.strip():
-                        annotations.save_tag(n.value, c.value, tag_id=tid)
+                        save(item, n.value.strip(), c.value)
                         ui.notify(_("Saved"))
                         changed()
 
-                ui.button(icon="save", on_click=save).props("flat round dense").mark(
-                    f"tag-save-{t.id}"
+                ui.button(icon="save", on_click=store).props("flat round dense").mark(
+                    f"{mark}-save-{item.id}"
                 )
-                if t.key is None:
-                    ui.button(icon="delete", on_click=lambda t=t: delete(t)).props(
-                        "flat round dense color=negative"
-                    ).tooltip(_("Delete the tag (from every paper)")).mark(f"tag-delete-{t.id}")
+                if can_delete(item):
+                    button = ui.button(icon="delete", on_click=lambda i=item: confirm_delete(i))
+                    button.props("flat round dense color=negative").mark(f"{mark}-delete-{item.id}")
+                    if delete_tip:
+                        button.tooltip(delete_tip)
 
-    def delete(t: Tag) -> None:
-        confirm(
-            _("Delete the tag “{name}”, from every paper?").format(name=t.name),
-            _("Delete"),
-            lambda: (annotations.delete_tag(t.id), changed()),
-            mark="tag-delete-ok",
-        )
+    listing()
+    with ui.row().classes("items-center gap-2 mt-2"):
+        name = ui.input(new_label).props("dense").mark(f"new-{mark}-name")
+        colour = ColourInput(_("Colour"), value=DEFAULT_COLOUR).props("dense").classes("w-36")
+        option = ui.checkbox(new_option).mark(f"new-{mark}-option") if new_option else None
 
+        def add_one() -> None:
+            if name.value.strip():
+                add(name.value.strip(), colour.value, bool(option and option.value))
+                name.value = ""
+                changed()
+
+        ui.button(_("Add"), on_click=add_one).mark(f"new-{mark}-add")
+
+
+def tags_section(on_change: Callable[[], None] | None = None) -> None:
+    """Every tag: rename, recolour, delete (the built-in "starred" is kept)."""
     ui.label(
         _(
             "Tags are put on papers from their details. A global tag sticks to the paper; a tag "
             "within a period (⏱, e.g. “starred”) is set separately in each period / folder."
         )
     ).classes("text-grey")
-    listing()
-    with ui.row().classes("items-center gap-2 mt-2"):
-        name = ui.input(_("New tag")).props("dense").mark("new-tag-name")
-        colour = ColourInput(_("Colour"), value=DEFAULT_COLOUR).props("dense").classes("w-36")
-        per_period = ui.checkbox(_("within a period")).mark("new-tag-period")
-
-        def add() -> None:
-            if name.value.strip():
-                annotations.save_tag(name.value, colour.value, per_period.value)
-                name.value = ""
-                changed()
-
-        ui.button(_("Add"), on_click=add).mark("new-tag-add")
+    colour_list_editor(
+        annotations.all_tags,
+        lambda t, name, colour: annotations.save_tag(name, colour, tag_id=t.id),
+        lambda name, colour, per_period: annotations.save_tag(name, colour, per_period),
+        mark="tag",
+        delete=lambda t: annotations.delete_tag(t.id),
+        delete_message=lambda t: _("Delete the tag “{name}”, from every paper?").format(
+            name=t.name
+        ),
+        can_delete=lambda t: t.key is None,
+        delete_tip=_("Delete the tag (from every paper)"),
+        note=lambda t: _("within a period") if t.per_period else _("global"),
+        new_label=_("New tag"),
+        new_option=_("within a period"),
+        on_change=on_change,
+    )
 
 
 def tags_dialog(on_change: Callable[[], None]) -> None:

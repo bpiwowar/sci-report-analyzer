@@ -46,6 +46,7 @@ STATUS_COLOUR = {
 }
 
 APP_NAME = "SciReport Analyzer"
+DEFAULT_COLOUR = "#0969da"  # (a new tag's, co-author category's…)
 
 # Opacity of the items not selected in a chart: faint, not to be confused with the selection.
 DIM_OPACITY = 0.12
@@ -382,7 +383,7 @@ def author_html(name: str, mark: str | None, note: str | None, colour: str | Non
     text = escape(name)
     title = f' title="{escape(note)}"' if note else ""
     if mark and mark.startswith("cat:"):
-        c = escape(colour or "#0969da", quote=True)
+        c = escape(colour or DEFAULT_COLOUR, quote=True)
         return f'<span class="vr-cat" style="color:{c}"{title}>{text}</span>'
     if mark == "owner":
         return f'<span class="vr-owner">{text}</span>'

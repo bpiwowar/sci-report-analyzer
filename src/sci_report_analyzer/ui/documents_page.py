@@ -17,7 +17,7 @@ from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
 from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
-from .theme import bare_page
+from .theme import DEFAULT_COLOUR, bare_page
 from .viewer_side import Side, bookmarks_section, categories_section
 
 # Extracts the document's lines of text (sent once, to find its papers in), and shows the
@@ -260,7 +260,7 @@ class DocumentPage:
                 "kind": m.kind,
                 "pdf": bool(by_id[m.pub_id].pdf),
                 "title": self.side.cite_hint(by_id[m.pub_id]),
-                "colour": "#cf222e" if by_id[m.pub_id].pdf else "#0969da",
+                "colour": "#cf222e" if by_id[m.pub_id].pdf else DEFAULT_COLOUR,
             }
             for i, m in enumerate(self.mentions)
         ]
