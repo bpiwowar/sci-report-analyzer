@@ -2376,9 +2376,6 @@ msgstr "Aucun PDF stocké pour cet article."
 msgid "No acronym"
 msgstr "Pas d'acronyme"
 
-msgid "No candidate"
-msgstr "Aucun candidat"
-
 msgid "No category yet"
 msgstr "Aucune catégorie pour l'instant"
 
@@ -4172,11 +4169,9 @@ msgstr "Type"
 msgid "Type PURGE to confirm"
 msgstr "Tapez PURGE pour confirmer"
 
-msgid "Type at least 2 characters."
-msgstr "Saisissez au moins 2 caractères."
-
-msgid "Type at least 3 characters."
-msgstr "Saisissez au moins 3 caractères."
+#, python-brace-format
+msgid "Type at least {n} characters."
+msgstr "Saisissez au moins {n} caractères."
 
 msgid "Type back to automatic"
 msgstr "Type redevenu automatique"
@@ -4284,9 +4279,6 @@ msgstr "Utiliser ce niveau"
 
 msgid "Use this name (and edit it)"
 msgstr "Utiliser ce nom (et le modifier)"
-
-msgid "Use this record"
-msgstr "Utiliser cette fiche"
 
 msgid "Use this venue"
 msgstr "Utiliser ce canal"

@@ -509,8 +509,10 @@ def search_venue_dialog(pub_id: int, paper_venues: list[int], done) -> None:
             results.clear()
             text = (query.value or "").strip()
             with results:
-                if len(text) < 2:
-                    ui.label(_("Type at least 2 characters.")).classes("text-xs text-grey")
+                if len(text) < MIN_SEARCH:
+                    ui.label(_("Type at least {n} characters.").format(n=MIN_SEARCH)).classes(
+                        "text-xs text-grey"
+                    )
                     return
                 hits = venues.find_venues(text)
                 if not hits:
@@ -1813,6 +1815,29 @@ def _track_editor(s: PubStat, done: Callable[..., None]) -> None:
 SOURCE_SITES = Labels({"scimago": "Scimago", "core": N_("the CORE portal"), "jcr": "JCR"})
 
 
+# The shortest text searched for (a venue, a ranking record).
+MIN_SEARCH = 3
+
+
+def record_results(badges: list[Badge], on_pick: Callable[[str], object], mark: str) -> None:
+    """Ranking records found: each with its rank, name, list and score, a link to check it,
+    and a button to use it (``{mark}-{i}``)."""
+    if not badges:
+        ui.label(_("No ranking record found.")).classes("text-xs text-grey")
+    for i, b in enumerate(badges):
+        with ui.row().classes("items-center gap-2 no-wrap w-full"):
+            rank_chip(b)
+            ui.label(b.name).classes("grow text-sm")
+            ui.label(
+                f"{b.source} · {round(b.score * 100)}%"
+                + (" · " + _("acronym") if b.extra.get("acronym") else "")
+            ).classes("text-xs text-grey")
+            _check_link(b)
+            ui.button(_("Use"), on_click=lambda k=b.recordKey: on_pick(k)).props(
+                "dense flat color=primary"
+            ).mark(f"{mark}-{i}")
+
+
 def _check_link(b: Badge) -> None:
     """Link to the ranking list's own page, to check a (possibly fuzzy) match."""
     if b.url and b.source in SOURCE_SITES:
@@ -1897,23 +1922,11 @@ def _rank_editor(s: PubStat, done, venue_scope, for_venue, venue_id, step: _Step
                     badges = [b for b in badges if b.source in lists]
                 results.clear()
                 with results:
-                    if not badges:
-                        ui.label(_("No candidate")).classes("text-grey")
-                    for b in sorted(badges, key=lambda b: -b.score)[:12]:
-                        with ui.row().classes("items-center gap-2 no-wrap"):
-                            rank_chip(b)
-                            ui.label(
-                                f"{b.name} · {b.source} · {round(b.score * 100)}%"
-                                + (" · " + _("acronym") if b.extra.get("acronym") else "")
-                            ).classes("text-sm")
-                            _check_link(b)
-                            ui.button(icon="check", on_click=lambda k=b.recordKey: pick(k)).props(
-                                "dense flat round size=sm"
-                            ).tooltip(_("Use this record"))
+                    record_results(sorted(badges, key=lambda b: -b.score)[:12], pick, "record-use")
 
             def update() -> None:
                 text = query["text"]
-                show(service.search(text, 60) if len(text) > 2 else list(seen.values()))
+                show(service.search(text, 60) if len(text) >= MIN_SEARCH else list(seen.values()))
 
             def set_query(e) -> None:
                 query["text"] = e.value or ""
