@@ -34,7 +34,7 @@ from functools import lru_cache
 from lark import Lark, Transformer
 from lark.exceptions import LarkError
 
-from .db.models import AppSetting, Folder, Period
+from .db.models import AppSetting, Folder, FolderSettings, Period
 from .db.session import session_scope
 from .i18n import _
 from .pubview import PubStat, hashtag, saved_summary, tagged
@@ -480,17 +480,24 @@ class Numbering:
 
 
 def _citations(folder_id: int | None) -> dict:
+    """How a folder's notes cite papers: its settings' (see folders.settings_id)."""
+    from . import folders
+
     if not folder_id:
         return {}
     with session_scope() as s:
-        f = s.get(Folder, folder_id)
-        return dict(f.citations or {}) if f is not None else {}
+        if s.get(Folder, folder_id) is None:
+            return {}
+        return dict(s.get(FolderSettings, folders.settings_id(s, folder_id)).citations or {})
 
 
 def _save_citations(folder_id: int, **values) -> None:
+    from . import folders
+
     with session_scope() as s:
-        if (f := s.get(Folder, folder_id)) is not None:
-            f.citations = {**(f.citations or {}), **values}
+        if s.get(Folder, folder_id) is not None:
+            c = s.get(FolderSettings, folders.settings_id(s, folder_id))
+            c.citations = {**(c.citations or {}), **values}
 
 
 def numbering(folder_id: int | None) -> Numbering:

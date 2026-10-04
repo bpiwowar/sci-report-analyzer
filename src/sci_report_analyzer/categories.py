@@ -1,6 +1,6 @@
 """Categories of a folder (an ordered tree, e.g. a committee's grid: "Research", under it
-"Projects"…), and the excerpts of its people's PDFs filed in them: listed by category, as
-Markdown for a report."""
+"Projects"…): those of its settings (shared, see folders.settings_id), and the excerpts of
+its people's PDFs filed in them: listed by category, as Markdown for a report."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from datetime import datetime
 
 from sqlalchemy import func, select
 
+from . import folders
 from .db.models import Category, Excerpt, PeriodDocument, Publication
 from .db.session import session_scope
 from .i18n import _
@@ -51,13 +52,18 @@ class Node:
 def tree(folder_id: int) -> list[Node]:
     """The folder's categories, in order (depth first: a category, then its subcategories)."""
     with session_scope() as s:
-        rows = list(
-            s.scalars(
-                select(Category)
-                .where(Category.folder_id == folder_id)
-                .order_by(Category.position, Category.id)
-            )
+        return _tree(s, folders.settings_id(s, folder_id))
+
+
+def _tree(s, settings_id: int) -> list[Node]:
+    """The categories of some settings, in order (see tree)."""
+    rows = list(
+        s.scalars(
+            select(Category)
+            .where(Category.settings_id == settings_id)
+            .order_by(Category.position, Category.id)
         )
+    )
     kids: dict[int | None, list[Category]] = {}
     for c in rows:
         kids.setdefault(c.parent_id, []).append(c)
@@ -79,10 +85,10 @@ def tree(folder_id: int) -> list[Node]:
     return out
 
 
-def next_colour(s, folder_id: int) -> str:
-    """The colour of a new category of a folder: the first of the palette none has yet
+def next_colour(s, settings_id: int) -> str:
+    """The colour of a new category of some settings: the first of the palette none has yet
     (all taken: in turn)."""
-    used = list(s.scalars(select(Category.colour).where(Category.folder_id == folder_id)))
+    used = list(s.scalars(select(Category.colour).where(Category.settings_id == settings_id)))
     free = [c for c in PALETTE if c not in used]
     return free[0] if free else PALETTE[len(used) % len(PALETTE)]
 
@@ -90,24 +96,27 @@ def next_colour(s, folder_id: int) -> str:
 def add(folder_id: int, name: str, parent_id: int | None = None) -> int:
     """A new category (the last of its siblings, in the next colour); returns its id."""
     with session_scope() as s:
-        last = s.scalar(
-            select(func.max(Category.position)).where(
-                Category.folder_id == folder_id,
-                Category.parent_id.is_(None)
-                if parent_id is None
-                else Category.parent_id == parent_id,
-            )
+        return _add(s, folders.settings_id(s, folder_id), name.strip() or "Category", parent_id)
+
+
+def _add(s, settings_id: int, name: str, parent_id: int | None, **values) -> int:
+    last = s.scalar(
+        select(func.max(Category.position)).where(
+            Category.settings_id == settings_id,
+            Category.parent_id.is_(None) if parent_id is None else Category.parent_id == parent_id,
         )
-        c = Category(
-            folder_id=folder_id,
-            parent_id=parent_id,
-            name=name.strip() or "Category",
-            position=(last or 0) + 1,
-            colour=next_colour(s, folder_id),
-        )
-        s.add(c)
-        s.flush()
-        return c.id
+    )
+    c = Category(
+        settings_id=settings_id,
+        parent_id=parent_id,
+        name=name,
+        position=(last or 0) + 1,
+        colour=values.pop("colour", None) or next_colour(s, settings_id),
+        **values,
+    )
+    s.add(c)
+    s.flush()
+    return c.id
 
 
 def update(
@@ -131,7 +140,8 @@ def set_influence(folder_id: int, cat_id: int | None) -> None:
     """The category gathering the excerpts flagged "influence" of the others (none:
     ``None``); at most one per folder."""
     with session_scope() as s:
-        for c in s.scalars(select(Category).where(Category.folder_id == folder_id)):
+        sid = folders.settings_id(s, folder_id)
+        for c in s.scalars(select(Category).where(Category.settings_id == sid)):
             c.influence = c.id == cat_id
 
 
@@ -145,7 +155,7 @@ def move(cat_id: int, delta: int) -> None:
             s.scalars(
                 select(Category)
                 .where(
-                    Category.folder_id == c.folder_id,
+                    Category.settings_id == c.settings_id,
                     Category.parent_id.is_(None)
                     if c.parent_id is None
                     else Category.parent_id == c.parent_id,
@@ -166,7 +176,7 @@ def place(cat_id: int, target_id: int, where: str) -> bool:
     it (its last subcategory); never within itself. Returns whether it moved."""
     with session_scope() as s:
         c, t = s.get(Category, cat_id), s.get(Category, target_id)
-        if c is None or t is None or c.id == t.id or c.folder_id != t.folder_id:
+        if c is None or t is None or c.id == t.id or c.settings_id != t.settings_id:
             return False
         p: Category | None = t
         while p is not None:  # (the target must not be below the category)
@@ -179,7 +189,7 @@ def place(cat_id: int, target_id: int, where: str) -> bool:
             for x in s.scalars(
                 select(Category)
                 .where(
-                    Category.folder_id == c.folder_id,
+                    Category.settings_id == c.settings_id,
                     Category.parent_id.is_(None)
                     if parent is None
                     else Category.parent_id == parent,
@@ -203,10 +213,9 @@ def subtree(cat_id: int) -> list[int]:
     """A category and those below it."""
     with session_scope() as s:
         c = s.get(Category, cat_id)
-        folder_id = c.folder_id if c else None
-    if folder_id is None:
-        return []
-    node = next(n for n in tree(folder_id) if n.id == cat_id)
+        if c is None:
+            return []
+        node = next(n for n in _tree(s, c.settings_id) if n.id == cat_id)
     out: list[int] = []
 
     def walk(n: Node) -> None:
@@ -219,7 +228,8 @@ def subtree(cat_id: int) -> list[int]:
 
 
 def excerpt_count(cat_id: int) -> int:
-    """The excerpts filed in a category or below it (of all the people of its folder)."""
+    """The excerpts filed in a category or below it (of all the people of the folders using
+    it)."""
     with session_scope() as s:
         return s.scalar(
             select(func.count(Excerpt.id)).where(Excerpt.category_id.in_(subtree(cat_id)))
@@ -262,24 +272,95 @@ def delete(cat_id: int) -> bool:
 
 def copy_tree(source_folder: int, folder_id: int) -> int:
     """Add the categories of another folder (without their excerpts); returns how many."""
-    nodes = tree(source_folder)
-    ids: dict[int, int] = {}
     with session_scope() as s:
-        for n in nodes:
-            c = Category(
-                folder_id=folder_id,
-                parent_id=ids.get(n.parent_id) if n.parent_id else None,
-                name=n.name,
-                position=len(ids) + 1,
+        return copy_settings(
+            s, folders.settings_id(s, source_folder), folders.settings_id(s, folder_id)
+        )
+
+
+def copy_settings(s, source_id: int, settings_id: int) -> int:
+    """Add the categories of some settings to others (without their excerpts); returns how
+    many."""
+    nodes = _tree(s, source_id)
+    ids: dict[int, int] = {}
+    for n in nodes:
+        c = Category(
+            settings_id=settings_id,
+            parent_id=ids.get(n.parent_id) if n.parent_id else None,
+            name=n.name,
+            position=len(ids) + 1,
+            start_year=n.start_year,
+            end_year=n.end_year,
+            influence=n.influence,
+            colour=n.colour,
+        )
+        s.add(c)
+        s.flush()
+        ids[n.id] = c.id
+    return len(nodes)
+
+
+def _places(nodes: list[Node]) -> dict[int, tuple]:
+    """Each category's place by its names: its path, each name numbered among its siblings
+    of the same name (so that the copies of categories are found back)."""
+    out: dict[int, tuple] = {}
+    seen: dict[tuple, int] = {}
+    for n in nodes:  # (parents first)
+        up = out.get(n.parent_id, ()) if n.parent_id else ()
+        k = seen[(up, n.name)] = seen.get((up, n.name), -1) + 1
+        out[n.id] = (*up, (n.name, k))
+    return out
+
+
+def remap(s, period_ids: list[int], source_id: int, settings_id: int) -> int:
+    """File the excerpts of some people (their periods) filed in categories of some settings
+    in the categories of others, at the same place (same names; see _places); those missing
+    are added (with their colour and years). Returns how many were added."""
+    if not period_ids or source_id == settings_id:
+        return 0
+    old, new = _tree(s, source_id), _tree(s, settings_id)
+    used = set(
+        s.scalars(
+            select(Excerpt.category_id).where(
+                Excerpt.period_id.in_(period_ids),
+                Excerpt.category_id.in_([n.id for n in old]),
+            )
+        )
+    )
+    if not used:
+        return 0
+    by_id = {n.id: n for n in old}
+    needed: set[int] = set()
+    for i in used:  # (and the categories above them)
+        while i is not None and i not in needed:
+            needed.add(i)
+            i = by_id[i].parent_id
+    places, there = _places(old), {p: i for i, p in _places(new).items()}
+    target: dict[int, int] = {}
+    added = 0
+    for n in old:  # (parents first)
+        if n.id not in needed:
+            continue
+        if (found := there.get(places[n.id])) is None:
+            parent = target.get(n.parent_id) if n.parent_id else None
+            found = _add(
+                s,
+                settings_id,
+                n.name,
+                parent,
+                colour=n.colour,
                 start_year=n.start_year,
                 end_year=n.end_year,
-                influence=n.influence,
-                colour=n.colour,
             )
-            s.add(c)
-            s.flush()
-            ids[n.id] = c.id
-    return len(nodes)
+            there[places[n.id]] = found
+            added += 1
+        target[n.id] = found
+    for e in s.scalars(
+        select(Excerpt).where(Excerpt.period_id.in_(period_ids), Excerpt.category_id.in_(used))
+    ):
+        e.category_id = target[e.category_id]
+    s.flush()
+    return added
 
 
 # ---- Excerpts -------------------------------------------------------------------------------
