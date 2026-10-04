@@ -65,8 +65,3 @@ panel): it does not work (no effect, no tooltip).
 
 If the bundled PDF.js supports it, enable its "note" (comment) annotation tool along with
 highlighting (check the PDF.js version and its editor modes / `annotationEditorMode`).
-
-## Folders (after the folder-wide notes above)
-
-- Mark some papers of a folder with tags (e.g. "starred"); several tags, each with its
-  name.
