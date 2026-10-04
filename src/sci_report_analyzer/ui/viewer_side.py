@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from nicegui import ui
 
-from .. import annotations, categories, documents, folders, manual, reflist, reports
+from .. import annotations, categories, documents, folders, manual, pdftext, reflist, reports
 from ..i18n import N_, _
 from ..sources.base import SourceError
 from .mdedit import MarkdownEditor, quote
@@ -205,6 +205,7 @@ class Side:
                 type="warning",
             )
             return
+        sel["text"] = pdftext.clean_pdf_text(sel["text"], one_paragraph=True)
         page, rects = sel.get("p"), sel.get("rects") or []
         category_picker(
             self,
@@ -540,7 +541,7 @@ class Side:
             name, url = self.source_link(page)
             name = name.replace("[", "(").replace("]", ")")
             where = f"[{name}, {where}]({url})" if where else f"[{name}]({url})"
-        editor.insert_block(quote(sel["text"], where))
+        editor.insert_block(quote(pdftext.clean_pdf_text(sel["text"], one_paragraph=True), where))
 
     async def tag_selection(self) -> None:
         """Tag the papers of the list selected in the PDF (e.g. an area over numbered
