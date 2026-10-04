@@ -687,6 +687,8 @@ def tags_tab() -> None:
 
 
 def author_categories_section() -> None:
+    from .tags import colour_list_editor
+
     ui.label(_("Co-author categories")).classes("text-lg mt-6")
     ui.label(
         _(
@@ -695,44 +697,15 @@ def author_categories_section() -> None:
             "publication's details; membership is per person."
         )
     ).classes("text-grey")
-
-    @ui.refreshable
-    def listing() -> None:
-        for c in annotations.author_categories():
-            with ui.row().classes("items-center gap-2"):
-                name = ui.input(_("Name"), value=c.name).props("dense")
-                colour = ColourInput(_("Colour"), value=c.colour).props("dense").classes("w-36")
-                ui.button(
-                    icon="save",
-                    on_click=lambda cid=c.id, n=name, col=colour: (
-                        annotations.save_author_category(n.value, col.value, cid),
-                        ui.notify(_("Saved")),
-                    ),
-                ).props("flat round dense")
-                ui.button(icon="delete", on_click=lambda c=c: delete(c)).props(
-                    "flat round dense color=negative"
-                ).mark(f"author-category-delete-{c.id}")
-
-    def delete(c) -> None:
-        confirm(
-            _("Delete the co-author category “{name}”?").format(name=c.name),
-            _("Delete"),
-            lambda: (annotations.delete_author_category(c.id), listing.refresh()),
-            mark="author-category-delete-ok",
-        )
-
-    listing()
-    with ui.row().classes("items-center gap-2 mt-2"):
-        name = ui.input(_("New category")).props("dense")
-        colour = ColourInput(_("Colour"), value="#0969da").props("dense").classes("w-36")
-        ui.button(
-            _("Add"),
-            on_click=lambda: (
-                (annotations.save_author_category(name.value, colour.value), listing.refresh())
-                if name.value
-                else None
-            ),
-        )
+    colour_list_editor(
+        annotations.author_categories,
+        lambda c, name, colour: annotations.save_author_category(name, colour, c.id),
+        lambda name, colour, _option: annotations.save_author_category(name, colour),
+        mark="author-category",
+        delete=lambda c: annotations.delete_author_category(c.id),
+        delete_message=lambda c: _("Delete the co-author category “{name}”?").format(name=c.name),
+        new_label=_("New category"),
+    )
 
 
 # ---- data ----------------------------------------------------------------------------------
