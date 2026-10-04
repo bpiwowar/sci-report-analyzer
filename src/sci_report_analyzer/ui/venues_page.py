@@ -15,6 +15,7 @@ from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
 from ..ranking.badge import (
     TRACK_LABEL,
+    TRACK_ORDER,
     UNRANKED_COLOUR,
     category_of,
     core_periods,
@@ -1387,7 +1388,7 @@ def venue_dialog(
                     )
                     .mark("venue-issns")
                 )
-                ui.label(_("Variants (raw texts, matched by their cleaned text)")).classes(
+                ui.label(_("Variants (cleaned texts, grouped by track)")).classes(
                     "font-medium mt-2"
                 )
                 colours = annotations.track_colours()
@@ -1424,40 +1425,103 @@ def venue_dialog(
                         ui.button(_("Split each into a workshop"), on_click=split_all).props(
                             "dense flat color=primary"
                         ).mark("venue-split-workshops")
-                for key, example, count, manual, track in row.variants:
-                    with ui.row().classes("items-center gap-2 no-wrap w-full"):
-                        ui.label(example or key).classes("text-sm")
-                        ui.label(
-                            f"“{key}” · "
-                            + ngettext("{n} record", "{n} records", count).format(n=count)
-                            + (" · " + _("set by hand") if manual else "")
-                        ).classes("text-xs text-grey grow")
-                        _track_picker(
-                            track,
-                            lambda t, k=key: (
-                                venues.set_variant_track(k, t),
-                                ui.notify(_("Track saved")),
-                            ),
-                            f"venue-variant-track-{key}",
-                            colours=colours,
-                        ).tooltip(_("Track of the papers with this variant"))
-                        if len(row.variants) > 1:
-                            ui.button(
-                                icon="call_split",
-                                on_click=lambda k=key: (venues.split_key(k), finish()),
-                            ).props("flat round dense size=sm").tooltip(
-                                _("Split into its own venue")
+                # The venue's source texts by their key (a variant's raw texts).
+                key_texts: dict[str, list[venue_match.TextMatch]] = {}
+                for t in venue_match.texts_of([row.id]).get(row.id, []):
+                    key_texts.setdefault(t.key, []).append(t)
+
+                def set_track(key: str, track: str | None) -> None:
+                    venues.set_variant_track(key, track)
+                    row.variants[:] = [
+                        (*v[:4], track, v[5]) if v[0] == key else v for v in row.variants
+                    ]
+                    ui.notify(_("Track saved"))
+                    variants_view.refresh()  # (its new group)
+
+                workshop_tip = _("Split into a workshop venue whose main conference is this one")
+
+                def variant(key, example, count, manual, track, source) -> None:
+                    """A variant: its cleaned text, its track and actions, its raw texts."""
+                    texts = sorted(
+                        key_texts.get(key, []),
+                        key=lambda t: -row.source_texts.get((t.source, t.raw), 0),
+                    )
+                    with ui.column().classes("gap-0 w-full").mark(f"venue-variant-{key}"):
+                        with ui.row().classes("items-center gap-2 no-wrap w-full"):
+                            ui.label(service.clean(example, source) if example else key).classes(
+                                "text-sm"
+                            ).tooltip(_("Cleaned text (after the normalization rules)"))
+                            ui.label(
+                                ngettext("{n} record", "{n} records", count).format(n=count)
+                                + (" · " + _("set by hand") if manual else "")
+                            ).classes("text-xs text-grey grow")
+                            _track_picker(
+                                track,
+                                lambda t, k=key: set_track(k, t),
+                                f"venue-variant-track-{key}",
+                                colours=colours,
+                            ).tooltip(_("Track of the papers with this variant"))
+                            if len(row.variants) > 1:
+                                ui.button(
+                                    icon="call_split",
+                                    on_click=lambda k=key: (venues.split_key(k), finish()),
+                                ).props("flat round dense size=sm").tooltip(
+                                    _("Split into its own venue")
+                                )
+                            if row.kind not in WORKSHOP_KINDS:
+                                ui.button(
+                                    icon="group_work",
+                                    on_click=lambda k=key: (venues.split_as_workshop(k), finish()),
+                                ).props(
+                                    "flat round dense size=sm color="
+                                    + ("orange-9" if key in workshop_keys else "grey")
+                                ).tooltip(workshop_tip).mark(f"venue-split-workshop-{key}")
+                        if not texts:  # (added by hand, in no source yet)
+                            ui.label(
+                                _("“{text}”: in no source text").format(text=example or key)
+                            ).classes("text-xs text-grey pl-4")
+                            return
+                        with (
+                            ui.expansion(
+                                ngettext("{n} raw text", "{n} raw texts", len(texts)).format(
+                                    n=len(texts)
+                                )
                             )
-                        if row.kind not in WORKSHOP_KINDS:
-                            ui.button(
-                                icon="group_work",
-                                on_click=lambda k=key: (venues.split_as_workshop(k), finish()),
-                            ).props(
-                                "flat round dense size=sm color="
-                                + ("orange-9" if key in workshop_keys else "grey")
-                            ).tooltip(
-                                _("Split into a workshop venue whose main conference is this one")
-                            ).mark(f"venue-split-workshop-{key}")
+                            .props("dense dense-toggle header-class=text-xs")
+                            .classes("w-full pl-2 text-grey")
+                            .mark(f"venue-variant-raw-{key}")
+                        ):
+                            for t in texts:
+                                with ui.row().classes("items-center gap-2 no-wrap pl-4"):
+                                    source_tag(t.source)
+                                    n = row.source_texts.get((t.source, t.raw), 0)
+                                    ui.label(f"{t.raw} ({n})").classes("text-xs")
+
+                @ui.refreshable
+                def variants_view() -> None:
+                    """The variants grouped by track: the main venue (no track) first."""
+                    groups: dict[str | None, list] = {}
+                    for v in row.variants:
+                        groups.setdefault(v[4], []).append(v)
+                    order = {t: i for i, t in enumerate(TRACK_ORDER)}
+                    for track in sorted(
+                        groups, key=lambda t: (t is not None, order.get(t, len(order)), t or "")
+                    ):
+                        with (
+                            ui.row()
+                            .classes("items-center gap-2 mt-1")
+                            .mark(f"venue-variant-group-{track or 'none'}")
+                        ):
+                            if track:
+                                label = escape(TRACK_LABEL.get(track, track))
+                                style = _track_style(track, colours)
+                                span(f'<span class="vr-chip" style="{style}">{label}</span>')
+                            else:
+                                ui.label(_("Main venue")).classes("text-sm text-grey")
+                        for v in sorted(groups[track], key=lambda v: -v[2]):
+                            variant(*v)
+
+                variants_view()
                 with ui.row().classes("items-center gap-2 w-full no-wrap"):
                     new_raw = (
                         ui.input(_("Add a variant (a raw venue text)"))
@@ -1554,7 +1618,7 @@ def venue_dialog(
                                     )
 
                 rules_view()
-                texts = venue_match.texts_of([row.id]).get(row.id, [])
+                texts = [t for ts in key_texts.values() for t in ts]
                 if texts:
                     counts = row.source_texts
                     with (
