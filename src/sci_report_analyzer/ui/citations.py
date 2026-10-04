@@ -243,7 +243,8 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
             ui.textarea(
                 _("Starting notes"),
                 value=reports.skeleton(folder_id),
-                placeholder="## Publications\n[]{.publications}\n\n## Activities\n[]{.excerpts}",
+                placeholder=f"## {_('Publications')}\n[]{{.publications}}\n\n"
+                f"## {_('Activities')}\n[]{{.excerpts}}",
             )
             .props("dense outlined autogrow")
             .classes("w-full font-mono text-sm mt-2")
