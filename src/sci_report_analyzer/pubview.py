@@ -424,7 +424,7 @@ def member_view(
         venue_name=names.get(vid) if vid else None,
         via=via,
         track=tm.track if tm else None,
-        detected_track=_text_track(m.venue) or _text_track((m.raw or {}).get("part")),
+        detected_track=_text_track(m.venue),
         conflicts=tm.conflicts if tm else (),
         venue_reliable=(m.raw or {}).get("venue_reliable", True),
     )

@@ -24,7 +24,6 @@ from sqlalchemy import select
 from ..db.models import DoiRecord, utcnow
 from ..db.session import session_scope
 from ..i18n import _
-from ..ranking.ordinals import expand
 from .base import (
     FetchedPub,
     FetchResult,
@@ -143,44 +142,18 @@ _JOURNAL_TYPES = {"journal-article", "article-journal"}
 _CHAPTER_TYPES = {"book-chapter", "chapter"}
 _PREPRINT_PUBLISHERS = re.compile(r"\b(arxiv|biorxiv|medrxiv|ssrn|zenodo|preprints?)\b", re.I)
 
-_ORDINAL = rf"(?:\d+(?:st|nd|rd|th)|{expand('{ordinals:en}')})"
-# "Proceedings of the 60th Annual Meeting ...", "Proceedings of the Third Conference ...".
-_PROCEEDINGS = re.compile(
-    rf"^\s*(?:companion\s+)?proceedings\s+of\s+(?:the\s+)?(?:{_ORDINAL}\s+)?", re.I
-)
-_LEADING_ORDINAL = re.compile(rf"^\s*(?:the\s+)?(?:(?:19|20)\d{{2}}\s+)?(?:{_ORDINAL}\s+)?", re.I)
-# A part of the proceedings, kept in parentheses (its track is detected):
-# "...: Tutorial Abstracts" → "... (Tutorial Abstracts)".
-_PART = re.compile(
-    r"\s*:\s*((?:volume\s+\d+\s*[:,]\s*)?(?:long|short|tutorial|demo|system demonstration|student "
-    r"research|industry|shared task|findings)[^:()]*)$",
-    re.I,
-)
-
 
 def _clean(text: str | None) -> str | None:
     return re.sub(r"\s+", " ", text).strip() or None if text else None
 
 
-# "(Volume 1: Long Papers)", "(Volume 3: Shared Task Papers, Day 2)".
-_VOLUME = re.compile(r"\s*\((volume\s+\d+[^()]*)\)\s*$", re.I)
-
-
-def venue_text(container: str | None) -> tuple[str | None, str | None]:
-    """A DOI container title as a venue text, like the other sources give it, and the part
-    of the proceedings it names ("Short Papers", "Tutorial Abstracts"...: its track)."""
+def venue_text(container: str | None) -> str | None:
+    """A DOI container title as a venue text: as the registry gives it (but its spaces).
+    "Proceedings of the 2018 …", its year, its ordinal and the part of the proceedings it
+    names (": System Demonstrations": its track) are left to the cleaning and detection
+    rules (Settings)."""
     text = _clean(container)
-    if not text:
-        return None, None
-    text = _PROCEEDINGS.sub("", text)
-    text = _LEADING_ORDINAL.sub("", text)
-    text = re.sub(r"\(([A-Z][\w&+-]*)[\s'’]+(?:19|20)?\d{2}\)", r"(\1)", text)  # "(LREC 2022)"
-    part = None
-    for rx in (_VOLUME, _PART):
-        if m := rx.search(text):
-            part = m.group(1)
-            text = text[: m.start()].rstrip(" ,:")
-    return text[:1].upper() + text[1:], part
+    return text[:1].upper() + text[1:] if text else None
 
 
 # ACL Anthology DOIs name the event: 10.18653/v1/2022.acl-long.583, 10.18653/v1/P17-2035.
@@ -263,7 +236,7 @@ def parse(msg: dict[str, Any], registry: str) -> dict[str, Any]:
     # A chapter of a conference's book (LNCS...): the conference, not the book's title
     # ("Perception, Representations, Image, Sound, Music" is CMMR 2019's).
     chapter_of_event = kind in _CHAPTER_TYPES and bool(event_name)
-    venue, part = venue_text(
+    venue = venue_text(
         (event_name if chapter_of_event else None)
         or container
         or event_name
@@ -296,7 +269,6 @@ def parse(msg: dict[str, Any], registry: str) -> dict[str, Any]:
         # such as "Caring is Sharing"): the other sources' venue is used.
         "venue_reliable": not (kind in _CHAPTER_TYPES and not event),
         "container": container,
-        "part": part,
         "series": containers[0] if len(containers) > 1 else None,
         "venue_type": "conference"
         if kind in _CONFERENCE_TYPES or chapter_of_event
@@ -423,7 +395,6 @@ def fetched_pub(doi: str, data: dict[str, Any], publication_id: int | None = Non
         "registry": data.get("registry"),
         "publisher": data.get("publisher"),
         "container": data.get("container"),
-        "part": data.get("part"),
         "venue_reliable": data.get("venue_reliable", True),
     }
     if data.get("url"):

@@ -219,7 +219,34 @@ LANGUAGE_RULES: tuple[NormRule, ...] = (
     ),
 )
 
+# The front matter of a DOI record's title (it names the volume: "Proceedings of the 2018
+# Conference on …"); its year and ordinal go with their own rules. Not for the other
+# sources: "Proceedings of Machine Learning Research" is a series' name.
+PREFIX_RULES: tuple[NormRule, ...] = (
+    NormRule(
+        id="proceedingsOf",
+        name="Proceedings of",
+        description="Remove a leading “Proceedings of (the)” (or “Companion proceedings of”).",
+        pattern=r"^\s*(?:companion\s+)?proceedings\s+of\s+(?:the\s+)?",
+        replacement="",
+        ignore_case=True,
+        sources=["doi"],
+        example="Proceedings of the 2018 Conference on Widgets: System Demonstrations",
+    ),
+    NormRule(
+        id="leadingThe",
+        name="Leading “The”",
+        description="Remove a leading “The”.",
+        pattern=r"^\s*the\s+",
+        replacement="",
+        ignore_case=True,
+        sources=["doi"],
+        example="The Journal of Widget Studies",
+    ),
+)
+
 DEFAULT_NORM_RULES: tuple[NormRule, ...] = (
+    *PREFIX_RULES,
     *LANGUAGE_RULES,
     NormRule(
         id="parenAcronym",
