@@ -885,6 +885,9 @@ msgstr ""
 msgid "Clear out the automatic settings of all papers?"
 msgstr "Effacer les réglages automatiques de tous les articles ?"
 
+msgid "Clear the filters (the period and its years are kept)"
+msgstr "Effacer les filtres (la période et ses années sont conservées)"
+
 msgid "Clear the notes"
 msgstr "Effacer les notes"
 
@@ -3165,6 +3168,9 @@ msgstr ""
 msgid "Reports"
 msgstr "Rapports"
 
+msgid "Reset"
+msgstr "Réinitialiser"
+
 msgid "Reset the built-in tracks"
 msgstr "Rétablir les sessions prédéfinies"
 
@@ -3443,6 +3449,9 @@ msgstr "Campagnes d'évaluation"
 #, python-brace-format
 msgid "Shared with {folders}: changed for them too"
 msgstr "Partagés avec {folders} : modifiés pour eux aussi"
+
+msgid "Shift-click: add to the selection (or remove) · Alt-click: only this one"
+msgstr "Maj-clic : ajouter à la sélection (ou retirer) · Alt-clic : celui-ci seulement"
 
 msgid "Short"
 msgstr "Court"

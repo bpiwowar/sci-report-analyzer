@@ -2529,3 +2529,90 @@ async def test_primary_source_filters_the_panel(user: User) -> None:
     await user.open(f"/person/{pid}/{period}")
     await user.should_see("A workshop contribution")
     await user.should_see("Deep ranking for search")
+
+
+def _three_kinds() -> int:
+    """Papers of three categories (a journal, a conference and a workshop)."""
+    pid = make_person("Jane Doe")
+    add_source(
+        pid,
+        "dblp",
+        "x/1",
+        [
+            pub("a", "A journal paper", 2021, "Neural Computation", authors=["Jane Doe"]),
+            pub("b", "A workshop paper", 2019, "Some Workshop on Things", authors=["Jane Doe"]),
+            pub(
+                "c",
+                "A conference paper",
+                2020,
+                "Conference on Widget Processing",
+                authors=["Jane Doe"],
+            ),
+        ],
+    )
+    return pid
+
+
+async def test_multiple_selection(user: User) -> None:
+    """Shift-click adds to the selection (one of them), alt-click keeps only one, a click
+    toggles; the selection is in the URL (as a single one earlier), and reset clears it."""
+    import dataclasses
+    from urllib.parse import urlencode
+
+    from sci_report_analyzer.pubview import Sel
+    from sci_report_analyzer.ui.panel import decode_sels, encode_sels
+
+    pid = _three_kinds()
+    await user.open(f"/person/{pid}")
+    await user.should_see("A conference paper")
+    titles = ["A journal paper", "A workshop paper", "A conference paper"]
+
+    async def shown(*wanted: str) -> None:
+        for title in titles:
+            if title in wanted:
+                await user.should_see(title)
+            else:
+                await user.should_not_see(title)
+
+    def click(key: str, **mods: bool) -> None:
+        user.find(f"category-{key}").trigger("click", mods)
+
+    click("q2")  # a click: only this one
+    await shown("A journal paper")
+    click("k_intl_workshop", shiftKey=True)  # shift: added (Q2 or a workshop)
+    await shown("A journal paper", "A workshop paper")
+    assert len(user.find(marker="selection").elements) == 2
+    await user.should_see(marker="reset-filters")
+    click("q2", shiftKey=True)  # shift again: removed
+    await shown("A workshop paper")
+    click("k_intl_conference", altKey=True)  # alt: only this one
+    await shown("A conference paper")
+    click("k_intl_conference")  # a click on the only one: none
+    await shown(*titles)
+    await user.should_not_see(marker="reset-filters")
+
+    # Across charts: one of the categories, and of the years.
+    click("q2")
+    click("k_intl_workshop", shiftKey=True)
+    (chart,) = user.find("years-chart").elements
+    label = next(x for x in chart.options["xAxis"]["data"] if "2019" in x)
+    index = chart.options["xAxis"]["data"].index(label)
+    user.find("years-chart").trigger(
+        "componentClick", {"seriesName": "x", "dataIndex": index, "shiftKey": True}
+    )
+    await shown("A workshop paper")
+    # A chip removes its selection; reset clears all the filters.
+    user.find(marker="selection", content=label).trigger("remove")
+    await shown("A journal paper", "A workshop paper")
+    user.find("reset-filters").click()
+    await shown(*titles)
+
+    # The URL keeps the selections (and earlier links: a single one).
+    sels = [Sel("category", "Q2", key="q2"), Sel("category", "workshop", key="k_intl_workshop")]
+    assert decode_sels(encode_sels(sels)) == sels
+    old = json.dumps(dataclasses.asdict(sels[0]))
+    assert decode_sels(old) == sels[:1]
+    await user.open(f"/person/{pid}?{urlencode({'sel': old, 'q': 'paper'})}")
+    await shown("A journal paper")
+    user.find("reset-filters").click()
+    await shown(*titles)

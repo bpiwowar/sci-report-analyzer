@@ -154,7 +154,11 @@ Edited proceedings (chairing) keep their venue's rank in categories of their own
 ## Panel
 
 Click a bar or legend entry to cross-filter: the other charts and the list are restricted
-to the selection. An unranked paper shows its kind (e.g. "Natl. conf.", "Book") instead.
+to the selection (click it again to drop it). **Shift**-click adds an entry to the selection
+(or removes it), **Alt**-click selects it alone: e.g. Q1, Q2, CORE A* and CORE A together. A
+paper matches one of the entries picked on a chart, and those of all the charts. The chips
+next to the filters remove one entry; **Reset** clears all the filters (search, tags,
+tracks, selection…), the period and its years aside. An unranked paper shows its kind (e.g. "Natl. conf.", "Book") instead.
 
 Click a publication to open its details:
 

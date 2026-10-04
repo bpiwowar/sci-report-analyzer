@@ -216,7 +216,7 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
         dlg.close()
         if show_tagged:
             panel.tag_filter = [chosen.id]
-            panel.sel = None
+            panel.sels = []
             panel._save_state()
         await panel.reload()
         # The tagged papers the panel does not show (e.g. outside the period's years).
