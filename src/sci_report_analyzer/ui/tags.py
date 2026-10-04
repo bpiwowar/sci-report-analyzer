@@ -12,7 +12,7 @@ from .. import annotations
 from ..db.models import Tag
 from ..i18n import _
 from .colours import ColourInput
-from .dialogs import transient_dialog
+from .dialogs import confirm, transient_dialog
 from .mdedit import MarkdownEditor
 from .theme import chip_style, chip_text, span
 
@@ -65,12 +65,17 @@ def tags_section(on_change: Callable[[], None] | None = None) -> None:
                     f"tag-save-{t.id}"
                 )
                 if t.key is None:
-                    ui.button(
-                        icon="delete",
-                        on_click=lambda tid=t.id: (annotations.delete_tag(tid), changed()),
-                    ).props("flat round dense color=negative").tooltip(
-                        _("Delete the tag (from every paper)")
-                    )
+                    ui.button(icon="delete", on_click=lambda t=t: delete(t)).props(
+                        "flat round dense color=negative"
+                    ).tooltip(_("Delete the tag (from every paper)")).mark(f"tag-delete-{t.id}")
+
+    def delete(t: Tag) -> None:
+        confirm(
+            _("Delete the tag “{name}”, from every paper?").format(name=t.name),
+            _("Delete"),
+            lambda: (annotations.delete_tag(t.id), changed()),
+            mark="tag-delete-ok",
+        )
 
     ui.label(
         _(

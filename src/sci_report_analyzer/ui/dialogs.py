@@ -3,7 +3,7 @@
 A closed dialog is deleted, and with it the UI context of the handlers of its buttons: what
 needs it (a notification, a refresh) comes before ``dlg.close()``; the OK button of
 ``actions`` does so (the dialog is closed once its handler is done). But a dialog opened from
-it comes after: one opened within it is deleted with it.
+it comes after (``close_then``): one opened within it is deleted with it.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
 
-from nicegui import ui
+from nicegui import context, ui
 
 from ..i18n import _
 
@@ -24,7 +24,9 @@ def transient_dialog(
 ) -> Iterator[tuple[ui.dialog, ui.card]]:
     """A dialog (its card of classes ``width``, under a ``title``), opened at the end of the
     block and deleted once closed."""
+    opener = context.slot
     with ui.dialog() as dlg, ui.card().classes(width) as card:
+        dlg.opener = opener  # type: ignore[attr-defined]
         if persistent:
             dlg.props("persistent")
         if title is not None:
@@ -38,6 +40,13 @@ def close(dlg: ui.dialog) -> None:
     """Close (and so delete) a dialog, unless already gone (e.g. with its page)."""
     if not dlg.is_deleted:
         dlg.close()
+
+
+def close_then(dlg: ui.dialog, then: Callable[[], Any]) -> None:
+    """Close a dialog, then ``then`` (e.g. another dialog opened) where it was opened."""
+    close(dlg)
+    with dlg.opener:  # type: ignore[attr-defined]
+        then()
 
 
 def ok_handler(dlg: ui.dialog, on_ok: Callable[..., Any]) -> Callable[..., Any]:

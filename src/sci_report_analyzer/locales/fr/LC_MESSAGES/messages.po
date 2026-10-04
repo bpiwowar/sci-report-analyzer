@@ -881,6 +881,15 @@ msgstr "Effacer les réglages automatiques de tous les articles ?"
 msgid "Clear the filters (the period and its years are kept)"
 msgstr "Effacer les filtres (la période et ses années sont conservées)"
 
+#, python-brace-format
+msgid ""
+"Clear the manual decisions on “{venue}” (its kind, level, ranking record,"
+" short name, search text, joint conference, workshop hosts)?"
+msgstr ""
+"Effacer les décisions manuelles sur « {venue} » (son type, son niveau, "
+"son entrée de classement, son nom court, son texte de recherche, sa "
+"conférence conjointe, les conférences d'un atelier) ?"
+
 msgid "Clear the notes"
 msgstr "Effacer les notes"
 
@@ -1102,6 +1111,10 @@ msgstr "Supprimer"
 msgid "Delete rule"
 msgstr "Supprimer la règle"
 
+#, python-brace-format
+msgid "Delete the co-author category “{name}”?"
+msgstr "Supprimer la catégorie de co-auteurs « {name} » ?"
+
 msgid "Delete the data"
 msgstr "Supprimer les données"
 
@@ -1112,11 +1125,21 @@ msgstr ""
 "Supprimer les fichiers des articles qui ne sont plus dans la base, et "
 "oublier les PDF dont le fichier a été supprimé à la main"
 
+#, python-brace-format
+msgid "Delete the folder “{folder}” and its periods? Its people are kept."
+msgstr ""
+"Supprimer le dossier « {folder} » et ses périodes ? Ses personnes sont "
+"conservées."
+
 msgid "Delete the rule"
 msgstr "Supprimer la règle"
 
 msgid "Delete the tag (from every paper)"
 msgstr "Supprimer l'étiquette (de tous les articles)"
+
+#, python-brace-format
+msgid "Delete the tag “{name}”, from every paper?"
+msgstr "Supprimer l'étiquette « {name} », de tous les articles ?"
 
 msgid "Delete the track"
 msgstr "Supprimer la session"

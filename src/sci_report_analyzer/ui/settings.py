@@ -700,13 +700,17 @@ def author_categories_section() -> None:
                         ui.notify(_("Saved")),
                     ),
                 ).props("flat round dense")
-                ui.button(
-                    icon="delete",
-                    on_click=lambda cid=c.id: (
-                        annotations.delete_author_category(cid),
-                        listing.refresh(),
-                    ),
-                ).props("flat round dense color=negative")
+                ui.button(icon="delete", on_click=lambda c=c: delete(c)).props(
+                    "flat round dense color=negative"
+                ).mark(f"author-category-delete-{c.id}")
+
+    def delete(c) -> None:
+        confirm(
+            _("Delete the co-author category “{name}”?").format(name=c.name),
+            _("Delete"),
+            lambda: (annotations.delete_author_category(c.id), listing.refresh()),
+            mark="author-category-delete-ok",
+        )
 
     listing()
     with ui.row().classes("items-center gap-2 mt-2"):
