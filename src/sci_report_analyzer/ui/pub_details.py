@@ -40,6 +40,7 @@ from ..sources import ADAPTERS
 from ..sources.base import normalize_doi
 from . import scimago_years
 from .colours import ColourInput
+from .dialogs import actions, close, confirm, ok_handler, transient_dialog
 from .theme import (
     author_html,
     badge_details,
@@ -231,8 +232,7 @@ def venue_rule_dialog(
     old = rules[index] if index is not None and index < len(rules) else prefill
     label = ADAPTERS[source].label if source else None
 
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl vr-details"):
-        ui.label(_("Venue rule")).classes("text-lg font-medium")
+    with transient_dialog(_("Venue rule"), width="w-full max-w-3xl vr-details") as (dlg, _card):
         ui.label(
             _(
                 "Source venue texts matching the regex belong to the venue, and are ranked as it "
@@ -386,9 +386,8 @@ def venue_rule_dialog(
                     "{n} variants now matched by the rule were removed",
                     len(drop),
                 ).format(n=len(drop))
-            # Refresh the caller first: a closed dialog is deleted, with its client context.
             done(message)
-            dlg.close()
+            close(dlg)
 
         def save() -> None:
             rule = candidate()
@@ -414,8 +413,10 @@ def venue_rule_dialog(
             def track_name(track: str | None) -> str:
                 return tracks.name(track) if track else _("no track")
 
-            with ui.dialog() as ask, ui.card().classes("max-w-xl"):
-                ui.label(_("Variants of another track")).classes("text-lg font-medium")
+            with transient_dialog(_("Variants of another track"), width="max-w-xl") as (
+                ask,
+                _card,
+            ):
                 ui.label(
                     _(
                         "The rule matches these variants of the venue, of another track than "
@@ -428,7 +429,6 @@ def venue_rule_dialog(
                         ui.label(f"{v.text} ({track_name(v.track)})").classes("text-sm font-mono")
 
                 def remove() -> None:
-                    ask.close()
                     drop = [*found.redundant, *found.conflicting]
                     store(new_rules, _("Venue rule saved"), drop)
 
@@ -436,11 +436,9 @@ def venue_rule_dialog(
                     ui.button(_("Edit the regex"), on_click=ask.close).props("flat").mark(
                         "rule-conflict-edit"
                     )
-                    ui.button(_("Remove them"), on_click=remove).props("color=negative").mark(
-                        "rule-conflict-remove"
-                    )
-            ask.on_value_change(lambda e: None if e.value else ask.delete())
-            ask.open()
+                    ui.button(_("Remove them"), on_click=ok_handler(ask, remove)).props(
+                        "color=negative"
+                    ).mark("rule-conflict-remove")
 
         def delete_rule() -> None:
             new_rules = venues.venue_patterns(target.value)
@@ -454,17 +452,14 @@ def venue_rule_dialog(
                 )
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(_("Save rule"), on_click=save).mark("rule-save")
-    preview()
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+        preview()
 
 
 def merge_venues_dialog(venue_ids: list[int], done, *, text: str | None = None) -> None:
     """Merge venues that match the same text into one (the one kept is chosen)."""
     names = venues.venue_names()
     ids = [i for i in dict.fromkeys(venue_ids) if i in names]
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-        ui.label(_("Merge into one venue")).classes("text-lg font-medium")
+    with transient_dialog(_("Merge into one venue"), width="w-full max-w-xl") as (dlg, _card):
         if text:
             ui.label(_("These venues all match “{text}”.").format(text=text)).classes("text-sm")
         ui.label(
@@ -488,13 +483,8 @@ def merge_venues_dialog(venue_ids: list[int], done, *, text: str | None = None) 
         def ok() -> None:
             venues.merge_venues(keep.value, [i for i in ids if i != keep.value])
             done(_("Merged into “{venue}”").format(venue=names[keep.value]))
-            dlg.close()
 
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Merge"), icon="merge", on_click=ok).mark("merge-confirm")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+        actions(dlg, _("Merge"), ok, icon="merge", mark="merge-confirm")
 
 
 def search_venue_dialog(pub_id: int, paper_venues: list[int], done) -> None:
@@ -503,8 +493,7 @@ def search_venue_dialog(pub_id: int, paper_venues: list[int], done) -> None:
     names = venues.venue_names()
     others = [v for v in dict.fromkeys(paper_venues) if v in names]
     chosen: dict = {}
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-2xl"):
-        ui.label(_("Search for a venue")).classes("text-lg font-medium")
+    with transient_dialog(_("Search for a venue"), width="w-full max-w-2xl") as (dlg, _card):
         query = (
             ui.input(_("Venue name, acronym or ranking record"), on_change=lambda: search())
             .props("dense outlined debounce=300 autofocus clearable")
@@ -613,30 +602,16 @@ def search_venue_dialog(pub_id: int, paper_venues: list[int], done) -> None:
             merge = [v for v, box in merge_boxes.items() if box.value]
             venues.use_venue(pub_id, target, merge, others)
             done(_("Merged and linked") if merge else _("Linked to the venue (by hand)"))
-            dlg.close()
 
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            use = ui.button(_("Use this venue"), icon="check", on_click=ok).mark("venue-use")
-            use.set_enabled(False)
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
-    search()
+        use = actions(dlg, _("Use this venue"), ok, icon="check", mark="venue-use")
+        use.set_enabled(False)
+        search()
 
 
 def open_details(panel: PublicationsPanel, s: PubStat, tab: str = "publication") -> None:
-    with (
-        panel.dialogs,
-        ui.dialog() as dlg,
-        ui.card()
-        .classes("w-full max-w-4xl vr-details")
-        .style("max-height: 90vh; overflow-y: auto") as card,
-    ):
-        pass
-    show_details(panel, s, card, dlg.close, tab)
-    # Dialogs are built per click: drop them once closed.
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+    with panel.dialogs, transient_dialog(width="w-full max-w-4xl vr-details") as (dlg, card):
+        card.style("max-height: 90vh; overflow-y: auto")
+        show_details(panel, s, card, dlg.close, tab)
 
 
 def show_details(
@@ -860,19 +835,16 @@ def _stored_pdf(s: PubStat, done) -> None:
     def remove() -> None:
         def ok() -> None:
             pdfs.remove(s.id)
-            confirm.close()
             done(_("PDF removed"))
 
-        with ui.dialog() as confirm, ui.card():
-            ui.label(
-                _("Remove the stored PDF, with its annotations?")
-                if s.pdf == "edited"
-                else _("Remove the stored PDF?")
-            )
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=confirm.close).props("flat")
-                ui.button(_("Remove"), color="negative", on_click=ok).mark("remove-pdf-ok")
-        confirm.open()
+        confirm(
+            _("Remove the stored PDF, with its annotations?")
+            if s.pdf == "edited"
+            else _("Remove the stored PDF?"),
+            _("Remove"),
+            ok,
+            mark="remove-pdf-ok",
+        )
 
     ui.button(icon="delete_outline", on_click=remove).props("flat dense round size=sm").tooltip(
         _("Remove the stored PDF")
@@ -1248,8 +1220,7 @@ def author_search_links(name: str, title: str | None = None) -> list[tuple[str, 
 
 
 def _new_category(name: str, act) -> None:
-    with ui.dialog() as dlg, ui.card().classes("w-80"):
-        ui.label(_("New co-author category")).classes("text-lg")
+    with transient_dialog(_("New co-author category"), width="w-80") as (dlg, _card):
         cname = (
             ui.input(_("Name"), placeholder=_("e.g. Intl. collaborators"))
             .classes("w-full")
@@ -1257,11 +1228,10 @@ def _new_category(name: str, act) -> None:
         )
         colour = ColourInput(_("Colour"), value="#0969da").classes("w-full")
 
-        def save() -> None:
+        def save() -> bool | None:
             if not cname.value.strip():
-                return
+                return False
             cid = annotations.save_author_category(cname.value.strip(), colour.value)
-            dlg.close()
             act(
                 annotations.set_author_category,
                 name,
@@ -1270,11 +1240,7 @@ def _new_category(name: str, act) -> None:
                 msg=_("Added {name} to {category}").format(name=name, category=cname.value.strip()),
             )
 
-        with ui.row().classes("justify-end w-full"):
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Create"), on_click=save).mark("category-create")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+        actions(dlg, _("Create"), save, mark="category-create")
 
 
 class _Step:
@@ -1404,13 +1370,13 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
         }
     ) > 1 and (dm is None or dm.minor)
     picked: set[Key] = set()
-    actions: dict[str, ui.button] = {}
+    buttons: dict[str, ui.button] = {}
 
     def toggle(key: Key, on: bool) -> None:
         (picked.add if on else picked.discard)(key)
-        if actions:
-            actions["validate"].set_enabled(len(picked) == 1)
-            actions["merge"].set_enabled(len({k[0] for k in picked}) > 1)
+        if buttons:
+            buttons["validate"].set_enabled(len(picked) == 1)
+            buttons["merge"].set_enabled(len({k[0] for k in picked}) > 1)
 
     def validate() -> None:
         (key,) = picked
@@ -1418,7 +1384,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
         members = [m for m in groups[key] if m.id in used] or groups[key]
         m = pick_venue_member(members) or members[0]
         label = ADAPTERS[m.source].label
-        with ui.dialog() as confirm, ui.card():
+        with transient_dialog() as (dlg, _card):
             ui.label(_("Use “{venue}” for this paper?").format(venue=names.get(vid, "?"))).classes(
                 "font-medium"
             )
@@ -1446,13 +1412,8 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
             def ok() -> None:
                 annotations.set_venue_source(s.id, m.source)
                 done(_("Validated: the venue from {source}").format(source=label))
-                confirm.close()
 
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=confirm.close).props("flat")
-                ui.button(_("Validate"), on_click=ok).mark("confirm-validate")
-        confirm.on_value_change(lambda e: None if e.value else confirm.delete())
-        confirm.open()
+            actions(dlg, _("Validate"), ok, mark="confirm-validate")
 
     def explain_box(m: MemberView) -> None:
         """The cleaned text; a click shows how it was cleaned and matched."""
@@ -1609,12 +1570,12 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
                     explain_box(m)
         if several:
             with ui.row().classes("items-center gap-2"):
-                actions["validate"] = (
+                buttons["validate"] = (
                     ui.button(_("Validate for this paper"), icon="task_alt", on_click=validate)
                     .props("dense")
                     .mark("validate-source")
                 )
-                actions["merge"] = (
+                buttons["merge"] = (
                     ui.button(
                         _("Merge the selected venues"),
                         icon="merge",
@@ -1625,8 +1586,8 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
                     .props("dense outline")
                     .mark("merge-selected-venues")
                 )
-                actions["validate"].set_enabled(False)
-                actions["merge"].set_enabled(False)
+                buttons["validate"].set_enabled(False)
+                buttons["merge"].set_enabled(False)
         if preprints:
             ui.label(
                 ngettext(

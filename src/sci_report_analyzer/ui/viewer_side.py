@@ -14,6 +14,7 @@ from .. import annotations, categories, documents, folders, manual, pdftext, ref
 from ..i18n import N_, _
 from ..sources.base import SourceError
 from .categories_editor import categories_dialog
+from .dialogs import actions, close, confirm, ok_handler, transient_dialog
 from .mdedit import MarkdownEditor, quote
 from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
@@ -435,20 +436,22 @@ class Side:
             for s in stats
         }
 
-        def chosen(e) -> None:
-            if e.value:
-                dialog.close()
-                if (target := editor()) is not None:
-                    target.insert(f"[@{e.value}]")
+        def chosen(e) -> bool | None:
+            if not e.value:
+                return False
+            if (target := editor()) is not None:
+                target.insert(f"[@{e.value}]")
 
-        with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
+        with transient_dialog(width="w-[40rem] max-w-full") as (dialog, _card):
             ui.label(_("Cite a paper")).classes("font-medium")
             ui.select(
-                options, with_input=True, label=_("Title (type to search)"), on_change=chosen
+                options,
+                with_input=True,
+                label=_("Title (type to search)"),
+                on_change=ok_handler(dialog, chosen),
             ).props("dense outlined autofocus options-dense").classes("w-full").mark(
                 f"{mark}-cite-paper"
             )
-        dialog.open()
 
     def tab_of(self, editor: MarkdownEditor) -> str:
         """The tab a notes' editor is in."""
@@ -607,7 +610,7 @@ def bookmarks_section(kind: str, key: int) -> Callable[[], None]:
 
     def rename(i: int) -> None:
         marks = documents.bookmarks(kind, key)
-        with ui.dialog() as dlg, ui.card().classes("w-96"):
+        with transient_dialog(width="w-96") as (dlg, _card):
             name = (
                 ui.input(_("Name"), value=marks[i]["name"]).classes("w-full").mark("bookmark-name")
             )
@@ -616,15 +619,10 @@ def bookmarks_section(kind: str, key: int) -> Callable[[], None]:
                 if name.value.strip():
                     marks[i]["name"] = name.value.strip()
                     documents.set_bookmarks(kind, key, marks)
-                dlg.close()
                 listing.refresh()
 
-            name.on("keydown.enter", ok)
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                ui.button(_("Rename"), on_click=ok).mark("bookmark-rename-ok")
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+            name.on("keydown.enter", ok_handler(dlg, ok))
+            actions(dlg, _("Rename"), ok, mark="bookmark-rename-ok")
 
     listing()
     return listing.refresh
@@ -635,20 +633,22 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
     or to link the selection to), else on HAL (to add)."""
     item = documents.selection_item(text)
     state: dict = {"found": None}
-    with side.host.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-2xl"):
-        ui.label(_("Find the paper")).classes("text-lg font-medium")
+    with (
+        side.host.dialogs,
+        transient_dialog(_("Find the paper"), width="w-full max-w-2xl") as (dlg, _card),
+    ):
         ui.label(reflist.label(item, 300)).classes("text-sm text-grey").mark("find-text")
         busy = ui.spinner(size="sm")
         busy.visible = False
 
         def show(pub_id: int) -> None:
-            dlg.close()
             side.show_paper(pub_id)
+            close(dlg)
 
         def link(pub_id: int) -> None:
-            dlg.close()
             assert side.link is not None and page is not None
             side.link(pub_id, page, rects, text)
+            close(dlg)
 
         @ui.refreshable
         def body() -> None:
@@ -726,10 +726,7 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
             body.refresh()
 
         body()
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Close"), on_click=dlg.close).props("flat")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+        actions(dlg, cancel=_("Close"))
 
 
 def excerpt_properties(
@@ -841,14 +838,11 @@ def category_picker(
     ``merge``: or merge it with an excerpt (called with it, and whether only its place is
     cited), the similar ones shown with a warning."""
     folder_id, folder_name = side.folder
-    with side.host.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-        ui.label(_(title)).classes("text-lg font-medium")
+    with side.host.dialogs, transient_dialog(_(title), width="w-full max-w-xl") as (dlg, _card):
         short = text if len(text) <= 300 else text[:299] + "…"
         ui.label(f"“{' '.join(short.split())}”").classes("text-sm text-grey").mark("excerpt-text")
         if merge is not None and side.period_id is not None:
-            similar_excerpts(
-                side, text, lambda lead, ref_only: (dlg.close(), merge(lead, ref_only))
-            )
+            similar_excerpts(side, text, lambda lead, ref_only: (merge(lead, ref_only), close(dlg)))
         props = excerpt_properties() if properties else dict
         search = (
             ui.input(
@@ -870,9 +864,9 @@ def category_picker(
             if cat_id == current:
                 return
             chosen(cat_id, **props())
-            dlg.close()
             name = next((n.path for n in categories.tree(folder_id) if n.id == cat_id), "")
             ui.notify(_(done).format(category=name))
+            close(dlg)
 
         @ui.refreshable
         def listing() -> None:
@@ -939,8 +933,6 @@ def category_picker(
             ).mark("category-create")
             ui.space()
             ui.button(_("Close"), on_click=dlg.close).props("flat").mark("category-close")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
 
 
 def categories_section(side: Side) -> Callable[[], None]:
@@ -1187,7 +1179,7 @@ def categories_section(side: Side) -> Callable[[], None]:
         if not docs:
             ui.notify(_("No excerpt from a document yet"))
             return
-        with side.host.dialogs, ui.dialog() as dlg, ui.card().classes("w-[32rem]"):
+        with side.host.dialogs, transient_dialog(width="w-[32rem]") as (dlg, _card):
             ui.label(_("Names of the documents")).classes("font-medium")
             ui.label(_("As cited in the copied excerpts: %% Application, p. 4 %%")).classes(
                 "text-sm text-grey"
@@ -1200,14 +1192,9 @@ def categories_section(side: Side) -> Callable[[], None]:
             def ok() -> None:
                 for i, field in inputs:
                     documents.rename(i, field.value)
-                dlg.close()
                 side.refresh_excerpts()
 
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                ui.button(_("Save"), on_click=ok).mark("doc-names-ok")
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+            actions(dlg, _("Save"), ok, mark="doc-names-ok")
 
     def merge_mode(e: categories.ExcerptView | None) -> None:
         state["merging"] = e
@@ -1222,7 +1209,6 @@ def categories_section(side: Side) -> Callable[[], None]:
             return
 
         def yes() -> None:
-            dialog.close()
             if why := categories.merge_excerpts(source.id, target.id, ref_only=bool(mode.value)):
                 ui.notify(why, type="warning")
             side.refresh_excerpts()
@@ -1230,7 +1216,9 @@ def categories_section(side: Side) -> Callable[[], None]:
         def short(t: str) -> str:
             return t if len(t) <= 80 else t[:79] + "…"
 
-        with side.host.dialogs, ui.dialog() as dialog, ui.card():
+        with side.host.dialogs, transient_dialog() as (dialog, _card):
+            # Closed: out of the merge mode.
+            dialog.on_value_change(lambda ev: None if ev.value else listing.refresh())
             ui.label(
                 _("Merge “{first}” with “{second}”?").format(
                     first=short(source.text), second=short(target.text)
@@ -1254,28 +1242,21 @@ def categories_section(side: Side) -> Callable[[], None]:
                 .props("dense")
                 .mark("excerpt-merge-mode")
             )
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dialog.close).props("flat")
-                ui.button(_("Merge"), on_click=yes).mark("excerpt-merge-confirm")
-        dialog.on("hide", lambda: (dialog.delete(), listing.refresh()))
-        dialog.open()
+            actions(dialog, _("Merge"), yes, mark="excerpt-merge-confirm")
 
     def remove(e: categories.ExcerptView) -> None:
         def yes() -> None:
             categories.remove_excerpt(e.id)
-            dialog.close()
             side.refresh_excerpts()
 
         short = e.text if len(e.text) <= 120 else e.text[:119] + "…"
-        with side.host.dialogs, ui.dialog() as dialog, ui.card():
-            ui.label(_("Remove the excerpt “{text}”?").format(text=short))
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dialog.close).props("flat")
-                ui.button(_("Remove"), on_click=yes).props("color=negative").mark(
-                    "excerpt-remove-confirm"
-                )
-        dialog.on("hide", dialog.delete)
-        dialog.open()
+        with side.host.dialogs:
+            confirm(
+                _("Remove the excerpt “{text}”?").format(text=short),
+                _("Remove"),
+                yes,
+                mark="excerpt-remove-confirm",
+            )
 
     def move(e: categories.ExcerptView) -> None:
         def to(cat_id: int, **_props) -> None:
@@ -1332,8 +1313,12 @@ def categories_section(side: Side) -> Callable[[], None]:
     def edit_excerpt(e: categories.ExcerptView) -> None:
         """Its text (that of a group), years and "influence" flag; the passages as selected
         shown."""
-        with side.host.dialogs, ui.dialog() as dialog, ui.card().classes("w-[32rem]"):
-            ui.label(_("Merged excerpts") if e.members else _("Excerpt")).classes("text-lg")
+        with (
+            side.host.dialogs,
+            transient_dialog(
+                _("Merged excerpts") if e.members else _("Excerpt"), width="w-[32rem]"
+            ) as (dialog, _card),
+        ):
             text = (
                 ui.textarea(_("Text of the group") if e.members else _("Text"), value=e.quoted)
                 .props("outlined autogrow")
@@ -1356,14 +1341,9 @@ def categories_section(side: Side) -> Callable[[], None]:
                     edited = " ".join((text.value or "").split())
                     categories.set_group_text(e.id, None if edited == joined else edited)
                 categories.update_excerpt(e.id, text=None if e.members else text.value, **props())
-                dialog.close()
                 side.refresh_excerpts()
 
-            with ui.row().classes("w-full justify-end"):
-                ui.button(_("Cancel"), on_click=dialog.close).props("flat")
-                ui.button(_("Save"), on_click=save).mark("excerpt-edit-save")
-        dialog.on_value_change(lambda ev: None if ev.value else dialog.delete())
-        dialog.open()
+            actions(dialog, _("Save"), save, mark="excerpt-edit-save")
 
     listing()
     return listing.refresh

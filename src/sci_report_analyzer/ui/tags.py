@@ -12,6 +12,7 @@ from .. import annotations
 from ..db.models import Tag
 from ..i18n import _
 from .colours import ColourInput
+from .dialogs import transient_dialog
 from .mdedit import MarkdownEditor
 from .theme import chip_style, chip_text, span
 
@@ -93,13 +94,11 @@ def tags_section(on_change: Callable[[], None] | None = None) -> None:
 
 
 def tags_dialog(on_change: Callable[[], None]) -> None:
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-2xl"):
+    with transient_dialog(width="w-full max-w-2xl") as (dlg, _card):
         with ui.row().classes("w-full items-center justify-between"):
             ui.label(_("Tags")).classes("text-lg font-medium")
             ui.button(icon="close", on_click=dlg.close).props("flat round")
         tags_section(on_change)
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
 
 
 def note_editor(

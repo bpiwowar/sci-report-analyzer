@@ -11,6 +11,7 @@ from nicegui import app, ui
 
 from .. import folders, reports
 from ..i18n import N_, _
+from .dialogs import ok_handler, transient_dialog
 from .mdedit import MarkdownEditor
 from .tags import note_editor
 
@@ -76,25 +77,21 @@ def folder_notes_editor(
 
     def confirm_clear() -> None:
         def clear() -> None:
-            dlg.close()
             if not holder[0].value.strip() and store(""):  # (unless typed since)
                 holder[0].adopt("")
 
         def restore() -> None:
-            dlg.close()
             holder[0].adopt(base["text"])
 
-        with holder[0].box, ui.dialog().props("persistent") as dlg, ui.card():
+        with holder[0].box, transient_dialog(persistent=True) as (dlg, _card):
             ui.label(_("Clear all the notes of the folder on this person?"))
             with ui.row().classes("justify-end w-full"):
-                ui.button(_("Restore them"), on_click=restore).props("flat").mark(
+                ui.button(_("Restore them"), on_click=ok_handler(dlg, restore)).props("flat").mark(
                     "folder-note-restore"
                 )
-                ui.button(_("Clear the notes"), on_click=clear).props("flat color=negative").mark(
-                    "folder-note-clear"
-                )
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+                ui.button(_("Clear the notes"), on_click=ok_handler(dlg, clear)).props(
+                    "flat color=negative"
+                ).mark("folder-note-clear")
 
     editor = note_editor(
         _("Notes of the folder"),

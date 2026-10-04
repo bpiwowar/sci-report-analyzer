@@ -34,6 +34,7 @@ from ..ranking import tracks
 from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR
 from ..ranking.kinds import KIND_SHORT
 from ..sources import ADAPTERS
+from .dialogs import actions, ok_handler, transient_dialog
 from .pdf_viewer import download_dialog, pdf_button, watch
 from .pub_details import open_details, source_badge
 from .reflist import tag_from_list
@@ -706,8 +707,10 @@ class PublicationsPanel:
 
     def _add_publication(self) -> None:
         """A paper the sources miss, by its DOI or its HAL id (or their URLs)."""
-        with self.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
-            ui.label(_("Add a publication")).classes("text-lg font-medium")
+        with (
+            self.dialogs,
+            transient_dialog(_("Add a publication"), width="w-full max-w-xl") as (dlg, _card),
+        ):
             ui.label(
                 _(
                     "Its record is fetched and merged with the other sources' (listed in the "
@@ -726,27 +729,23 @@ class PublicationsPanel:
             busy = ui.spinner(size="sm")
             busy.visible = False
 
-            async def add() -> None:
+            async def add() -> bool:
                 if busy.visible:
-                    return
+                    return False
                 busy.visible = True
                 try:
                     title = await manual.add_publication(self.person_id, ref.value or "")
                 except ValueError as e:
                     ui.notify(str(e), type="warning")
-                    return
+                    return False
                 finally:
                     busy.visible = False
                 ui.notify(_("Added: {title}").format(title=title))
-                dlg.close()
                 await self.reload()
+                return True
 
-            ref.on("keydown.enter", add)
-            with ui.row().classes("w-full justify-end items-center"):
-                ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-                ui.button(_("Add"), icon="add", on_click=add).mark("add-publication-ok")
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
+            ref.on("keydown.enter", ok_handler(dlg, add))
+            actions(dlg, _("Add"), add, icon="add", mark="add-publication-ok")
 
     def _summary(self, rows: list[PubStat]) -> None:
         """The publications shown, by kind of venue and category with their venues and years.
@@ -763,8 +762,10 @@ class PublicationsPanel:
         for c in cats:
             levels.setdefault(c.key, default)
         other = _("Other")
-        with self.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
-            ui.label(_("Summary")).classes("text-lg font-medium")
+        with (
+            self.dialogs,
+            transient_dialog(_("Summary"), width="w-full max-w-3xl") as (dlg, _card),
+        ):
             with ui.row().classes("w-full items-center gap-1"):
                 ui.label(_("Kinds:")).classes("text-sm text-grey w-24")
                 kind_boxes = {
@@ -894,8 +895,6 @@ class PublicationsPanel:
                 ).props("flat dense")
                 ui.button(_("Close"), on_click=dlg.close).props("flat dense")
             fill()
-        dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-        dlg.open()
 
     def _distribution(self, rows: list[PubStat], cats, sels: list[Sel]) -> None:
         total = len(rows)

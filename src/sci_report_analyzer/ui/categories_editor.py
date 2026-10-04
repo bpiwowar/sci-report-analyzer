@@ -10,6 +10,7 @@ from nicegui import ui
 from .. import categories, folders
 from ..i18n import _, ngettext
 from .colours import ColourMenu
+from .dialogs import actions, transient_dialog
 
 # Drag and drop: where a category is dropped (onto the top / middle / bottom of another).
 _WHERE = (
@@ -56,8 +57,9 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
         if changed:
             changed()
 
-    with ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
-        ui.label(_("Categories of {folder}").format(folder=name)).classes("text-lg font-medium")
+    with transient_dialog(
+        _("Categories of {folder}").format(folder=name), width="w-full max-w-3xl"
+    ) as (dlg, _card):
         ui.label(
             _(
                 "Excerpts of the people's documents (a passage selected in a PDF) are filed in "
@@ -183,7 +185,7 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
             count = categories.excerpt_count(n.id)
             within = set(categories.subtree(n.id))
             targets = {c.id: c.path for c in categories.tree(folder_id) if c.id not in within}
-            with ui.dialog() as confirm, ui.card().classes("max-w-lg"):
+            with transient_dialog(width="max-w-lg") as (confirm, _card):
                 if not count:
                     ui.label(
                         _("Delete “{name}” and its subcategories?").format(name=n.name)
@@ -209,26 +211,23 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                             "text-sm text-grey"
                         )
 
-                def ok() -> None:
+                def ok() -> bool | None:
                     if count:
                         if not target.value:
                             ui.notify(_("Choose where to move them"), type="warning")
-                            return
+                            return False
                         categories.move_excerpts(n.id, target.value)
                     if not categories.delete(n.id):
                         ui.notify(_("Excerpts were filed there meanwhile"), type="warning")
-                    confirm.close()
                     done()
 
-                with ui.row().classes("w-full justify-end"):
-                    ui.button(_("Cancel"), on_click=confirm.close).props("flat")
-                    ui.button(
-                        _("Move, then delete") if count else _("Delete"),
-                        color="negative",
-                        on_click=ok,
-                    ).mark("category-delete-ok")
-            confirm.on_value_change(lambda e: None if e.value else confirm.delete())
-            confirm.open()
+                actions(
+                    confirm,
+                    _("Move, then delete") if count else _("Delete"),
+                    ok,
+                    danger=True,
+                    mark="category-delete-ok",
+                )
 
         with ui.column().classes("w-full gap-0 max-h-[60vh] overflow-auto"):
             listing()
@@ -275,5 +274,3 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                 ).mark("category-copy")
             ui.space()
             ui.button(_("Close"), on_click=dlg.close).props("flat")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
