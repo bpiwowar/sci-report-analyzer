@@ -7,12 +7,9 @@ from datetime import date
 from html import escape
 
 from nicegui import background_tasks, ui
-from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 
-from .. import annotations, folders, manual, pubview, source_settings
-from ..db.models import Person, Publication
-from ..db.session import session_scope
+from .. import annotations, folders, manual, persons, pubview, source_settings
+from ..db.models import Person
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
 from ..sync import any_running, discover, is_syncing, start_sync
@@ -24,27 +21,8 @@ from .person import purge_dialog, remove_from_folder_dialog
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
 
-def _people() -> list[tuple[Person, int]]:
-    with session_scope() as s:
-        counts = dict(
-            s.execute(
-                select(Publication.person_id, func.count())
-                .where(Publication.missing.is_(False))
-                .group_by(Publication.person_id)
-            ).all()
-        )
-        people = list(
-            s.scalars(select(Person).options(selectinload(Person.links)).order_by(Person.name))
-        )
-        return [(p, counts.get(p.id, 0)) for p in people]
-
-
 async def _create(name: str, affiliation: str, folder_id: int | None = None) -> None:
-    with session_scope() as s:
-        person = Person(name=name.strip(), affiliation=affiliation.strip() or None)
-        s.add(person)
-        s.flush()
-        pid = person.id
+    pid = persons.create(name, affiliation)
     if folder_id:
         folders.add_person(folder_id, pid)
     ui.notify(_("Searching sources for {name}…").format(name=name))
@@ -175,7 +153,7 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
 
 def _sync(person_ids: list[int] | None) -> None:
     started = 0
-    for person, _status in _people():
+    for person, _status in persons.people_with_counts():
         if person_ids is not None and person.id not in person_ids:
             continue
         if any(ln.is_stale or ln.sync_state == "error" for ln in person.links):
@@ -266,7 +244,7 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
         ).props("dense outlined use-chips clearable").classes("w-80").mark(
             f"folder-tag-filter-{folder_id}"
         )
-    people = {p.id: (p, n) for p, n in _people()}
+    everyone = {p.id: (p, n) for p, n in persons.people_with_counts()}
     years = pubview.problem_years(m.person_id for m in f.members)
     problems = {
         m.person_id: pubview.count_in_period(years[m.person_id], m.start_year, m.end_year)
@@ -283,9 +261,9 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
         ).classes("text-sm text-orange-9").tooltip(_(_PROBLEMS_TIP)).mark("folder-problems")
     with ui.grid(columns="repeat(auto-fill, minmax(340px, 1fr))").classes("w-full"):
         for m in f.members:
-            if m.person_id in people and set(only) <= set(m.tags):
+            if m.person_id in everyone and set(only) <= set(m.tags):
                 _card(
-                    *people[m.person_id],
+                    *everyone[m.person_id],
                     member=m,
                     folder_id=f.id,
                     problems=problems.get(m.person_id),

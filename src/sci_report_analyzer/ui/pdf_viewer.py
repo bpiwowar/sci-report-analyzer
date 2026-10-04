@@ -17,9 +17,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import Client, app, background_tasks, ui
 
-from .. import annotations, documents, livereload, pdfs, pdftext
-from ..db.models import Publication
-from ..db.session import session_scope
+from .. import annotations, documents, livereload, pdfs, pdftext, persons
 from ..i18n import N_, _, ngettext
 from .dialogs import transient_dialog
 from .theme import APP_NAME, bare_page
@@ -852,9 +850,8 @@ def gone(element: ui.element) -> bool:
 
 
 def _title(pub_id: int) -> tuple[str, int] | None:
-    with session_scope() as s:
-        pub = s.get(Publication, pub_id)
-        return (pub.title or _("(untitled)"), pub.person_id) if pub else None
+    found = persons.paper(pub_id)
+    return (found[0] or _("(untitled)"), found[1]) if found else None
 
 
 def register() -> None:

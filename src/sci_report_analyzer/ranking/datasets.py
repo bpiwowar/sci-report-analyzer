@@ -411,3 +411,26 @@ def jcr_rows_from_csv(text: str) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def jcr_count() -> int:
+    """The number of JCR rows imported."""
+    from sqlalchemy import func, select
+
+    from ..db.models import JcrRecord
+    from ..db.session import session_scope
+
+    with session_scope() as s:
+        return s.scalar(select(func.count()).select_from(JcrRecord)) or 0
+
+
+def import_jcr(rows: list[dict]) -> None:
+    """JCR rows (``jcr_rows_from_csv``) instead of those imported before."""
+    from sqlalchemy import delete
+
+    from ..db.models import JcrRecord
+    from ..db.session import session_scope
+
+    with session_scope() as s:
+        s.execute(delete(JcrRecord))
+        s.add_all(JcrRecord(data=r) for r in rows)

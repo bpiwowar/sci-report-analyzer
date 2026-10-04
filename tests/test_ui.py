@@ -2678,3 +2678,23 @@ def test_cleaning_rules_origin_order_and_impact() -> None:
     venue_match.refresh()
     [(m, key)] = venue_match.key_changes([*rules, added])
     assert (m.raw, key) == ("Neural Journal", "neural")
+
+
+def test_persons_core() -> None:
+    from sci_report_analyzer import persons
+    from sci_report_analyzer.ranking import datasets
+
+    pid = persons.create(" Jane Doe ", "")
+    persons.update(pid, name="Jane Doe", affiliation=" Lab ", aliases=["J. Doe", " "], notes="")
+    p = persons.load(pid)
+    assert (p.name, p.affiliation, p.aliases, p.notes) == ("Jane Doe", "Lab", ["J. Doe"], None)
+    link = add_source(pid, "thesesfr", "jd", theses=[thesis("t1", "director", "On ranking")])
+    assert persons.link_id(pid, "thesesfr", "jd") == link
+    assert persons.students(pid) == ["A Student"]
+    persons.save_student_aliases(pid, {"A Student": ["A. Student"], "Other": []})
+    assert persons.student_aliases(pid) == {"A Student": ["A. Student"]}
+    who = persons.names(pid)
+    assert (who.name, who.aliases, who.students) == ("Jane Doe", {"J. Doe"}, ["A Student"])
+    assert [(q.id, n) for q, n in persons.people_with_counts()] == [(pid, 0)]
+    datasets.import_jcr([{"journal": "Neural Journal"}])
+    assert datasets.jcr_count() == 1
