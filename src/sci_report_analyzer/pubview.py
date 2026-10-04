@@ -710,6 +710,81 @@ class PeopleIndex:
         return marks, notes
 
 
+@dataclass
+class _PaperMaps:
+    """A person's papers' tag numbers, and their tags, numbers and notes within periods
+    (by paper, then period)."""
+
+    numbers: dict[int, dict[int, int]] = field(default_factory=dict)
+    tags: dict[int, dict[int, set[int]]] = field(default_factory=dict)
+    period_numbers: dict[int, dict[int, dict[int, int]]] = field(default_factory=dict)
+    notes: dict[int, dict[int, str]] = field(default_factory=dict)
+
+
+def _period_maps(s, person_id: int) -> _PaperMaps:
+    out = _PaperMaps()
+    for pt in s.scalars(
+        select(PublicationTag)
+        .join(Publication)
+        .where(Publication.person_id == person_id, PublicationTag.number.is_not(None))
+    ):
+        out.numbers.setdefault(pt.publication_id, {})[pt.tag_id] = pt.number
+    for period in s.scalars(
+        select(Period)
+        .where(Period.person_id == person_id)
+        .options(selectinload(Period.paper_notes))
+    ):
+        for pt in period.paper_tags:
+            out.tags.setdefault(pt.publication_id, {}).setdefault(period.id, set()).add(pt.tag_id)
+            if pt.number is not None:
+                out.period_numbers.setdefault(pt.publication_id, {}).setdefault(period.id, {})[
+                    pt.tag_id
+                ] = pt.number
+        for pn in period.paper_notes:
+            out.notes.setdefault(pn.publication_id, {})[period.id] = pn.text
+    return out
+
+
+async def _paper_badge(
+    pub: Publication,
+    kind: str,
+    badge: Badge | None,
+    venue: Venue | None,
+    venues: dict[int, Venue],
+    year: int | None,
+) -> tuple[Badge | None, Venue | None]:
+    """A paper's badge given its kind (none for an edited volume, a workshop's main
+    conference's, the kind's default level when unranked), and a workshop's main
+    conference."""
+    host = None
+    if kind in UNRANKED_KINDS and not pub.rank_override:
+        badge = None  # an edited volume: not a paper of its venue
+    if kind in WORKSHOP_KINDS and not pub.rank_override and not _has_decision(venue):
+        badge, host = await workshop_badge(venue, year, venues)
+    if (
+        not pub.rank_override
+        and not is_ranked(badge)
+        and (level := service.settings.kind_levels.get(kind))
+    ):
+        # Default level of the kind (e.g. every national conference is "C").
+        vtype = "conference" if kind in CONFERENCE_LIKE else "journal"
+        name = venue.name if venue else None
+        badge = badge_from_level({"type": vtype, "rank": level, "name": name})
+        badge.extra["kind_default"] = kind
+    return badge, host
+
+
+def _auto_track(
+    best: MemberView | None, validated: bool, views: list[MemberView], badge: Badge | None
+) -> str | None:
+    """The track of the source whose venue is used (a track wins over none, unless the
+    source without is validated by hand; different tracks: a disagreement)."""
+    found = (
+        (best.eff_track if validated else track_of(best, venue_members(views))) if best else None
+    )
+    return found or (FINDINGS_ID if badge and badge.findings else None)
+
+
 async def load_stats(person_id: int) -> list[PubStat]:
     venue_match.refresh()  # venue texts of newly synced records
     texts = venue_match.matches()
@@ -731,31 +806,7 @@ async def load_stats(person_id: int) -> list[PubStat]:
         person = s.get(Person, person_id)
         people = PeopleIndex.for_person(s, person)
         pending_links: dict[int, int] = {}
-        period_tags: dict[int, dict[int, set[int]]] = {}
-        period_notes: dict[int, dict[int, str]] = {}
-        period_numbers: dict[int, dict[int, dict[int, int]]] = {}
-        numbers: dict[int, dict[int, int]] = {}
-        for pt in s.scalars(
-            select(PublicationTag)
-            .join(Publication)
-            .where(Publication.person_id == person_id, PublicationTag.number.is_not(None))
-        ):
-            numbers.setdefault(pt.publication_id, {})[pt.tag_id] = pt.number
-        for period in s.scalars(
-            select(Period)
-            .where(Period.person_id == person_id)
-            .options(selectinload(Period.paper_notes))
-        ):
-            for pt in period.paper_tags:
-                period_tags.setdefault(pt.publication_id, {}).setdefault(period.id, set()).add(
-                    pt.tag_id
-                )
-                if pt.number is not None:
-                    period_numbers.setdefault(pt.publication_id, {}).setdefault(period.id, {})[
-                        pt.tag_id
-                    ] = pt.number
-            for pn in period.paper_notes:
-                period_notes.setdefault(pn.publication_id, {})[period.id] = pn.text
+        maps = _period_maps(s, person_id)
         out: list[PubStat] = []
         for i, pub in enumerate(pubs):
             if i % 50 == 49:
@@ -784,37 +835,18 @@ async def load_stats(person_id: int) -> list[PubStat]:
                 # Linked after the loop, in a short write transaction (SQLite has a single
                 # writer; resolutions write the cache meanwhile).
                 pending_links[pub.id] = venue.id if venue else None
-            host = None
-            if kind in UNRANKED_KINDS and not pub.rank_override:
-                badge = None  # an edited volume: not a paper of its venue
-            if kind in WORKSHOP_KINDS and not pub.rank_override and not _has_decision(venue):
-                badge, host = await workshop_badge(venue, pub.year_override or pub.year, venues)
-            if (
-                not pub.rank_override
-                and not is_ranked(badge)
-                and (level := service.settings.kind_levels.get(kind))
-            ):
-                # Default level of the kind (e.g. every national conference is "C").
-                vtype = "conference" if kind in CONFERENCE_LIKE else "journal"
-                name = venue.name if venue else None
-                badge = badge_from_level({"type": vtype, "rank": level, "name": name})
-                badge.extra["kind_default"] = kind
+            year = pub.year_override or pub.year
+            badge, host = await _paper_badge(pub, kind, badge, venue, venues, year)
             text = best.venue if best else None
-            # The track of the source whose venue is used (a track wins over none, unless
-            # the source without is validated by hand; different tracks: a disagreement).
             validated = best is not None and best.source == pub.venue_source
-            auto_track = (
-                (best.eff_track if validated else track_of(best, venue_members(views)))
-                if best
-                else None
-            ) or (FINDINGS_ID if badge and badge.findings else None)
+            auto_track = _auto_track(best, validated, views, badge)
             # Set by hand, it wins (the main track: none).
             override = pub.track_override
             track = (None if override == MAIN else override) if override else auto_track
             pos, num, authors, pos_exact = _authorship(members)
             if pub.author_pos_override is not None:  # (0: the order does not matter)
                 pos, pos_exact = pub.author_pos_override, True
-            marks, notes = people.marks(authors, pos, pos_exact, pub.year_override or pub.year)
+            marks, notes = people.marks(authors, pos, pos_exact, year)
             if pub.author_pos_override is None:
                 for m in ("owner", "owner?"):
                     if m in marks:
@@ -841,7 +873,7 @@ async def load_stats(person_id: int) -> list[PubStat]:
                 PubStat(
                     id=pub.id,
                     title=pub.title,
-                    year=pub.year_override or pub.year,
+                    year=year,
                     badge=badge,
                     track=track,
                     category=category_of(badge, track, kind),
@@ -874,15 +906,15 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     track_override=override,
                     auto_track=auto_track,
                     tags={tg.id for tg in pub.tags},
-                    period_tags=period_tags.get(pub.id, {}),
-                    period_notes=period_notes.get(pub.id, {}),
-                    numbers=numbers.get(pub.id, {}),
+                    period_tags=maps.tags.get(pub.id, {}),
+                    period_notes=maps.notes.get(pub.id, {}),
+                    numbers=maps.numbers.get(pub.id, {}),
                     pdf=None
                     if pub.id not in stored_pdfs
                     else "edited"
                     if stored_pdfs[pub.id]
                     else "stored",
-                    period_numbers=period_numbers.get(pub.id, {}),
+                    period_numbers=maps.period_numbers.get(pub.id, {}),
                     venue_short=None
                     if archival_only or no_venue
                     else venue.short_name
