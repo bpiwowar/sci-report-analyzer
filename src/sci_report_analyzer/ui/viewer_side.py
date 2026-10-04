@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from nicegui import ui
 
-from .. import categories, documents, folders, manual, reflist, reports
+from .. import annotations, categories, documents, folders, manual, reflist, reports
 from ..i18n import N_, _
 from ..sources.base import SourceError
 from .mdedit import MarkdownEditor, quote
@@ -249,6 +249,33 @@ class Side:
             ),
             toolbar=lambda: self.quote_tool(lambda: self.folder_editor, first=True),
         )
+
+    def cite_hint(self, s: PubStat) -> str:
+        """The hover of a paper cited in the PDF: what clicking does, and (in a folder) its
+        tags there."""
+        lines = [
+            s.title or _("(untitled)"),
+            _("Click: details · Shift-click: cite in the notes"),
+        ]
+        if self.folder:
+            names = {t.id: t.name for t in annotations.all_tags()}
+            tags = sorted(names[t] for t in s.tags_in(self.period_id) if t in names)
+            lines.append(
+                _("In {folder}: {tags}").format(folder=self.folder[1], tags=", ".join(tags))
+                if tags
+                else _("In {folder}: no tag").format(folder=self.folder[1])
+            )
+        return "\n".join(lines)
+
+    def cite(self, pub_id: int) -> None:
+        """Insert the citation of a paper (``[@key]``) in the notes last used, at the cursor."""
+        notes = [e for e in self.notes if not e.editor.is_deleted]
+        key = reports.citation_keys(self.stats).get(pub_id)
+        if not notes or key is None:
+            ui.notify(_("No notes to cite in"), type="warning")
+            return
+        self.select("notes")
+        notes[0].insert(f"[@{key}]")
 
     def source_link(self, page: int | None) -> tuple[str, str]:
         """(short name, url at ``page``) of the PDF shown: where a quote in the folder's notes

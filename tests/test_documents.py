@@ -209,6 +209,19 @@ async def test_document_page(user: User, monkeypatch, tmp_path):
     # The preview numbers the citations.
     user.find(marker="doc-note").elements.pop().value = "See [@anon2022neural]."
     await user.should_see("See [1].")
+    # Shift-click on a citation in the PDF: cited in the notes last used, at the cursor.
+    inserted = []
+    monkeypatch.setattr(MarkdownEditor, "insert", lambda self, text: inserted.append(text))
+    layout = user.client.layout
+    [(listener, _ev)] = [
+        (i, ls) for i, ls in layout._event_listeners.items() if ls.type == "vrDocPaper"
+    ]
+    layout._handle_event({"listener_id": listener, "args": {"i": 0, "cite": True}})
+    await user.should_see(marker="doc-note")
+    assert len(inserted) == 1 and re.fullmatch(r"\[@anon\d{4}\w+\]", inserted[0])
+    layout._handle_event({"listener_id": listener, "args": {"i": 0}})  # (plain click: details)
+    await user.should_see(marker="pdf-details")
+    assert len(inserted) == 1
 
 
 async def test_bookmarks_and_selection(user: User, monkeypatch, tmp_path):
