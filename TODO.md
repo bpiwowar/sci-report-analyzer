@@ -41,3 +41,11 @@ highlight so that the two don't conflict (overlapping marks).
 
 If the bundled PDF.js supports it, enable its "note" (comment) annotation tool along with
 highlighting (check the PDF.js version and its editor modes / `annotationEditorMode`).
+
+## PDF viewer: the editor pane
+
+- Resizable layout: drag the separator between the editor pane (notes, excerpts…) and the
+  PDF display (remember the split).
+- One editor per folder, not per document: several documents are annotated, but the notes
+  are a single text. A quote then names its source document explicitly (e.g. its title
+  or a short reference with the page, linking back to the place in that PDF).
