@@ -5,22 +5,57 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from html import escape
+from typing import TYPE_CHECKING
 
 from nicegui import ui
 
 from .. import annotations
 from ..db.models import Tag
 from ..i18n import _
+from ..pubview import tag_order
 from .colours import ColourInput
 from .mdedit import MarkdownEditor
 from .theme import chip_style, chip_text, span
 
+if TYPE_CHECKING:
+    from ..db.models import Period
+    from ..pubview import PubStat
+
 DEFAULT_COLOUR = "#0969da"
 
+# Drag and drop of the papers of a tag (ordering them): dropped before / after another one
+# (its top / bottom half). Their own type of data: not text, dropped into an editor.
+_PAPER = "application/x-vr-paper"
+_WHERE = (
+    "const r = e.currentTarget.getBoundingClientRect();"
+    " const w = e.clientY - r.top < r.height / 2 ? 'before' : 'after';"
+)
+_DRAG = (
+    "(e) => { e.stopPropagation(); e.dataTransfer.setData('" + _PAPER + "', '%d');"
+    " e.dataTransfer.effectAllowed = 'move'; }"
+)
+_OVER = (
+    "(e) => { if (!e.dataTransfer.types.includes('" + _PAPER + "')) return;"
+    " e.preventDefault(); " + _WHERE + " e.currentTarget.style.boxShadow = w === 'before'"
+    " ? 'inset 0 2px 0 #1976d2' : 'inset 0 -2px 0 #1976d2'; }"
+)
+_LEAVE = "(e) => { e.currentTarget.style.boxShadow = 'none'; }"
+_DROP = (
+    "(e) => { const d = e.dataTransfer.getData('" + _PAPER + "'); if (!d) return;"
+    " e.preventDefault(); " + _WHERE + " e.currentTarget.style.boxShadow = 'none';"
+    " emit({id: +d, where: w}); }"
+)
 
-def tag_chip(t: Tag, number: int | None = None) -> None:
-    """A tag, with the paper's number in the list it was put from."""
-    n = f" #{number}" if number is not None else ""
+
+def tag_chip(
+    t: Tag,
+    number: int | None = None,
+    on_number: Callable[[int | None], None] | None = None,
+    mark: str = "",
+) -> None:
+    """A tag, with the paper's number in the list it was put from (``on_number``: that
+    number edited by Alt-clicking it; a plain click goes on, e.g. to the paper's row)."""
+    n = f" #{number}" if number is not None and on_number is None else ""
     kind = _("tag within the period") if t.per_period else _("tag")
     span(
         f'<span class="vr-chip" style="background:{t.colour};color:{chip_text(t.colour)}">'
@@ -28,6 +63,297 @@ def tag_chip(t: Tag, number: int | None = None) -> None:
     ).tooltip(
         _("{tag}, number {number} in its list").format(tag=kind, number=number) if n else kind
     )
+    if on_number is not None and number is not None:
+        number_edit(number, on_number, mark=mark or f"tag-number-{t.id}", plain=False)
+
+
+def number_edit(
+    number: int | None,
+    save: Callable[[int | None], None],
+    *,
+    mark: str,
+    tip: str = "",
+    plain: bool | Callable[[], None] = True,
+    show: Callable[[int | None], ui.element] | None = None,
+) -> None:
+    """A paper's number within a tag ("#3"; "#": none), Alt-clicked: typed (Enter or leaving
+    it saves, Escape cancels, empty: no number). ``plain``: what a plain click does (True:
+    the same; False: nothing here, the click going on to what is around, e.g. a row opening
+    the paper's details; else that function, e.g. citing the paper); ``show``: what shows
+    the number (with its own mark and tooltip; else "#3", marked ``mark``)."""
+    box = ui.element("span").classes("vr-num inline-flex items-center")
+    state = {"number": number}
+    js = (
+        "(e) => { e.stopPropagation(); emit({altKey: e.altKey}); }"
+        if plain is not False
+        else "(e) => { if (!e.altKey) return; e.stopPropagation(); e.preventDefault();"
+        " emit({altKey: true}); }"
+    )
+
+    def clicked(e) -> None:
+        if (isinstance(e.args, dict) and e.args.get("altKey")) or plain is True:
+            edit()
+        elif callable(plain):
+            plain()
+
+    def display() -> None:
+        box.clear()
+        n = state["number"]
+        with box:
+            if show is not None:
+                shown = show(n)
+            else:
+                shown = (
+                    ui.label(f"#{n}" if n is not None else "#")
+                    .classes(
+                        "cursor-pointer text-sm px-1 rounded hover:bg-grey-3"
+                        + ("" if n is not None else " text-grey")
+                    )
+                    .tooltip(
+                        tip
+                        or (
+                            _("Its number in the tag's list (click to change it)")
+                            if plain is True
+                            else _("Its number in the tag's list (Alt-click to change it)")
+                        )
+                    )
+                    .mark(mark)
+                )
+            shown.on("click", clicked, js_handler=js)
+
+    def edit() -> None:
+        box.clear()
+        done = {"yes": False}
+        with box:
+            n = state["number"]
+            field = (
+                ui.input(value="" if n is None else str(n))
+                .props("dense autofocus hide-bottom-space input-class=text-sm")
+                .classes("w-14 vr-num-edit")
+                .tooltip(_("Enter: save · Escape: cancel · empty: no number"))
+                .mark(f"{mark}-input")
+            )
+
+        def commit() -> None:
+            if done["yes"]:
+                return
+            done["yes"] = True
+            text = (field.value or "").strip().lstrip("#").strip()
+            if text and not text.isdigit():
+                ui.notify(_("A number, please"), type="warning")
+                display()
+                return
+            value = int(text) if text else None
+            changed = value != state["number"]
+            state["number"] = value
+            display()
+            if changed:
+                save(value)
+
+        def cancel() -> None:
+            done["yes"] = True
+            display()
+
+        field.on("keydown.enter", commit)
+        field.on("blur", commit)
+        field.on("keydown.escape", cancel)
+
+    display()
+
+
+def _store(s: PubStat, tag: Tag, period_id: int | None, number: int | None) -> None:
+    """The paper's number within the tag, as loaded (the tag on it)."""
+    if tag.per_period:
+        s.period_tags.setdefault(period_id, set()).add(tag.id)
+        numbers = s.period_numbers.setdefault(period_id, {})
+    else:
+        s.tags.add(tag.id)
+        numbers = s.numbers
+    if number is None:
+        numbers.pop(tag.id, None)
+    else:
+        numbers[tag.id] = number
+
+
+def save_number(s: PubStat, tag: Tag, period_id: int | None, number: int | None) -> None:
+    """Set (None: remove) a paper's number within a tag, within the period for a per-period
+    tag."""
+    annotations.set_tag_number(s.id, tag.id, number, period_id if tag.per_period else None)
+    _store(s, tag, period_id, number)
+
+
+def save_order(rows: list[PubStat], tag: Tag, period_id: int | None) -> None:
+    """Number the papers of a tag 1, 2… in this order."""
+    where = period_id if tag.per_period else None
+    annotations.number_in_order(tag.id, [r.id for r in rows], where)
+    for i, r in enumerate(rows, 1):
+        _store(r, tag, period_id, i)
+
+
+def clear_numbers(rows: list[PubStat], tag: Tag, period_id: int | None) -> None:
+    where = period_id if tag.per_period else None
+    annotations.clear_tag_numbers(tag.id, [r.id for r in rows], where)
+    for r in rows:
+        _store(r, tag, period_id, None)
+
+
+def moved(ids: list[int], src: int, target: int, where: str = "before") -> list[int]:
+    """``ids`` with ``src`` moved before / after ``target``."""
+    if src == target or src not in ids or target not in ids:
+        return list(ids)
+    out = [i for i in ids if i != src]
+    at = out.index(target) + (where == "after")
+    return [*out[:at], src, *out[at:]]
+
+
+def reorder(
+    stats: list[PubStat], tag: Tag, period_id: int | None, src: int, target: int, where: str
+) -> bool:
+    """A paper of the tag moved before / after another one: the papers of the tag numbered
+    in the new order; whether it moved."""
+    rows = tag_order(stats, tag.id, period_id)
+    ids = [r.id for r in rows]
+    new = moved(ids, src, target, where)
+    if new == ids and all(r.number_of(tag.id, period_id) == i for i, r in enumerate(rows, 1)):
+        return False
+    by_id = {r.id: r for r in rows}
+    save_order([by_id[i] for i in new], tag, period_id)
+    return True
+
+
+def step(stats: list[PubStat], tag: Tag, period_id: int | None, pub_id: int, delta: int) -> bool:
+    """A paper of the tag moved up (-1) or down (+1)."""
+    ids = [r.id for r in tag_order(stats, tag.id, period_id)]
+    if pub_id not in ids:
+        return False
+    j = ids.index(pub_id) + delta
+    if not 0 <= j < len(ids):
+        return False
+    return reorder(stats, tag, period_id, pub_id, ids[j], "before" if delta < 0 else "after")
+
+
+def draggable(row: ui.element, pub_id: int, dropped: Callable[[int, str], None]) -> None:
+    """A paper's row, dragged and dropped onto (``dropped``: the paper dropped, and
+    "before" / "after")."""
+    row.props("draggable=true")
+    row.on("dragstart", js_handler=_DRAG % pub_id)
+    row.on("dragover", js_handler=_OVER)
+    row.on("dragleave", js_handler=_LEAVE)
+    row.on(
+        "drop",
+        lambda e: (
+            dropped(int(e.args["id"]), e.args.get("where") or "before")
+            if isinstance(e.args, dict) and e.args.get("id")
+            else None
+        ),
+        js_handler=_DROP,
+    )
+
+
+def tag_order_dialog(
+    tag: Tag, stats: list[PubStat], period: Period | None, on_change: Callable[[], None]
+) -> None:
+    """The papers of a tag (of the person; within the period for a per-period tag), in
+    their order: dragged or moved up / down (numbering them all 1, 2… in the new order),
+    a number typed (click it), numbered in the order shown, or their numbers removed."""
+    pid = period.id if period else None
+    if tag.per_period and pid is None:
+        ui.notify(_("Choose a period first"), type="warning")
+        return
+
+    def changed() -> None:
+        listing.refresh()
+        on_change()
+
+    with ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
+        with ui.row().classes("w-full items-center no-wrap"):
+            ui.label(
+                _("Order the papers tagged “{tag}” within {period}").format(
+                    tag=tag.name, period=period.name
+                )
+                if tag.per_period
+                else _("Order the papers tagged “{tag}”").format(tag=tag.name)
+            ).classes("text-lg font-medium grow")
+            ui.button(icon="close", on_click=dlg.close).props("flat round dense")
+        ui.label(
+            _(
+                "Their numbers (#) order them: in the publications, and in the citations of "
+                "folder notes (those without a number come after). Drag a paper or use its "
+                "arrows (all are then numbered 1, 2… in the new order), or click a number "
+                "to type it."
+            )
+        ).classes("text-sm text-grey")
+
+        @ui.refreshable
+        def listing() -> None:
+            rows = tag_order(stats, tag.id, pid)
+            if not rows:
+                ui.label(_("No paper with this tag")).classes("text-grey")
+            with ui.column().classes("w-full gap-0 max-h-[60vh] overflow-auto"):
+                for i, s in enumerate(rows):
+                    row = ui.row().classes("w-full items-center no-wrap gap-2 py-1 border-b")
+                    row.mark(f"tag-order-row-{s.id}")
+                    draggable(
+                        row,
+                        s.id,
+                        lambda src, where, tid=s.id: (
+                            reorder(stats, tag, pid, src, tid, where) and changed()
+                        ),
+                    )
+                    with row:
+                        ui.icon("drag_indicator", color="grey").classes("cursor-move").tooltip(
+                            _("Drag onto another paper (its top / bottom half: before / after it)")
+                        )
+                        with ui.element("span").classes("w-12 shrink-0"):
+                            number_edit(
+                                s.number_of(tag.id, pid),
+                                lambda n, s=s: (save_number(s, tag, pid, n), changed()),
+                                mark=f"tag-order-number-{s.id}",
+                            )
+                        with ui.column().classes("grow min-w-0 gap-0"):
+                            ui.label(s.title or _("(untitled)")).classes(
+                                "text-sm leading-tight" + (" text-grey" if s.hidden else "")
+                            )
+                            about = " · ".join(x for x in (s.venue, str(s.year or "")) if x)
+                            ui.label(about).classes("text-xs text-grey ellipsis")
+                        up = ui.button(
+                            icon="arrow_upward",
+                            on_click=lambda s=s: step(stats, tag, pid, s.id, -1) and changed(),
+                        ).props("flat round dense size=sm")
+                        up.tooltip(_("Up")).mark(f"tag-order-up-{s.id}")
+                        down = ui.button(
+                            icon="arrow_downward",
+                            on_click=lambda s=s: step(stats, tag, pid, s.id, 1) and changed(),
+                        ).props("flat round dense size=sm")
+                        down.tooltip(_("Down")).mark(f"tag-order-down-{s.id}")
+                        if i == 0:
+                            up.disable()
+                        if i == len(rows) - 1:
+                            down.disable()
+
+        listing()
+
+        def number_all() -> None:
+            save_order(tag_order(stats, tag.id, pid), tag, pid)
+            changed()
+
+        def clear_all() -> None:
+            clear_numbers(tag_order(stats, tag.id, pid), tag, pid)
+            changed()
+
+        with ui.row().classes("w-full items-center gap-2"):
+            numbered = ui.button(
+                _("Number in this order"), icon="format_list_numbered", on_click=number_all
+            )
+            numbered.props("flat").tooltip(_("Number them 1, 2… as listed"))
+            numbered.mark("tag-order-number-all")
+            ui.button(_("Clear the numbers"), icon="backspace", on_click=clear_all).props(
+                "flat color=negative"
+            ).tooltip(_("Remove their numbers (the tag stays)")).mark("tag-order-clear")
+            ui.space()
+            ui.button(_("Close"), on_click=dlg.close).props("flat")
+    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
+    dlg.open()
 
 
 def tags_section(on_change: Callable[[], None] | None = None) -> None:
@@ -214,7 +540,14 @@ def paper_tags_and_notes(
                     added = annotations.toggle_tag(s.id, tid, pid)
                     target = s.period_tags.setdefault(pid, set()) if per else s.tags
                     (target.add if added else target.discard)(tid)
+                    if not added:  # (its number goes with it)
+                        numbers = s.period_numbers.get(pid, {}) if per else s.numbers
+                        numbers.pop(tid, None)
                     chips.refresh()
+                    reload()
+
+                def renumber(n: int | None, t=t) -> None:
+                    save_number(s, t, pid, n)
                     reload()
 
                 ui.chip(
@@ -229,6 +562,8 @@ def paper_tags_and_notes(
                     if t.per_period
                     else _("on the paper (every period)")
                 )
+                if on:
+                    number_edit(s.number_of(t.id, pid), renumber, mark=f"tag-number-{t.name}")
             new = (
                 ui.input(placeholder=_("+ new tag"))
                 .props("dense borderless")

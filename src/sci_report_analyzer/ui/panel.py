@@ -34,10 +34,10 @@ from ..ranking import tracks
 from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR
 from ..ranking.kinds import KIND_SHORT
 from ..sources import ADAPTERS
-from .pdf_viewer import download_dialog, pdf_button, watch
+from .pdf_viewer import changed, download_dialog, pdf_button, watch
 from .pub_details import open_details, source_badge
 from .reflist import tag_from_list
-from .tags import tag_chip, tags_dialog
+from .tags import save_number, tag_chip, tag_order_dialog, tags_dialog
 from .theme import DIM_OPACITY, NOTE_EXTRAS, author_html, rank_chip, span, stripes, track_chip
 
 logger = logging.getLogger(__name__)
@@ -516,6 +516,10 @@ class PublicationsPanel:
                 ).props("dense outlined use-chips clearable").classes("min-w-32").tooltip(
                     _("Papers with one of these tags (⏱: within the period)")
                 ).mark("tag-filter")
+                if len(self.tag_filter) == 1:
+                    ui.button(icon="format_list_numbered", on_click=self.order_tag).props(
+                        "flat round dense"
+                    ).tooltip(_("Order the papers of this tag (their numbers)")).mark("tag-order")
             ui.button(icon="sell", on_click=self.manage_tags).props("flat round dense").tooltip(
                 _("Manage tags (names, colours)")
             ).mark("manage-tags-panel")
@@ -1265,7 +1269,7 @@ class PublicationsPanel:
             lambda pub=s: open_details(self, pub),
             js_handler=(
                 "(e) => { if (!e.target.closest("
-                "'a, button, .q-btn, .vr-src, .vr-venue-link, .vr-problems'))"
+                "'a, button, .q-btn, .vr-src, .vr-venue-link, .vr-problems, .vr-num-edit'))"
                 " emit(); }"
             ),
         ).mark(f"pub-{s.id}")
@@ -1370,11 +1374,33 @@ class PublicationsPanel:
                     for tag in self.tags:
                         number = s.number_of(tag.id, pid)
                         if tag.id in mine and (tag.id != self.starred_id or number is not None):
-                            tag_chip(tag, number)
+                            tag_chip(
+                                tag,
+                                number,
+                                lambda n, s=s, tag=tag: self.set_number(s, tag, n),
+                                mark=f"pub-tag-number-{s.id}-{tag.id}",
+                            )
 
     @property
     def period(self):
         return next((p for p in self.periods if p.id == self.period_id), None)
+
+    def papers_changed(self) -> None:
+        """Papers changed here (e.g. their numbers within a tag): the list and the person's
+        other windows (their citations) up to date."""
+        background_tasks.create(self.reload())
+        changed(self.person_id, but=self)
+
+    def set_number(self, s: PubStat, tag, number: int | None) -> None:
+        save_number(s, tag, self.period_id, number)
+        self.papers_changed()
+
+    def order_tag(self) -> None:
+        """The dialog ordering the papers of the tag filtered on."""
+        tag = next((t for t in self.tags if self.tag_filter == [t.id]), None)
+        if tag is not None:
+            with self.dialogs:
+                tag_order_dialog(tag, self.stats, self.period, self.papers_changed)
 
     def manage_tags(self) -> None:
         def changed() -> None:

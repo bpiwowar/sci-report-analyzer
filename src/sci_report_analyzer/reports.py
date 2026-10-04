@@ -183,6 +183,7 @@ class Context:
     # The blocks ([]{.name} on its line): name -> its Markdown, given the level of its
     # headings (that below the heading the block is under).
     blocks: dict[str, Callable[[int], str]] = field(default_factory=dict)
+    numbered_tag: int | None = None  # (the tag whose numbers the papers have, if any)
 
     def __post_init__(self) -> None:
         self.by_key = {p.key: p for p in self.papers}
@@ -583,6 +584,7 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
         templates=load_templates(folder_id).names,
         discuss=discuss,
         blocks={"publications": publications, "excerpts": excerpts},
+        numbered_tag=tag,
     )
 
 

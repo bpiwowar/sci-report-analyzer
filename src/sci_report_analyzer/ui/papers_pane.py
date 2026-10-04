@@ -8,10 +8,12 @@ from collections.abc import Callable
 
 from nicegui import ui
 
-from .. import reports
+from .. import annotations, reports
 from ..i18n import _
+from ..pubview import tag_order
 from . import pdf_viewer
 from .mdedit import MarkdownEditor
+from .tags import draggable, number_edit, reorder, save_number, step
 from .theme import NOTE_EXTRAS
 
 _CSS = ".vr-at-cursor { background: rgba(255, 193, 7, 0.25); box-shadow: inset 3px 0 #ffc107; }"
@@ -79,8 +81,14 @@ class PapersPane:
         templates: Callable[[], reports.Templates],
         period_id: int,
         mark: str = "papers-pane",
+        on_numbers: Callable[[], None] | None = None,
     ) -> None:
+        """``on_numbers``: the papers' numbers within the folder's numbered tag changed here
+        (dragged, moved up / down, typed), the pane then rebuilt by it."""
         self._editor = editor
+        self._on_numbers = on_numbers
+        self._tag = None  # (the numbered tag, when its papers can be ordered here)
+        self._order: list[int] = []  # (its papers, in their order)
         self._context = context
         self._templates = templates
         self.period_id = period_id
@@ -139,6 +147,9 @@ class PapersPane:
             return all(w in hay.lower() for w in words)
 
         off = [p for p in ctx.discuss if p.off_period]
+        tid = ctx.numbered_tag if self._on_numbers and not words else None
+        self._tag = next((t for t in annotations.all_tags() if t.id == tid), None)
+        self._order = [s.id for s in tag_order(ctx.stats, tid, self.period_id)] if tid else []
         with ui.row().classes("w-full items-center gap-2"):
             ui.label(
                 _("{cited} of the {n} papers to discuss cited").format(
@@ -212,21 +223,46 @@ class PapersPane:
             .classes("w-full items-start no-wrap gap-2 py-1 border-b")
             .classes("opacity-70" if p.off_period else "")
             .props(f'data-paper-key="{p.key}"')
-        ):
-            ui.badge(number, color=colour).classes("cursor-pointer shrink-0 mt-1").on(
-                "click", lambda: self.cite(p.key)
-            ).tooltip(
-                " · ".join(
-                    [_("cited {n}×").format(n=times) if times else _("not cited yet")]
-                    + ([] if to_discuss else [_("not to discuss")])
-                    + (
-                        [_("off-period ({year})").format(year=s.year or _("no year"))]
-                        if p.off_period
-                        else []
-                    )
-                    + [_("click: cite it")]
+            .mark(f"{self.mark}-row-{p.key}")
+        ) as row:
+            ordered = self._tag is not None and s.id in self._order
+            if ordered:
+                self._orderable(row, s, ctx)
+            tip = " · ".join(
+                [_("cited {n}×").format(n=times) if times else _("not cited yet")]
+                + ([] if to_discuss else [_("not to discuss")])
+                + (
+                    [_("off-period ({year})").format(year=s.year or _("no year"))]
+                    if p.off_period
+                    else []
                 )
-            ).mark(f"{self.mark}-cite-{p.key}")
+                + [_("click: cite it")]
+                + (
+                    [_("Alt-click: set its number within “{tag}”").format(tag=self._tag.name)]
+                    if ordered
+                    else []
+                )
+            )
+
+            def badge(_n=None) -> ui.element:
+                return (
+                    ui.badge(number, color=colour)
+                    .classes("cursor-pointer shrink-0 mt-1")
+                    .tooltip(tip)
+                    .mark(f"{self.mark}-cite-{p.key}")
+                )
+
+            if ordered:
+                tag = self._tag
+                number_edit(
+                    s.number_of(tag.id, self.period_id),
+                    lambda n: (save_number(s, tag, self.period_id, n), self._numbers_changed()),
+                    mark=f"{self.mark}-number-{s.id}",
+                    plain=lambda: self.cite(p.key),
+                    show=badge,
+                )
+            else:
+                badge().on("click", lambda: self.cite(p.key))
             with ui.column().classes("grow min-w-0 gap-0"):
                 with ui.row().classes("w-full items-start no-wrap gap-1"):
                     ui.label(s.title or _("(untitled)")).classes(
@@ -252,6 +288,52 @@ class PapersPane:
                     ui.markdown("\n\n".join(notes), extras=NOTE_EXTRAS).classes(
                         "w-full vr-note text-xs text-grey-8"
                     ).mark(f"{self.mark}-note-{p.key}")
+            if ordered:
+                with ui.column().classes("gap-0 shrink-0"):
+                    i = self._order.index(s.id)
+                    up = ui.button(
+                        icon="keyboard_arrow_up", on_click=lambda: self._step(ctx, s, -1)
+                    )
+                    up.props("flat dense round size=xs").tooltip(_("Up")).mark(
+                        f"{self.mark}-up-{p.key}"
+                    )
+                    down = ui.button(
+                        icon="keyboard_arrow_down", on_click=lambda: self._step(ctx, s, 1)
+                    )
+                    down.props("flat dense round size=xs").tooltip(_("Down")).mark(
+                        f"{self.mark}-down-{p.key}"
+                    )
+                    if i == 0:
+                        up.disable()
+                    if i == len(self._order) - 1:
+                        down.disable()
             with ui.button(icon="more_vert").props("flat dense round size=sm"), ui.menu():
                 for t in self._templates().items:
                     ui.menu_item(t.label, on_click=lambda a=t.attrs: self.cite(p.key, a))
+
+    # ---- ordering the papers of the numbered tag (their numbers) ----------------------
+
+    def _orderable(self, row: ui.element, s, ctx: reports.Context) -> None:
+        """Its row dragged onto another one (its handle)."""
+        tag = self._tag
+
+        def dropped(src: int, where: str) -> None:
+            if reorder(ctx.stats, tag, self.period_id, src, s.id, where):
+                self._numbers_changed()
+
+        draggable(row, s.id, dropped)
+        with ui.column().classes("gap-0 items-center shrink-0 mt-1"):
+            ui.icon("drag_indicator", color="grey").classes("cursor-move").tooltip(
+                _(
+                    "Drag onto another paper to reorder them (numbered 1, 2… in the new order "
+                    "within “{tag}”)"
+                ).format(tag=tag.name)
+            )
+
+    def _step(self, ctx: reports.Context, s, delta: int) -> None:
+        if step(ctx.stats, self._tag, self.period_id, s.id, delta):
+            self._numbers_changed()
+
+    def _numbers_changed(self) -> None:
+        if self._on_numbers:
+            self._on_numbers()
