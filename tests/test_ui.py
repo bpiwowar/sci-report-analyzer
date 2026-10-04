@@ -2698,3 +2698,40 @@ def test_persons_core() -> None:
     assert [(q.id, n) for q, n in persons.people_with_counts()] == [(pid, 0)]
     datasets.import_jcr([{"journal": "Neural Journal"}])
     assert datasets.jcr_count() == 1
+
+
+def test_panel_statistics_counted() -> None:
+    from types import SimpleNamespace
+
+    from sci_report_analyzer.pubview import (
+        HIST_CAP,
+        coauthor_counts,
+        role_shares,
+        year_bin_defs,
+        year_counts,
+    )
+
+    def paper(year, cat, role=None, authors=None):
+        return SimpleNamespace(
+            year=year,
+            category=SimpleNamespace(key=cat),
+            contribution=role,
+            num_authors=authors,
+        )
+
+    rows = [
+        paper(2020, "q1", "first", 3),
+        paper(2020, "q2", "last", 40),
+        paper(2023, "q1", "first", 3),
+        paper(None, "q1", "middle"),
+        paper(2023, "q1"),
+    ]
+    bins = year_bin_defs([2020, 2023])
+    counts = year_counts(rows, bins)
+    assert sum(counts["q1"]) == 3 and sum(counts["q2"]) == 1
+    assert coauthor_counts(rows) == {3: 2, HIST_CAP: 1}
+    shares = role_shares(rows, ["first", "middle", "last"])
+    assert shares.totals[0] == 4 and shares.counts["first"][0] == 2
+    assert (shares.first, shares.last) == (50, 25)
+    assert sum(shares.totals[1:]) == 3  # (by years: those with one)
+    assert role_shares([paper(2020, "q1")], ["first"]) is None

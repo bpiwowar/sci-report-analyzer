@@ -22,13 +22,16 @@ from ..pubview import (
     PubStat,
     Sel,
     category_list,
+    coauthor_counts,
     load_stats,
     match_sels,
     pick_sel,
+    role_shares,
     save_summary_settings,
     summary_lines,
     summary_settings,
     year_bin_defs,
+    year_counts,
 )
 from ..ranking import tracks
 from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR
@@ -949,38 +952,38 @@ class PublicationsPanel:
         if len(set(years)) < 2:
             return
         bins = year_bin_defs(years)
+        counts = year_counts(rows, bins)
         chosen = {x.label for x in sels if x.facet == "year"}
         series = []
         for c in cats:
-            data = []
-            for label, lo, hi in bins:
-                n = sum(
-                    1
-                    for s in rows
-                    if s.category.key == c.key and s.year is not None and lo <= s.year <= hi
-                )
-                dim = chosen and label not in chosen
-                data.append({"value": n, "itemStyle": {"opacity": DIM_OPACITY if dim else 1}})
-            if any(d["value"] for d in data):
-                item = {"color": c.colour}
-                if c.striped:
-                    item["decal"] = {
-                        "symbol": "rect",
-                        "dashArrayX": [1, 0],
-                        "dashArrayY": [2, 4],
-                        "rotation": 0.8,
-                        "color": c.stripe if c.track else "rgba(255,255,255,0.45)",
-                    }
-                series.append(
-                    {
-                        "name": c.label,
-                        "type": "bar",
-                        "stack": "y",
-                        "data": data,
-                        "itemStyle": item,
-                        "emphasis": {"focus": "none"},
-                    }
-                )
+            if not any(line := counts.get(c.key, [])):
+                continue
+            data = [
+                {
+                    "value": n,
+                    "itemStyle": {"opacity": DIM_OPACITY if chosen and label not in chosen else 1},
+                }
+                for (label, _lo, _hi), n in zip(bins, line, strict=True)
+            ]
+            item = {"color": c.colour}
+            if c.striped:
+                item["decal"] = {
+                    "symbol": "rect",
+                    "dashArrayX": [1, 0],
+                    "dashArrayY": [2, 4],
+                    "rotation": 0.8,
+                    "color": c.stripe if c.track else "rgba(255,255,255,0.45)",
+                }
+            series.append(
+                {
+                    "name": c.label,
+                    "type": "bar",
+                    "stack": "y",
+                    "data": data,
+                    "itemStyle": item,
+                    "emphasis": {"focus": "none"},
+                }
+            )
         chart = (
             ui.echart(
                 {
@@ -1050,9 +1053,7 @@ class PublicationsPanel:
         with ui.column().classes("w-1/2"):
             if not with_authors:
                 return
-            counts: dict[int, int] = {}
-            for n in with_authors:
-                counts[min(n, HIST_CAP)] = counts.get(min(n, HIST_CAP), 0) + 1
+            counts = coauthor_counts(rows)
             avg = sum(with_authors) / len(with_authors)
             self._hist(
                 _("Co-authors per paper · avg {avg} ({n})").format(
@@ -1067,33 +1068,20 @@ class PublicationsPanel:
     def _contributions(self, rows: list[PubStat], sels: list[Sel]) -> None:
         """The person's role in the papers (first author, contributor… last author), overall
         and by years: shares of the papers of each column."""
-        known = [s for s in rows if s.contribution]
+        cfg = contribution.load_config()
+        shares = role_shares(rows, [r.key for r in cfg.roles])
         with ui.column().classes("w-1/2 gap-0").mark("contributions"):
-            if not known:
+            if shares is None:
                 return
             chosen = [x for x in sels if x.facet == "contribution"]
-            years = [s.year for s in known if s.year is not None]
-            bins = year_bin_defs(years) if len(set(years)) > 1 else []
-            columns = [(_("All"), None, None), *bins]
-            totals = [
-                sum(lo is None or (s.year is not None and lo <= s.year <= hi) for s in known)
-                for _label, lo, hi in columns
-            ]
-            cfg = contribution.load_config()
+            columns = [(_("All"), None, None), *shares.bins]
             series = []
             for key, label, colour in ((r.key, r.label, r.colour) for r in cfg.roles):
-                counts = [
-                    sum(
-                        s.contribution == key
-                        and (lo is None or (s.year is not None and lo <= s.year <= hi))
-                        for s in known
-                    )
-                    for _label, lo, hi in columns
-                ]
+                counts = shares.counts[key]
                 if not counts[0]:
                     continue
                 data = []
-                for (_label, lo, _hi), n, total in zip(columns, counts, totals, strict=True):
+                for (_label, lo, _hi), n, total in zip(columns, counts, shares.totals, strict=True):
                     picked = any(x.key == key and x.lo == (lo or 0) for x in chosen)
                     data.append(
                         {
@@ -1112,15 +1100,11 @@ class PublicationsPanel:
                         "data": data,
                     }
                 )
-            share = {
-                k: round(100 * sum(s.contribution in keys for s in known) / len(known))
-                for k, keys in (("first", ("sole", "first")), ("last", ("last",)))
-            }
             chart = ui.echart(
                 {
                     "title": {
                         "text": _("Contribution role ({n}) · first {first}% · last {last}%").format(
-                            n=len(known), first=share["first"], last=share["last"]
+                            n=shares.totals[0], first=shares.first, last=shares.last
                         ),
                         "textStyle": {"fontSize": 13},
                     },

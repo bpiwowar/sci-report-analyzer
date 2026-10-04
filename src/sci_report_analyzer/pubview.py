@@ -1298,3 +1298,67 @@ def venue_groups(stat: PubStat) -> VenueGroups:
         conflicting=conflicting,
         no_venue=no_venue,
     )
+
+
+# ---- the panel's statistics (counted here, drawn by the panel) ------------------------------
+
+
+def year_counts(rows: list[PubStat], bins: list[tuple[str, int, int]]) -> dict[str, list[int]]:
+    """Per category key, its papers in each year bin (``year_bin_defs``)."""
+    counts: dict[str, list[int]] = {}
+    for s in rows:
+        if s.year is None:
+            continue
+        line = counts.setdefault(s.category.key, [0] * len(bins))
+        for i, (_label, lo, hi) in enumerate(bins):
+            if lo <= s.year <= hi:
+                line[i] += 1
+    return counts
+
+
+def coauthor_counts(rows: list[PubStat]) -> dict[int, int]:
+    """The papers by number of co-authors (``HIST_CAP``: that many or more)."""
+    counts: dict[int, int] = {}
+    for s in rows:
+        if s.num_authors is not None:
+            n = min(s.num_authors, HIST_CAP)
+            counts[n] = counts.get(n, 0) + 1
+    return counts
+
+
+@dataclass
+class RoleShares:
+    """The person's contribution roles in papers: in all of them (the first column), then
+    by years (``bins``: ``year_bin_defs``, if they span several years)."""
+
+    bins: list[tuple[str, int, int]]
+    totals: list[int]  # the papers of each column
+    counts: dict[str, list[int]]  # per role, its papers in each column
+    first: int  # the share (%) of the papers as sole or first author
+    last: int  # as last author
+
+
+def role_shares(rows: list[PubStat], roles: Iterable[str]) -> RoleShares | None:
+    """Of the papers with a role (none: None)."""
+    known = [s for s in rows if s.contribution]
+    if not known:
+        return None
+    years = [s.year for s in known if s.year is not None]
+    bins = year_bin_defs(years) if len(set(years)) > 1 else []
+    columns = [(None, None), *((lo, hi) for _label, lo, hi in bins)]
+
+    def within(s: PubStat, lo: int | None, hi: int | None) -> bool:
+        return lo is None or (s.year is not None and lo <= s.year <= hi)
+
+    totals = [sum(within(s, lo, hi) for s in known) for lo, hi in columns]
+    counts = {
+        role: [
+            sum(s.contribution == role and within(s, lo, hi) for s in known) for lo, hi in columns
+        ]
+        for role in roles
+    }
+
+    def share(keys: tuple[str, ...]) -> int:
+        return round(100 * sum(s.contribution in keys for s in known) / len(known))
+
+    return RoleShares(bins, totals, counts, share(("sole", "first")), share(("last",)))
