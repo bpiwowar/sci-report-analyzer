@@ -1,6 +1,7 @@
 import gzip
 import json
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -17,6 +18,11 @@ from sci_report_analyzer.ranking.service import service  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures"
 pytest_plugins = ["nicegui.testing.user_plugin"]
+
+
+def pytest_sessionfinish(session, exitstatus) -> None:
+    """The session's data directory (ranking records, settings…) is removed at the end."""
+    shutil.rmtree(_TMP, ignore_errors=True)
 
 
 def _write_datasets(d: Path) -> None:
