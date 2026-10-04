@@ -94,9 +94,6 @@ CONFERENCE_LIKE = ("intl_conference", "natl_conference", *WORKSHOP_KINDS)
 # A workshop's rank is that of its main conference.
 WORKSHOP_RE = Rule("workshop")
 _HOST_RE = Rule("workshop_host")
-# Shared tasks and evaluation campaigns: their venues, and their papers' titles.
-SHARED_TASK_VENUE_RE = Rule("shared_task_venue")
-SHARED_TASK_TITLE_RE = Rule("shared_task_title")
 
 
 def host_text(venue: str | None) -> str | None:
@@ -213,7 +210,6 @@ class KindEvidence:
     venue_type: str | None = None  # "conference" / "journal" hint from the source
     doc_type: str | None = None
     archival: bool = False
-    title: str | None = None  # the paper's (a shared task's paper says so)
 
 
 def _keyword_hit(text: str, words: list[str]) -> bool:
@@ -251,16 +247,8 @@ def detect_kind(
     if doc_types & _BOOK_DOC_TYPES and not (badge and (badge.coreRank or badge.quartile)):
         return "chapter" if doc_types & _CHAPTER_DOC_TYPES else "book"
 
-    # Shared tasks (before workshops: SemEval is no ACL workshop), unless a journal.
-    journal_ranked = badge is not None and badge.source in ("scimago", "jcr") and badge.quartile
-    if (
-        not journal_ranked
-        and not doc_types & _JOURNAL_DOC_TYPES
-        and (SHARED_TASK_VENUE_RE.search(venue) or SHARED_TASK_TITLE_RE.search(ev.title or ""))
-    ):
-        return "shared_task"
-
     # Workshops (unless a journal ranking lists the venue).
+    journal_ranked = badge is not None and badge.source in ("scimago", "jcr") and badge.quartile
     if WORKSHOP_RE.search(venue) and not journal_ranked:
         natl = _keyword_hit(venue, national_keywords) or (
             unknown_scope == "national" and not _keyword_hit(venue, international_keywords)

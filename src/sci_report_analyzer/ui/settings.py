@@ -28,7 +28,13 @@ from ..i18n import N_, _, ngettext
 from ..ranking import datasets, detection
 from ..ranking.badge import FINDINGS_RE, SOURCE_LABELS, TOGGLABLE_SOURCES, TRACK_LABEL, detect_track
 from ..ranking.kinds import KINDS, WORKSHOP_RE, KindEvidence, detect_kind, host_text
-from ..ranking.normalize import NormRule, apply_rules, default_rules, normalize
+from ..ranking.normalize import (
+    DEFAULT_NORM_RULES,
+    NormRule,
+    apply_rules,
+    default_rules,
+    normalize,
+)
 from ..ranking.service import load_settings, save_settings, service
 from ..sources import ADAPTERS
 from . import scimago_years
@@ -45,10 +51,7 @@ NAV = (
         N_("Venues"),
         (
             ("matching", N_("Ranking sources"), 0),
-            (None, N_("Cleaning rules"), 0),
-            ("rules", N_("General"), 1),
-            (None, N_("Language-specific"), 1),
-            *((f"rules-{lang}", name, 2) for lang, name in i18n.LANGUAGES.items()),
+            ("rules", N_("Cleaning rules"), 0),
             ("kinds", N_("Venue kinds"), 0),
             ("detection", N_("Detection rules"), 0),
         ),
@@ -68,7 +71,6 @@ PANELS = {
     "keys": lambda: keys_tab(),
     "matching": lambda: matching_tab(),
     "rules": lambda: rules_tab(),
-    **{f"rules-{lang}": (lambda lang=lang: rules_tab(lang)) for lang in i18n.LANGUAGES},
     "kinds": lambda: kinds_tab(),
     "detection": lambda: detection_tab(),
     "flags": lambda: flags_tab(),
@@ -78,6 +80,12 @@ PANELS = {
     "io": lambda: io_tab(),
 }
 NAV_CSS = """
+.vr-rule-default { background:#eaf7ec; }
+.vr-rule-edited { background:#fff8c5; }
+.vr-rule-added { background:#ffe7d1; }
+.body--dark .vr-rule-default { background:rgba(46,160,67,.16); }
+.body--dark .vr-rule-edited { background:rgba(210,153,34,.18); }
+.body--dark .vr-rule-added { background:rgba(219,109,40,.22); }
 .vr-settings-nav .q-tab { justify-content:flex-start; min-height:32px; text-transform:none; }
 .vr-settings-nav .q-tab__content { align-items:flex-start; }
 """
@@ -426,120 +434,198 @@ def matching_tab() -> None:
     ui.button(_("Save"), icon="save", on_click=save).classes("mt-2")
 
 
-def _merged(edited: list[NormRule], language: str | None) -> list[NormRule]:
-    """The saved rules with those of ``language`` (none: the general ones) as edited: the
-    language rules first (by language), then the general ones."""
-    others = [r for r in load_settings().norm_rules if r.language != language]
+# Where a rule comes from (its card's background, a marker): label, tooltip.
+ORIGINS = {
+    "default": (N_("default"), N_("A built-in rule, as by default")),
+    "edited": (N_("edited"), N_("A built-in rule, changed from its default")),
+    "added": (N_("added"), N_("A rule added by hand")),
+}
+_NORM_DEFAULTS = {r.id: r for r in DEFAULT_NORM_RULES}
+
+
+def _show_origin(card: ui.element, origin: str) -> None:
+    """A rule's card and marker as a default rule's, a changed one's or an added one's."""
+    card.classes(remove=" ".join(f"vr-rule-{o}" for o in ORIGINS), add=f"vr-rule-{origin}")
+    label, tip = ORIGINS[origin]
+    ui.badge(_(label), color="grey-8").props("outline").tooltip(_(tip)).mark(f"origin-{origin}")
+
+
+def _norm_origin(r: NormRule) -> str:
+    d = _NORM_DEFAULTS.get(r.id)
+    if d is None:
+        return "added"
+    return "default" if r.model_dump() == d.model_dump() else "edited"
+
+
+# The rules' languages, as grouped in Settings: any language (none), then each language.
+LANGUAGE_GROUPS: tuple[str | None, ...] = (None, *i18n.LANGUAGES)
+
+
+def _language_name(lang: str | None) -> str:
+    return i18n.LANGUAGES[lang] if lang else _("Any language")
+
+
+def _in_order(rules: list[NormRule]) -> list[NormRule]:
+    """The cleaning rules as applied: those of a language first (by language), then the
+    general ones."""
     order = list(i18n.LANGUAGES)
     return sorted(
-        others + edited,
-        key=lambda r: order.index(r.language) if r.language in order else len(order),
+        rules, key=lambda r: order.index(r.language) if r.language in order else len(order)
     )
 
 
-def rules_tab(language: str | None = None) -> None:
-    if language is None:
-        ui.label(_("Cleaning rules")).classes("text-lg")
-        ui.label(
-            _(
-                "Python regular expressions applied, in order, to the venue texts of the sources "
-                "(\\1, \\2… or \\g<name> in the replacement; \\b, \\d, \\w are ASCII). "
-                "The cleaned text, lowercased and without accents or punctuation, is the key "
-                "matching the venues' variants; it is also what the rankings are searched with. "
-                "Which venue a text belongs to is then set on the venues (variants and venue "
-                "rules, on the Venues page or from a paper's details)."
-            )
-        ).classes("text-grey text-sm")
-    else:
-        ui.label(
-            _("Cleaning rules · {language}").format(language=i18n.LANGUAGES[language])
-        ).classes("text-lg")
-        ui.label(
-            _(
-                "Rules removing words of a language (e.g. spelled ordinals): applied to every "
-                "venue text, before the general rules."
-            )
-        ).classes("text-grey text-sm")
-    rules = [r.model_copy() for r in load_settings().norm_rules if r.language == language]
-    m = f"norm-{language}" if language else "norm"  # the markers
+def rules_tab() -> None:
+    ui.label(_("Cleaning rules")).classes("text-lg")
+    ui.label(
+        _(
+            "Python regular expressions applied, in order, to the venue texts of the sources "
+            "(\\1, \\2… or \\g<name> in the replacement; \\b, \\d, \\w are ASCII). "
+            "The cleaned text, lowercased and without accents or punctuation, is the key "
+            "matching the venues' variants; it is also what the rankings are searched with. "
+            "Which venue a text belongs to is then set on the venues (variants and venue "
+            "rules, on the Venues page or from a paper's details). The rules removing words "
+            "of a language (e.g. spelled ordinals) are applied first, to every venue text."
+        )
+    ).classes("text-grey text-sm")
+    rules = [r.model_copy() for r in load_settings().norm_rules]
     sources = {k: a.label for k, a in ADAPTERS.items()}
+    languages = {"": _("Any language"), **i18n.LANGUAGES}
 
+    def at(r: NormRule) -> int:
+        return next(i for i, x in enumerate(rules) if x is r)
+
+    def reset_one(r: NormRule) -> None:
+        rules[at(r)] = _NORM_DEFAULTS[r.id].model_copy(deep=True)
+        listing.refresh()
+        preview()
+
+    def set_language(r: NormRule, lang: str | None) -> None:
+        if (lang or None) != r.language:
+            r.language = lang or None
+            listing.refresh()
+            preview()
+
+    def rule_card(r: NormRule, m: str, i: int) -> None:
+        card = ui.column().classes("w-full gap-1 border rounded p-2").mark(f"{m}-rule-{i}")
+
+        # Its marker (and background), and its reset when changed from its default.
+        @ui.refreshable
+        def origin() -> None:
+            o = _norm_origin(r)
+            _show_origin(card, o)
+            if o == "edited":
+                ui.button(icon="restart_alt", on_click=lambda: reset_one(r)).props(
+                    "flat round dense size=sm"
+                ).tooltip(_("Reset to the default")).mark(f"{m}-reset-{i}")
+
+        def changed(e=None) -> None:
+            origin.refresh()
+            preview(e)
+
+        with card:
+            with ui.row().classes("items-center gap-2 w-full no-wrap"):
+                ui.checkbox(value=r.enabled, on_change=changed).bind_value(r, "enabled").tooltip(
+                    _("enabled")
+                ).mark(f"{m}-enabled-{i}")
+                ui.input(_("name"), value=r.name, on_change=changed).bind_value(r, "name").props(
+                    "dense outlined"
+                ).classes("w-56")
+                with ui.row().classes("items-center gap-1 no-wrap shrink-0"):
+                    origin()
+                ui.input(_("pattern"), value=r.pattern, on_change=changed).bind_value(
+                    r, "pattern"
+                ).props("dense outlined").classes("grow font-mono").mark(f"{m}-pattern-{i}")
+                ui.icon("arrow_forward")
+                ui.input(_("replacement"), value=r.replacement, on_change=changed).bind_value(
+                    r, "replacement"
+                ).props("dense outlined").classes("w-32 font-mono")
+                with ui.column().classes("gap-0"):
+                    ui.button(icon="arrow_upward", on_click=lambda: move(r, -1)).props(
+                        "flat round dense size=xs"
+                    )
+                    ui.button(icon="arrow_downward", on_click=lambda: move(r, 1)).props(
+                        "flat round dense size=xs"
+                    )
+                ui.button(
+                    icon="delete", on_click=lambda: (rules.pop(at(r)), listing.refresh())
+                ).props("flat round dense color=negative")
+            with ui.row().classes("items-center gap-2 w-full no-wrap pl-10"):
+                ui.select(
+                    languages,
+                    label=_("language"),
+                    value=r.language or "",
+                    on_change=lambda e: set_language(r, e.value),
+                ).props("dense outlined").classes("w-36").tooltip(
+                    _("The language whose words the rule removes (any: a general rule)")
+                ).mark(f"{m}-language-{i}")
+                ui.checkbox(_("ignore case"), value=r.ignore_case, on_change=changed).bind_value(
+                    r, "ignore_case"
+                )
+                ui.select(
+                    sources,
+                    multiple=True,
+                    label=_("only for"),
+                    value=list(r.sources),
+                    on_change=changed,
+                ).bind_value(r, "sources").props("dense outlined use-chips").classes(
+                    "min-w-32"
+                ).tooltip(_("Sources whose venue texts the rule applies to (empty: all)"))
+                ui.input(_("description"), value=r.description, on_change=changed).bind_value(
+                    r, "description"
+                ).props("dense outlined").classes("grow")
+                if r.example:
+                    ex = ui.label().classes("text-xs text-grey font-mono")
+                    ex.text = f"“{r.example}” → “{r.apply(r.example).strip()}”"
+                if r.compiled() is None:
+                    ui.label(_("invalid regex")).classes("text-negative text-xs")
+
+    # By language (the markers: "norm-…" for any language, "norm-fr-…" for French).
     @ui.refreshable
     def listing() -> None:
-        for i, r in enumerate(rules):
-            with ui.column().classes("w-full gap-1 border rounded p-2").mark(f"{m}-rule-{i}"):
-                with ui.row().classes("items-center gap-2 w-full no-wrap"):
-                    ui.checkbox(value=r.enabled).bind_value(r, "enabled").tooltip(
-                        _("enabled")
-                    ).mark(f"{m}-enabled-{i}")
-                    ui.input(_("name"), value=r.name).bind_value(r, "name").props(
-                        "dense outlined"
-                    ).classes("w-56")
-                    ui.input(
-                        _("pattern"), value=r.pattern, on_change=lambda e: preview(e)
-                    ).bind_value(r, "pattern").props("dense outlined").classes(
-                        "grow font-mono"
-                    ).mark(f"{m}-pattern-{i}")
-                    ui.icon("arrow_forward")
-                    ui.input(
-                        _("replacement"), value=r.replacement, on_change=lambda e: preview(e)
-                    ).bind_value(r, "replacement").props("dense outlined").classes("w-32 font-mono")
-                    with ui.column().classes("gap-0"):
-                        ui.button(icon="arrow_upward", on_click=lambda i=i: move(i, -1)).props(
-                            "flat round dense size=xs"
-                        )
-                        ui.button(icon="arrow_downward", on_click=lambda i=i: move(i, 1)).props(
-                            "flat round dense size=xs"
-                        )
-                    ui.button(
-                        icon="delete", on_click=lambda i=i: (rules.pop(i), listing.refresh())
-                    ).props("flat round dense color=negative")
-                with ui.row().classes("items-center gap-2 w-full no-wrap pl-10"):
-                    ui.checkbox(_("ignore case"), value=r.ignore_case).bind_value(r, "ignore_case")
-                    ui.select(
-                        sources, multiple=True, label=_("only for"), value=list(r.sources)
-                    ).bind_value(r, "sources").props("dense outlined use-chips").classes(
-                        "min-w-32"
-                    ).tooltip(_("Sources whose venue texts the rule applies to (empty: all)"))
-                    ui.input(_("description"), value=r.description).bind_value(
-                        r, "description"
-                    ).props("dense outlined").classes("grow")
-                    if r.example:
-                        ex = ui.label().classes("text-xs text-grey font-mono")
-                        ex.text = f"“{r.example}” → “{r.apply(r.example).strip()}”"
-                    if r.compiled() is None:
-                        ui.label(_("invalid regex")).classes("text-negative text-xs")
+        for lang in LANGUAGE_GROUPS:
+            m = f"norm-{lang}" if lang else "norm"
+            with ui.row().classes("items-center gap-2 mt-3"):
+                ui.label(_language_name(lang)).classes("text-md font-bold")
+                ui.button(
+                    _("Add a rule (first)"), icon="add", on_click=lambda lang=lang: add(lang)
+                ).props("flat dense").mark(f"{m}-add")
+            for i, r in enumerate(x for x in rules if x.language == lang):
+                rule_card(r, m, i)
 
-    def move(i: int, d: int) -> None:
-        j = i + d
-        if 0 <= j < len(rules):
+    def move(r: NormRule, d: int) -> None:
+        """Before (after) the previous (next) rule of its language."""
+        same = [i for i, x in enumerate(rules) if x.language == r.language]
+        k = same.index(at(r)) + d
+        if 0 <= k < len(same):
+            i, j = at(r), same[k]
             rules[i], rules[j] = rules[j], rules[i]
             listing.refresh()
             preview()
 
-    listing()
-
-    def add() -> None:
-        n = 1 + sum(r.id.startswith("custom") for r in rules)
+    def add(lang: str | None) -> None:
+        ids = {r.id for r in rules}
+        n = 1 + sum(r.id.startswith("custom") and r.language == lang for r in rules)
+        while f"custom{n}{lang or ''}" in ids:
+            n += 1
+        first = next((i for i, r in enumerate(rules) if r.language == lang), len(rules))
         rules.insert(
-            0,
+            first,
             NormRule(
-                id=f"custom{n}{language or ''}",
+                id=f"custom{n}{lang or ''}",
                 name=_("Custom rule {n}").format(n=n),
                 pattern="",
-                language=language,
+                language=lang,
             ),
         )
         listing.refresh()
 
     def reset() -> None:
-        rules[:] = [r for r in default_rules() if r.language == language]
+        rules[:] = default_rules()
         listing.refresh()
         preview()
 
-    with ui.row().classes("items-center gap-2"):
-        ui.button(_("Add a rule (first)"), icon="add", on_click=add).props("flat").mark(f"{m}-add")
-        ui.button(_("Reset to the defaults"), icon="restart_alt", on_click=reset).props("flat")
+    listing()
+    ui.button(_("Reset to the defaults"), icon="restart_alt", on_click=reset).props("flat")
 
     # Live preview with the rules as edited (saved or not).
     with ui.row().classes("items-center gap-2 w-full"):
@@ -554,7 +640,10 @@ def rules_tab(language: str | None = None) -> None:
             .classes("w-40")
         )
     out = ui.column().classes("gap-0")
-    changes = ui.column().classes("gap-0 w-full").mark(f"{m}-changes")
+    changes = ui.column().classes("gap-0 w-full").mark("norm-changes")
+
+    def edited() -> list[NormRule]:
+        return _in_order([r for r in rules if r.pattern])
 
     def valid() -> bool:
         bad = [r.name for r in rules if r.pattern and r.compiled() is None]
@@ -569,7 +658,7 @@ def rules_tab(language: str | None = None) -> None:
         if text:
             with out:
                 v = text
-                every = _merged([r for r in rules if r.pattern], language)
+                every = edited()
                 for r in every:
                     if r.applies_to(src) and (after := r.apply(v)) != v:
                         ui.label(f"{r.name}: “{after.strip()}”").classes("font-mono text-xs")
@@ -586,10 +675,10 @@ def rules_tab(language: str | None = None) -> None:
         changes.clear()
         if not valid():
             return
-        edited = _merged([r for r in rules if r.pattern], language)
+        every = edited()
         diff = []
         for m in venue_match.matches().values():
-            new = normalize(apply_rules(m.raw, edited, m.source))
+            new = normalize(apply_rules(m.raw, every, m.source))
             if new != m.key:
                 diff.append((m, new))
         with changes:
@@ -604,7 +693,7 @@ def rules_tab(language: str | None = None) -> None:
         if not valid():
             return
         new = load_settings()
-        new.norm_rules = _merged([r for r in rules if r.pattern], language)
+        new.norm_rules = edited()
         save_settings(new)
         n = venue_match.refresh()
         ui.notify(
@@ -615,8 +704,8 @@ def rules_tab(language: str | None = None) -> None:
     with ui.row().classes("gap-2"):
         ui.button(_("Check the effect on the venue texts"), icon="rule", on_click=impact).props(
             "flat"
-        ).mark(f"{m}-impact")
-        ui.button(_("Save the rules"), icon="save", on_click=save).mark(f"{m}-save")
+        ).mark("norm-impact")
+        ui.button(_("Save the rules"), icon="save", on_click=save).mark("norm-save")
 
 
 # ---- corrections & levels ------------------------------------------------------------------
@@ -1273,9 +1362,9 @@ def kinds_tab() -> None:
 # ---- detection rules -----------------------------------------------------------------------
 
 
-def _try_detection(st, venue: str, title: str) -> str:
-    """What the rules in force detect in a venue text and a paper title."""
-    ev = KindEvidence(venue or None, title=title or None)
+def _try_detection(st, venue: str) -> str:
+    """What the rules in force detect in a venue text."""
+    ev = KindEvidence(venue or None)
     kind = detect_kind(
         None,
         ev,
@@ -1288,7 +1377,7 @@ def _try_detection(st, venue: str, title: str) -> str:
         out.append(_("track: {track}").format(track=TRACK_LABEL.get(track, track)))
     if WORKSHOP_RE.search(venue) and (host := host_text(venue)):
         out.append(_("main conference: “{host}”").format(host=host))
-    if detection.regex("joint").search(venue):
+    if detection.Rule("joint").search(venue):
         out.append(_("joint conference"))
     return " · ".join(out)
 
@@ -1298,11 +1387,13 @@ def detection_tab() -> None:
     ui.label(_("Detection rules")).classes("text-lg")
     ui.label(
         _(
-            "Python regular expressions classifying the venues and papers when no decision "
-            "was made by hand: shared tasks, workshops and their main conference, conference "
-            "or journal, tracks, joint conferences. {rule:campaigns} in a pattern stands for "
-            "the pattern of the rule with that id; (?-i:…) makes a part case-sensitive. Each "
-            "rule shows its default when changed."
+            "Python regular expressions classifying the venues when no decision was made by "
+            "hand: workshops and their main conference, conference or journal, tracks, joint "
+            "conferences. A rule matching words of a language is part of another (“atelier”, "
+            "of the workshop rule): a venue text matching it matches the latter. {rule:<id>} "
+            "in a pattern stands for the pattern of the rule with that id; (?-i:…) makes a "
+            "part case-sensitive. Each rule shows whether it is a default one, and its default "
+            "when changed."
         )
     ).classes("text-grey text-sm")
     rules = {r.id: r.model_copy() for r in st.detection_rules}
@@ -1311,30 +1402,22 @@ def detection_tab() -> None:
         return detection.compile_rules(rules.values())
 
     # Live preview with the rules as edited (saved or not).
-    with ui.row().classes("items-center gap-2 w-full"):
-        venue = (
-            ui.input(_("Try a venue text"), placeholder="Trustworthy AI @ ACM Multimedia 2024")
-            .props("dense outlined clearable debounce=300")
-            .classes("grow")
-            .mark("detect-try-venue")
-        )
-        title = (
-            ui.input(_("and a paper title"), placeholder="Team Foo at SemEval-2017 Task 12")
-            .props("dense outlined clearable debounce=300")
-            .classes("grow")
-            .mark("detect-try-title")
-        )
+    venue = (
+        ui.input(_("Try a venue text"), placeholder="Trustworthy AI @ ACM Multimedia 2024")
+        .props("dense outlined clearable debounce=300")
+        .classes("w-full")
+        .mark("detect-try-venue")
+    )
     result = ui.label().classes("font-mono text-sm").mark("detect-result")
 
     def preview(_e=None) -> None:
-        if not (venue.value or title.value):
+        if not venue.value:
             result.text = ""
             return
         with detection.using(rules.values()):
-            result.text = _try_detection(st, venue.value or "", title.value or "")
+            result.text = _try_detection(st, venue.value or "")
 
     venue.on_value_change(preview)
-    title.on_value_change(preview)
 
     def examples(d: detection.DetectionDefault) -> None:
         rx = compiled()[d.id]
@@ -1342,39 +1425,64 @@ def detection_tab() -> None:
             ui.label(_("invalid regex")).classes("text-negative text-xs")
             return
         for ex in d.examples:
-            m = rx.search(ex)
-            text = f"{'✓' if m else '✗'} “{ex}”"
-            if m and m.lastindex:
-                text += " → “{}”".format(next((g for g in m.groups() if g), "").strip())
-            ui.label(text).classes("text-xs font-mono " + ("text-grey" if m else "text-negative"))
+            found = rx.search(ex)
+            text = f"{'✓' if found else '✗'} “{ex}”"
+            if found and found.lastindex:
+                text += " → “{}”".format(next((g for g in found.groups() if g), "").strip())
+            ui.label(text).classes(
+                "text-xs font-mono " + ("text-grey" if found else "text-negative")
+            )
 
     def card(d: detection.DetectionDefault) -> None:
         r = rules[d.id]
+        box = ui.column().classes("w-full gap-1 border rounded p-2").mark(f"detect-rule-{d.id}")
+
+        def edited() -> bool:
+            return (r.pattern, r.ignore_case) != (d.pattern, d.ignore_case)
+
+        def changed(_e=None) -> None:
+            status.refresh()
+            shown.refresh()
+            preview()
 
         @ui.refreshable
         def body() -> None:
             with ui.row().classes("items-center gap-2 w-full no-wrap"):
-                ui.label(_(d.name)).classes("font-bold w-48 shrink-0")
-                ui.input(
-                    _("pattern"), value=r.pattern, on_change=lambda e: (shown.refresh(), preview())
-                ).bind_value(r, "pattern").props("dense outlined debounce=300").classes(
-                    "grow font-mono"
-                ).mark(f"detect-pattern-{d.id}")
-                ui.checkbox(
-                    _("ignore case"),
-                    value=r.ignore_case,
-                    on_change=lambda e: (shown.refresh(), preview()),
-                ).bind_value(r, "ignore_case")
+                with ui.column().classes("gap-1 w-48 shrink-0"):
+                    ui.label(_(d.name)).classes("font-bold")
+                    with ui.row().classes("items-center gap-1"):
+                        ui.badge(_language_name(d.language), color="grey-8").props(
+                            "outline"
+                        ).tooltip(_("The language of the rule's words"))
+                        status()
+                ui.input(_("pattern"), value=r.pattern, on_change=changed).bind_value(
+                    r, "pattern"
+                ).props("dense outlined debounce=300").classes("grow font-mono").mark(
+                    f"detect-pattern-{d.id}"
+                )
+                ui.checkbox(_("ignore case"), value=r.ignore_case, on_change=changed).bind_value(
+                    r, "ignore_case"
+                )
                 ui.button(icon="restart_alt", on_click=reset).props("flat round dense").tooltip(
                     _("Reset to the default")
                 ).mark(f"detect-reset-{d.id}")
             shown()
 
         @ui.refreshable
+        def status() -> None:
+            _show_origin(box, "edited" if edited() else "default")
+
+        @ui.refreshable
         def shown() -> None:
             with ui.column().classes("gap-0 pl-52 w-full"):
                 ui.label(_(d.description)).classes("text-xs text-grey")
-                if (r.pattern, r.ignore_case) != (d.pattern, d.ignore_case):
+                if d.part_of:
+                    of = detection.DEFAULTS[d.part_of]
+                    name = f"{_(of.name)} · {_language_name(of.language)}"
+                    ui.label(_("part of the rule “{name}”").format(name=name)).classes(
+                        "text-xs text-grey"
+                    )
+                if edited():
                     case = " " + _("[ignore case]") if d.ignore_case else ""
                     ui.label(_("default: {pattern}").format(pattern=d.pattern + case)).classes(
                         "text-xs text-grey font-mono break-all"
@@ -1386,13 +1494,18 @@ def detection_tab() -> None:
             body.refresh()
             preview()
 
-        with ui.column().classes("w-full gap-1 border rounded p-2"):
+        with box:
             body()
 
-    for group, label in detection.DETECTION_GROUPS.items():
-        ui.label(label).classes("text-md font-bold mt-3")
-        for d in detection.DEFAULT_DETECTION_RULES:
-            if d.group == group:
+    # By language, then by what they decide.
+    defaults = detection.DEFAULT_DETECTION_RULES
+    for lang in LANGUAGE_GROUPS:
+        ui.label(_language_name(lang)).classes("text-lg font-bold mt-4")
+        for group, label in detection.DETECTION_GROUPS.items():
+            mine = [d for d in defaults if (d.language, d.group) == (lang, group)]
+            if mine:
+                ui.label(label).classes("text-md font-bold mt-2")
+            for d in mine:
                 card(d)
 
     def save() -> None:

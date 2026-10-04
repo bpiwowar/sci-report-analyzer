@@ -836,7 +836,7 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
             )
             if kind not in VENUE_KINDS:  # (a thesis: not a venue's kind)
                 kind = "other"
-            if v.hosts and kind not in (*WORKSHOP_KINDS, "shared_task"):
+            if v.hosts and kind not in WORKSHOP_KINDS:
                 kind = "natl_workshop" if kind.startswith("natl") else "intl_workshop"
             if kind != v.kind:
                 auto_kinds[v.id] = kind
