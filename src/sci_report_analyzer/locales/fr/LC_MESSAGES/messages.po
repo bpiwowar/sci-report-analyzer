@@ -846,6 +846,9 @@ msgstr "Cliquez sur l’extrait avec lequel fusionner « {text} »"
 msgid "Click to set the period"
 msgstr "Cliquer pour définir la période"
 
+msgid "Click: details · Shift-click: cite in the notes"
+msgstr "Clic : détails · Maj-clic : citer dans les notes"
+
 msgid "Close"
 msgstr "Fermer"
 
@@ -1595,6 +1598,14 @@ msgstr ""
 "Dans leur ordre sur le graphique (p. ex. de la réalisation du travail à "
 "son encadrement)."
 
+#, python-brace-format
+msgid "In {folder}: no tag"
+msgstr "Dans {folder} : aucun tag"
+
+#, python-brace-format
+msgid "In {folder}: {tags}"
+msgstr "Dans {folder} : {tags}"
+
 msgid "Include imported JCR rows (check you may share them)"
 msgstr "Inclure les lignes JCR importées (vérifiez que vous pouvez les partager)"
 
@@ -2223,6 +2234,9 @@ msgstr "Aucune correspondance dans les classements."
 
 msgid "No merge to propose."
 msgstr "Aucune fusion à proposer."
+
+msgid "No notes to cite in"
+msgstr "Aucune note où citer"
 
 msgid "No one in this folder yet."
 msgstr "Personne dans ce dossier pour l'instant."

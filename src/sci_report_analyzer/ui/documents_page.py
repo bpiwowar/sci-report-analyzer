@@ -279,7 +279,6 @@ class DocumentPage:
         rows = [s for s in self.side.stats if not s.hidden]
         by_id = {s.id: s for s in rows}
         self.mentions = documents.find_papers(lines, rows, documents.links_of(self.d.id))
-        untitled = _("(untitled)")
         links = [
             {
                 "i": i,
@@ -287,7 +286,7 @@ class DocumentPage:
                 "rects": m.rects,
                 "kind": m.kind,
                 "pdf": bool(by_id[m.pub_id].pdf),
-                "title": by_id[m.pub_id].title or untitled,
+                "title": self.side.cite_hint(by_id[m.pub_id]),
                 "colour": "#cf222e" if by_id[m.pub_id].pdf else "#0969da",
             }
             for i, m in enumerate(self.mentions)
@@ -370,7 +369,10 @@ class DocumentPage:
             args = args[0] if args else {}
         i = args.get("i") if isinstance(args, dict) else args
         if isinstance(i, int) and 0 <= i < len(self.mentions):
-            self.show(i)
+            if isinstance(args, dict) and args.get("cite"):  # (shift-click)
+                self.side.cite(self.mentions[i].pub_id)
+            else:
+                self.show(i)
 
     def show(self, i: int) -> None:
         """The details of a paper found, with where it was found (and a way to undo it)."""

@@ -462,7 +462,7 @@ window.vrDoc = {
         });
         mark.addEventListener('click', (e) => {
           e.preventDefault(); e.stopPropagation();
-          emitEvent('vr-doc-paper', {i: l.i});
+          emitEvent('vr-doc-paper', {i: l.i, cite: e.shiftKey});
         });
         pv.div.appendChild(mark);
       });
