@@ -38,6 +38,14 @@ def _int(v) -> int | None:
     return int(v) if v not in (None, "") else None
 
 
+def shared_note(folder_id: int) -> None:
+    """Says which other folders use the same settings as a folder (changed for them too)."""
+    if others := folders.sharing(folder_id):
+        ui.label(
+            _("Shared with {folders}: changed for them too").format(folders=", ".join(others))
+        ).classes("text-sm text-primary").mark("settings-shared")
+
+
 def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None) -> None:
     """Add, rename, order, nest (subcategories), date and delete the categories."""
     name = next((f.name for f in folders.folders() if f.id == folder_id), "")
@@ -56,6 +64,7 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                 "(optional): those a category is about. Its colour tints its excerpts."
             )
         ).classes("text-sm text-grey")
+        shared_note(folder_id)
 
         @ui.refreshable
         def listing() -> None:
@@ -241,10 +250,11 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
 
             new.on("keydown.enter", add)
             ui.button(_("Add"), icon="add", on_click=add).props("flat dense").mark("category-add")
+            mine = folders.settings_of(folder_id)
             others = {
-                f.id: f.name
+                f.id: f.path
                 for f in folders.folders()
-                if f.id != folder_id and categories.tree(f.id)
+                if folders.settings_of(f.id) != mine and categories.tree(f.id)
             }
             if others:
                 source = (

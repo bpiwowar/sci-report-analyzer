@@ -1,4 +1,4 @@
-"""Main page: the list of people."""
+"""Main page (Reports): the folders and their people, or all the people."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
 from ..sync import discover, is_syncing, start_sync
 from .categories_editor import categories_dialog
+from .folders_editor import folders_dialog
 from .person import purge_dialog, remove_from_folder_dialog
 from .theme import STATUS_COLOUR, fmt_dt, frame, source_tag
 
@@ -63,7 +64,7 @@ async def _create(name: str, affiliation: str, folder_id: int | None = None) -> 
     ui.navigate.to(f"/person/{pid}?tab=sources")
 
 
-LAST_FOLDER = "ui.people.folder"  # the folder shown on the People page (sticky)
+LAST_FOLDER = "ui.people.folder"  # the folder shown on the Reports page (sticky)
 ALL = 0  # "folder" value of the All people (cleanup) view
 
 
@@ -99,16 +100,16 @@ def _goto(folder_id: int) -> None:
 def _header(current: folders.FolderView | None, known: dict[int, folders.FolderView]) -> None:
     with ui.row().classes("w-full items-center gap-2"):
         ui.icon("folder" if current else "groups", size="md", color="amber-8" if current else "")
-        ui.label(current.name if current else _("All people")).classes("text-2xl").mark(
+        ui.label(current.path if current else _("All people")).classes("text-2xl").mark(
             "people-title"
         )
         if current and current.date:
             ui.label(current.date.isoformat()).classes("text-grey")
         if current and current.hidden:
             ui.badge(_("hidden"), color="grey")
-        options = {
-            f.id: _("{name} (hidden)").format(name=f.name) if f.hidden else f.name
-            for f in sorted(known.values(), key=lambda f: f.hidden)
+        options = {  # (as a tree, the hidden ones last)
+            n.id: _("{name} (hidden)").format(name=n.path) if n.hidden else n.path
+            for n in sorted(folders.tree(), key=lambda n: n.hidden)
         }
         ui.select(
             {**options, ALL: _("All people (cleanup)")},
@@ -143,6 +144,13 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
                 _("Purge: remove all papers of the folder's people and re-sync")
             ).mark("purge-folder")
         ui.space()
+        ui.button(
+            _("Folders"),
+            icon="account_tree",
+            on_click=lambda: folders_dialog(ui.navigate.reload),
+        ).props("flat").tooltip(
+            _("The tree of folders: nest, move and rename them; their settings")
+        ).mark("folders-tree")
         ui.button(
             _("New folder"),
             icon="create_new_folder",
@@ -203,6 +211,13 @@ def _add_dialog(current: folders.FolderView | None) -> None:
 def _folder_view(f: folders.FolderView) -> None:
     if f.notes:
         ui.label(f.notes).classes("text-sm text-grey")
+    if within := [n for n in folders.tree() if n.parent_id == f.id]:
+        with ui.row().classes("items-center gap-2"):
+            ui.label(_("Folders within it:")).classes("text-sm text-grey")
+            for n in within:
+                ui.button(n.name, icon="folder", on_click=lambda n=n: _goto(n.id)).props(
+                    "flat dense no-caps color=amber-9"
+                ).mark(f"subfolder-{n.id}")
     _folder_cards(f.id)
     members = {m.person_id for m in f.members}
     others = {pid: n for pid, n in folders.all_people().items() if pid not in members}

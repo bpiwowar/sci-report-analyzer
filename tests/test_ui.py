@@ -602,6 +602,59 @@ async def test_folder_dialog_saves_its_notes_only_if_edited(user: User) -> None:
     assert folders.folders()[0].notes == "Mine."
 
 
+async def test_folders_tree_editor(user: User) -> None:
+    from sci_report_analyzer import categories, folders
+
+    top = folders.save_folder(None, "Hiring")
+    sub = folders.save_folder(None, "Session", parent_id=top)
+    prize = folders.save_folder(None, "Prize")
+    categories.add(top, "Research")
+    await user.open(f"/?folder={sub}")
+    await user.should_see(marker="people-title", content="Hiring › Session")
+    await user.should_see("Reports")  # (the page, in the header)
+    # Its categories: its parent's (shared).
+    user.find(marker="folder-categories").click()
+    await user.should_see(marker="settings-shared", content="Shared with Hiring")
+    user.find(marker="folders-tree").click()
+    await user.should_see(marker=f"folder-node-{sub}")
+    # Collapsed, then shown again.
+    user.find(marker=f"folder-toggle-{top}").click()
+    await user.should_not_see(marker=f"folder-node-{sub}")
+    user.find(marker=f"folder-toggle-{top}").click()
+    await user.should_see(marker=f"folder-node-{sub}")
+    # Renamed in place.
+    user.find(marker=f"folder-tree-name-{sub}").clear().type("Session 2026").trigger(
+        "keydown.enter"
+    )
+    assert [n.path for n in folders.tree() if n.id == sub] == ["Hiring › Session 2026"]
+    # Its own settings (a copy of its parent's), then its parent's again (once confirmed).
+    user.find(marker=f"folder-settings-{sub}").elements.pop().value = "own"
+    assert folders.own_settings(sub) and [n.name for n in categories.tree(sub)] == ["Research"]
+    await user.should_see("Its own settings: a copy of its parent's")
+    user.find(marker=f"folder-settings-{sub}").elements.pop().value = "parent"
+    user.find(marker="folder-settings-confirm").click()
+    assert not folders.own_settings(sub)
+    await user.should_see(marker=f"folder-shared-{sub}")
+    # Moved: with the "In" menu, dragged onto a folder, then onto the top level.
+    user.find(marker=f"folder-parent-{sub}").elements.pop().value = prize
+    assert [n.parent_id for n in folders.tree() if n.id == sub] == [prize]
+    user.find(marker=f"folder-node-{top}").trigger("drop", {"id": sub, "where": "inside"})
+    user.find(marker=f"folder-node-{top}").trigger("drop", {"id": top, "where": "inside"})
+    assert [n.parent_id for n in folders.tree() if n.id == sub] == [top]
+    user.find(marker=f"folder-node-{sub}").trigger("drop", {"id": top, "where": "inside"})
+    await user.should_see("A folder cannot go within itself")
+    user.find(marker="folder-drop-top").trigger("drop", {"id": sub})
+    assert [(n.parent_id, n.own) for n in folders.tree() if n.id == sub] == [(None, True)]
+    # A folder within another one, added.
+    user.find(marker=f"folder-sub-{prize}").click()
+    await user.should_see(marker="folder-tree-name-4")
+    assert [(n.path, n.own) for n in folders.tree() if n.id == 4] == [("Prize › New folder", False)]
+    # The folder's page lists those within it.
+    await user.open(f"/?folder={prize}")
+    user.find(marker="subfolder-4").click()
+    await user.should_see(marker="people-title", content="Prize › New folder")
+
+
 async def test_remove_from_folder_keeping_or_deleting_data(user: User) -> None:
     from sci_report_analyzer import annotations, folders
 
