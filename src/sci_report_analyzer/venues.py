@@ -13,10 +13,18 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from . import venue_match
-from .db.models import AppSetting, Publication, SourceLink, SourcePub, Venue, VenueKey
+from .db.models import AppSetting, Publication, SourceLink, SourcePub, Venue, VenueKey, utcnow
 from .db.session import session_scope
 from .i18n import _
-from .ranking.badge import TRACK_ORDER, Badge, category_of, category_order, detect_track
+from .ranking.badge import (
+    TRACK_ORDER,
+    Badge,
+    category_of,
+    category_order,
+    core_rank_at,
+    detect_track,
+    edition_year,
+)
 from .ranking.kinds import (
     KINDS,
     VENUE_KINDS,
@@ -40,6 +48,18 @@ JOURNAL_KINDS = ("intl_journal", "natl_journal")
 
 
 _ACRONYM = re.compile(r"[A-Z][A-Za-z0-9&+-]{1,11}")
+
+
+def dropped_from_core(badge: Badge | None, year: int | None = None) -> tuple[str, int] | None:
+    """(rank, edition year) of a CORE record its edition in force (in ``year``: this one by
+    default) no longer lists ("CORE A until 2008"): a venue's rank is not its last one."""
+    if not badge or badge.manual or not badge.coreRank or not badge.coreHistory:
+        return None
+    _edition, rank = core_rank_at(badge.coreHistory, year or utcnow().year)
+    if rank is not None:
+        return None
+    last = max(badge.coreHistory, key=edition_year)
+    return badge.coreHistory[last], edition_year(last)
 
 
 def auto_short_name(
