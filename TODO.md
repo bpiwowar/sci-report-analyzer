@@ -57,3 +57,7 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
 - Remove the "report on cited papers" view: merged into the folder notes. Next to the
   "quote" icon, another icon colour-coded by citation status, with the details on hover:
   all cited / cited but not in the range / not cited.
+- `.index` (and `.number`) in the citation templates: set by the folder's settings, with
+  the tag whose papers are numbered (`.index` = the paper's number among the "starred"
+  ones, in my case) and the number's format (e.g. `**#{index}**`), instead of a global
+  setting.
