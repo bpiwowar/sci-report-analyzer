@@ -217,6 +217,7 @@ class DocumentPage:
         self.side.on_attach.append(self._note_again)
         ui.on("vr-doc-text", self.update)
         ui.on("vr-doc-paper", self.clicked)
+        ui.on("vr-doc-excerpt", lambda e: self.side.select_excerpt((e.args or {}).get("id")))
         ui.timer(0.05, self._load, once=True)
 
     async def _load(self) -> None:

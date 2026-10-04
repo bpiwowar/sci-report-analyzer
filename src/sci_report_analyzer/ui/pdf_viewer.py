@@ -521,7 +521,9 @@ window.vrPane = {
       let result = null;
       try { if (asked.includes(m.what)) result = vrPdf[m.what](); } catch (e) {}
       this.post({kind: 'answer', id: m.id, result});
-    } else if (m.kind === 'doc' && ['mark', 'show'].includes(m.what)) vrDoc[m.what](m.arg);
+    } else if (m.kind === 'doc' && ['mark', 'show', 'select'].includes(m.what)) {
+      vrDoc[m.what](m.arg);
+    }
   },
   // The header's button (the window opened from the click, else blocked as a pop-up): the
   // side panel in the pane, or back here.
@@ -545,11 +547,36 @@ window.vrPane = {
   },
 };
 // The papers found in a document (links), and the excerpts filed in categories: drawn on
-// the pages.
+// the pages; the one selected (clicked, here or in the side panel) stands out.
 window.vrDoc = {
-  id: null, needText: false, links: [], excerpts: [],
+  id: null, needText: false, links: [], excerpts: [], selected: null,
   show(links) { this.links = links; this.redraw(); },
   mark(excerpts) { this.excerpts = excerpts; this.redraw(); },
+  select(id) {
+    if (id === this.selected) return;
+    this.selected = id;
+    this.redraw();
+  },
+  // A click on a page (not a text selected, nor an area drawn, nor while editing): the
+  // excerpt tinted there selected (the next one where several overlap), its entry in the
+  // side panel too; elsewhere, none. (The tints let the mouse through: text still selected.)
+  clicked(ev) {
+    const a = vrPdf.app(), w = vrPdf.win();
+    if (!a || !a.pdfViewer || ev.button !== 0 || ev.shiftKey || ev.altKey || ev.ctrlKey
+        || ev.metaKey || vrPdf.areaOn || a.pdfViewer.annotationEditorMode > 0) return;
+    const sel = w && w.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+    const t = ev.target, pageDiv = t.closest && t.closest('.page');
+    if (!pageDiv || t.closest('.vr-doc, .annotationLayer a, .annotationEditorLayer > *')) return;
+    const pv = a.pdfViewer.getPageView(+pageDiv.dataset.pageNumber - 1), box = vrPdf.pageBox(pv);
+    const [x, y] = pv.viewport.convertToPdfPoint(ev.clientX - box.left, ev.clientY - box.top);
+    const hits = this.excerpts.filter(e => e.rects.some(r => (r[4] ?? e.page) === pv.id
+      && x >= r[0] - 1 && x <= r[2] + 1 && y >= r[1] - 1 && y <= r[3] + 1)).map(e => e.id);
+    const id = hits.length ? hits[(hits.indexOf(this.selected) + 1) %% hits.length] : null;
+    if (id === this.selected) return;
+    this.select(id);
+    vrPane.emit('vr-doc-excerpt', {id});
+  },
   redraw() {
     const a = vrPdf.app();
     if (!a || !a.pdfViewer) return;
@@ -572,10 +599,12 @@ window.vrDoc = {
         mark.className = 'vr-doc';
         mark.style.userSelect = 'none';  // (never copied with the text)
         mark.title = x.category;
+        const on = x.id === this.selected, colour = x.colour || '#ffc800';
         Object.assign(mark.style, {
           position: 'absolute', left: left + 'px', top: top + 'px', width: w + 'px',
           height: h + 'px', pointerEvents: 'none', zIndex: 4,
-          background: x.colour ? x.colour + '40' : 'rgba(255, 200, 0, 0.25)',
+          background: colour + (on ? '80' : '40'),
+          boxShadow: on ? '0 0 0 2px ' + colour : '',
         });
         pv.div.appendChild(mark);
       }
@@ -632,6 +661,7 @@ document.addEventListener('webviewerloaded', (e) => {
   w.addEventListener('mousedown', (ev) => vrPdf.areaDown(ev), true);
   w.addEventListener('mousemove', (ev) => vrPdf.areaMove(ev), true);
   w.addEventListener('mouseup', (ev) => vrPdf.areaUp(ev), true);
+  w.addEventListener('click', (ev) => vrDoc.clicked(ev));
   vrPdf.nav();
   // The viewer's actions not wanted here: files (the app's header has them), signatures…
   const style = w.document.createElement('style');
@@ -749,6 +779,7 @@ window.vrPdf = {
 window.vrDoc = {
   mark(x) { vrPane.post({kind: 'doc', what: 'mark', arg: x}); },
   show(x) { vrPane.post({kind: 'doc', what: 'show', arg: x}); },
+  select(x) { vrPane.post({kind: 'doc', what: 'select', arg: x}); },
 };
 // A link (e.g. a quote's, in the notes) to the PDF shown: there, in the PDF window; to another
 // page: in a new one (this window kept for the side panel).
