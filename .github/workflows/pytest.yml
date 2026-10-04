@@ -31,8 +31,8 @@ jobs:
 
       - name: Lint with ruff
         run: |
-          uv run ruff check src tests
-          uv run ruff format --check src tests
+          uv run ruff check src tests scripts
+          uv run ruff format --check src tests scripts
 
       - name: Test with pytest
         timeout-minutes: 15
