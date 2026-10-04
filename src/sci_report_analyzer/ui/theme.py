@@ -111,7 +111,7 @@ def frame(title: str) -> Iterator[None]:
     with ui.header().classes("items-center justify-between py-1"):
         with ui.row().classes("items-center gap-4"):
             ui.link("SciReport Analyzer", "/").classes("text-white text-lg font-bold no-underline")
-            ui.link(_("People"), "/").classes("text-white no-underline")
+            ui.link(_("Reports"), "/").classes("text-white no-underline")
             ui.link(_("Venues"), "/venues").classes("text-white no-underline")
             ui.link(_("Settings"), "/settings").classes("text-white no-underline")
             ui.link(_("Help"), "/help").classes("text-white no-underline")

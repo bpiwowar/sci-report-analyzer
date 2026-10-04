@@ -898,7 +898,7 @@ async def load_stats(person_id: int) -> list[PubStat]:
     return out
 
 
-# ---- problems, cached for the People page --------------------------------------------------
+# ---- problems, cached for the Reports page -------------------------------------------------
 
 PROBLEMS_KEY = "problems.{}"  # AppSetting: years of a person's papers with problems
 
