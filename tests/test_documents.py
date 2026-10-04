@@ -5,7 +5,7 @@ import asyncio
 import re
 
 import pytest
-from helpers import add_source, make_person, note_saved, pub
+from helpers import PDF, add_source, make_person, note_status, pub
 from nicegui import ui
 from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
@@ -18,7 +18,6 @@ from sci_report_analyzer.ui.mdedit import MarkdownEditor, quote
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
 
-PDF = b"%PDF-1.4\n% a tiny test file\n%%EOF\n"
 TITLES = {
     "a": "Deep ranking models for search",
     "b": "Neural retrieval models for long documents",
@@ -131,13 +130,6 @@ def test_store_and_cleanup():
     assert not path.exists()
 
 
-def _viewer(monkeypatch, tmp_path) -> None:
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
-
-
 async def test_documents_tab(user: User):
     pid, period, _ = _person()
     await user.open(f"/person/{pid}?tab=documents")
@@ -169,9 +161,8 @@ async def test_documents_tab_without_period(user: User):
     await user.should_see(marker="documents-no-period")
 
 
-async def test_document_page(user: User, monkeypatch, tmp_path):
+async def test_document_page(user: User, monkeypatch, fake_viewer):
     _, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     await user.open(f"/doc/{doc}")
     await user.should_see(marker="pdf-frame")
@@ -199,7 +190,7 @@ async def test_document_page(user: User, monkeypatch, tmp_path):
     # The document's own note.
     await user.should_see(marker="doc-note")
     user.find(marker="doc-note").elements.pop().value = "Strong candidate"
-    await note_saved(user, "doc-note")
+    await note_status(user, "doc-note")
     await user.should_see("Strong candidate")
     assert documents.info(doc).note == "Strong candidate"
     # Citing a paper: those of the document first (the latest first).
@@ -225,9 +216,8 @@ async def test_document_page(user: User, monkeypatch, tmp_path):
     assert len(inserted) == 1
 
 
-async def test_bookmarks_and_selection(user: User, monkeypatch, tmp_path):
+async def test_bookmarks_and_selection(user: User, fake_viewer):
     _, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     documents.set_lines(doc, LINES)
     selection = {
@@ -264,9 +254,8 @@ async def test_bookmarks_and_selection(user: User, monkeypatch, tmp_path):
     await user.should_see(marker="find-search")
 
 
-async def test_paper_pdf_bookmarks(user: User, monkeypatch, tmp_path):
+async def test_paper_pdf_bookmarks(user: User, fake_viewer):
     _, _, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     pdfs.save(ids["a"], PDF, None)
     user.javascript_rules[re.compile(r"vrPdf\.location\(\)")] = lambda _: {
         "p": 4,
@@ -281,11 +270,10 @@ async def test_paper_pdf_bookmarks(user: User, monkeypatch, tmp_path):
     await user.should_see("Page 4")
 
 
-async def test_quote_into_the_notes(user: User, monkeypatch, tmp_path):
+async def test_quote_into_the_notes(user: User, monkeypatch, fake_viewer):
     assert quote("Ranking\n models are  deep", "p. 2") == "> Ranking models are deep (p. 2)"
     assert quote("Selected on the page") == "> Selected on the page"
     _, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     selection: dict = {"text": "Our ranking model\nbeats sparse ones", "p": 1}
     user.javascript_rules[re.compile(r"vrPdf\.quoted\(\)")] = lambda _: selection
@@ -313,9 +301,8 @@ async def test_quote_into_the_notes(user: User, monkeypatch, tmp_path):
     assert len(user.find(marker="note-quote").elements) == 3
 
 
-async def test_folder_notes(user: User, monkeypatch, tmp_path):
+async def test_folder_notes(user: User, monkeypatch, fake_viewer):
     _, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     pdfs.save(ids["a"], PDF, None)
     folder = folders.folder_of_period(period)[0]
     selection = {"text": "Deep models rank", "p": 3}
@@ -325,7 +312,7 @@ async def test_folder_notes(user: User, monkeypatch, tmp_path):
     await user.open(f"/pdf/{ids['a']}?period={period}")
     await user.should_see(marker="folder-note")
     user.find(marker="folder-note").elements.pop().value = "Shortlist: **two** papers"
-    await note_saved(user, "folder-note")
+    await note_status(user, "folder-note")
     assert folders.notes_of(period) == "Shortlist: **two** papers"
     # The person's within the folder: not another person's, not the folder's own notes.
     other_period = folders.add_person(folder, make_person("Ann Smith"))
@@ -355,20 +342,10 @@ async def test_folder_notes(user: User, monkeypatch, tmp_path):
     await user.should_not_see(marker="folder-note")
 
 
-async def _status(user: User, mark: str, text: str) -> None:
-    """Wait until a note editor's status is ``text`` (e.g. once typing pauses)."""
-    for _i in range(40):
-        if user.find(marker=f"{mark}-status").elements.pop().text == text:
-            return
-        await asyncio.sleep(0.1)
-    raise AssertionError(f"{mark}: not {text!r}")
-
-
-async def test_folder_notes_stale_save_refused(user: User, monkeypatch, tmp_path):
+async def test_folder_notes_stale_save_refused(user: User, monkeypatch, fake_viewer):
     """An editor whose notes changed since it loaded them (saved elsewhere) does not save over
     them: it says so, and offers to copy its text or to reload."""
     _, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     pdfs.save(ids["a"], PDF, None)
     copied = []
     monkeypatch.setattr(ui.clipboard, "write", lambda text: copied.append(text))
@@ -380,7 +357,7 @@ async def test_folder_notes_stale_save_refused(user: User, monkeypatch, tmp_path
     appended = "Mine.\n\n## Starred papers\n\nAppended."
     folders.set_notes(period, appended)
     user.find(marker="folder-note").elements.pop().value = "Mine, edited."
-    await _status(user, "folder-note", "Not saved")
+    await note_status(user, "folder-note", "Not saved")
     assert folders.notes_of(period) == appended
     await user.should_see(marker="folder-note-conflict")
     user.find(marker="folder-note-copy-unsaved").click()
@@ -391,7 +368,7 @@ async def test_folder_notes_stale_save_refused(user: User, monkeypatch, tmp_path
     assert editor.value == appended
     await user.should_not_see(marker="folder-note-conflict")
     editor.value = appended + " More."
-    await note_saved(user, "folder-note")
+    await note_status(user, "folder-note")
     assert folders.notes_of(period) == appended + " More."
     # Saving from the notes as they are: not refused.
     assert folders.set_notes(period, "Same.", base=folders.notes_of(period))
@@ -399,17 +376,16 @@ async def test_folder_notes_stale_save_refused(user: User, monkeypatch, tmp_path
     assert folders.notes_of(period) == "Same."
 
 
-async def test_folder_notes_cleared_after_asking(user: User, monkeypatch, tmp_path):
+async def test_folder_notes_cleared_after_asking(user: User, fake_viewer):
     """Emptying the notes saves nothing until confirmed (else restores them)."""
     _, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     pdfs.save(ids["a"], PDF, None)
     folders.set_notes(period, "Precious notes.")
     await user.open(f"/pdf/{ids['a']}?period={period}")
     await user.should_see(marker="folder-note")
     editor = user.find(marker="folder-note").elements.pop()
     editor.value = ""
-    await _status(user, "folder-note", "Not saved")
+    await note_status(user, "folder-note", "Not saved")
     await user.should_see(marker="folder-note-restore")
     assert folders.notes_of(period) == "Precious notes."
     user.find(marker="folder-note-restore").click()
@@ -418,21 +394,20 @@ async def test_folder_notes_cleared_after_asking(user: User, monkeypatch, tmp_pa
     assert folders.notes_of(period) == "Precious notes."
     # Confirmed: cleared.
     editor.value = "  "
-    await _status(user, "folder-note", "Not saved")
+    await note_status(user, "folder-note", "Not saved")
     user.find(marker="folder-note-clear").click()
-    await _status(user, "folder-note", "Saved")
+    await note_status(user, "folder-note", "Saved")
     assert folders.notes_of(period) == ""
     # Empty already: nothing to ask.
     editor.value = "New start."
-    await note_saved(user, "folder-note")
+    await note_status(user, "folder-note")
     assert folders.notes_of(period) == "New start."
 
 
-async def test_folder_notes_cite_and_copy(user: User, monkeypatch, tmp_path):
+async def test_folder_notes_cite_and_copy(user: User, monkeypatch, fake_viewer):
     """The folder's notes cite a paper and copy with the references, in the PDF viewer and on
     the documents page."""
     _, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     pdfs.save(ids["a"], PDF, None)
     inserted = []
     monkeypatch.setattr(MarkdownEditor, "insert", lambda self, text: inserted.append(text))
@@ -469,9 +444,8 @@ async def test_folder_notes_cite_and_copy(user: User, monkeypatch, tmp_path):
     assert len(inserted) == 1 and re.fullmatch(r"\[@\w+\]", inserted[0])
 
 
-async def test_last_place(user: User, monkeypatch, tmp_path):
+async def test_last_place(user: User, fake_viewer):
     _, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     pdfs.save(ids["a"], PDF, None)
     assert documents.last_place("pub", ids["a"]) is None
     documents.save_last_place("pub", ids["a"], {"p": "3", "zoom": "page-width", "top": 512.4})
@@ -734,7 +708,7 @@ def test_category_colours():
     ]
 
 
-async def test_excerpt_from_an_area(user: User, monkeypatch, tmp_path):
+async def test_excerpt_from_an_area(user: User, monkeypatch, fake_viewer):
     """An area (a rectangle) of a page, selected: its text filed as an excerpt, the
     rectangle as its place (tinted as a text's)."""
     from nicegui import Client
@@ -751,7 +725,6 @@ async def test_excerpt_from_an_area(user: User, monkeypatch, tmp_path):
     _, period, _ = _person()
     folder = folders.folders()[0].id
     figures = categories.add(folder, "Figures")
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     selection = {"text": "", "p": 2, "rects": [[60.5, 400, 320, 520.2, 2]], "area": True}
     user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
@@ -778,13 +751,12 @@ async def test_excerpt_from_an_area(user: User, monkeypatch, tmp_path):
     assert "vrPdf.unhighlight([[60.5, 400, 320, 520.2, 2]], 2)" in scripts
 
 
-async def test_tag_from_a_list_in_the_pdf(user: User, monkeypatch, tmp_path):
+async def test_tag_from_a_list_in_the_pdf(user: User, fake_viewer):
     """A list selected in the PDF (e.g. areas over numbered references): its papers found
     and tagged, as from a pasted list."""
     from sci_report_analyzer import annotations
 
     pid, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     selection = {"text": "", "p": 3, "rects": [], "area": True}
     user.javascript_rules[re.compile(r"vrPdf\.selection\(\)")] = lambda _: selection
@@ -807,13 +779,12 @@ async def test_tag_from_a_list_in_the_pdf(user: User, monkeypatch, tmp_path):
     assert not annotations.panel_state(pid).get("tag_filter")  # (the person's panel as it was)
 
 
-async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
+async def test_excerpts_in_the_viewer(user: User, fake_viewer):
     from sci_report_analyzer import categories
 
     _, period, _ = _person()
     folder = folders.folders()[0].id
     research = categories.add(folder, "Research")
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     documents.set_lines(doc, LINES)
     user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: {
@@ -918,7 +889,7 @@ async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
     )
 
 
-async def test_excerpt_years_from_its_text(user: User, monkeypatch, tmp_path):
+async def test_excerpt_years_from_its_text(user: User, fake_viewer):
     """The years in a passage (e.g. "2026-32"): its years when added, taken out of its text
     when leading it (with a colon) or ending it; the clear button empties them (the text as
     selected again)."""
@@ -927,7 +898,6 @@ async def test_excerpt_years_from_its_text(user: User, monkeypatch, tmp_path):
     _, period, _ = _person()
     folder = folders.folders()[0].id
     research = categories.add(folder, "Research")
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     selection = {"text": "2026-32: Led the Quokka project", "p": 1, "rects": []}
     user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
@@ -956,12 +926,11 @@ async def test_excerpt_years_from_its_text(user: User, monkeypatch, tmp_path):
     assert (e2.text, e2.start_year, e2.end_year) == ("Led the Wombat network.", 2018, 2022)
 
 
-async def test_categories_editor(user: User, monkeypatch, tmp_path):
+async def test_categories_editor(user: User, fake_viewer):
     from sci_report_analyzer import categories
 
     _, period, _ = _person()
     folder = folders.folders()[0].id
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     await user.open(f"/doc/{doc}")
     # (also the folder page's "categories" button)
@@ -1160,7 +1129,7 @@ async def test_numbered_citations_two_lists():
     assert cites == [ids["Neural"], ids["Sparse"]]
 
 
-async def test_split_scroll_sync_installed(user: User, monkeypatch, tmp_path):
+async def test_split_scroll_sync_installed(user: User, monkeypatch, fake_viewer):
     from nicegui import Client
 
     scripts = []
@@ -1171,7 +1140,6 @@ async def test_split_scroll_sync_installed(user: User, monkeypatch, tmp_path):
         lambda self, code, **kw: (scripts.append(code), run(self, code))[1],
     )
     _, period, _ids = _person()
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     await user.open(f"/doc/{doc}")
     await user.should_see(marker="doc-note")
@@ -1213,11 +1181,10 @@ def _page_event(user: User, name: str, args) -> None:
     layout._handle_event({"listener_id": lid, "args": args})
 
 
-async def test_side_panel_in_another_window(user: User, monkeypatch, tmp_path):
+async def test_side_panel_in_another_window(user: User, monkeypatch, fake_viewer):
     """The side panel in its own window (the pane, its PDF window's token in the URL): its
     tabs without the PDF, its questions to the PDF (the selection) as in the PDF window."""
     _, period, ids = _person()
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     selection = {"text": "Our ranking model beats sparse ones", "p": 1}
     user.javascript_rules[re.compile(r"vrPdf\.quoted\(\)")] = lambda _: selection
@@ -1248,7 +1215,7 @@ async def test_side_panel_in_another_window(user: User, monkeypatch, tmp_path):
     await user.should_see(marker="pdf-pane")
 
 
-async def test_side_panel_detached_and_back(user: User, monkeypatch, tmp_path):
+async def test_side_panel_detached_and_back(user: User, monkeypatch, fake_viewer):
     """While the side panel is in another window: hidden in the PDF window, the header's
     actions sent there; back, up to date (the note edited there)."""
     from nicegui import Client
@@ -1261,7 +1228,6 @@ async def test_side_panel_detached_and_back(user: User, monkeypatch, tmp_path):
         lambda self, code, **kw: (scripts.append(code), run(self, code))[1],
     )
     _, period, _ids = _person()
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     user.javascript_rules[re.compile(r"vrPdf\.location\(\)")] = lambda _: {
         "p": 2,
@@ -1295,7 +1261,7 @@ async def test_side_panel_detached_and_back(user: User, monkeypatch, tmp_path):
     await user.should_see(marker="bookmark-0")
 
 
-async def test_excerpt_selected(user: User, monkeypatch, tmp_path):
+async def test_excerpt_selected(user: User, monkeypatch, fake_viewer):
     """An excerpt clicked on the PDF (its tint): highlighted there and in the categories' tab
     (shown); a click elsewhere: none. Its entry clicked: the same, on the PDF too."""
     from nicegui import Client
@@ -1311,7 +1277,6 @@ async def test_excerpt_selected(user: User, monkeypatch, tmp_path):
     )
     _, period, _ = _person()
     research = categories.add(folders.folders()[0].id, "Research")
-    _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     documents.set_lines(doc, LINES)
     first = categories.add_excerpt(

@@ -1,7 +1,24 @@
+import gzip
+import json
+from pathlib import Path
+
 from sci_report_analyzer import sync
 from sci_report_analyzer.db.models import Person
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.sources.base import FetchedPub, FetchedThesis, FetchResult
+
+FIXTURES = Path(__file__).parent / "fixtures"
+# A tiny PDF file.
+PDF = b"%PDF-1.4\n% a tiny test file\n%%EOF\n"
+
+
+def load_fixture(name: str):
+    """A JSON file of ``tests/fixtures`` (gzipped if its name ends with .gz)."""
+    path = FIXTURES / name
+    if path.suffix == ".gz":
+        with gzip.open(path, "rt") as f:
+            return json.load(f)
+    return json.loads(path.read_text())
 
 
 def make_person(name: str = "Jane Doe") -> int:
@@ -28,12 +45,13 @@ def thesis(tid: str, role: str, title: str) -> FetchedThesis:
     return FetchedThesis(thesis_id=tid, role=role, title=title, student="A Student")
 
 
-async def note_saved(user, mark: str) -> None:
-    """Wait until a note editor has saved what was typed (once typing pauses)."""
+async def note_status(user, mark: str, text: str = "Saved") -> None:
+    """Wait until a note editor's status is ``text`` (by default: saved what was typed, once
+    typing pauses)."""
     import asyncio
 
     for _ in range(40):
-        if user.find(marker=f"{mark}-status").elements.pop().text == "Saved":
+        if user.find(marker=f"{mark}-status").elements.pop().text == text:
             return
         await asyncio.sleep(0.1)
-    raise AssertionError(f"{mark}: not saved")
+    raise AssertionError(f"{mark}: not {text!r}")

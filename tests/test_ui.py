@@ -4,7 +4,7 @@ import asyncio
 import json
 
 import pytest
-from helpers import add_source, make_person, note_saved, pub, thesis
+from helpers import add_source, load_fixture, make_person, note_status, pub, thesis
 from nicegui import ui
 from nicegui.testing import User
 
@@ -242,8 +242,6 @@ async def test_quit_button(user: User, monkeypatch) -> None:
 
 
 async def test_panel_reloads_after_resync(user: User, monkeypatch) -> None:
-    import asyncio
-
     from sci_report_analyzer import sync
     from sci_report_analyzer.sources import ADAPTERS
     from sci_report_analyzer.sources.base import FetchResult
@@ -725,7 +723,7 @@ async def test_folder_notes_without_a_document(user: User) -> None:
     await user.should_see(marker="folder-note")
     await user.should_see(marker="notes-person", content="Jane Doe")
     user.find(marker="folder-note").elements.pop().value = "Strong **candidate**"
-    await note_saved(user, "folder-note")
+    await note_status(user, "folder-note")
     assert folders.notes_of(period) == "Strong **candidate**"
     await user.should_not_see(marker="note-quote")  # (no PDF to quote from)
     # Their excerpts, by category.
@@ -908,7 +906,7 @@ async def test_paper_corrections_and_rank_note(user: User) -> None:
     user.find("tab-notes").click()
     await user.should_see("paper-note")
     user.find("paper-note").elements.pop().value = "checked on the **PDF**"
-    await note_saved(user, "paper-note")
+    await note_status(user, "paper-note")
     with session_scope() as s:
         assert s.get(Publication, pub_id).note == "checked on the **PDF**"
     user.find("override-year").elements.pop().value = 2018
@@ -1369,14 +1367,12 @@ async def test_add_a_joint_venue_without_a_name(user: User) -> None:
 
 
 async def test_doi_record_on_hover(user: User) -> None:
-    from pathlib import Path
-
     from sci_report_analyzer.db.models import DoiRecord, utcnow
     from sci_report_analyzer.db.session import session_scope
     from sci_report_analyzer.sources import doi
 
     d = "10.1145/3404835.3462812"
-    msg = json.loads((Path(__file__).parent / "fixtures" / "doi_crossref_sigir.json").read_text())
+    msg = load_fixture("doi_crossref_sigir.json")
     with session_scope() as s:
         s.add(
             DoiRecord(
@@ -2166,7 +2162,6 @@ async def test_propose_merges_one_at_a_time(user: User) -> None:
 
 
 async def test_joint_venue_with_different_levels(user: User) -> None:
-    from helpers import add_source, make_person, pub
     from sqlalchemy import select
 
     from sci_report_analyzer import pubview, venues
@@ -2213,7 +2208,6 @@ async def test_joint_venue_with_different_levels(user: User) -> None:
 async def test_joint_venue_level_explained_and_chosen(user: User) -> None:
     """The level of a joint venue says where it comes from (the lowest of its conferences'),
     and is chosen right there; or it is not a joint venue."""
-    from helpers import add_source, make_person, pub
     from sqlalchemy import select
 
     from sci_report_analyzer import pubview, venues
@@ -2255,8 +2249,6 @@ async def test_joint_venue_level_explained_and_chosen(user: User) -> None:
 
 
 async def test_problems_on_folder_cards(user: User) -> None:
-    from helpers import add_source, make_person, pub
-
     from sci_report_analyzer import folders, pubview
 
     pid = make_person()
@@ -2309,7 +2301,7 @@ async def test_paper_tags_and_notes(user: User) -> None:
     # A note within the period.
     await user.should_see("period-note")
     user.find("period-note").elements.pop().value = "good *fit*"
-    await note_saved(user, "period-note")
+    await note_status(user, "period-note")
     with session_scope() as s:
         assert s.get(PeriodNote, (period, pub_id)).text == "good *fit*"
     await user.should_see(f"has-note-{pub_id}")

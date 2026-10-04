@@ -32,7 +32,7 @@ and reports, to prepare an evaluation.
 Your **email** (Settings → API keys) is required before anything is fetched: it is sent to
 the sources (OpenAlex, Crossref and Unpaywall ask for it) so they can reach you.
 
-A **primary source** (Settings → Sources; a folder can use another one, or none) decides
+A **primary source** (Settings → Publication sources; a folder can use another one, or none) decides
 which papers count: one it doesn't list for the person is left out of the panel, the reports
 and the summary, e.g. HAL, where CNRS researchers must deposit their papers. The switch
 *only those not in HAL* lists them, to add them there. The other sources still help find
@@ -53,7 +53,7 @@ chapters: their venue text is their own title, series or publisher, so they have
 linked to one by hand).
 Each source gives a venue text, which is matched to a venue:
 
-1. The text is cleaned by the **normalization rules** (Settings: regular expressions,
+1. The text is cleaned by the **cleaning rules** (Settings → Cleaning rules: regular expressions,
    possibly for some sources only, removing years, ordinals, page ranges…).
 2. It belongs to the venue having it as a **variant** (same cleaned text); a variant added
    by hand wins over everything else. Otherwise a **venue rule** (a regex on the source's
@@ -71,7 +71,7 @@ and kept forever. It is the paper's main source: its title, year, authors and ve
 the other sources only fill in what it lacks. A book chapter without an event (e.g. a volume
 of a series such as LNCS) names no real venue: the other sources give it.
 
-**Sources used.** Settings → Matching chooses the publication sources the app uses; a disabled
+**Sources used.** Settings → Publication sources chooses the sources the app uses; a disabled
 one is neither searched nor synced, and its records are left out (kept for later).
 
 Venues are classified in two levels:
@@ -234,7 +234,7 @@ image (on or off), **A** area, **B** bookmark, **F** find the paper, **E** add t
 category; PDF.js's own: ⌘F / Ctrl+F search, + / − zoom, N / P (or J / K) next and previous
 page, R rotate, Home / End, Delete removes the annotation selected. The panel's ⬇ button
 downloads the PDFs of all the papers shown; "Store a PDF" (details) uploads one. Settings →
-Data shows the space used and cleans up the files of papers no longer in the database. A
+Data & cache shows the space used and cleans up the files of papers no longer in the database. A
 paper that leaves the sources takes its downloaded PDF with it; an uploaded or annotated one
 keeps the paper.
 
@@ -333,7 +333,7 @@ estimated (3 years before the defence, marked ≈). They follow the panel's peri
 supervision overlapping it, juries with the defence within it.
 
 **Backups** of the database (not of the PDFs) are made in `backups/` next to it (Settings →
-Data shows where): one a day at startup (the last 7 kept), and one before each upgrade of
+Data & cache shows where): one a day at startup (the last 7 kept), and one before each upgrade of
 its schema (`pre-migration-…`; one marked `.pending` is from an upgrade that failed, and is
 always kept). To restore one, quit the app and copy it over the database file (removing the
 `-wal` and `-shm` files next to it).

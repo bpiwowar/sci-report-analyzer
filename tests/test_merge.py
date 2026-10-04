@@ -201,12 +201,9 @@ async def test_discover_searches_in_natural_name_order(monkeypatch):
 
 
 def test_purge_removes_papers_and_records():
-    from helpers import add_source, make_person, pub
-    from sqlalchemy import func, select
+    from sqlalchemy import func
 
-    from sci_report_analyzer import annotations, sync
-    from sci_report_analyzer.db.models import Publication, SourceLink, SourcePub
-    from sci_report_analyzer.db.session import session_scope
+    from sci_report_analyzer.db.models import SourceLink
 
     pid = make_person()
     other = make_person("Other Person")
