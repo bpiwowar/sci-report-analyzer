@@ -53,7 +53,8 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
 - A citation in the PDF (a reference linked to a paper): shift-click inserts the
   citation (`[@key]`) in the editor at the cursor, instead of opening the paper's
   details (plain click). Hovering a citation shows the possible actions (click: details,
-  shift-click: cite).
+  shift-click: cite), and whether the paper is in the folder's shortlist (its tags, e.g.
+  "starred": the colour says it already, the hover makes it explicit).
 - Split view of the notes (Markdown editor | preview): keep the two scrolled in sync
   (the preview follows the editor's position, and back), if possible.
 
