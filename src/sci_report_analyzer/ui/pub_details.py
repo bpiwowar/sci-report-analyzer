@@ -356,10 +356,13 @@ def venue_rule_dialog(
                 if not effects:
                     ui.label(_("No venue text changes venue.")).classes("text-xs text-grey")
                     return
+                n = sum(e.count for e in effects)
+                records = ngettext("{n} record", "{n} records", n).format(n=n)
                 ui.label(
-                    _("{n} venue text(s) change venue ({records} record(s)):").format(
-                        n=len(effects), records=sum(e.count for e in effects)
-                    )
+                    ngettext(
+                        "{n} venue text changes venue", "{n} venue texts change venue", len(effects)
+                    ).format(n=len(effects))
+                    + f" ({records}):"
                 ).classes("text-sm text-orange-9").mark("rule-effects")
                 with ui.column().classes("gap-0").style("max-height:240px;overflow-y:auto"):
                     for e in effects[:100]:
@@ -1592,7 +1595,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
         if preprints:
             ui.label(
                 ngettext(
-                    "{n} preprint record(s) ignored", "{n} preprint record(s) ignored", preprints
+                    "{n} preprint record ignored", "{n} preprint records ignored", preprints
                 ).format(n=preprints)
             ).classes("text-xs text-grey")
         ui.button(

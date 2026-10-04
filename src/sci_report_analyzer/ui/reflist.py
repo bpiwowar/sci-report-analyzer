@@ -226,13 +226,13 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
         with panel.dialogs:
             ui.notify(
                 ngettext(
-                    "“{tag}” put on {n} papers (not shown: {hidden})",
+                    "“{tag}” put on {n} paper (not shown: {hidden})",
                     "“{tag}” put on {n} papers (not shown: {hidden})",
                     len(numbers),
                 ).format(tag=chosen.name, n=len(numbers), hidden=panel.not_shown(rest))
                 if rest
                 else ngettext(
-                    "“{tag}” put on {n} papers", "“{tag}” put on {n} papers", len(numbers)
+                    "“{tag}” put on {n} paper", "“{tag}” put on {n} papers", len(numbers)
                 ).format(tag=chosen.name, n=len(numbers)),
                 type="warning" if rest else None,
             )

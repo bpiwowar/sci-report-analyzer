@@ -233,8 +233,8 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
         with ui.column().classes("gap-1 bg-red-1 rounded p-3 w-full"):
             ui.label(
                 ngettext(
-                    "This removes, for {n} person(s):",
-                    "This removes, for {n} person(s):",
+                    "This removes, for {n} person:",
+                    "This removes, for {n} people:",
                     n["people"],
                 ).format(n=n["people"])
             ).classes("font-medium")
@@ -274,8 +274,8 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
                 start_sync(pid)
             ui.notify(
                 ngettext(
-                    "Papers purged; re-syncing {n} person(s)",
-                    "Papers purged; re-syncing {n} person(s)",
+                    "Papers purged; re-syncing {n} person",
+                    "Papers purged; re-syncing {n} people",
                     n["people"],
                 ).format(n=n["people"]),
                 type="positive",
@@ -523,7 +523,7 @@ def _validated_card(person_id: int, ln: SourceLink) -> None:
         )
         if ln.record_count is not None:
             ui.label(
-                ngettext("{n} records", "{n} records", ln.record_count).format(n=ln.record_count)
+                ngettext("{n} record", "{n} records", ln.record_count).format(n=ln.record_count)
             ).classes("text-sm text-grey")
         ui.space()
         if ln.source == "scholar":
@@ -571,7 +571,7 @@ def _scholar_dialog(ln: SourceLink) -> None:
             finish_link(ln.id, result)
             n = len(result.publications)
             ui.notify(
-                ngettext("Imported {n} publications", "Imported {n} publications", n).format(n=n)
+                ngettext("Imported {n} publication", "Imported {n} publications", n).format(n=n)
             )
             _refresh(sources_list)
             _refresh(stale_banner)
@@ -604,7 +604,7 @@ def _candidate_card(
             details.append(ev["affiliation"])
         if ev.get("works_count") is not None:
             details.append(
-                ngettext("{n} works", "{n} works", ev["works_count"]).format(n=ev["works_count"])
+                ngettext("{n} work", "{n} works", ev["works_count"]).format(n=ev["works_count"])
             )
         own_id = ln.external_id if ln.source == "orcid" else ""
         theirs = normalize_orcid(ev.get("orcid") or own_id)

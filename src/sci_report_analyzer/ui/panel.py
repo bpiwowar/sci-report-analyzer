@@ -435,10 +435,10 @@ class PublicationsPanel:
         with ui.row().classes("w-full items-center gap-3"):
             n = (
                 ngettext(
-                    "{n} of {total} publications", "{n} of {total} publications", len(filtered)
+                    "{n} of {total} publication", "{n} of {total} publications", len(filtered)
                 ).format(n=len(conditioned), total=len(filtered))
                 if self.sels
-                else ngettext("{n} publications", "{n} publications", len(filtered)).format(
+                else ngettext("{n} publication", "{n} publications", len(filtered)).format(
                     n=len(filtered)
                 )
             )
@@ -701,9 +701,9 @@ class PublicationsPanel:
             for name, count in pending.most_common():
                 with ui.row().classes("items-center gap-2"):
                     span(author_html(name, "owner?", None))
-                    ui.label(
-                        ngettext("{n} paper(s)", "{n} paper(s)", count).format(n=count)
-                    ).classes("text-xs text-grey")
+                    ui.label(ngettext("{n} paper", "{n} papers", count).format(n=count)).classes(
+                        "text-xs text-grey"
+                    )
 
                     def accept(n=name) -> None:
                         annotations.add_alias(self.person_id, n)
