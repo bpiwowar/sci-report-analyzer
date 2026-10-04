@@ -2,7 +2,7 @@
 
 import pytest
 
-from sci_report_analyzer.ranking.normalize import LANGUAGE_RULES, apply_rules
+from sci_report_analyzer.ranking.normalize import LANGUAGE_RULES, apply_rules, normalize
 from sci_report_analyzer.ranking.ordinals import english_ordinal, french_ordinal
 
 
@@ -48,21 +48,24 @@ def test_english(n, words) -> None:
     [
         (
             "Thirty-fifth Conference on Neural Information Processing Systems",
-            "Conference on Neural Information Processing Systems",
+            "Zth Conference on Neural Information Processing Systems",
         ),
         (
             "The Fourth Arabic Natural Language Processing Workshop",
-            "The Arabic Natural Language Processing Workshop",
+            "The Zth Arabic Natural Language Processing Workshop",
         ),
-        ("Vingt-et-unième congrès", "congrès"),
-        ("Vingt et unièmes journées", "journées"),
-        ("DEUXIÈME atelier", "atelier"),
-        ("Premières rencontres", "rencontres"),
-        ("Quatre-vingtieme colloque", "colloque"),
-        ("45th Annual Meeting", "Annual Meeting"),
-        ("ACL 2022 - 60th Annual Meeting", "ACL 2022 - Annual Meeting"),
-        ("17e conférence", "conférence"),
-        ("1er atelier, 2ème colloque, 22èmes journées, 3ième", "atelier, colloque, journées,"),
+        ("Vingt-et-unième congrès", "Zème congrès"),
+        ("Vingt et unièmes journées", "Zème journées"),
+        ("DEUXIÈME atelier", "Zème atelier"),
+        ("Premières rencontres", "Zème rencontres"),
+        ("Quatre-vingtieme colloque", "Zème colloque"),
+        ("45th Annual Meeting", "Zth Annual Meeting"),
+        ("ACL 2022 - 60th Annual Meeting", "ACL 2022 - Zth Annual Meeting"),
+        ("17e conférence", "Zème conférence"),
+        (
+            "1er atelier, 2ème colloque, 22èmes journées, 3ième",
+            "Zème atelier, Zème colloque, Zème journées, Zème",
+        ),
         # Not ordinals:
         ("North American Chapter", "North American Chapter"),
         ("Health Text Mining", "Health Text Mining"),
@@ -72,3 +75,12 @@ def test_english(n, words) -> None:
 )
 def test_rules(text, cleaned) -> None:
     assert apply_rules(text, LANGUAGE_RULES) == cleaned
+
+
+def test_ordinal_marks_left_out_of_keys() -> None:
+    """ "Zth" / "Zème" are for reading: "Fourteenth X" and "X" have the same key."""
+    for text, plain in (
+        ("Fourteenth ACM Conference on Widgets", "ACM Conference on Widgets"),
+        ("Quatorzième conférence sur les gadgets", "conférence sur les gadgets"),
+    ):
+        assert normalize(apply_rules(text, LANGUAGE_RULES)) == normalize(plain)

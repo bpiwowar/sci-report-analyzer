@@ -91,13 +91,26 @@ def strip_diacritics(s: str) -> str:
     return _COMBINING.sub("", unicodedata.normalize("NFD", s))
 
 
+# What the ordinals rules leave ("Zth ACM Conference", "Zème conférence"): readable, but
+# not in the keys ("Fourteenth X" and "X" are the same venue).
+ORDINAL_EN, ORDINAL_FR = "Zth", "Zème"
+_ORDINAL_MARKS = re.compile(r"\b(?:zth|zeme)\b")
+_ORDINAL_MARKS_TEXT = re.compile(rf"\s*\b(?:{ORDINAL_EN}|{ORDINAL_FR})\b")
+
+
+def without_ordinal_marks(text: str) -> str:
+    """A cleaned text without its ordinal marks (as the rankings name venues)."""
+    return _ORDINAL_MARKS_TEXT.sub("", text).strip()
+
+
 def normalize(raw: str | None) -> str:
-    """Lowercase, de-accented, punctuation-stripped, single-spaced."""
+    """Lowercase, de-accented, punctuation-stripped, single-spaced (ordinal marks out)."""
     if not raw:
         return ""
     s = strip_diacritics(str(raw).lower())
     s = s.replace("&", " and ")
     s = _NON_ALNUM.sub(" ", s)
+    s = _ORDINAL_MARKS.sub(" ", s)
     return _SPACES.sub(" ", s.strip())
 
 
@@ -184,9 +197,10 @@ LANGUAGE_RULES: tuple[NormRule, ...] = (
     NormRule(
         id="ordinalsEn",
         name="Ordinals",
-        description="Remove ordinals: 1st, 35th…, and in words, first to thousandth "
-        "(twenty-first, one hundred and first…).",
+        description="Replace ordinals by “Zth” (left out of the keys): 1st, 35th…, and in "
+        "words, first to thousandth (twenty-first, one hundred and first…).",
         pattern=r"\b(?:\d+(?:st|nd|rd|th)|{ordinals:en})\b",
+        replacement=ORDINAL_EN,
         ignore_case=True,
         language="en",
         example="Fourteenth ACM Conference on Recommender Systems",
@@ -194,10 +208,11 @@ LANGUAGE_RULES: tuple[NormRule, ...] = (
     NormRule(
         id="ordinalsFr",
         name="Ordinals",
-        description="Remove ordinals: 1er, 17e, 22èmes…, and in words, premier to millième "
-        "(second, vingt et unième…).",
+        description="Replace ordinals by “Zème” (left out of the keys): 1er, 17e, 22èmes…, "
+        "and in words, premier to millième (second, vingt et unième…).",
         pattern=r"(?<![\wÀ-ÿ])(?:\d+(?:e|er|re|[eèé]re|i?[eè]me)s?|{ordinals:fr})"
         r"(?![\wÀ-ÿ])",
+        replacement=ORDINAL_FR,
         ignore_case=True,
         language="fr",
         example="Quatorzième conférence en recherche d'information",
