@@ -14,6 +14,7 @@ from sci_report_analyzer.ranking.normalize import (
     clean_venue,
     normalize,
     tokenize,
+    without_ordinal_marks,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -51,12 +52,14 @@ def _pick(r):
 @pytest.mark.parametrize("case", GOLDEN["cases"], ids=lambda c: c["venue"][:40])
 def test_cleaning(case):
     if case["venue"] in DIVERGES:
-        assert clean_venue(case["venue"]).startswith("Journées")
+        assert clean_venue(case["venue"]).startswith("Zème Journées")
         return
-    # The reference keeps spelled ordinals ("Thirty-sixth", "Première"): the language rules
-    # drop them.
+    # The reference keeps spelled ordinals ("Thirty-sixth", "Première") and drops the others:
+    # the language rules replace them all ("Zth"), a mark left out here.
     # Parenthesised text is kept (but acronyms): the reference's "cleanNoParens".
-    assert clean_venue(case["venue"]) == apply_rules(case["cleanNoParens"], LANGUAGE_RULES)
+    assert without_ordinal_marks(clean_venue(case["venue"])) == without_ordinal_marks(
+        apply_rules(case["cleanNoParens"], LANGUAGE_RULES)
+    )
     assert normalize(case["venue"]) == case["norm"]
     assert tokenize(case["venue"]) == case["tokens"]
 

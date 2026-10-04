@@ -35,6 +35,7 @@ from .normalize import (
     normalize,
     tokenize,
     tokens_match,
+    without_ordinal_marks,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,8 +78,9 @@ _PARENS = re.compile(r"\((?:[^()]|\([^()]*\))*\)")
 
 
 def for_rankings(text: str) -> str:
-    """A cleaned venue text as the rankings name it: without its parenthesised text."""
-    return re.sub(r"\s{2,}", " ", _PARENS.sub(" ", text)).strip()
+    """A cleaned venue text as the rankings name it: without its parenthesised text, nor
+    its ordinal marks ("Zth")."""
+    return re.sub(r"\s{2,}", " ", _PARENS.sub(" ", without_ordinal_marks(text))).strip()
 
 
 def paren_acronym(raw: str | None) -> str | None:

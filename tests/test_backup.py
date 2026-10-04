@@ -181,3 +181,26 @@ def test_parentheses_rule_dropped_from_saved_rules(tmp_path):
         with sqlite3.connect(db) as c:
             value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
         assert [r["id"] for r in value["norm_rules"]] == kept
+
+
+def test_ordinal_marks_in_saved_rules(tmp_path):
+    """Saved ordinal rules replace by "Zth" / "Zème" (not when their replacement was
+    edited)."""
+    import json
+
+    db = tmp_path / "db.sqlite"
+    cfg = _cfg()
+    with create_engine(f"sqlite:///{db}").begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "c4f8a2d6e913")
+    en = {"id": "ordinalsEn", "name": "Ordinals", "pattern": "x", "replacement": " "}
+    fr = {"id": "ordinalsFr", "name": "Ordinals", "pattern": "y", "replacement": "#"}
+    with sqlite3.connect(db) as c:
+        c.execute(
+            "INSERT INTO app_setting (key, value) VALUES ('matching', ?)",
+            (json.dumps({"norm_rules": [en, fr]}),),
+        )
+    _migrate(db)
+    with sqlite3.connect(db) as c:
+        value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
+    assert [r["replacement"] for r in value["norm_rules"]] == ["Zth", "#"]
