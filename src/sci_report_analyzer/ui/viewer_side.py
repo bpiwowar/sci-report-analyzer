@@ -973,10 +973,27 @@ def categories_section(side: Side) -> Callable[[], None]:
                 .style(f"padding-left:{1.2 * n.depth}rem")
             ):
                 ui.label(n.name).classes("font-medium text-sm" if not n.depth else "text-sm")
+                if n.influence:
+                    ui.icon("campaign", size="xs", color="amber-9").tooltip(
+                        _("The “rayonnement” category: it also lists the influence excerpts")
+                    )
                 if n.years:
                     ui.label(n.years).classes("text-xs text-grey")
                 if items:
                     ui.badge(str(len(items))).props("rounded color=amber-8")
+            if n.influence:  # (after its own: those flagged elsewhere, as copied)
+                paths = {c.id: c.path for c in nodes}
+                flagged = [
+                    e for c in nodes if c.id != n.id for e in by_cat.get(c.id, []) if e.influence
+                ]
+                for e in flagged:
+                    ui.label(f"{paths[e.category_id]} · {e.quoted}").classes(
+                        "text-xs text-grey italic line-clamp-2"
+                    ).style(f"padding-left:{1.2 * n.depth + 0.6}rem").tooltip(
+                        _("Flagged “influence” in {category} (copied here too)").format(
+                            category=paths[e.category_id]
+                        )
+                    ).mark(f"excerpt-influence-copy-{e.id}")
             for e in items:  # (an excerpt, or a group: its lead, then the others)
                 with (
                     ui.column()

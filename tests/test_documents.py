@@ -523,6 +523,23 @@ def test_categories_and_markdown():
         "- **Research › Projects**\n"
         "  - Led the ANR project X. %% Application, p. 2 %%\n"
     )
+    # A "rayonnement" category of the folder: them there too (after its own), no section.
+    outreach = categories.add(folder, "Outreach")
+    keynote = categories.add_excerpt(outreach, period, "Gave a keynote.", 4, [], document_id=doc)
+    categories.set_influence(folder, outreach)
+    assert [n.influence for n in categories.tree(folder)] == [False, False, False, True]
+    assert categories.markdown(folder, period).endswith(
+        "## Outreach\n\n- Gave a keynote. %% Application, p. 4 %%\n"
+        "- **Teaching**\n"
+        "  - Taught IR. %% Application, p. 1 %%\n"
+        "  - Chaired a workshop. %% Application, p. 3 %% — 2022\n"
+        "- **Research › Projects**\n"
+        "  - Led the ANR project X. %% Application, p. 2 %%\n"
+    )
+    categories.set_influence(folder, None)
+    assert "## Rayonnement" in categories.markdown(folder, period)
+    categories.remove_excerpt(keynote)
+    assert categories.delete(outreach)
     categories.remove_excerpt(chaired)
     categories.update_excerpt(taught)
     categories.update_excerpt(led)
@@ -779,6 +796,10 @@ async def test_categories_editor(user: User, monkeypatch, tmp_path):
     await user.should_see("A category cannot go within itself")
     user.find(marker="category-drop-end").trigger("drop", {"id": research})
     assert [n.path for n in categories.tree(folder)] == ["Teaching", "Research", "Research › New"]
+    # One "rayonnement" category (another one chosen: it instead).
+    user.find(marker=f"category-influence-{teaching}").click()
+    user.find(marker=f"category-influence-{research}").click()
+    assert [n.influence for n in categories.tree(folder)] == [False, True, False]
     # Not deleted with excerpts there (or below): moved first.
     new = categories.tree(folder)[2].id
     categories.add_excerpt(new, period, "Filed below.", 1, [], document_id=doc)

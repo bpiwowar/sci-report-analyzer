@@ -290,7 +290,7 @@ class Folder(Base):
 class Category(Base):
     """A category of a folder's grid (e.g. "Research", and under it "Projects"), in order:
     excerpts of its people's documents are filed in it. Its years (optional) are those it
-    is about."""
+    is about; one can gather the excerpts showing influence (``influence``)."""
 
     __tablename__ = "category"
 
@@ -303,6 +303,9 @@ class Category(Base):
     position: Mapped[int] = mapped_column(default=0)  # among its siblings
     start_year: Mapped[int | None]
     end_year: Mapped[int | None]
+    # The folder's "rayonnement" (at most one): the excerpts flagged "influence" in the
+    # other categories are listed in it too.
+    influence: Mapped[bool] = mapped_column(default=False, server_default="0")
 
 
 class Excerpt(Base):
