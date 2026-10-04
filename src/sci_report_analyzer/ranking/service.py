@@ -26,7 +26,7 @@ from .badge import (
     badge_archival,
     badge_from_record,
 )
-from .detection import DetectionRule, default_detection_rules
+from .detection import DetectionRule, Rule, default_detection_rules, regex
 from .kinds import DEFAULT_INTERNATIONAL_KEYWORDS, DEFAULT_NATIONAL_KEYWORDS
 from .matcher import Matcher
 from .normalize import (
@@ -48,31 +48,19 @@ MATCHING_KEY = "matching"
 LONG_TTL = timedelta(days=90)
 SHORT_TTL = timedelta(days=14)  # OpenAlex fallback and "not ranked"
 _ACRONYM_RE = re.compile(r"[A-Z]{3,}")
-_FINDINGS_PREFIX = re.compile(r"^\s*findings\s+(?:of\s+(?:the\s+)?)?", re.I)
 # A parenthesised acronym, as in DBLP stream titles: "AAAI Conference on AI (AAAI)".
 _PAREN_ACRONYM = re.compile(r"\(\s*([A-Za-z][A-Za-z0-9&+-]*[A-Z][A-Za-z0-9&+-]*)\s*\)")
 OPENALEX_BACKOFF = timedelta(minutes=15)
 
 
 # Bumped when the matching logic changes, so that cached matches are recomputed.
-MATCH_VERSION = "m9"
-# Words saying a venue text is a conference (not a journal).
-_CONFERENCE_CUE = re.compile(
-    r"\b(?:conf(?:erence|\.)?|conférence|symposium|workshops?|congress|colloque|"
-    r"proceedings|proc\.)(?=\W|$)",
-    re.I,
-)
-# Words naming a journal ("Journal of Neuroscience"), and a society or an event instead
-# ("Society for Neuroscience", its annual meeting).
-_JOURNAL_FORM = re.compile(
-    r"\b(?:journal|transactions|letters|review|annals|bulletin|magazine|quarterly|revue)\b",
-    re.I,
-)
-_NOT_A_JOURNAL = re.compile(
-    r"\b(?:society|soci[ée]t[ée]|association|meeting|congress|forum|summit)\b", re.I
-)
-# Minimum score of a conference record replacing a fuzzy journal match.
-CONFERENCE_ALT_SCORE = 0.75
+MATCH_VERSION = "m10"
+# Words saying a venue text is a conference, or a journal ("Journal of Neuroscience"), or
+# a society or an event instead ("Society for Neuroscience", its annual meeting); words any
+# conference name can have.
+_CONFERENCE_CUE = Rule("conference")
+_JOURNAL_FORM = Rule("journal")
+_NOT_A_JOURNAL = Rule("not_journal")
 
 
 # Parenthesised text, kept in the cleaned texts (it can name a track: "(Demonstrations)")
@@ -92,33 +80,14 @@ def paren_acronym(raw: str | None) -> str | None:
     return found[-1] if found else None
 
 
-# Words any conference name can have: they say nothing of which one it is.
-_GENERIC_WORDS = frozenset(
-    [
-        "international",
-        "national",
-        "annual",
-        "conference",
-        "conferences",
-        "symposium",
-        "workshop",
-        "proceedings",
-        "meeting",
-        "joint",
-        "acm",
-        "ieee",
-        "ifip",
-    ]
-)
-
-
 def _name_overlap(text: str, name: str | None) -> bool:
     """Whether a venue text and a ranking record's name substantially overlap: at least half
     of the distinctive words of the shorter one are shared, a word matching the other's
     word, a prefix of it ("comput" ↔ "computing") or the initials of consecutive words
     ("AI" ↔ "Artificial Intelligence")."""
-    a = [w for w in tokenize(_PAREN_ACRONYM.sub(" ", text)) if w not in _GENERIC_WORDS]
-    b = [w for w in tokenize(name) if w not in _GENERIC_WORDS]
+    generic = regex("generic_words")
+    a = tokenize(generic.sub(" ", _PAREN_ACRONYM.sub(" ", text)))
+    b = tokenize(generic.sub(" ", name or ""))
     if not a or not b:
         return False
 
@@ -177,6 +146,11 @@ class MatchSettings(BaseModel):
 
     sources: dict[str, bool] = Field(default_factory=_default_sources)
     min_score: float = 0.8
+    # Minimum score of a conference record replacing a fuzzy journal match of a conference
+    # text; of a match in the list of predatory venues; the score of an OpenAlex match.
+    conference_alt_score: float = 0.75
+    predatory_min_score: float = 0.9
+    openalex_score: float = 0.8
     # Ordered regex substitutions cleaning the venue texts of the sources.
     norm_rules: list[NormRule] = Field(default_factory=default_rules)
     # Venue kinds (first level): keywords deciding national vs international, the scope
@@ -380,7 +354,7 @@ class RankingService:
             hindex=stats.get("h_index"),
             twoYearMeanCitedness=stats.get("2yr_mean_citedness"),
             worksCount=s.get("works_count"),
-            score=0.8,
+            score=self.settings.openalex_score,
             exact=False,
             url=s.get("homepage_url") or s.get("id"),
         )
@@ -412,7 +386,9 @@ class RankingService:
         if findings:
             colon = raw_s.rfind(":")
             host_raw = (
-                _FINDINGS_PREFIX.sub("", raw_s, count=1) if colon == -1 else raw_s[colon + 1 :]
+                (tracks.conference_name(tracks.FINDINGS_ID, raw_s) or raw_s)
+                if colon == -1
+                else raw_s[colon + 1 :]
             )
         acronym = paren_acronym(host_raw) if corrected is None and type_hint != "journal" else None
         key = f"{norm_venue}#{type_hint}" if type_hint else norm_venue
@@ -458,7 +434,7 @@ class RankingService:
                     c
                     for c in self.matcher.candidates(match_venue, None, 10)
                     if c.record.get("type") == "conference"
-                    and c.score >= CONFERENCE_ALT_SCORE
+                    and c.score >= st.conference_alt_score
                     and st.source_on(c.record["source"])
                 ),
                 None,
@@ -525,7 +501,7 @@ class RankingService:
 
         if st.source_on("predatory"):
             ph = self.predatory.match(match_venue, issn)
-            if ph and (ph.exact or ph.score >= 0.9):
+            if ph and (ph.exact or ph.score >= st.predatory_min_score):
                 if badge is None:
                     badge = Badge(
                         name=ph.record["name"],

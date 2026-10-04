@@ -84,7 +84,7 @@ def auto_short_name(
 
 
 # Where a workshop's text names its main conference.
-_HOST_PART = re.compile(r"\s@\s?|@\s|\bco-located\b|\bin conjunction with\b", re.I)
+_HOST_PART = Rule("workshop_host")
 
 
 def ensure_venue(session: Session, raw: str, source: str | None = None) -> Venue | None:

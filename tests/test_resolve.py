@@ -262,6 +262,39 @@ def test_a_society_is_not_its_journal():
     assert asyncio.run(name("Journal of Neuroscience")) == "Journal of Neuroscience"
 
 
+def test_cues_are_the_detection_rules():
+    from sci_report_analyzer.ranking.detection import DetectionRule
+    from sci_report_analyzer.ranking.service import load_settings, save_settings
+
+    # A meeting is a conference: its acronym names the CORE conference, not the journal of
+    # its proceedings.
+    b = resolve("Annual Meeting of the Association for Computational Linguistics (ACL)")
+    assert b is not None and b.source == "core"
+    # Rules as set: a society is no longer told from a journal.
+    st = load_settings()
+    st.detection_rules = [
+        DetectionRule(id=r.id, pattern=r"\bguild\b") if r.id.startswith("not_journal") else r
+        for r in st.detection_rules
+    ]
+    save_settings(st)
+    assert resolve("Society for Neuroscience") is not None
+    assert resolve("Guild for Neuroscience") is None
+
+
+def test_thresholds_are_settings():
+    from sci_report_analyzer.ranking.service import load_settings, save_settings
+
+    def predatory(text):
+        b = resolve(text)
+        return bool(b and b.predatory)
+
+    assert not predatory("Journal of Legit Science")  # (0.77)
+    st = load_settings()
+    st.predatory_min_score = 0.75
+    save_settings(st)
+    assert predatory("Journal of Legit Science")
+
+
 def test_journals_are_downloaded_and_merged(monkeypatch, tmp_path):
     """Installed (not run from the source tree), the Scimago journals are downloaded from
     the repository, each update merged into the copy there; unchanged: not downloaded."""

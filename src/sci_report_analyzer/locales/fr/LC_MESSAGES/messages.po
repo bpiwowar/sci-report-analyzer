@@ -310,6 +310,18 @@ msgstr ""
 msgid "A venue text naming a journal (after the conference rule)."
 msgstr "Un texte de canal nommant une revue (après la règle des conférences)."
 
+msgid "A venue text naming a society or an event, not a journal."
+msgstr "Un texte de canal nommant une société ou un événement, pas une revue."
+
+msgid ""
+"A venue text naming a society or an event, not a journal: an approximate "
+"match to a journal of the same words is dropped (“Society for Neuroscience” "
+"is not the “Journal of Neuroscience”)."
+msgstr ""
+"Un texte de canal nommant une société ou un événement, pas une revue : sa "
+"correspondance approchée avec une revue de mêmes mots est écartée (« Society"
+" for Neuroscience » n'est pas le « Journal of Neuroscience »)."
+
 msgid "A venue text naming a workshop (ranked as its main conference)."
 msgstr ""
 "Un texte de canal nommant un atelier (classé comme sa conférence "
@@ -1557,6 +1569,9 @@ msgstr ""
 msgid "General: {names}"
 msgstr "Généraux : {names}"
 
+msgid "Generic words"
+msgstr "Mots génériques"
+
 msgid "Give an absolute path"
 msgstr "Indiquez un chemin absolu"
 
@@ -2106,6 +2121,9 @@ msgstr ""
 "Paramètres d’appariement (règles de nettoyage et de détection, sessions…)"
 " et décisions manuelles sur les canaux de publication. Les personnes et "
 "les publications ne sont jamais exportées."
+
+msgid "Matching the rankings"
+msgstr "Correspondance avec les classements"
 
 msgid "Merge"
 msgstr "Fusionner"
@@ -3507,6 +3525,9 @@ msgstr "Canaux similaires"
 msgid "Skip"
 msgstr "Passer"
 
+msgid "Society or event"
+msgstr "Société ou événement"
+
 msgid "Software"
 msgstr "Logiciel"
 
@@ -4443,6 +4464,15 @@ msgstr "Dans la période seulement"
 
 msgid "Won't be suggested again"
 msgstr "Ne sera plus proposé"
+
+msgid ""
+"Words any conference name can have, left out when comparing a venue text "
+"with the name of a ranking's record found by its acronym (they say nothing "
+"of which conference it is)."
+msgstr ""
+"Mots que tout nom de conférence peut avoir, ignorés en comparant un texte de"
+" canal au nom d'une entrée d'un classement trouvée par son acronyme (ils ne "
+"disent rien de la conférence dont il s'agit)."
 
 msgid ""
 "Words are matched case-insensitively, acronyms (e.g. TALN) case-"
@@ -5699,4 +5729,3 @@ msgstr "✓ C'est {name}"
 #, python-brace-format
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
-

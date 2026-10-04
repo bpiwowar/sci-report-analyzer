@@ -192,6 +192,9 @@ def _track_text(t: tracks.Track) -> str:
 
 _SCALARS = (
     "min_score",
+    "conference_alt_score",
+    "predatory_min_score",
+    "openalex_score",
     "national_keywords",
     "international_keywords",
     "unknown_scope",
