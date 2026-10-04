@@ -45,6 +45,9 @@ STATUS_COLOUR = {
     "rejected": "grey",
 }
 
+APP_NAME = "SciReport Analyzer"
+DEFAULT_COLOUR = "#0969da"  # (a new tag's, co-author category's…)
+
 # Opacity of the items not selected in a chart: faint, not to be confused with the selection.
 DIM_OPACITY = 0.12
 
@@ -76,7 +79,11 @@ CSS = """
 .vr-venue-link { color:inherit; text-decoration:none; }
 .vr-venue-link:hover .vr-matched { border-bottom-style:solid; }
 .vr-count-link { color:var(--q-primary); cursor:pointer; text-decoration:underline dotted; }
-.vr-drop td { background: rgba(9,105,218,.15) !important; outline: 1px dashed var(--q-primary); }
+/* Drag and drop (ui/dnd.py): dropped before, after or onto an item. */
+.vr-drop-before { box-shadow: inset 0 2px 0 var(--q-primary); }
+.vr-drop-after { box-shadow: inset 0 -2px 0 var(--q-primary); }
+.vr-drop-on, .vr-drop-on > td { background: rgba(25,118,210,.12) !important; }
+.vr-drop-on { outline: 1px dashed var(--q-primary); outline-offset: -1px; }
 .vr-row:hover { background: rgba(127,127,127,.08); }
 .vr-track { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 3px,
             transparent 3px 7px); }
@@ -102,15 +109,15 @@ MARKDOWN_CSS = """
 """
 CSS += MARKDOWN_CSS
 CSS += f".vr-dim {{ opacity:{DIM_OPACITY}; }}\n"
+ui.add_css(CSS, shared=True)  # (every page: also the PDF windows)
 
 
 @contextmanager
 def frame(title: str) -> Iterator[None]:
-    ui.add_css(CSS)
-    ui.page_title(f"{title} · SciReport Analyzer")
+    ui.page_title(f"{title} · {APP_NAME}")
     with ui.header().classes("items-center justify-between py-1"):
         with ui.row().classes("items-center gap-4"):
-            ui.link("SciReport Analyzer", "/").classes("text-white text-lg font-bold no-underline")
+            ui.link(APP_NAME, "/").classes("text-white text-lg font-bold no-underline")
             ui.link(_("Reports"), "/").classes("text-white no-underline")
             ui.link(_("Venues"), "/venues").classes("text-white no-underline")
             ui.link(_("Settings"), "/settings").classes("text-white no-underline")
@@ -138,6 +145,12 @@ def frame(title: str) -> Iterator[None]:
                 )
                 ui.link(_("Settings → API keys"), "/settings?tab=keys")
         yield
+
+
+def bare_page(title: str) -> None:
+    """A page without the frame (e.g. a PDF window): its title, no padding."""
+    ui.page_title(f"{title} · {APP_NAME}")
+    ui.query(".nicegui-content").classes("p-0 gap-0")
 
 
 def language_menu() -> None:
@@ -182,6 +195,35 @@ def chip_text(colour: str | None) -> str:
     return text_colour(c) if re.fullmatch(r"#[0-9a-fA-F]{6}", c) else "#fff"
 
 
+def chip_html(
+    label: str,
+    colour: str | None = None,
+    *,
+    style: str = "",
+    title: str | None = None,
+    striped: bool = False,
+) -> str:
+    """A chip: ``label`` (escaped) on ``colour`` (its text readable), with more ``style``
+    (e.g. a track's, ``track_style``), a hover ``title``; ``striped``: a track's stripes."""
+    css = (f"background:{colour};color:{chip_text(colour)};" if colour else "") + style
+    cls = "vr-chip vr-track" if striped else "vr-chip"
+    hover = f' title="{escape(title)}"' if title else ""
+    return f'<span class="{cls}" style="{css}"{hover}>{escape(label)}</span>'
+
+
+# The main track (no track): a discreet chip.
+MAIN_TRACK_STYLE = "background:transparent;color:#8c959f;border:1px dashed #c8d1da"
+
+
+def track_style(track: str | None, colours: dict[str, str] | None = None) -> str:
+    """A track's chip style, in its colour (``colours``: those of the tracks as edited, else
+    as saved); the main track (no track) discreet."""
+    if not track:
+        return MAIN_TRACK_STYLE
+    colour = tracks.colour(track) if colours is None else colours.get(track, tracks.FALLBACK_COLOUR)
+    return f"background:{colour};color:{chip_text(colour)}"
+
+
 def chip_style(colour: str, selected: bool = True) -> str:
     """The style of a selectable q-chip in ``colour``, its text readable when selected."""
     return f"--q-primary:{colour}" + (f";color:{chip_text(colour)}" if selected else "")
@@ -202,14 +244,7 @@ def stripes(cat: Category) -> str:
 
 def track_chip_html(track: str | None) -> str:
     """A track's chip, in its colour (none: the main track, discreet)."""
-    if track:
-        colour = tracks.colour(track)
-        style = f"background:{colour};color:{chip_text(colour)}"
-        label = tracks.name(track)
-    else:
-        style = "background:transparent;color:#8c959f;border:1px dashed #c8d1da"
-        label = _("main track")
-    return f'<span class="vr-chip" style="{style}">{escape(label)}</span>'
+    return chip_html(tracks.name(track) if track else _("main track"), style=track_style(track))
 
 
 def track_chip(track: str | None, mark: str | None = None) -> ui.html:
@@ -228,12 +263,7 @@ def rank_chip(badge: Badge | None, track: str | None = None, kind: str | None = 
         label = badge.rank_label if cat.base_key == "other" else cat.label
     if badge and badge.predatory:
         label = f"⚠ {label}"
-    cls = "vr-chip vr-track" if cat.striped else "vr-chip"
-    colour = cat.colour
-    el = span(
-        f'<span class="{cls}" style="background:{colour};color:{text_colour(colour)}'
-        f'{stripes(cat)}">{escape(label)}</span>'
-    )
+    el = span(chip_html(label, cat.colour, style=stripes(cat), striped=cat.striped))
     if badge:
         with el:
             ui.tooltip(badge_details(badge)).style("white-space:pre-line")
@@ -310,6 +340,29 @@ def source_tag(source: str, archival: bool = False, url: str | None = None) -> u
     return tag
 
 
+def refresh_alive(r: ui.refreshable, *args) -> None:
+    """Refresh a module-level refreshable (on every page showing it), skipping the pages
+    that are gone (their client deleted)."""
+
+    def alive(target) -> bool:
+        try:
+            target.container.client  # noqa: B018 - raises once the client was deleted
+        except RuntimeError:
+            return False
+        return not target.container.is_deleted
+
+    r.targets = [t for t in r.targets if alive(t)]
+    r.refresh(*args)
+
+
+def int_or_none(v) -> int | None:
+    """An input's integer (a number, or its text), else None (empty, or not a number)."""
+    try:
+        return int(v) if v not in (None, "") else None
+    except ValueError:
+        return None
+
+
 def fmt_dt(dt) -> str:
     return dt.strftime("%Y-%m-%d %H:%M") if dt else "—"
 
@@ -321,6 +374,49 @@ def level_options(levels: list[str]) -> dict[str, str]:
         return text.split(":", 1)[-1].split(",")[0].split("(")[0].strip().rstrip(".")
 
     return {lv: f"{lv} — {short(LEVEL_HELP[lv])}" if lv in LEVEL_HELP else lv for lv in levels}
+
+
+CORE_RANKS = ["A*", "A", "B", "C"]
+QUARTILES = ["Q1", "Q2", "Q3", "Q4"]
+
+
+def level_picker(
+    level_type: str, rank: str | None, *, allow_auto: bool = False
+) -> tuple[ui.select, ui.select]:
+    """A level set by hand: its type (conference or journal) and its rank, among those of
+    the type (CORE ranks, quartiles) or typed; ``allow_auto``: or none (automatic). Returns
+    the type and rank selects; the rank explained below."""
+    auto = {"": _("— automatic")} if allow_auto else {}
+
+    def options(t: str, current: str | None = None) -> dict[str, str]:
+        levels = CORE_RANKS if t == "conference" else QUARTILES
+        extra = [current] if current and current not in levels else []
+        return {**auto, **level_options([*levels, *extra])}
+
+    def type_changed(e) -> None:
+        keep = allow_auto and not rank_select.value
+        rank_select.set_options(
+            options(e.value), value="" if keep else "A" if e.value == "conference" else "Q1"
+        )
+
+    with ui.row().classes("items-center gap-2"):
+        type_select = ui.select(
+            {"conference": _("Conference (CORE)"), "journal": _("Journal (quartile)")},
+            value=level_type,
+            on_change=type_changed,
+        ).props("dense outlined")
+        rank_select = (
+            ui.select(
+                options(level_type, rank),
+                value=rank or ("" if allow_auto else "A" if level_type == "conference" else "Q1"),
+                new_value_mode="add-unique",
+                with_input=True,
+            )
+            .props("dense outlined")
+            .classes("w-72")
+        )
+    level_hint(rank_select).bind_visibility_from(rank_select, "value")
+    return type_select, rank_select
 
 
 def level_hint(select) -> ui.label:
@@ -347,7 +443,7 @@ def author_html(name: str, mark: str | None, note: str | None, colour: str | Non
     text = escape(name)
     title = f' title="{escape(note)}"' if note else ""
     if mark and mark.startswith("cat:"):
-        c = escape(colour or "#0969da", quote=True)
+        c = escape(colour or DEFAULT_COLOUR, quote=True)
         return f'<span class="vr-cat" style="color:{c}"{title}>{text}</span>'
     if mark == "owner":
         return f'<span class="vr-owner">{text}</span>'

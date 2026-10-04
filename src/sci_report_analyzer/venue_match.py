@@ -346,3 +346,17 @@ def texts_of(venue_ids: Iterable[int]) -> dict[int, list[TextMatch]]:
         if m.venue_id in ids:
             out[m.venue_id].append(m)
     return out
+
+
+def key_changes(rules: Iterable) -> list[tuple[TextMatch, str]]:
+    """The venue texts whose key would change with these cleaning rules (``NormRule``):
+    (text, new key)."""
+    from .ranking.normalize import apply_rules, normalize
+
+    rules = list(rules)
+    changed = []
+    for m in matches().values():
+        new = normalize(apply_rules(m.raw, rules, m.source))
+        if new != m.key:
+            changed.append((m, new))
+    return changed

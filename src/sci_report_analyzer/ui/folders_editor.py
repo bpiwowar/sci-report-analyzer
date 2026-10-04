@@ -10,7 +10,8 @@ from nicegui import ui
 
 from .. import annotations, folders
 from ..i18n import _, ngettext
-from .categories_editor import _DRAG, _DROP, _LEAVE, _OVER
+from .dialogs import actions, confirm, ok_handler, transient_dialog
+from .dnd import draggable, drop_zone
 
 TOP = 0  # "parent" value of the top level
 ALL = 0  # "folder" value of the All people (cleanup) view (on the Reports page)
@@ -44,16 +45,14 @@ def folders_tree(current: int, select: Callable[[int], None], changed: Callable[
             then()
         changed()
 
-    def dropped(args, target: folders.FolderNode | None) -> None:
+    def dropped(folder_id: int, target: folders.FolderNode | None, where: str) -> None:
         """Onto the middle of a folder: within it; its top or bottom: next to it (in its
         parent); the bottom zone (no target): at the top level."""
-        if not isinstance(args, dict) or not args.get("id"):
-            return
         parent = None
         if target is not None:
-            parent = target.id if args.get("where") == "inside" else target.parent_id
-        if int(args["id"]) != (target.id if target else None):
-            move(int(args["id"]), parent)
+            parent = target.id if where == "inside" else target.parent_id
+        if folder_id != (target.id if target else None):
+            move(folder_id, parent)
 
     def toggle(folder_id: int) -> None:
         collapsed.symmetric_difference_update({folder_id})
@@ -102,13 +101,10 @@ def folders_tree(current: int, select: Callable[[int], None], changed: Callable[
                     + (" bg-amber-2" if n.id == current else "")
                 )
                 .style(f"padding-left:{1.1 * n.depth}rem")
-                .props("draggable=true")
                 .mark(f"folder-node-{n.id}")
             )
-            row.on("dragstart", js_handler=_DRAG % n.id)
-            row.on("dragover", js_handler=_OVER)
-            row.on("dragleave", js_handler=_LEAVE)
-            row.on("drop", lambda e, n=n: dropped(e.args, n), js_handler=_DROP)
+            draggable(row, "folder", n.id)
+            drop_zone(row, "folder", lambda i, w, n=n: dropped(i, n, w), middle="inside")
             row.on(
                 "click",
                 lambda n=n: select(n.id),
@@ -157,9 +153,7 @@ def folders_tree(current: int, select: Callable[[int], None], changed: Callable[
                 .style("border: 1px dashed #bbb")
                 .mark("folder-drop-top")
             )
-            end_zone.on("dragover", js_handler=_OVER)
-            end_zone.on("dragleave", js_handler=_LEAVE)
-            end_zone.on("drop", lambda e: dropped(e.args, None), js_handler=_DROP)
+            drop_zone(end_zone, "folder", lambda i, w: dropped(i, None, w), zoned=False)
 
     with ui.column().classes("w-full gap-0"):
         listing()
@@ -231,22 +225,16 @@ def _menu(
 
 
 def _rename_dialog(n: folders.FolderNode, changed: Callable[[], None]) -> None:
-    with ui.dialog() as dlg, ui.card().classes("w-96"):
-        ui.label(_("Rename the folder")).classes("text-lg")
+    with transient_dialog(_("Rename the folder"), width="w-96") as (dlg, _card):
         name = ui.input(_("Name"), value=n.name).classes("w-full").props("autofocus")
         name.mark("folder-rename-input")
 
         def ok() -> None:
             folders.rename(n.id, name.value)
-            dlg.close()
             changed()
 
-        name.on("keydown.enter", ok)
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Rename"), on_click=ok).mark("folder-rename-ok")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+        name.on("keydown.enter", ok_handler(dlg, ok))
+        actions(dlg, _("Rename"), ok, mark="folder-rename-ok")
 
 
 def _move_dialog(
@@ -256,8 +244,10 @@ def _move_dialog(
 ) -> None:
     """Where a folder is: the top level, or another folder (not within itself)."""
     within = set(folders.within(n.id))
-    with ui.dialog() as dlg, ui.card().classes("w-96"):
-        ui.label(_("Move “{folder}” to").format(folder=n.name)).classes("text-lg")
+    with transient_dialog(_("Move “{folder}” to").format(folder=n.name), width="w-96") as (
+        dlg,
+        _card,
+    ):
 
         def chosen(e) -> None:
             move(n.id, e.value, dlg.close)
@@ -268,10 +258,7 @@ def _move_dialog(
             label=_("In"),
             on_change=chosen,
         ).props("dense outlined options-dense").classes("w-full").mark(f"folder-parent-{n.id}")
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+        actions(dlg)
 
 
 def _own_settings(n: folders.FolderNode, changed: Callable[[], None]) -> None:
@@ -281,28 +268,22 @@ def _own_settings(n: folders.FolderNode, changed: Callable[[], None]) -> None:
 
 
 def _parent_settings(n: folders.FolderNode, changed: Callable[[], None]) -> None:
-    with ui.dialog() as confirm, ui.card().classes("max-w-lg"):
-        ui.label(
-            _(
-                "Use the settings of the folder it is in? Its own ones (categories, "
-                "citations in the notes) are dropped, unless other folders use them; its "
-                "people's excerpts go to the categories of the same names there (added if "
-                "missing)."
-            )
-        )
 
-        def ok() -> None:
-            _added(folders.use_parent_settings(n.id))
-            confirm.close()  # (before: a closed dialog loses its client)
-            changed()
+    def ok() -> None:
+        _added(folders.use_parent_settings(n.id))
+        changed()
 
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Cancel"), on_click=confirm.close).props("flat")
-            ui.button(_("Use the parent's"), color="negative", on_click=ok).mark(
-                "folder-settings-confirm"
-            )
-    confirm.on_value_change(lambda e: None if e.value else confirm.delete())
-    confirm.open()
+    confirm(
+        _(
+            "Use the settings of the folder it is in? Its own ones (categories, "
+            "citations in the notes) are dropped, unless other folders use them; its "
+            "people's excerpts go to the categories of the same names there (added if "
+            "missing)."
+        ),
+        _("Use the parent's"),
+        ok,
+        mark="folder-settings-confirm",
+    )
 
 
 def _settings_dialog(
@@ -323,14 +304,11 @@ def _settings_dialog(
         while up in by_id and up not in targets:
             targets[up] = by_id[up].path
             up = by_id[up].parent_id
-    with ui.dialog() as dlg, ui.card().classes("w-[36rem] max-w-full"):
-        ui.label(
-            (
-                _("Copy the settings of “{folder}”")
-                if copy
-                else _("Move the settings of “{folder}”")
-            ).format(folder=n.path)
-        ).classes("text-lg")
+    title = _("Copy the settings of “{folder}”") if copy else _("Move the settings of “{folder}”")
+    with transient_dialog(title.format(folder=n.path), width="w-[36rem] max-w-full") as (
+        dlg,
+        _card,
+    ):
         ui.label(
             _(
                 "The folder gets its own copy of these settings (its categories, the citations "
@@ -373,9 +351,9 @@ def _settings_dialog(
 
         who()
 
-        def ok() -> None:
+        def ok() -> bool | None:
             if target.value is None:
-                return
+                return False
             try:
                 if copy:
                     n_added = folders.copy_settings_to(n.id, target.value)
@@ -383,15 +361,9 @@ def _settings_dialog(
                     n_added = folders.move_settings(n.id, target.value)
             except ValueError as e:
                 ui.notify(str(e), type="warning")
-                return
+                return False
             _added(n_added)
-            dlg.close()  # (before: a closed dialog loses its client)
             changed()
 
-        with ui.row().classes("w-full justify-end"):
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Copy") if copy else _("Move"), color="negative", on_click=ok).mark(
-                "folder-settings-apply"
-            )
-    dlg.on_value_change(lambda e: None if e.value else dlg.delete())
-    dlg.open()
+        label = _("Copy") if copy else _("Move")
+        actions(dlg, label, ok, danger=True, mark="folder-settings-apply")

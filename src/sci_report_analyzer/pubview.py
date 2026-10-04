@@ -1252,3 +1252,122 @@ def hashtag(name: str) -> str:
 def links_of(person_id: int) -> list[SourceLink]:
     with session_scope() as s:
         return list(s.scalars(select(SourceLink).where(SourceLink.person_id == person_id)))
+
+
+# A paper's source records by venue and track (its matching tab).
+GroupKey = tuple[int | None, str | None]
+
+
+@dataclass
+class VenueGroups:
+    """A paper's published records (its preprints too, when it has only them) by venue and
+    track, the paper's own first; ``used``: the records whose venue is used; ``several``:
+    more than one venue; ``conflicting``: the sources disagree (on the venue or the track);
+    ``no_venue``: a kind without one (a book…), so no group."""
+
+    groups: dict[GroupKey, list[MemberView]]
+    used: set[int]
+    preprints: int
+    several: bool
+    conflicting: bool
+    no_venue: bool
+
+
+def venue_groups(stat: PubStat) -> VenueGroups:
+    # Preprints (arXiv, HAL deposits...) don't rank the paper: only the published versions
+    # count (unless there are only preprints).
+    published = [m for m in stat.members if not m.archival] or stat.members
+    # A different track is a disagreement too; a record without one takes that of its
+    # venue's other records (a demo paper is a demo).
+    groups: dict[GroupKey, list[MemberView]] = {}
+    for m in published:
+        groups.setdefault((m.venue_id, track_of(m, published)), []).append(m)
+    first = [k for k in groups if k[0] == stat.venue_id and k[1] == stat.track] or [
+        k for k in groups if k[0] == stat.venue_id
+    ]
+    if first:  # the paper's venue first
+        groups = {first[0]: groups.pop(first[0]), **groups}
+    no_venue = stat.kind in NO_VENUE_KINDS and stat.venue_id is None
+    if no_venue:
+        groups = {}
+    # A workshop's main conference is no disagreement (the workshop is more precise).
+    dm = doi_member(stat.members)
+    conflicting = len(
+        {
+            (same_venue(ms[0]), k[1])
+            for k, ms in groups.items()
+            if k[0] is not None and not all(m.minor for m in ms)
+        }
+    ) > 1 and (dm is None or dm.minor)
+    return VenueGroups(
+        groups,
+        used={m.id for m in venue_members(stat.members)},
+        preprints=len(stat.members) - len(published),
+        several=len([g for g in groups if g[0] is not None]) > 1,
+        conflicting=conflicting,
+        no_venue=no_venue,
+    )
+
+
+# ---- the panel's statistics (counted here, drawn by the panel) ------------------------------
+
+
+def year_counts(rows: list[PubStat], bins: list[tuple[str, int, int]]) -> dict[str, list[int]]:
+    """Per category key, its papers in each year bin (``year_bin_defs``)."""
+    counts: dict[str, list[int]] = {}
+    for s in rows:
+        if s.year is None:
+            continue
+        line = counts.setdefault(s.category.key, [0] * len(bins))
+        for i, (_label, lo, hi) in enumerate(bins):
+            if lo <= s.year <= hi:
+                line[i] += 1
+    return counts
+
+
+def coauthor_counts(rows: list[PubStat]) -> dict[int, int]:
+    """The papers by number of co-authors (``HIST_CAP``: that many or more)."""
+    counts: dict[int, int] = {}
+    for s in rows:
+        if s.num_authors is not None:
+            n = min(s.num_authors, HIST_CAP)
+            counts[n] = counts.get(n, 0) + 1
+    return counts
+
+
+@dataclass
+class RoleShares:
+    """The person's contribution roles in papers: in all of them (the first column), then
+    by years (``bins``: ``year_bin_defs``, if they span several years)."""
+
+    bins: list[tuple[str, int, int]]
+    totals: list[int]  # the papers of each column
+    counts: dict[str, list[int]]  # per role, its papers in each column
+    first: int  # the share (%) of the papers as sole or first author
+    last: int  # as last author
+
+
+def role_shares(rows: list[PubStat], roles: Iterable[str]) -> RoleShares | None:
+    """Of the papers with a role (none: None)."""
+    known = [s for s in rows if s.contribution]
+    if not known:
+        return None
+    years = [s.year for s in known if s.year is not None]
+    bins = year_bin_defs(years) if len(set(years)) > 1 else []
+    columns = [(None, None), *((lo, hi) for _label, lo, hi in bins)]
+
+    def within(s: PubStat, lo: int | None, hi: int | None) -> bool:
+        return lo is None or (s.year is not None and lo <= s.year <= hi)
+
+    totals = [sum(within(s, lo, hi) for s in known) for lo, hi in columns]
+    counts = {
+        role: [
+            sum(s.contribution == role and within(s, lo, hi) for s in known) for lo, hi in columns
+        ]
+        for role in roles
+    }
+
+    def share(keys: tuple[str, ...]) -> int:
+        return round(100 * sum(s.contribution in keys for s in known) / len(known))
+
+    return RoleShares(bins, totals, counts, share(("sole", "first")), share(("last",)))

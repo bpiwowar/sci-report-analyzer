@@ -1402,3 +1402,87 @@ def pattern_uses(venue_id: int) -> list[PatternUse]:
                 lost.append((src, raw, m.venue_name))
         out.append(PatternUse(i, r, sorted(ex, key=lambda e: -e[2]), lost))
     return out
+
+
+# ---- a venue's dialog ------------------------------------------------------------------------
+
+
+@dataclass
+class VenueEdit:
+    """A venue's fields set by hand, as edited in its dialog (empty: automatic)."""
+
+    name: str = ""  # (a joint venue without one: named after its conferences)
+    short_name: str = ""
+    no_short: bool = False  # it has no acronym (none inferred)
+    url: str = ""
+    kind: str = ""
+    level_type: str = "conference"
+    level_rank: str = ""
+    record_key: str | None = None
+    match_text: str = ""
+    issns: str = ""  # comma-separated
+    auto_name: bool = False  # (a joint venue named after its conferences)
+
+
+def edit_state(venue_id: int, kind: str) -> VenueEdit | None:
+    """A venue's fields set by hand, to edit (``kind``: its kind now, its level's type by
+    default)."""
+    with session_scope() as s:
+        v = s.get(Venue, venue_id)
+        if v is None:
+            return None
+        auto_name = _auto_named(v)
+        return VenueEdit(
+            name="" if auto_name else v.name,
+            short_name=(v.short_name or "") if v.short_manual else "",
+            no_short=v.short_manual and not v.short_name,
+            url=v.url or "",
+            kind=v.kind if v.kind_manual else "",
+            level_type=v.level_type or ("journal" if kind.endswith("journal") else "conference"),
+            level_rank=v.level_rank or "",
+            record_key=v.record_key,
+            match_text=v.match_text or "",
+            issns=", ".join((v.identifiers or {}).get("issn") or []),
+            auto_name=auto_name,
+        )
+
+
+def save_edit(venue_id: int, edit: VenueEdit, *, parts: Any = ..., hosts: Any = ...) -> None:
+    """Save a venue as edited. ``parts``: a joint venue's conferences set by hand (None:
+    back to those found in its texts; ``...``: unchanged); ``hosts``: a workshop's main
+    conferences (``...``: unchanged). A joint venue without a name typed is named after its
+    conferences."""
+    with session_scope() as s:
+        v = s.get(Venue, venue_id)
+        if v is None:
+            return
+        name, current, was_auto = v.name, v.parts, _auto_named(v)
+        parts_manual = bool((v.joint or {}).get("manual"))
+        issns = ", ".join((v.identifiers or {}).get("issn") or [])
+    typed = edit.name.strip()
+    joint = bool(current if parts is ... else parts)
+    if parts is None:  # (back to the parts found in its texts: those it has so far)
+        joint = bool(current) and not parts_manual
+    auto = joint and not typed
+    if hosts is not ...:
+        save_hosts(venue_id, hosts)
+    short = edit.short_name.strip()
+    update_venue(
+        venue_id,
+        **({} if auto else {"name": typed or name}),
+        short_name=None if edit.no_short else short or None,
+        short_manual=edit.no_short or bool(short),
+        url=normalize_url(edit.url),
+        kind=edit.kind or None,
+        level_type=edit.level_type if edit.level_rank else None,
+        level_rank=edit.level_rank or None,
+        record_key=edit.record_key,
+        match_text=edit.match_text.strip() or None,
+    )
+    if edit.issns != issns:
+        save_issns(venue_id, [i for i in edit.issns.split(",") if i.strip()])
+    # (after the name: one typed is no longer that of its conferences)
+    if parts is not ... or auto != was_auto:
+        if parts is ...:
+            parts = list(current) if parts_manual else None
+        set_joint_parts(venue_id, parts, auto_name=auto)

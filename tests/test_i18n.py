@@ -34,7 +34,7 @@ def test_every_string_has_a_french_translation(english) -> None:
     missing = sorted(m for m in _source_msgids() if fr.gettext(m) == m and m.strip())
     # (a few strings are the same in French: listed in the catalog with msgstr == msgid)
     po = (PKG / "locales/fr/LC_MESSAGES/messages.po").read_text(encoding="utf-8")
-    missing = [m for m in missing if f'msgstr "{m}"' not in po]
+    missing = [m for m in missing if f'msgstr "{m}"' not in po and f'msgstr[0] "{m}"' not in po]
     assert not missing, f"{len(missing)} untranslated strings, e.g. {missing[:5]}"
 
 

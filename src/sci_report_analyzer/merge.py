@@ -299,3 +299,54 @@ def join_publications(session: Session, target: Publication, others: Sequence[Pu
     session.flush()
     session.refresh(target)
     canonical(target, target.members)
+
+
+def split_out(source_pub_id: int) -> None:
+    """A source's record out of its publication (not the same paper): one of its own."""
+    from .db.session import session_scope
+
+    with session_scope() as s:
+        if (sp := s.get(SourcePub, source_pub_id)) is not None:
+            split_member(s, sp)
+
+
+def join(pub_id: int, other_ids: Sequence[int]) -> None:
+    """Publications merged into ``pub_id`` (the same paper)."""
+    from .db.session import session_scope
+
+    with session_scope() as s:
+        target = s.get(Publication, pub_id)
+        others = [p for i in other_ids if (p := s.get(Publication, i)) is not None]
+        if target is not None and others:
+            join_publications(s, target, others)
+
+
+def source_record(source_pub_id: int) -> dict | None:
+    """What a source says about a record (its fields), and the profile it comes from
+    (``link_url``, ``external_id``)."""
+    from .db.session import session_scope
+
+    with session_scope() as s:
+        sp = s.get(SourcePub, source_pub_id)
+        if sp is None:
+            return None
+        fields = (
+            "title",
+            "venue",
+            "year",
+            "authors",
+            "doc_type",
+            "doi",
+            "issn",
+            "venue_type",
+            "external_key",
+            "pdf_url",
+            "archival",
+            "url",
+            "raw",
+        )
+        return {
+            **{k: getattr(sp, k) for k in fields},
+            "link_url": sp.link.url,
+            "external_id": sp.link.external_id,
+        }

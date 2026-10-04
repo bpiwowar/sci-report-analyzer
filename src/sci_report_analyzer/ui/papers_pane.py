@@ -16,7 +16,10 @@ from .mdedit import MarkdownEditor
 from .tags import draggable, number_edit, reorder, save_number, step
 from .theme import NOTE_EXTRAS
 
-_CSS = ".vr-at-cursor { background: rgba(255, 193, 7, 0.25); box-shadow: inset 3px 0 #ffc107; }"
+ui.add_css(
+    ".vr-at-cursor { background: rgba(255, 193, 7, 0.25); box-shadow: inset 3px 0 #ffc107; }",
+    shared=True,
+)
 
 # The citation at the cursor: its paper highlighted in the pane (and scrolled to).
 _CURSOR_JS = r"""
@@ -94,7 +97,6 @@ class PapersPane:
         self.period_id = period_id
         self.mark = mark
         self._cited: dict | None = None
-        ui.add_css(_CSS)
         with ui.column().classes("w-full gap-1 no-wrap") as self.box:
             self.search = (
                 ui.input(

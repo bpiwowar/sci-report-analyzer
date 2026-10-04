@@ -365,6 +365,9 @@ msgstr ""
 msgid "API keys"
 msgstr "Clés d’API"
 
+msgid "Activities"
+msgstr "Activités"
+
 msgid "Add"
 msgstr "Ajouter"
 
@@ -762,9 +765,6 @@ msgstr ""
 "Profils candidats trouvés — validez-les dans l'onglet Sources. Certaines "
 "sources ont échoué : {sources}"
 
-msgid "Candidates"
-msgstr "Candidats"
-
 msgid "Candidates to review"
 msgstr "Candidats à examiner"
 
@@ -846,10 +846,6 @@ msgstr "Nettoyer"
 msgid "Cleaned as"
 msgstr "Nettoyé en"
 
-#, python-brace-format
-msgid "Cleaned as: “{text}”"
-msgstr "Nettoyé en : « {text} »"
-
 msgid "Cleaned text (after the normalization rules)"
 msgstr "Texte nettoyé (après les règles de normalisation)"
 
@@ -857,8 +853,10 @@ msgid "Cleaning rules"
 msgstr "Règles de nettoyage"
 
 #, python-brace-format
-msgid "Cleaning rules saved — {n} venue text(s) re-matched"
-msgstr "Règles de nettoyage enregistrées — {n} texte(s) de canal ré-apparié(s)"
+msgid "Cleaning rules saved — {n} venue text re-matched"
+msgid_plural "Cleaning rules saved — {n} venue texts re-matched"
+msgstr[0] "Règles de nettoyage enregistrées — {n} texte de canal ré-apparié"
+msgstr[1] "Règles de nettoyage enregistrées — {n} textes de canal ré-appariés"
 
 msgid "Clear"
 msgstr "Effacer"
@@ -906,6 +904,15 @@ msgstr "Effacer les réglages automatiques de tous les articles ?"
 
 msgid "Clear the filters (the period and its years are kept)"
 msgstr "Effacer les filtres (la période et ses années sont conservées)"
+
+#, python-brace-format
+msgid ""
+"Clear the manual decisions on “{venue}” (its kind, level, ranking record,"
+" short name, search text, joint conference, workshop hosts)?"
+msgstr ""
+"Effacer les décisions manuelles sur « {venue} » (son type, son niveau, "
+"son entrée de classement, son nom court, son texte de recherche, sa "
+"conférence conjointe, les conférences d'un atelier) ?"
 
 msgid "Clear the notes"
 msgstr "Effacer les notes"
@@ -1134,6 +1141,10 @@ msgstr "Supprimer"
 msgid "Delete rule"
 msgstr "Supprimer la règle"
 
+#, python-brace-format
+msgid "Delete the co-author category “{name}”?"
+msgstr "Supprimer la catégorie de co-auteurs « {name} » ?"
+
 msgid "Delete the data"
 msgstr "Supprimer les données"
 
@@ -1144,11 +1155,21 @@ msgstr ""
 "Supprimer les fichiers des articles qui ne sont plus dans la base, et "
 "oublier les PDF dont le fichier a été supprimé à la main"
 
+#, python-brace-format
+msgid "Delete the folder “{folder}” and its periods? Its people are kept."
+msgstr ""
+"Supprimer le dossier « {folder} » et ses périodes ? Ses personnes sont "
+"conservées."
+
 msgid "Delete the rule"
 msgstr "Supprimer la règle"
 
 msgid "Delete the tag (from every paper)"
 msgstr "Supprimer l'étiquette (de tous les articles)"
+
+#, python-brace-format
+msgid "Delete the tag “{name}”, from every paper?"
+msgstr "Supprimer l'étiquette « {name} », de tous les articles ?"
 
 msgid "Delete the track"
 msgstr "Supprimer la session"
@@ -1159,11 +1180,11 @@ msgstr "Supprimer {name} et toutes ses données (étiquettes, étoiles, période
 
 #, python-brace-format
 msgid ""
-"Delete {n} person(s) and all their data (sources, publications, tags, "
-"stars, periods)?"
+"Delete {n} person and all their data (sources, publications, tags, stars,"
+" periods)?"
 msgid_plural ""
-"Delete {n} person(s) and all their data (sources, publications, tags, "
-"stars, periods)?"
+"Delete {n} people and all their data (sources, publications, tags, stars,"
+" periods)?"
 msgstr[0] ""
 "Supprimer {n} personne et toutes ses données (sources, publications, "
 "étiquettes, étoiles, périodes) ?"
@@ -1737,7 +1758,7 @@ msgstr[0] "{n} ligne JCR importée"
 msgstr[1] "{n} lignes JCR importées"
 
 #, python-brace-format
-msgid "Imported {n} publications"
+msgid "Imported {n} publication"
 msgid_plural "Imported {n} publications"
 msgstr[0] "{n} publication importée"
 msgstr[1] "{n} publications importées"
@@ -2205,11 +2226,12 @@ msgstr "Fusionner avec un extrait"
 
 msgid ""
 "Merge with another excerpt: click it then (or drag this one onto it; onto"
-" its top or bottom edge: placed before or after)"
+" its top or bottom edge: placed before or after; onto a category's "
+"heading: first in it)"
 msgstr ""
 "Fusionner avec un autre extrait : cliquez ensuite dessus (ou faites "
-"glisser celui-ci dessus ; sur son bord haut ou bas : placé avant ou "
-"après)"
+"glisser celui-ci dessus ; sur son bord haut ou bas : placé avant ou après"
+" ; sur le titre d'une catégorie : en premier dans celle-ci)"
 
 msgid "Merge with current settings"
 msgstr "Fusionner avec les paramètres actuels"
@@ -2428,9 +2450,6 @@ msgstr "Aucun PDF stocké pour cet article."
 
 msgid "No acronym"
 msgstr "Pas d'acronyme"
-
-msgid "No candidate"
-msgstr "Aucun candidat"
 
 msgid "No category yet"
 msgstr "Aucune catégorie pour l'instant"
@@ -2887,8 +2906,8 @@ msgstr ""
 "indiquez les années de chacune)."
 
 #, python-brace-format
-msgid "Papers purged; re-syncing {n} person(s)"
-msgid_plural "Papers purged; re-syncing {n} person(s)"
+msgid "Papers purged; re-syncing {n} person"
+msgid_plural "Papers purged; re-syncing {n} people"
 msgstr[0] "Articles purgés ; resynchronisation de {n} personne"
 msgstr[1] "Articles purgés ; resynchronisation de {n} personnes"
 
@@ -3690,8 +3709,8 @@ msgid "Start"
 msgstr "Début"
 
 #, python-brace-format
-msgid "Started {n} sync(s)"
-msgid_plural "Started {n} sync(s)"
+msgid "Started {n} sync"
+msgid_plural "Started {n} syncs"
 msgstr[0] "{n} synchronisation lancée"
 msgstr[1] "{n} synchronisations lancées"
 
@@ -4194,8 +4213,8 @@ msgid "This paper is no longer in the database"
 msgstr "Cet article n'est plus dans la base de données"
 
 #, python-brace-format
-msgid "This removes, for {n} person(s):"
-msgid_plural "This removes, for {n} person(s):"
+msgid "This removes, for {n} person:"
+msgid_plural "This removes, for {n} people:"
 msgstr[0] "Cela supprime, pour {n} personne :"
 msgstr[1] "Cela supprime, pour {n} personnes :"
 
@@ -4287,11 +4306,9 @@ msgstr "Type"
 msgid "Type PURGE to confirm"
 msgstr "Tapez PURGE pour confirmer"
 
-msgid "Type at least 2 characters."
-msgstr "Saisissez au moins 2 caractères."
-
-msgid "Type at least 3 characters."
-msgstr "Saisissez au moins 3 caractères."
+#, python-brace-format
+msgid "Type at least {n} characters."
+msgstr "Saisissez au moins {n} caractères."
 
 msgid "Type back to automatic"
 msgstr "Type redevenu automatique"
@@ -4403,9 +4420,6 @@ msgstr "Utiliser ce niveau"
 msgid "Use this name (and edit it)"
 msgstr "Utiliser ce nom (et le modifier)"
 
-msgid "Use this record"
-msgstr "Utiliser cette fiche"
-
 msgid "Use this venue"
 msgstr "Utiliser ce canal"
 
@@ -4504,9 +4518,6 @@ msgstr "Canal de publication enregistré"
 
 msgid "Venue text"
 msgstr "Texte du canal"
-
-msgid "Venue to look up"
-msgstr "Canal de publication à rechercher"
 
 msgid "Venues"
 msgstr "Canaux"
@@ -5462,8 +5473,8 @@ msgid "{n} PDFs ({size:.1f} MB) in {path}"
 msgstr "{n} PDF ({size:.1f} Mo) dans {path}"
 
 #, python-brace-format
-msgid "{n} candidate(s) to review"
-msgid_plural "{n} candidate(s) to review"
+msgid "{n} candidate to review"
+msgid_plural "{n} candidates to review"
 msgstr[0] "{n} candidat à examiner"
 msgstr[1] "{n} candidats à examiner"
 
@@ -5480,8 +5491,10 @@ msgstr[0] "{n} catégorie copiée"
 msgstr[1] "{n} catégories copiées"
 
 #, python-brace-format
-msgid "{n} conflict(s): choose which value to keep"
-msgstr "{n} conflit(s) : choisissez la valeur à conserver"
+msgid "{n} conflict: choose which value to keep"
+msgid_plural "{n} conflicts: choose which value to keep"
+msgstr[0] "{n} conflit : choisissez la valeur à conserver"
+msgstr[1] "{n} conflits : choisissez la valeur à conserver"
 
 #, python-brace-format
 msgid "{n} hidden by the filters"
@@ -5492,7 +5505,7 @@ msgid "{n} of {total} items matched"
 msgstr "{n} éléments sur {total} rapprochés"
 
 #, python-brace-format
-msgid "{n} of {total} publications"
+msgid "{n} of {total} publication"
 msgid_plural "{n} of {total} publications"
 msgstr[0] "{n} publication sur {total}"
 msgstr[1] "{n} publications sur {total}"
@@ -5512,14 +5525,8 @@ msgstr[0] "{n} article"
 msgstr[1] "{n} articles"
 
 #, python-brace-format
-msgid "{n} paper(s)"
-msgid_plural "{n} paper(s)"
-msgstr[0] "{n} article"
-msgstr[1] "{n} articles"
-
-#, python-brace-format
-msgid "{n} paper(s) with problems in the people's periods"
-msgid_plural "{n} paper(s) with problems in the people's periods"
+msgid "{n} paper with problems in the people's periods"
+msgid_plural "{n} papers with problems in the people's periods"
 msgstr[0] "{n} article avec des problèmes dans les périodes des personnes"
 msgstr[1] "{n} articles avec des problèmes dans les périodes des personnes"
 
@@ -5530,19 +5537,19 @@ msgstr[0] "{n} personne"
 msgstr[1] "{n} personnes"
 
 #, python-brace-format
-msgid "{n} preprint record(s) ignored"
-msgid_plural "{n} preprint record(s) ignored"
+msgid "{n} preprint record ignored"
+msgid_plural "{n} preprint records ignored"
 msgstr[0] "{n} notice de prépublication ignorée"
 msgstr[1] "{n} notices de prépublication ignorées"
 
 #, python-brace-format
-msgid "{n} problem(s)"
-msgid_plural "{n} problem(s)"
+msgid "{n} problem"
+msgid_plural "{n} problems"
 msgstr[0] "{n} problème"
 msgstr[1] "{n} problèmes"
 
 #, python-brace-format
-msgid "{n} publications"
+msgid "{n} publication"
 msgid_plural "{n} publications"
 msgstr[0] "{n} publication"
 msgstr[1] "{n} publications"
@@ -5584,14 +5591,8 @@ msgstr[0] "{n} notice"
 msgstr[1] "{n} notices"
 
 #, python-brace-format
-msgid "{n} records"
-msgid_plural "{n} records"
-msgstr[0] "{n} notice"
-msgstr[1] "{n} notices"
-
-#, python-brace-format
-msgid "{n} source(s) not up to date"
-msgid_plural "{n} source(s) not up to date"
+msgid "{n} source not up to date"
+msgid_plural "{n} sources not up to date"
 msgstr[0] "{n} source pas à jour"
 msgstr[1] "{n} sources pas à jour"
 
@@ -5622,23 +5623,25 @@ msgstr[0] "{n} variante désormais reconnue par la règle a été supprimée"
 msgstr[1] "{n} variantes désormais reconnues par la règle ont été supprimées"
 
 #, python-brace-format
+msgid "{n} venue text changes venue"
+msgid_plural "{n} venue texts change venue"
+msgstr[0] "{n} texte de canal change de canal de publication"
+msgstr[1] "{n} textes de canal changent de canal de publication"
+
+#, python-brace-format
+msgid "{n} venue text gets another key"
+msgid_plural "{n} venue texts get another key"
+msgstr[0] "{n} texte de canal de publication obtient une autre clé"
+msgstr[1] "{n} textes de canal de publication obtiennent une autre clé"
+
+#, python-brace-format
 msgid "{n} venue text is matched by several venues."
 msgid_plural "{n} venue texts are matched by several venues."
 msgstr[0] "{n} texte de canal est reconnu par plusieurs canaux."
 msgstr[1] "{n} textes de canal sont reconnus par plusieurs canaux."
 
 #, python-brace-format
-msgid "{n} venue text(s) change venue ({records} record(s)):"
-msgstr ""
-"{n} texte(s) de canal change(nt) de canal de publication ({records} "
-"notice(s)) :"
-
-#, python-brace-format
-msgid "{n} venue text(s) get another key"
-msgstr "{n} texte(s) de canal de publication obtiennent une autre clé"
-
-#, python-brace-format
-msgid "{n} works"
+msgid "{n} work"
 msgid_plural "{n} works"
 msgstr[0] "{n} travail"
 msgstr[1] "{n} travaux"
@@ -5794,13 +5797,13 @@ msgstr ""
 "session {track}."
 
 #, python-brace-format
-msgid "“{tag}” put on {n} papers"
+msgid "“{tag}” put on {n} paper"
 msgid_plural "“{tag}” put on {n} papers"
 msgstr[0] "« {tag} » posée sur {n} article"
 msgstr[1] "« {tag} » posée sur {n} articles"
 
 #, python-brace-format
-msgid "“{tag}” put on {n} papers (not shown: {hidden})"
+msgid "“{tag}” put on {n} paper (not shown: {hidden})"
 msgid_plural "“{tag}” put on {n} papers (not shown: {hidden})"
 msgstr[0] "« {tag} » posée sur {n} article (non affiché : {hidden})"
 msgstr[1] "« {tag} » posée sur {n} articles (non affichés : {hidden})"

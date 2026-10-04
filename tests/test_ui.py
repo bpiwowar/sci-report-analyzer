@@ -622,6 +622,31 @@ async def test_folder_dialog_saves_its_notes_only_if_edited(user: User) -> None:
     assert folders.folders()[0].notes == "Mine."
 
 
+async def test_deleting_a_folder_or_a_tag_is_confirmed(user: User) -> None:
+    from sci_report_analyzer import annotations, folders
+
+    fid = folders.save_folder(None, "Prize committee")
+    await user.open(f"/?folder={fid}")
+    user.find(marker="folder-edit").click()
+    user.find(marker="folder-delete").click()
+    await user.should_see(
+        "Delete the folder “Prize committee” and its periods? Its people are kept."
+    )
+    assert folders.folders()
+    user.find(marker="folder-delete-ok").click()
+    await user.should_not_see(marker="folder-delete-ok")
+    assert not folders.folders()
+
+    tid = annotations.save_tag("To discuss", None)
+    await user.open("/settings?tab=tags")
+    user.find(marker=f"tag-delete-{tid}").click()
+    await user.should_see("Delete the tag “To discuss”, from every paper?")
+    assert any(t.id == tid for t in annotations.all_tags())
+    user.find(marker="tag-delete-ok").click()
+    await user.should_not_see(marker=f"tag-delete-{tid}")
+    assert not any(t.id == tid for t in annotations.all_tags())
+
+
 async def test_folders_tree_editor(user: User) -> None:
     from sci_report_analyzer import categories, folders
 
@@ -2310,7 +2335,7 @@ async def test_problems_on_folder_cards(user: User) -> None:
     assert pubview.problem_years([pid]) == {pid: [2018, 2021]}
     assert pubview.count_in_period([2019, 2021, None], 2020, 2024) == 2  # no year: in
     await user.open(f"/?folder={fid}")
-    await user.should_see(marker=f"problems-{pid}", content="1 problem(s)")
+    await user.should_see(marker=f"problems-{pid}", content="1 problem")
     await user.should_see(marker="folder-problems")
 
 
@@ -2646,3 +2671,97 @@ async def test_multiple_selection(user: User) -> None:
     await shown("A journal paper")
     user.find("reset-filters").click()
     await shown(*titles)
+
+
+def test_earlier_ui_states_normalized() -> None:
+    from sci_report_analyzer import annotations
+    from sci_report_analyzer.pubview import save_summary_settings, summary_settings
+
+    pid = make_person("Jane Doe")
+    annotations.save_panel_state(pid, {"period_id": None, "starred_only": True})
+    save_summary_settings({"off_categories": ["q4"], "details": {"q1": "count"}, "years": True})
+    annotations.normalize_ui_state()
+    annotations.normalize_ui_state()  # (idempotent)
+    assert annotations.panel_state(pid) == {
+        "period_id": None,
+        "tag_filter": [annotations.starred_tag_id()],
+    }
+    assert summary_settings() == {"details": {"q4": "off", "q1": "count"}, "years": True}
+
+
+def test_cleaning_rules_origin_order_and_impact() -> None:
+    from sci_report_analyzer import venue_match
+    from sci_report_analyzer.ranking.normalize import NormRule, default_rules, in_order, rule_origin
+
+    rules = default_rules()
+    assert rule_origin(rules[0]) == "default"
+    edited = rules[0].model_copy(update={"name": "Mine"})
+    assert rule_origin(edited) == "edited"
+    added = NormRule(id="mine", name="Mine", pattern=r"\bjournal\b", ignore_case=True)
+    assert rule_origin(added) == "added"
+    fr = NormRule(id="fr", name="Fr", pattern="x", language="fr")
+    assert in_order([added, fr], ["en", "fr"]) == [fr, added]
+
+    add_source(
+        make_person("Jane Doe"), "dblp", "x/1", [pub("a", "A paper", 2021, "Neural Journal")]
+    )
+    venue_match.refresh()
+    [(m, key)] = venue_match.key_changes([*rules, added])
+    assert (m.raw, key) == ("Neural Journal", "neural")
+
+
+def test_persons_core() -> None:
+    from sci_report_analyzer import persons
+    from sci_report_analyzer.ranking import datasets
+
+    pid = persons.create(" Jane Doe ", "")
+    persons.update(pid, name="Jane Doe", affiliation=" Lab ", aliases=["J. Doe", " "], notes="")
+    p = persons.load(pid)
+    assert (p.name, p.affiliation, p.aliases, p.notes) == ("Jane Doe", "Lab", ["J. Doe"], None)
+    link = add_source(pid, "thesesfr", "jd", theses=[thesis("t1", "director", "On ranking")])
+    assert persons.link_id(pid, "thesesfr", "jd") == link
+    assert persons.students(pid) == ["A Student"]
+    persons.save_student_aliases(pid, {"A Student": ["A. Student"], "Other": []})
+    assert persons.student_aliases(pid) == {"A Student": ["A. Student"]}
+    who = persons.names(pid)
+    assert (who.name, who.aliases, who.students) == ("Jane Doe", {"J. Doe"}, ["A Student"])
+    assert [(q.id, n) for q, n in persons.people_with_counts()] == [(pid, 0)]
+    datasets.import_jcr([{"journal": "Neural Journal"}])
+    assert datasets.jcr_count() == 1
+
+
+def test_panel_statistics_counted() -> None:
+    from types import SimpleNamespace
+
+    from sci_report_analyzer.pubview import (
+        HIST_CAP,
+        coauthor_counts,
+        role_shares,
+        year_bin_defs,
+        year_counts,
+    )
+
+    def paper(year, cat, role=None, authors=None):
+        return SimpleNamespace(
+            year=year,
+            category=SimpleNamespace(key=cat),
+            contribution=role,
+            num_authors=authors,
+        )
+
+    rows = [
+        paper(2020, "q1", "first", 3),
+        paper(2020, "q2", "last", 40),
+        paper(2023, "q1", "first", 3),
+        paper(None, "q1", "middle"),
+        paper(2023, "q1"),
+    ]
+    bins = year_bin_defs([2020, 2023])
+    counts = year_counts(rows, bins)
+    assert sum(counts["q1"]) == 3 and sum(counts["q2"]) == 1
+    assert coauthor_counts(rows) == {3: 2, HIST_CAP: 1}
+    shares = role_shares(rows, ["first", "middle", "last"])
+    assert shares.totals[0] == 4 and shares.counts["first"][0] == 2
+    assert (shares.first, shares.last) == (50, 25)
+    assert sum(shares.totals[1:]) == 3  # (by years: those with one)
+    assert role_shares([paper(2020, "q1")], ["first"]) is None
