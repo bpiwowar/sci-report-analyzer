@@ -82,7 +82,8 @@ PANELS = {
     "data": lambda: data_tab(),
     "io": lambda: io_tab(),
 }
-NAV_CSS = """
+ui.add_css(
+    """
 .vr-rule-default { background:#eaf7ec; }
 .vr-rule-edited { background:#fff8c5; }
 .vr-rule-added { background:#ffe7d1; }
@@ -91,7 +92,9 @@ NAV_CSS = """
 .body--dark .vr-rule-added { background:rgba(219,109,40,.22); }
 .vr-settings-nav .q-tab { justify-content:flex-start; min-height:32px; text-transform:none; }
 .vr-settings-nav .q-tab__content { align-items:flex-start; }
-"""
+""",
+    shared=True,
+)
 
 
 def register() -> None:
@@ -101,7 +104,6 @@ def register() -> None:
         if tab not in PANELS:
             tab = "sources"
         with frame(_("Settings")):
-            ui.add_css(NAV_CSS)
             ui.label(_("Settings")).classes("text-2xl")
             edits = unsaved.Edits()
             labels = {name: label for _g, entries in NAV for name, label in entries}

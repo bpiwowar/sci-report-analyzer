@@ -97,6 +97,17 @@ def on_chart_click(chart: ui.echart, handler: Callable[[str, int, dict[str, bool
 
 MULTI_TIP = N_("Shift-click: add to the selection (or remove) · Alt-click: only this one")
 
+# The summary's table of detail levels: hovering a cell highlights its column and row headers.
+_HL = "{background:var(--q-primary);color:white !important;border-radius:4px}"
+ui.add_css(
+    "".join(
+        f'.vr-sum:has(.vr-sum-cell[data-col="{level}"]:hover) .vr-sum-col[data-col="{level}"]{_HL}'
+        for level in SUMMARY_DETAILS
+    )
+    + f".vr-sum-line:has(.vr-sum-cell:hover) .vr-sum-row{_HL}",
+    shared=True,
+)
+
 
 class PublicationsPanel:
     def __init__(
@@ -788,20 +799,6 @@ class PublicationsPanel:
 
             @ui.refreshable
             def detail_table() -> None:
-                # Hovering a cell highlights its column and row headers.
-                hl = "{background:var(--q-primary);color:white !important;border-radius:4px}"
-                ui.add_css(
-                    "".join(
-                        f'.vr-sum:has(.vr-sum-cell[data-col="{level}"]:hover) '
-                        f'.vr-sum-col[data-col="{level}"]{hl}'
-                        for level in SUMMARY_DETAILS
-                    )
-                    + "".join(
-                        f'.vr-sum:has(.vr-sum-cell[data-row="{i}"]:hover) '
-                        f'.vr-sum-row[data-row="{i}"]{hl}'
-                        for i in range(len(cats))
-                    )
-                )
                 with ui.grid(columns=f"auto repeat({len(SUMMARY_DETAILS)}, 6rem)").classes(
                     "vr-sum gap-x-2 gap-y-0 items-center text-sm"
                 ):
@@ -810,21 +807,23 @@ class PublicationsPanel:
                         ui.label(label).classes("vr-sum-col text-center text-grey").props(
                             f"data-col={level}"
                         )
-                    for i, c in enumerate(cats):
+                    for c in cats:
                         n = sum(r.category.key == c.key for r in rows)
-                        span(
-                            f'<i style="display:inline-block;width:10px;height:10px;'
-                            f'background:{c.colour};margin-right:4px"></i>'
-                            f"{escape(c.label)} ({n})"
-                        ).classes("vr-sum-row px-1").props(f"data-row={i}")
-                        for level in SUMMARY_DETAILS:
-                            chosen = levels[c.key] == level
-                            ui.label("✅" if chosen else "·").classes(
-                                "vr-sum-cell text-center cursor-pointer rounded hover:bg-grey-3"
-                                + ("" if chosen else " text-grey-5")
-                            ).props(f"data-row={i} data-col={level}").on(
-                                "click", lambda c=c, level=level: pick(c.key, level)
-                            ).mark(f"summary-cat-{c.key}-{level}")
+                        # (a row: its cells in the grid, the hovered one found by :has())
+                        with ui.element("div").classes("vr-sum-line").style("display:contents"):
+                            span(
+                                f'<i style="display:inline-block;width:10px;height:10px;'
+                                f'background:{c.colour};margin-right:4px"></i>'
+                                f"{escape(c.label)} ({n})"
+                            ).classes("vr-sum-row px-1")
+                            for level in SUMMARY_DETAILS:
+                                chosen = levels[c.key] == level
+                                ui.label("✅" if chosen else "·").classes(
+                                    "vr-sum-cell text-center cursor-pointer rounded hover:bg-grey-3"
+                                    + ("" if chosen else " text-grey-5")
+                                ).props(f"data-col={level}").on(
+                                    "click", lambda c=c, level=level: pick(c.key, level)
+                                ).mark(f"summary-cat-{c.key}-{level}")
 
             def pick(key: str, level: str) -> None:
                 levels[key] = level
