@@ -542,10 +542,11 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
 
 def tints(period_id: int, document_id: int, names: dict[int, str]) -> list[dict]:
     """The excerpts of a document, to tint on its pages: each part of a group (even one
-    cited as a reference only, or under the group's text), in its category's colour;
-    ``names``: the paths of the categories."""
+    cited as a reference only, or under the group's text), in its category's colour (its
+    id: to select it, clicked); ``names``: the paths of the categories."""
     return [
         {
+            "id": x.id,
             "page": x.page,
             "rects": x.rects,
             "category": names.get(e.category_id, ""),

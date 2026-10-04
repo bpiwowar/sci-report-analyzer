@@ -1255,3 +1255,51 @@ async def test_side_panel_detached_and_back(user: User, monkeypatch, tmp_path):
     assert user.find(marker="doc-note").elements.pop().value == "Edited in the pane"
     user.find(marker="pdf-bookmark").click()  # (here again)
     await user.should_see(marker="bookmark-0")
+
+
+async def test_excerpt_selected(user: User, monkeypatch, tmp_path):
+    """An excerpt clicked on the PDF (its tint): highlighted there and in the categories' tab
+    (shown); a click elsewhere: none. Its entry clicked: the same, on the PDF too."""
+    from nicegui import Client
+
+    from sci_report_analyzer import categories
+
+    scripts = []
+    run = Client.run_javascript
+    monkeypatch.setattr(
+        Client,
+        "run_javascript",
+        lambda self, code, **kw: (scripts.append(code), run(self, code))[1],
+    )
+    _, period, _ = _person()
+    research = categories.add(folders.folders()[0].id, "Research")
+    _viewer(monkeypatch, tmp_path)
+    doc = documents.add(period, "Application.pdf", PDF)
+    documents.set_lines(doc, LINES)
+    first = categories.add_excerpt(
+        research, period, "Our ranking model.", 1, [[72, 680, 300, 690]], document_id=doc
+    )
+    second = categories.add_excerpt(
+        research, period, "Beats sparse ones.", 2, [[72, 600, 300, 610]], document_id=doc
+    )
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker=f"excerpt-part-{first}")
+    assert {t["id"] for t in categories.tints(period, doc, {})} == {first, second}
+    [tabs] = [e for e in user.client.elements.values() if isinstance(e, ui.tabs)]
+    tabs.value = "notes"
+
+    def on() -> list[int]:
+        return [
+            i
+            for i in (first, second)
+            if "vr-excerpt-on" in user.find(marker=f"excerpt-part-{i}").elements.pop().classes
+        ]
+
+    _page_event(user, "vrDocExcerpt", {"id": second})
+    assert on() == [second] and tabs.value == "categories"
+    assert any(c.startswith(f"vrDoc.select({second});") for c in scripts)
+    _page_event(user, "vrDocExcerpt", {"id": None})  # (a click elsewhere)
+    assert on() == []
+    user.find(content="Our ranking model.").click()  # (its entry)
+    assert on() == [first]
+    assert scripts[-1].startswith(f"vrDoc.select({first});")

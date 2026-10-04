@@ -68,6 +68,10 @@ class Side:
         self.bookmarks: Callable[[], None] | None = None
         self.wide: set[str] = set()  # (tabs shown wider, as the details of a paper)
         self.categories: Callable[[], None] | None = None
+        # The excerpt selected (clicked: its tint on the PDF, or its entry), and the entries of
+        # the categories' tab (by excerpt: highlighted when selected).
+        self.excerpt: int | None = None
+        self.excerpt_rows: dict[int, ui.element] = {}
         # A link from a selection to a paper (documents): (pub id, page, rects, text).
         self.link: Callable[[int, int, list, str], None] | None = None
         # The notes' editors (the selected text quoted into them), the last one used first.
@@ -276,6 +280,27 @@ class Side:
         names = {n.id: n.path for n in categories.tree(self.folder[0])} if self.folder else {}
         marks = categories.tints(self.period_id, key, names)
         self.box.client.run_javascript(f"vrDoc.mark({json.dumps(marks)})")
+
+    def select_excerpt(self, excerpt_id: int | None) -> None:
+        """An excerpt selected (else none): highlighted on the PDF, and its entry in the
+        categories' tab (shown, scrolled to)."""
+        self.excerpt = excerpt_id
+        for i, row in self.excerpt_rows.items():
+            if i == excerpt_id:
+                row.classes(add="vr-excerpt-on")
+            else:
+                row.classes(remove="vr-excerpt-on")
+        js = f"vrDoc.select({json.dumps(excerpt_id)});"
+        row = self.excerpt_rows.get(excerpt_id) if excerpt_id is not None else None
+        if row is not None:
+            if not self.details.visible and self.tab_bar.value != "categories":
+                self.tab_bar.value = "categories"
+                self._fit()
+            js += (  # (once the tab is shown)
+                f" setTimeout(() => document.getElementById('c{row.id}')"
+                "?.scrollIntoView({block: 'nearest', behavior: 'smooth'}), 100);"
+            )
+        self.box.client.run_javascript(js)
 
     def folder_notes(self) -> None:
         """The person's notes within the folder (one text for all their documents and papers
@@ -925,6 +950,8 @@ def categories_section(side: Side) -> Callable[[], None]:
         ".vr-drop { outline: 2px dashed #ffa000; outline-offset: 1px; }"
         " .vr-drop-before { box-shadow: inset 0 2px #ffa000; }"
         " .vr-drop-after { box-shadow: inset 0 -2px #ffa000; }"
+        " .vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
+        " box-shadow: 0 0 0 2px #ffa000; }"
     )
 
     @ui.refreshable
@@ -966,6 +993,7 @@ def categories_section(side: Side) -> Callable[[], None]:
             ).classes("text-sm text-grey")
             return
         by_cat: dict[int, list[categories.ExcerptView]] = {}
+        side.excerpt_rows.clear()
         for e in categories.excerpts(side.period_id, grouped=True):
             by_cat.setdefault(e.category_id, []).append(e)
         merging = state["merging"]
@@ -1041,7 +1069,12 @@ def categories_section(side: Side) -> Callable[[], None]:
         here = (x.document_id if kind == "doc" else x.publication_id) == key
         member = x.id != lead.id
         cited = bool(lead.group_text) or x.ref_only  # (only its place, in the group)
-        with ui.row().classes("w-full items-start no-wrap gap-1").mark(f"excerpt-part-{x.id}"):
+        with (
+            ui.row().classes("w-full items-start no-wrap gap-1").mark(f"excerpt-part-{x.id}") as row
+        ):
+            side.excerpt_rows[x.id] = row
+            if x.id == side.excerpt:
+                row.classes("vr-excerpt-on")
             ui.icon("subdirectory_arrow_right" if member else "format_quote", size="xs").classes(
                 "mt-1"
             ).style(f"color: {lead.colour}")
@@ -1058,7 +1091,12 @@ def categories_section(side: Side) -> Callable[[], None]:
                     on_page = [r for r in x.rects if len(r) < 5 or r[4] == x.page]
                     top = max((r[3] for r in on_page), default=None)
                     y = json.dumps(top + 20 if top is not None else None)
-                    label.on("click", js_handler=f"() => vrPdf.go({x.page}, {y})")
+                    label.on(
+                        "click",
+                        lambda: side.select_excerpt(x.id),
+                        js_handler=f"() => {{ vrPdf.go({x.page}, {y}); vrDoc.select({x.id}); "
+                        "emit(); }",
+                    )
                 else:
                     url = excerpt_url(x)
                     label.on("click", js_handler=f"() => window.open({json.dumps(url)})")
