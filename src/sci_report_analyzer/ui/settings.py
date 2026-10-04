@@ -33,7 +33,9 @@ from ..ranking.normalize import (
     NormRule,
     apply_rules,
     default_rules,
+    in_order,
     normalize,
+    rule_origin,
 )
 from ..ranking.service import load_settings, save_settings, service
 from ..sources import ADAPTERS
@@ -403,28 +405,12 @@ def _show_origin(card: ui.element, origin: str, origins: dict = ORIGINS) -> None
     ui.badge(_(label), color="grey-8").props("outline").tooltip(_(tip)).mark(f"origin-{origin}")
 
 
-def _norm_origin(r: NormRule) -> str:
-    d = _NORM_DEFAULTS.get(r.id)
-    if d is None:
-        return "added"
-    return "default" if r.model_dump() == d.model_dump() else "edited"
-
-
 # The rules' languages, as grouped in Settings: any language (none), then each language.
 LANGUAGE_GROUPS: tuple[str | None, ...] = (None, *i18n.LANGUAGES)
 
 
 def _language_name(lang: str | None) -> str:
     return i18n.LANGUAGES[lang] if lang else _("Any language")
-
-
-def _in_order(rules: list[NormRule]) -> list[NormRule]:
-    """The cleaning rules as applied: those of a language first (by language), then the
-    general ones."""
-    order = list(i18n.LANGUAGES)
-    return sorted(
-        rules, key=lambda r: order.index(r.language) if r.language in order else len(order)
-    )
 
 
 def rules_tab() -> None:
@@ -464,7 +450,7 @@ def rules_tab() -> None:
         # Its marker (and background), and its reset when changed from its default.
         @ui.refreshable
         def origin() -> None:
-            o = _norm_origin(r)
+            o = rule_origin(r)
             _show_origin(card, o)
             if o == "edited":
                 ui.button(icon="restart_alt", on_click=lambda: reset_one(r)).props(
@@ -596,7 +582,7 @@ def rules_tab() -> None:
     changes = ui.column().classes("gap-0 w-full").mark("norm-changes")
 
     def edited() -> list[NormRule]:
-        return _in_order([r for r in rules if r.pattern])
+        return in_order([r for r in rules if r.pattern], i18n.LANGUAGES)
 
     def valid() -> bool:
         bad = [r.name for r in rules if r.pattern and r.compiled() is None]
@@ -628,12 +614,7 @@ def rules_tab() -> None:
         changes.clear()
         if not valid():
             return
-        every = edited()
-        diff = []
-        for m in venue_match.matches().values():
-            new = normalize(apply_rules(m.raw, every, m.source))
-            if new != m.key:
-                diff.append((m, new))
+        diff = venue_match.key_changes(edited())
         with changes:
             ui.label(
                 ngettext(
