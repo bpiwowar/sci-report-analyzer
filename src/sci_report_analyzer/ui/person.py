@@ -7,14 +7,10 @@ from html import escape
 
 from fastapi import Request
 from nicegui import background_tasks, ui
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
-from .. import annotations, folders, manual, theses
+from .. import annotations, folders, manual, persons, theses
 from ..db.models import Person, SourceLink, Thesis
-from ..db.session import session_scope
 from ..i18n import _, ngettext
-from ..source_settings import active_links
 from ..sources import ADAPTERS
 from ..sources.scholar import parse_profile, profile_id_from_html
 from ..sources.thesesfr import ROLE_LABELS
@@ -38,13 +34,6 @@ from .panel import PublicationsPanel, period_label
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
 
-def _load(person_id: int) -> Person | None:
-    with session_scope() as s:
-        return s.scalar(
-            select(Person).where(Person.id == person_id).options(selectinload(Person.links))
-        )
-
-
 def register() -> None:
     @ui.page("/person/{person_id}")
     def person_page(
@@ -61,7 +50,7 @@ def register() -> None:
 
 
 def _person_page(request: Request, person_id: int, tab: str, period: int | None) -> None:
-    person = _load(person_id)
+    person = persons.load(person_id)
     if person is None:
         with frame(_("Not found")):
             ui.label(_("Unknown person"))
@@ -183,11 +172,13 @@ def _edit_dialog(person: Person) -> None:
             if orcid.value.strip() and value is None:
                 ui.notify(_("Not an ORCID (e.g. 0000-0002-1825-0097)"), type="warning")
                 return False
-            with session_scope() as s:
-                p = s.get(Person, person.id)
-                p.name, p.affiliation = name.value.strip(), aff.value.strip() or None
-                p.aliases = [a.strip() for a in aliases.value.splitlines() if a.strip()]
-                p.notes = notes.value or None
+            persons.update(
+                person.id,
+                name=name.value,
+                affiliation=aff.value,
+                aliases=aliases.value.splitlines(),
+                notes=notes.value,
+            )
             set_orcid(person.id, value)  # and rescore the candidates
             ui.navigate.reload()
 
@@ -196,8 +187,7 @@ def _edit_dialog(person: Person) -> None:
 
 def _delete_dialog(person: Person) -> None:
     def delete() -> None:
-        with session_scope() as s:
-            s.delete(s.get(Person, person.id))
+        folders.delete_people([person.id])
         ui.navigate.to("/")
 
     confirm(
@@ -281,7 +271,7 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
 
 @ui.refreshable
 def stale_banner(person_id: int) -> None:
-    person = _load(person_id)
+    person = persons.load(person_id)
     stale = [ln for ln in person.links if ln.is_stale or ln.sync_state == "error"]
     if is_syncing(person_id):
         with ui.row().classes("w-full items-center bg-blue-1 text-blue-9 rounded p-2"):
@@ -362,7 +352,7 @@ def sources_view(person_id: int, on_change) -> None:
 
     def tick() -> None:
         running = is_syncing(person_id) or any(
-            ln.sync_state == "running" for ln in _load(person_id).links
+            ln.sync_state == "running" for ln in persons.load(person_id).links
         )
         if running or state["was_running"]:
             refresh_alive(sources_list)
@@ -370,8 +360,7 @@ def sources_view(person_id: int, on_change) -> None:
         state["was_running"] = running
         # Reload the publications whenever a merge happened since they were loaded (a quick
         # sync can start and finish between two ticks).
-        with session_scope() as s:
-            merged = s.get(Person, person_id).last_merged_at
+        merged = persons.last_merged_at(person_id)
         if merged != state.get("merged_at"):
             if "merged_at" in state:
                 refresh_alive(sources_list)
@@ -386,14 +375,7 @@ async def _sync_one(
     person_id: int, link_id: int | None, source: str | None = None, ext: str | None = None
 ) -> None:
     if link_id is None:
-        with session_scope() as s:
-            link_id = s.scalar(
-                select(SourceLink.id).where(
-                    SourceLink.person_id == person_id,
-                    SourceLink.source == source,
-                    SourceLink.external_id == ext,
-                )
-            )
+        link_id = persons.link_id(person_id, source, ext)
     await sync_link(link_id)
 
 
@@ -403,7 +385,7 @@ def _link_url(ln: SourceLink) -> str | None:
 
 @ui.refreshable
 def sources_list(person_id: int) -> None:
-    person = _load(person_id)
+    person = persons.load(person_id)
     links = [ln for ln in person.links if not manual.is_hal_document(ln)]
     validated = [ln for ln in links if ln.status == "validated"]
     candidates = sorted(
@@ -842,8 +824,7 @@ def student_aliases_view(person_id: int, rows: list[Thesis]) -> None:
     )
     if not students:
         return
-    with session_scope() as s:
-        current = dict(s.get(Person, person_id).student_aliases or {})
+    current = persons.student_aliases(person_id)
     with ui.expansion(_("PhD student name aliases (for highlighting in author lists)")).classes(
         "w-full"
     ):
@@ -861,12 +842,13 @@ def student_aliases_view(person_id: int, rows: list[Thesis]) -> None:
                 )
 
         def save() -> None:
-            with session_scope() as s:
-                s.get(Person, person_id).student_aliases = {
+            persons.save_student_aliases(
+                person_id,
+                {
                     n: [a.strip() for a in i.value.split(",") if a.strip()]
                     for n, i in inputs.items()
-                    if i.value.strip()
-                }
+                },
+            )
             ui.notify(_("Aliases saved (reload the publications to see them)"))
 
         ui.button(_("Save aliases"), icon="save", on_click=save)
@@ -881,14 +863,7 @@ class ThesesView:
         self.panel = panel
         self.show_all = False
         self.shown: tuple | None = None
-        with session_scope() as s:
-            self.rows = list(
-                s.scalars(
-                    select(Thesis)
-                    .join(SourceLink)
-                    .where(SourceLink.person_id == person_id, active_links())
-                )
-            )
+        self.rows = persons.theses(person_id)
         if not self.rows:
             ui.label(_("No thesis: validate a theses.fr profile in the Sources tab.")).classes(
                 "text-grey"
@@ -951,8 +926,7 @@ class ThesesView:
                             "juries: the defence within it)"
                         )
                     ).mark("theses-all")
-            with session_scope() as s:
-                outcomes = dict(s.get(Person, self.person_id).student_outcomes or {})
+            outcomes = persons.student_outcomes(self.person_id)
             for role in ["director", "rapporteur", "examiner", "president", "author", "other"]:
                 items = [t for t in rows if t.role == role]
                 if items:

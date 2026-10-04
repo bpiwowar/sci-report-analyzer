@@ -8,7 +8,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 from nicegui import ui
-from sqlalchemy import delete, func, select
 
 from .. import (
     annotations,
@@ -22,8 +21,6 @@ from .. import (
     source_settings,
     venue_match,
 )
-from ..db.models import JcrRecord
-from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
 from ..ranking import datasets, detection, tracks
 from ..ranking.badge import SOURCE_LABELS, TOGGLABLE_SOURCES
@@ -1027,9 +1024,8 @@ def data_tab() -> None:
     jcr_count = ui.label()
 
     def count() -> None:
-        with session_scope() as s:
-            n = s.scalar(select(func.count()).select_from(JcrRecord))
-            jcr_count.text = ngettext("{n} JCR row", "{n} JCR rows", n).format(n=n)
+        n = datasets.jcr_count()
+        jcr_count.text = ngettext("{n} JCR row", "{n} JCR rows", n).format(n=n)
 
     count()
 
@@ -1038,9 +1034,7 @@ def data_tab() -> None:
         if not rows:
             ui.notify(_("No usable rows found (need a journal-name column)"), type="warning")
             return
-        with session_scope() as s:
-            s.execute(delete(JcrRecord))
-            s.add_all(JcrRecord(data=r) for r in rows)
+        datasets.import_jcr(rows)
         service.invalidate(data=True, clear_cache=True)
         count()
         ui.notify(

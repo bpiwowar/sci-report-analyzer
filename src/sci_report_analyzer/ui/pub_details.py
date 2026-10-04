@@ -8,11 +8,8 @@ from typing import TYPE_CHECKING
 from urllib.parse import quote_plus
 
 from nicegui import background_tasks, ui
-from sqlalchemy import select
 
-from .. import annotations, merge, pdfs, sync, venues
-from ..db.models import Person, Publication, SourceLink, SourcePub, Thesis
-from ..db.session import session_scope
+from .. import annotations, merge, pdfs, persons, sync, venues
 from ..i18n import N_, Labels, _, ngettext
 from ..pubview import (
     MemberView,
@@ -35,7 +32,6 @@ from ..ranking.kinds import (
     WORKSHOP_KINDS,
 )
 from ..ranking.service import VenuePattern, paren_acronym, service
-from ..source_settings import active_links
 from ..sources import ADAPTERS
 from ..sources.base import normalize_doi
 from . import scimago_years
@@ -62,30 +58,11 @@ if TYPE_CHECKING:
 
 async def _record_details(m: MemberView, box: ui.element, *, links: bool) -> None:
     """Fill ``box`` with what a source says about the record (and links to check it)."""
-    with session_scope() as s:
-        sp = s.get(SourcePub, m.id)
-        if sp is None:
-            return
-        data = {
-            k: getattr(sp, k)
-            for k in (
-                "title",
-                "venue",
-                "year",
-                "authors",
-                "doc_type",
-                "doi",
-                "issn",
-                "venue_type",
-                "external_key",
-                "pdf_url",
-                "archival",
-                "url",
-                "raw",
-            )
-        }
-        adapter = ADAPTERS[m.source]
-        profile = sp.link.url or adapter.profile_url(sp.link.external_id)
+    data = merge.source_record(m.id)
+    if data is None:
+        return
+    adapter = ADAPTERS[m.source]
+    profile = data["link_url"] or adapter.profile_url(data["external_id"])
     badge = m.badge
     if badge is None and data["venue"]:
         badge = await service.resolve(
@@ -903,8 +880,7 @@ def _publication_tab(panel: PublicationsPanel, s: PubStat, done) -> None:
                 if len(s.members) > 1:
 
                     def split(mid=m.id) -> None:
-                        with session_scope() as ss:
-                            merge.split_member(ss, ss.get(SourcePub, mid))
+                        merge.split_out(mid)
                         done(_("Split into a separate publication"))
 
                     ui.button(icon="call_split", on_click=split).props("flat round dense").tooltip(
@@ -922,9 +898,7 @@ def _publication_tab(panel: PublicationsPanel, s: PubStat, done) -> None:
         def do_join() -> None:
             if not join.value:
                 return
-            with session_scope() as ss:
-                target = ss.get(Publication, s.id)
-                merge.join_publications(ss, target, [ss.get(Publication, join.value)])
+            merge.join(s.id, [join.value])
             done(_("Merged"))
 
         ui.button(icon="merge", on_click=do_join).props("flat round dense").tooltip(_("Merge"))
@@ -1037,28 +1011,9 @@ def _authors_section(panel: PublicationsPanel, s: PubStat, done) -> None:
     """Author list: click a name to say who it is (the person, a PhD student, a category)."""
     if not s.authors:
         return
-    with session_scope() as ss:
-        person = ss.get(Person, panel.person_id)
-        person_name = person.name
-        own_aliases = set(person.aliases or [])
-        student_aliases = {k: set(v) for k, v in (person.student_aliases or {}).items()}
-        person_cats = {int(k): set(v) for k, v in (person.author_categories or {}).items()}
-        students = sorted(
-            {
-                n
-                for t in ss.scalars(
-                    select(Thesis)
-                    .join(SourceLink)
-                    .where(
-                        SourceLink.person_id == panel.person_id,
-                        active_links(),
-                        Thesis.role == "director",
-                    )
-                )
-                for n in (t.student or "").split(", ")
-                if n
-            }
-        )
+    who = persons.names(panel.person_id)
+    person_name, own_aliases, students = who.name, who.aliases, who.students
+    student_aliases, person_cats = who.student_aliases, who.categories
     categories = annotations.author_categories()
     ui.label(_("Authors")).classes("font-medium mt-2")
     ui.label(

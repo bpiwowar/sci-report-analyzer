@@ -160,14 +160,11 @@ def register() -> None:
     def notes_page(period_id: int) -> None:
         """A person's notes within a folder and their excerpts by category, as next to their
         PDFs (e.g. when they have no document)."""
-        from ..db.models import Period
-        from ..db.session import session_scope
+        from .. import persons
         from .theme import frame
         from .viewer_side import Side, categories_section
 
-        with session_scope() as s:
-            p = s.get(Period, period_id)
-            found = (p.person_id, p.person.name) if p is not None and p.folder_id else None
+        found = persons.of_period(period_id)
         folder = folders.folder_of_period(period_id)
         if found is None or folder is None:
             with frame(_("Not found")):
