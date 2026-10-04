@@ -14,12 +14,10 @@ from dataclasses import dataclass, field
 from .manual import parse_reference
 from .merge import _title_tokens
 from .pubview import PubStat
+from .ranking.service import service
 from .sources.base import normalize_doi
 from .sources.hal import document_id
 
-# The share of a paper's title words to find in an item for a match (and to suggest it).
-MATCH = 0.85
-SUGGEST = 0.5
 _MIN_TITLE_TOKENS = 2
 
 # An item's number at the start of a line: "3-", "3.", "3)", "[3]", "(3)".
@@ -70,7 +68,7 @@ class Match:
     @property
     def best(self) -> Candidate | None:
         c = self.candidates[0] if self.candidates else None
-        return c if c and c.score >= MATCH else None
+        return c if c and c.score >= service.settings.reflist_match else None
 
 
 def _join(lines: list[str]) -> str:
@@ -154,12 +152,13 @@ def match(items: list[Item], rows: list[PubStat]) -> list[Match]:
                 cands[r.id] = Candidate(r.id, r.title, r.year, 1.0, by_id=True)
         if not cands:
             words = _title_tokens(item.words)
+            suggest = service.settings.reflist_suggest
             for r in rows:
                 t = titles[r.id]
                 if len(t) < _MIN_TITLE_TOKENS:
                     continue
                 score = len(t & words) / len(t)
-                if score >= SUGGEST:
+                if score >= suggest:
                     cands[r.id] = Candidate(r.id, r.title, r.year, score)
         ranked = sorted(
             cands.values(),
@@ -192,10 +191,11 @@ async def search(item: Item) -> list[Found]:
     from .sources import hal
 
     words = _title_tokens(item.words)
+    suggest = service.settings.reflist_suggest
     docs = await hal.search_documents(sorted(words))
     out = []
     for d in docs:
         t = _title_tokens(d["title"])
-        if len(t) >= _MIN_TITLE_TOKENS and (score := len(t & words) / len(t)) >= SUGGEST:
+        if len(t) >= _MIN_TITLE_TOKENS and (score := len(t & words) / len(t)) >= suggest:
             out.append(Found(d["hal"], d["title"], d["year"], d["authors"], d["url"], score))
     return sorted(out, key=lambda f: (-round(f.score, 2), f.year not in item.years))[:3]

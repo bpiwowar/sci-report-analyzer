@@ -13,13 +13,14 @@ can be part of another (``part_of``): a text matches the latter if it matches ei
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable, Iterator
-from contextlib import contextmanager
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pydantic import BaseModel
 
 from ..i18n import N_, Labels
+from .inforce import InForce, leftmost
+from .normalize import safe_compile
 
 
 class DetectionRule(BaseModel):
@@ -61,6 +62,7 @@ DETECTION_GROUPS = Labels(
         "workshop": N_("Workshops"),
         "form": N_("Conference or journal"),
         "joint": N_("Joint conferences"),
+        "ranking": N_("Matching the rankings"),
     }
 )
 
@@ -84,9 +86,9 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         group="workshop",
         name=N_("Workshop @ conference"),
         description=N_("A venue text naming a workshop by its main conference: “X @ SIGIR”."),
-        pattern=r"(?-i:(?<=\w)\s*@\s*(?=[A-Z]))",
+        pattern=r"(?-i:(?<=[\w)\]])\s*@\s*(?=[A-Z]))",
         part_of="workshop",
-        examples=("Trustworthy AI @ ACM Multimedia",),
+        examples=("Trustworthy AI @ ACM Multimedia", "Foo Workshop (FooW) @ ECIR"),
     ),
     DetectionDefault(
         id="workshop_fr",
@@ -115,7 +117,7 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         group="workshop",
         name=N_("Workshop's main conference @"),
         description=N_("The main conference named after an “@”: “X @ SIGIR”."),
-        pattern=r"(?-i:(?<=\w)\s*@\s*)(?P<a>[^,:;()]+)",
+        pattern=r"(?-i:(?<=[\w)\]])\s*@\s*)(?P<a>[^,:;()]+)",
         part_of="workshop_host",
         examples=("Trustworthy AI @ ACM Multimedia",),
     ),
@@ -129,9 +131,9 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
             "whether it is a conference or a journal."
         ),
         pattern=r"\b(conf(erence)?|symposium|workshops?|proceedings|proc\.|meeting|congress|"
-        r"colloquium|forum|summit)\b",
+        r"colloquium|forum|summit)(?!\w)",
         language="en",
-        examples=("Symposium on Foo",),
+        examples=("Symposium on Foo", "Proc. Foo"),
     ),
     DetectionDefault(
         id="conference_fr",
@@ -152,9 +154,9 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         name=N_("Journal"),
         description=N_("A venue text naming a journal (after the conference rule)."),
         pattern=r"\b(journal|transactions|trans\.|letters|review|magazine|annals|"
-        r"bulletin|quarterly|j\.)\b",
+        r"bulletin|quarterly|j\.)(?!\w)",
         language="en",
-        examples=("Annals of Foo",),
+        examples=("Annals of Foo", "J. Foo"),
     ),
     DetectionDefault(
         id="journal_fr",
@@ -180,7 +182,59 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         language="en",
         examples=("Conference on Foo and the International Conference on Bar",),
     ),
+    # A fuzzy match of a society or an event to a journal of the same distinctive words is
+    # not one.
+    DetectionDefault(
+        id="not_journal",
+        group="ranking",
+        name=N_("Society or event"),
+        description=N_(
+            "A venue text naming a society or an event, not a journal: an approximate match to "
+            "a journal of the same words is dropped (“Society for Neuroscience” is not the "
+            "“Journal of Neuroscience”)."
+        ),
+        pattern=r"\b(society|association|meeting|congress|forum|summit)\b",
+        language="en",
+        examples=("Society for Foo",),
+    ),
+    DetectionDefault(
+        id="not_journal_fr",
+        group="ranking",
+        name=N_("Society or event"),
+        description=N_("A venue text naming a society or an event, not a journal."),
+        pattern=r"\bsoci[ée]t[ée]s?\b",
+        language="fr",
+        part_of="not_journal",
+        examples=("Société des gadgets",),
+    ),
+    DetectionDefault(
+        id="generic_words",
+        group="ranking",
+        name=N_("Generic words"),
+        description=N_(
+            "Words any conference name can have, left out when comparing a venue text with the "
+            "name of a ranking's record found by its acronym (they say nothing of which "
+            "conference it is)."
+        ),
+        pattern=r"\b(international|national|annual|conferences?|symposium|workshop|proceedings|"
+        r"meeting|joint|acm|ieee|ifip)\b",
+        language="en",
+        examples=("Annual International Conference on Foo",),
+    ),
 )
+# Former defaults: a rule saved with one takes the current default.
+FORMER_DEFAULTS: dict[str, tuple[str, ...]] = {
+    "workshop_at": (r"(?-i:(?<=\w)\s*@\s*(?=[A-Z]))",),
+    "workshop_host_at": (r"(?-i:(?<=\w)\s*@\s*)(?P<a>[^,:;()]+)",),
+    "conference": (
+        r"\b(conf(erence)?|symposium|workshops?|proceedings|proc\.|meeting|congress|"
+        r"colloquium|forum|summit)\b",
+    ),
+    "journal": (
+        r"\b(journal|transactions|trans\.|letters|review|magazine|annals|"
+        r"bulletin|quarterly|j\.)\b",
+    ),
+}
 DEFAULTS = {d.id: d for d in DEFAULT_DETECTION_RULES}
 _REF = re.compile(r"\{rule:([\w-]+)\}")
 
@@ -190,10 +244,13 @@ def default_detection_rules() -> list[DetectionRule]:
 
 
 def completed(rules: Iterable[DetectionRule]) -> list[DetectionRule]:
-    """The rules as set, in the defaults' order, a missing one taking its default (unknown
-    ones are dropped)."""
+    """The rules as set, in the defaults' order, a missing one (or one of a former default)
+    taking its default (unknown ones are dropped)."""
     by_id = {r.id: r for r in rules}
-    return [by_id.get(d.id) or d.rule() for d in DEFAULT_DETECTION_RULES]
+    return [
+        r if (r := by_id.get(d.id)) and r.pattern not in FORMER_DEFAULTS.get(d.id, ()) else d.rule()
+        for d in DEFAULT_DETECTION_RULES
+    ]
 
 
 def _expand(pattern: str, patterns: dict[str, str], seen: frozenset[str] = frozenset()) -> str:
@@ -212,18 +269,11 @@ def compile_rules(rules: Iterable[DetectionRule]) -> dict[str, re.Pattern[str] |
     patterns = {r.id: r.pattern for r in rules}
     out: dict[str, re.Pattern[str] | None] = {}
     for r in rules:
-        try:
-            out[r.id] = re.compile(
-                _expand(r.pattern, patterns, frozenset({r.id})), re.I if r.ignore_case else 0
-            )
-        except re.error:
-            out[r.id] = None
+        out[r.id] = safe_compile(_expand(r.pattern, patterns, frozenset({r.id})), r.ignore_case)
     return out
 
 
 # The rules in force: those of the settings (``use``), compiled on first use.
-_source: Callable[[], Iterable[DetectionRule]] | None = None
-_compiled: dict[str, re.Pattern[str]] | None = None
 _defaults: dict[str, re.Pattern[str]] | None = None
 
 
@@ -239,37 +289,15 @@ def _with_defaults(rules: Iterable[DetectionRule]) -> dict[str, re.Pattern[str]]
     return {k: v or defaults[k] for k, v in compile_rules(rules).items()}
 
 
-def use(source: Callable[[], Iterable[DetectionRule]] | None) -> None:
-    """Take the rules in force from ``source`` (the settings), from their next use."""
-    global _source
-    _source = source
-    reset()
-
-
-def reset() -> None:
-    """Forget the compiled rules (the settings changed)."""
-    global _compiled
-    _compiled = None
-
-
-@contextmanager
-def using(rules: Iterable[DetectionRule]) -> Iterator[None]:
-    """The given rules in force meanwhile (a preview of edited rules)."""
-    global _compiled
-    before = _compiled
-    _compiled = _with_defaults(rules)
-    try:
-        yield
-    finally:
-        _compiled = before
+_IN_FORCE: InForce[dict[str, re.Pattern[str]]] = InForce(_with_defaults)
+use = _IN_FORCE.use
+reset = _IN_FORCE.reset
+using = _IN_FORCE.using
 
 
 def regex(rule_id: str) -> re.Pattern[str]:
     """The regex of a rule, as set."""
-    global _compiled
-    if _compiled is None:
-        _compiled = _with_defaults(_source() if _source else ())
-    return _compiled[rule_id]
+    return _IN_FORCE.get()[rule_id]
 
 
 # Each rule's own and those part of it ({"workshop": ("workshop", "workshop_at", …)}).
@@ -289,5 +317,4 @@ class Rule:
 
     def search(self, text: str, *args) -> re.Match[str] | None:
         """The leftmost match of its regexes (the first one's, on a tie)."""
-        found = (regex(p).search(text, *args) for p in PARTS[self.id])
-        return min((m for m in found if m), key=lambda m: m.start(), default=None)
+        return leftmost((regex(p) for p in PARTS[self.id]), text, *args)

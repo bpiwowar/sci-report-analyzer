@@ -27,7 +27,7 @@ from .db.models import (
     Venue,
 )
 from .db.session import session_scope
-from .i18n import N_, Labels, _, language
+from .i18n import N_, Labels, _, language, ngettext, pgettext
 from .merge import main_members
 from .ranking import tracks
 from .ranking.badge import (
@@ -147,7 +147,6 @@ class PubStat:
     author_pos_manual: bool = False
     note: str | None = None  # Markdown
     # A workshop's main conference (in the paper's year), which gives its rank.
-    host_id: int | None = None
     host_name: str | None = None
     # The person's role (a contribution Role's key), from their position.
     contribution: str | None = None
@@ -288,18 +287,12 @@ def _detected_kind(
     ), "detected"
 
 
-# Sources whose venue text is only a fallback (ORCID: a free "journal title" declared by
-# hand or copied from elsewhere, often missing or wrong for conference papers).
-UNRELIABLE_VENUE = frozenset({"orcid"})
-
-
 def venue_members(views: list[MemberView]) -> list[MemberView]:
     """Members whose venue ranks the paper: published versions, reliable sources first."""
     published = [mv for mv in views if not mv.archival] or views
+    unreliable = service.settings.unreliable_venue_sources
     reliable = [
-        mv
-        for mv in published
-        if mv.source not in UNRELIABLE_VENUE and mv.venue and mv.venue_reliable
+        mv for mv in published if mv.source not in unreliable and mv.venue and mv.venue_reliable
     ]
     return reliable or published
 
@@ -414,7 +407,7 @@ def pick_reason(best: MemberView, views: list[MemberView]) -> str:
             "; the DOI record is not used: a book chapter without an event (e.g. in a volume "
             "of a series such as LNCS) names no real venue"
         )
-    if any(v.archival or v.source in UNRELIABLE_VENUE for v in skipped):
+    if any(v.archival or v.source in service.settings.unreliable_venue_sources for v in skipped):
         why += _("; preprints and ORCID venues are only used when nothing else is available")
     return why
 
@@ -575,8 +568,6 @@ def _authorship(
 
 
 OWNER = "owner"
-# A PhD student on a paper more than this many years after their defence: a former student.
-FORMER_AFTER = 2
 
 
 @dataclass
@@ -604,7 +595,8 @@ class PeopleIndex:
     Marks: ``owner`` / ``student`` for confirmed names (exact name or alias, or an author
     position given by an id-based source), ``owner?`` / ``student?`` for potential matches
     (same surname and initial) waiting for a manual validation, ``former`` for a confirmed
-    student on a paper more than ``FORMER_AFTER`` years after their defence.
+    student on a paper more than ``former_student_after`` years (a setting) after their
+    defence.
     """
 
     owner_exact: set[str]
@@ -666,6 +658,7 @@ class PeopleIndex:
         marks: list[str | None] = []
         notes: dict[int, tuple[str, str | None]] = {}
         owner_found = False
+        former_after = service.settings.former_student_after
         for i, a in enumerate(authors):
             f = fold_name(a)
             if not owner_found and (f in self.owner_exact or (pos_exact and pos == i + 1)):
@@ -692,7 +685,7 @@ class PeopleIndex:
             mark = None
             for st in self.students:
                 if f in st.exact:
-                    if year and st.defence_year and year - st.defence_year > FORMER_AFTER:
+                    if year and st.defence_year and year - st.defence_year > former_after:
                         former = _("former {note}").format(note=st.note)
                         mark, notes[i] = "former", (former, st.name)
                     else:
@@ -717,6 +710,81 @@ class PeopleIndex:
         return marks, notes
 
 
+@dataclass
+class _PaperMaps:
+    """A person's papers' tag numbers, and their tags, numbers and notes within periods
+    (by paper, then period)."""
+
+    numbers: dict[int, dict[int, int]] = field(default_factory=dict)
+    tags: dict[int, dict[int, set[int]]] = field(default_factory=dict)
+    period_numbers: dict[int, dict[int, dict[int, int]]] = field(default_factory=dict)
+    notes: dict[int, dict[int, str]] = field(default_factory=dict)
+
+
+def _period_maps(s, person_id: int) -> _PaperMaps:
+    out = _PaperMaps()
+    for pt in s.scalars(
+        select(PublicationTag)
+        .join(Publication)
+        .where(Publication.person_id == person_id, PublicationTag.number.is_not(None))
+    ):
+        out.numbers.setdefault(pt.publication_id, {})[pt.tag_id] = pt.number
+    for period in s.scalars(
+        select(Period)
+        .where(Period.person_id == person_id)
+        .options(selectinload(Period.paper_notes))
+    ):
+        for pt in period.paper_tags:
+            out.tags.setdefault(pt.publication_id, {}).setdefault(period.id, set()).add(pt.tag_id)
+            if pt.number is not None:
+                out.period_numbers.setdefault(pt.publication_id, {}).setdefault(period.id, {})[
+                    pt.tag_id
+                ] = pt.number
+        for pn in period.paper_notes:
+            out.notes.setdefault(pn.publication_id, {})[period.id] = pn.text
+    return out
+
+
+async def _paper_badge(
+    pub: Publication,
+    kind: str,
+    badge: Badge | None,
+    venue: Venue | None,
+    venues: dict[int, Venue],
+    year: int | None,
+) -> tuple[Badge | None, Venue | None]:
+    """A paper's badge given its kind (none for an edited volume, a workshop's main
+    conference's, the kind's default level when unranked), and a workshop's main
+    conference."""
+    host = None
+    if kind in UNRANKED_KINDS and not pub.rank_override:
+        badge = None  # an edited volume: not a paper of its venue
+    if kind in WORKSHOP_KINDS and not pub.rank_override and not _has_decision(venue):
+        badge, host = await workshop_badge(venue, year, venues)
+    if (
+        not pub.rank_override
+        and not is_ranked(badge)
+        and (level := service.settings.kind_levels.get(kind))
+    ):
+        # Default level of the kind (e.g. every national conference is "C").
+        vtype = "conference" if kind in CONFERENCE_LIKE else "journal"
+        name = venue.name if venue else None
+        badge = badge_from_level({"type": vtype, "rank": level, "name": name})
+        badge.extra["kind_default"] = kind
+    return badge, host
+
+
+def _auto_track(
+    best: MemberView | None, validated: bool, views: list[MemberView], badge: Badge | None
+) -> str | None:
+    """The track of the source whose venue is used (a track wins over none, unless the
+    source without is validated by hand; different tracks: a disagreement)."""
+    found = (
+        (best.eff_track if validated else track_of(best, venue_members(views))) if best else None
+    )
+    return found or (FINDINGS_ID if badge and badge.findings else None)
+
+
 async def load_stats(person_id: int) -> list[PubStat]:
     venue_match.refresh()  # venue texts of newly synced records
     texts = venue_match.matches()
@@ -738,31 +806,7 @@ async def load_stats(person_id: int) -> list[PubStat]:
         person = s.get(Person, person_id)
         people = PeopleIndex.for_person(s, person)
         pending_links: dict[int, int] = {}
-        period_tags: dict[int, dict[int, set[int]]] = {}
-        period_notes: dict[int, dict[int, str]] = {}
-        period_numbers: dict[int, dict[int, dict[int, int]]] = {}
-        numbers: dict[int, dict[int, int]] = {}
-        for pt in s.scalars(
-            select(PublicationTag)
-            .join(Publication)
-            .where(Publication.person_id == person_id, PublicationTag.number.is_not(None))
-        ):
-            numbers.setdefault(pt.publication_id, {})[pt.tag_id] = pt.number
-        for period in s.scalars(
-            select(Period)
-            .where(Period.person_id == person_id)
-            .options(selectinload(Period.paper_notes))
-        ):
-            for pt in period.paper_tags:
-                period_tags.setdefault(pt.publication_id, {}).setdefault(period.id, set()).add(
-                    pt.tag_id
-                )
-                if pt.number is not None:
-                    period_numbers.setdefault(pt.publication_id, {}).setdefault(period.id, {})[
-                        pt.tag_id
-                    ] = pt.number
-            for pn in period.paper_notes:
-                period_notes.setdefault(pn.publication_id, {})[period.id] = pn.text
+        maps = _period_maps(s, person_id)
         out: list[PubStat] = []
         for i, pub in enumerate(pubs):
             if i % 50 == 49:
@@ -791,37 +835,18 @@ async def load_stats(person_id: int) -> list[PubStat]:
                 # Linked after the loop, in a short write transaction (SQLite has a single
                 # writer; resolutions write the cache meanwhile).
                 pending_links[pub.id] = venue.id if venue else None
-            host = None
-            if kind in UNRANKED_KINDS and not pub.rank_override:
-                badge = None  # an edited volume: not a paper of its venue
-            if kind in WORKSHOP_KINDS and not pub.rank_override and not _has_decision(venue):
-                badge, host = await workshop_badge(venue, pub.year_override or pub.year, venues)
-            if (
-                not pub.rank_override
-                and not is_ranked(badge)
-                and (level := service.settings.kind_levels.get(kind))
-            ):
-                # Default level of the kind (e.g. every national conference is "C").
-                vtype = "conference" if kind in CONFERENCE_LIKE else "journal"
-                name = venue.name if venue else None
-                badge = badge_from_level({"type": vtype, "rank": level, "name": name})
-                badge.extra["kind_default"] = kind
+            year = pub.year_override or pub.year
+            badge, host = await _paper_badge(pub, kind, badge, venue, venues, year)
             text = best.venue if best else None
-            # The track of the source whose venue is used (a track wins over none, unless
-            # the source without is validated by hand; different tracks: a disagreement).
             validated = best is not None and best.source == pub.venue_source
-            auto_track = (
-                (best.eff_track if validated else track_of(best, venue_members(views)))
-                if best
-                else None
-            ) or (FINDINGS_ID if badge and badge.findings else None)
+            auto_track = _auto_track(best, validated, views, badge)
             # Set by hand, it wins (the main track: none).
             override = pub.track_override
             track = (None if override == MAIN else override) if override else auto_track
             pos, num, authors, pos_exact = _authorship(members)
             if pub.author_pos_override is not None:  # (0: the order does not matter)
                 pos, pos_exact = pub.author_pos_override, True
-            marks, notes = people.marks(authors, pos, pos_exact, pub.year_override or pub.year)
+            marks, notes = people.marks(authors, pos, pos_exact, year)
             if pub.author_pos_override is None:
                 for m in ("owner", "owner?"):
                     if m in marks:
@@ -848,7 +873,7 @@ async def load_stats(person_id: int) -> list[PubStat]:
                 PubStat(
                     id=pub.id,
                     title=pub.title,
-                    year=pub.year_override or pub.year,
+                    year=year,
                     badge=badge,
                     track=track,
                     category=category_of(badge, track, kind),
@@ -881,15 +906,15 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     track_override=override,
                     auto_track=auto_track,
                     tags={tg.id for tg in pub.tags},
-                    period_tags=period_tags.get(pub.id, {}),
-                    period_notes=period_notes.get(pub.id, {}),
-                    numbers=numbers.get(pub.id, {}),
+                    period_tags=maps.tags.get(pub.id, {}),
+                    period_notes=maps.notes.get(pub.id, {}),
+                    numbers=maps.numbers.get(pub.id, {}),
                     pdf=None
                     if pub.id not in stored_pdfs
                     else "edited"
                     if stored_pdfs[pub.id]
                     else "stored",
-                    period_numbers=period_numbers.get(pub.id, {}),
+                    period_numbers=maps.period_numbers.get(pub.id, {}),
                     venue_short=None
                     if archival_only or no_venue
                     else venue.short_name
@@ -909,7 +934,6 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     doi_manual=pub.doi_manual,
                     author_pos_manual=pub.author_pos_override is not None,
                     note=pub.note,
-                    host_id=host.id if host else None,
                     host_name=host.name if host else None,
                 )
             )
@@ -1034,47 +1058,27 @@ def category_list(rows: list[PubStat]) -> list[Category]:
 
 
 SUMMARY_KEY = "summary"  # the summary dialog's last settings (an AppSetting)
-# Languages of the summary (English: the app's labels).
-SUMMARY_LANGUAGES = {"en": "English", "fr": "Français"}
-_FR_KINDS = {
-    "intl_conference": "Conf. int.",
-    "intl_workshop": "Atelier int.",
-    "intl_journal": "Revue int.",
-    "natl_conference": "Conf. nat.",
-    "natl_workshop": "Atelier nat.",
-    "natl_journal": "Revue nat.",
-    "shared_task": "Campagne d'éval.",
-    "preprint": "Prépublication",
-    "book": "Livre",
-    "chapter": "Chapitre",
-    "proceedings": "Actes (éd.)",
-    "software": "Logiciel",
-    "dataset": "Jeu de données",
-    "thesis": "Thèse",
-    "other": "Autre",
-}
+# Languages of the summary.
+SUMMARY_LANGUAGES = i18n.LANGUAGES
 
 
-def _fr_category(cat: Category, kind: str | None, n: int) -> str:
-    """A category's label in French ("Atelier CORE A*", "Court CORE A", "non classés"; in
-    the workshops' line, "dans une conf. CORE A")."""
-    unranked = "non classé" + ("s" if n > 1 else "")
-    base = cat.base_key
-    if base.startswith("k_"):
-        label = unranked if base == f"k_{kind}" else _FR_KINDS.get(base[2:], base[2:])
-    elif base in ("other", "unranked"):
-        label = "autre" if base == "other" else unranked
-    else:  # Q1, CORE A*: the same
-        label = next((lab for k, lab, _c in BASE_CATEGORIES if k == base), base)
-        if cat.workshop and kind in WORKSHOP_KINDS:  # (ranked by its main conference)
-            label = f"dans une conf. {label}"
-    if cat.workshop and kind not in WORKSHOP_KINDS:
-        label = f"Atelier {label}"
-    if cat.edited and kind != "proceedings":
-        label = f"Actes (éd.) {label}"
-    if cat.track:
-        label = f"{tracks.name(cat.track, 'fr')} {label}"
-    return label
+def _unranked(n: int) -> str:
+    return ngettext("{n} unranked", "{n} unranked", n).format(n=n)
+
+
+def _summary_category(cat: Category, kind: str | None, n: int) -> str:
+    """``n`` papers of a category in the summary, in the language of the moment; within
+    its kind, without what the kind says ("3 unranked"; a workshop's rank, that of its main
+    conference; an edited volume's)."""
+    rank = next((lab for k, lab, _c in BASE_CATEGORIES if k == cat.base_key), None)
+    if cat.base_key == "unranked" or (kind is not None and cat.key == f"k_{kind}"):
+        return _unranked(n)
+    if rank and cat.workshop and kind in WORKSHOP_KINDS:
+        label = pgettext("rank of a workshop's main conference", "{category}")
+        return f"{n} {label.format(category=rank)}"
+    if rank and cat.edited and kind == "proceedings":
+        return f"{n} {rank}"
+    return f"{n} {category_label(cat)}"
 
 
 def summary_settings() -> dict:
@@ -1116,10 +1120,20 @@ def summary_lines(
     a venue's papers are counted together ("3x Acoustica"); "off" categories are only
     counted in their kind. ``lang``: one of ``SUMMARY_LANGUAGES``; ``markdown``: a
     Markdown list (one item per line)."""
-    fr = lang == "fr"
-    no_venue = "sans canal" if fr else "no venue"
-    hidden = set(hidden)
-    details = details or {}
+    with i18n.using(lang):
+        return _summary_lines(rows, short, by_kind, years, set(hidden), details or {}, markdown)
+
+
+def _summary_lines(
+    rows: list[PubStat],
+    short: bool,
+    by_kind: bool,
+    years: bool,
+    hidden: set[str],
+    details: dict[str, str],
+    markdown: bool,
+) -> list[str]:
+    no_venue = pgettext("summary", "no venue")
 
     def detail(key: str) -> str:
         return details.get(key) or ("off" if key in hidden else "years" if years else "list")
@@ -1152,17 +1166,9 @@ def summary_lines(
             if level == "off":
                 continue
             members = [r for r in papers if r.category.key == cat.key]
-            if fr:
-                label = _fr_category(cat, kind, len(members))
-            else:
-                with i18n.using("en"):  # (the categories are labelled in the app's language)
-                    label = category_label(cat)
-                if kind is not None:  # within its kind: "unranked", "A*" for a workshop
-                    label = (
-                        "unranked" if cat.key == f"k_{kind}" else label.removeprefix("Workshop ")
-                    )
+            counted = _summary_category(cat, kind, len(members))
             if level == "count":
-                out.append(f"{len(members)} {label}")
+                out.append(counted)
                 continue
             with_years = level == "years"
             counts = Counter((venue_name(r), r.year if with_years else None) for r in members)
@@ -1177,7 +1183,7 @@ def summary_lines(
                 (f"{n}x " if n > 1 else "") + name + (f" {year}" if year else "")
                 for (name, year), n in items
             )
-            out.append(f"{len(members)} {label} ({venues})")
+            out.append(f"{counted} ({venues})")
         return out
 
     if not by_kind:
@@ -1188,14 +1194,9 @@ def summary_lines(
         papers = [r for r in rows if (r.kind if r.kind in KIND_ORDER else None) == kind]
         if not papers:
             continue
-        if fr:
-            label = _FR_KINDS.get(kind or "other", "Other")
-        else:
-            with i18n.using("en"):
-                label = KIND_SHORT.get(kind or "other", "Other")
+        label = KIND_SHORT[kind or "other"]
         items = category_items(papers, kind)
-        unranked = ("non classé" + ("s" if len(papers) > 1 else "")) if fr else "unranked"
-        only = f"{len(papers)} {unranked}"
+        only = _unranked(len(papers))
         head = f"{len(papers)} {label}"
         if len(items) == 1 and (items[0] == only or items[0].startswith(only + " ")):
             # "15 Preprint (arXiv …)"

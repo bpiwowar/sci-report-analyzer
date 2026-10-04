@@ -26,15 +26,16 @@ from .badge import (
     badge_archival,
     badge_from_record,
 )
-from .detection import DetectionRule, default_detection_rules
+from .detection import DetectionRule, Rule, default_detection_rules, regex
 from .kinds import DEFAULT_INTERNATIONAL_KEYWORDS, DEFAULT_NATIONAL_KEYWORDS
-from .matcher import Matcher
+from .matcher import Matcher, MatchResult
 from .normalize import (
     NormRule,
     apply_rules,
     default_rules,
     is_non_venue,
     normalize,
+    safe_compile,
     tokenize,
     tokens_match,
     without_ordinal_marks,
@@ -47,31 +48,19 @@ MATCHING_KEY = "matching"
 LONG_TTL = timedelta(days=90)
 SHORT_TTL = timedelta(days=14)  # OpenAlex fallback and "not ranked"
 _ACRONYM_RE = re.compile(r"[A-Z]{3,}")
-_FINDINGS_PREFIX = re.compile(r"^\s*findings\s+(?:of\s+(?:the\s+)?)?", re.I)
 # A parenthesised acronym, as in DBLP stream titles: "AAAI Conference on AI (AAAI)".
 _PAREN_ACRONYM = re.compile(r"\(\s*([A-Za-z][A-Za-z0-9&+-]*[A-Z][A-Za-z0-9&+-]*)\s*\)")
 OPENALEX_BACKOFF = timedelta(minutes=15)
 
 
 # Bumped when the matching logic changes, so that cached matches are recomputed.
-MATCH_VERSION = "m9"
-# Words saying a venue text is a conference (not a journal).
-_CONFERENCE_CUE = re.compile(
-    r"\b(?:conf(?:erence|\.)?|conférence|symposium|workshops?|congress|colloque|"
-    r"proceedings|proc\.)(?=\W|$)",
-    re.I,
-)
-# Words naming a journal ("Journal of Neuroscience"), and a society or an event instead
-# ("Society for Neuroscience", its annual meeting).
-_JOURNAL_FORM = re.compile(
-    r"\b(?:journal|transactions|letters|review|annals|bulletin|magazine|quarterly|revue)\b",
-    re.I,
-)
-_NOT_A_JOURNAL = re.compile(
-    r"\b(?:society|soci[ée]t[ée]|association|meeting|congress|forum|summit)\b", re.I
-)
-# Minimum score of a conference record replacing a fuzzy journal match.
-CONFERENCE_ALT_SCORE = 0.75
+MATCH_VERSION = "m10"
+# Words saying a venue text is a conference, or a journal ("Journal of Neuroscience"), or
+# a society or an event instead ("Society for Neuroscience", its annual meeting); words any
+# conference name can have.
+_CONFERENCE_CUE = Rule("conference")
+_JOURNAL_FORM = Rule("journal")
+_NOT_A_JOURNAL = Rule("not_journal")
 
 
 # Parenthesised text, kept in the cleaned texts (it can name a track: "(Demonstrations)")
@@ -91,33 +80,14 @@ def paren_acronym(raw: str | None) -> str | None:
     return found[-1] if found else None
 
 
-# Words any conference name can have: they say nothing of which one it is.
-_GENERIC_WORDS = frozenset(
-    [
-        "international",
-        "national",
-        "annual",
-        "conference",
-        "conferences",
-        "symposium",
-        "workshop",
-        "proceedings",
-        "meeting",
-        "joint",
-        "acm",
-        "ieee",
-        "ifip",
-    ]
-)
-
-
 def _name_overlap(text: str, name: str | None) -> bool:
     """Whether a venue text and a ranking record's name substantially overlap: at least half
     of the distinctive words of the shorter one are shared, a word matching the other's
     word, a prefix of it ("comput" ↔ "computing") or the initials of consecutive words
     ("AI" ↔ "Artificial Intelligence")."""
-    a = [w for w in tokenize(_PAREN_ACRONYM.sub(" ", text)) if w not in _GENERIC_WORDS]
-    b = [w for w in tokenize(name) if w not in _GENERIC_WORDS]
+    generic = regex("generic_words")
+    a = tokenize(generic.sub(" ", _PAREN_ACRONYM.sub(" ", text)))
+    b = tokenize(generic.sub(" ", name or ""))
     if not a or not b:
         return False
 
@@ -130,6 +100,30 @@ def _name_overlap(text: str, name: str | None) -> bool:
 
     shared = max(sum(found(w, b) for w in a), sum(found(w, a) for w in b))
     return shared >= max(1, min(len(a), len(b)) / 2)
+
+
+def _cache_key(norm_venue: str, type_hint: str | None, acronym: str | None) -> str:
+    """A venue text's key in the badge cache (cached matches of older matching code are
+    redone)."""
+    key = f"{norm_venue}#{type_hint}" if type_hint else norm_venue
+    if acronym:
+        key += f"@{acronym}"
+    return f"{MATCH_VERSION}|{key}"
+
+
+def _drop_generic_journal(m: MatchResult, badge: Badge | None, raw: str) -> bool:
+    """Whether a fuzzy journal match differs by its generic words: "Society for
+    Neuroscience" is not the "Journal of Neuroscience", even if both reduce to
+    "neuroscience"."""
+    return (
+        badge is not None
+        and not m.exact
+        and badge.name == m.record.get("name")
+        and badge.type == "journal"
+        and bool(_JOURNAL_FORM.search(badge.name or ""))
+        and not _JOURNAL_FORM.search(raw)
+        and bool(_NOT_A_JOURNAL.search(raw) or _CONFERENCE_CUE.search(raw))
+    )
 
 
 def is_ranked(b: Badge | None) -> bool:
@@ -157,10 +151,7 @@ class VenuePattern(BaseModel):
         return f"(?i){self.pattern}" if self.ignore_case else self.pattern
 
     def compiled(self) -> re.Pattern | None:
-        try:
-            return re.compile(self.pattern, re.I if self.ignore_case else 0)
-        except re.error:
-            return None
+        return safe_compile(self.pattern, self.ignore_case)
 
     def applies(self, source: str | None, raw: str | None) -> bool:
         if not raw or (self.sources and source not in self.sources):
@@ -179,6 +170,27 @@ class MatchSettings(BaseModel):
 
     sources: dict[str, bool] = Field(default_factory=_default_sources)
     min_score: float = 0.8
+    # Minimum score of a conference record replacing a fuzzy journal match of a conference
+    # text; of a match in the list of predatory venues; the score of an OpenAlex match.
+    conference_alt_score: float = 0.75
+    predatory_min_score: float = 0.9
+    openalex_score: float = 0.8
+    # The records of a paper in the sources: their titles' shared words (Jaccard) and their
+    # years' gap; the sources whose venue text is only a fallback (ORCID: a free "journal
+    # title" declared by hand or copied from elsewhere, often missing or wrong).
+    merge_title_jaccard: float = 0.9
+    merge_year_slack: int = 1
+    unreliable_venue_sources: list[str] = Field(default_factory=lambda: ["orcid"])
+    # A pasted list of references: the share of a paper's title words to find in an item
+    # for a match, and to suggest the paper.
+    reflist_match: float = 0.85
+    reflist_suggest: float = 0.5
+    # The similarity (shared words, same acronym) of two venues proposed for a merge, and
+    # of those listed as similar to a venue.
+    venue_merge_score: float = 0.5
+    venue_similar_score: float = 0.3
+    # A PhD student on a paper more than this many years after their defence: a former one.
+    former_student_after: int = 2
     # Ordered regex substitutions cleaning the venue texts of the sources.
     norm_rules: list[NormRule] = Field(default_factory=default_rules)
     # Venue kinds (first level): keywords deciding national vs international, the scope
@@ -382,7 +394,7 @@ class RankingService:
             hindex=stats.get("h_index"),
             twoYearMeanCitedness=stats.get("2yr_mean_citedness"),
             worksCount=s.get("works_count"),
-            score=0.8,
+            score=self.settings.openalex_score,
             exact=False,
             url=s.get("homepage_url") or s.get("id"),
         )
@@ -414,13 +426,12 @@ class RankingService:
         if findings:
             colon = raw_s.rfind(":")
             host_raw = (
-                _FINDINGS_PREFIX.sub("", raw_s, count=1) if colon == -1 else raw_s[colon + 1 :]
+                (tracks.conference_name(tracks.FINDINGS_ID, raw_s) or raw_s)
+                if colon == -1
+                else raw_s[colon + 1 :]
             )
         acronym = paren_acronym(host_raw) if corrected is None and type_hint != "journal" else None
-        key = f"{norm_venue}#{type_hint}" if type_hint else norm_venue
-        if acronym:
-            key += f"@{acronym}"
-        key = f"{MATCH_VERSION}|{key}"  # cached matches of older matching code are redone
+        key = _cache_key(norm_venue, type_hint, acronym)
 
         if corrected is None and is_non_venue(norm_venue):
             return badge_archival(key)
@@ -443,78 +454,24 @@ class RankingService:
         m = self.matcher.match(match_venue, issn, type_hint)
         if m and m.score >= st.min_score and st.source_on(m.record["source"]):
             badge = badge_from_record(m.record, m.score, m.exact)
-        if (
-            m
-            and badge is not None
-            and badge.type == "journal"
-            # A fuzzy journal match, or one without a real quartile (Scimago lists some
-            # proceedings, e.g. ACL's, with none).
-            and (not m.exact or badge.quartile not in ("Q1", "Q2", "Q3", "Q4"))
-            and (type_hint == "conference" or _CONFERENCE_CUE.search(raw_s))
-        ):
-            # A conference text fuzzily matching a journal ("International Conference on
-            # Language Resources and Evaluation" vs the journal "Language Resources and
-            # Evaluation"): take a close enough conference record instead.
-            alt = next(
-                (
-                    c
-                    for c in self.matcher.candidates(match_venue, None, 10)
-                    if c.record.get("type") == "conference"
-                    and c.score >= CONFERENCE_ALT_SCORE
-                    and st.source_on(c.record["source"])
-                ),
-                None,
-            )
-            if alt is not None:
-                badge = badge_from_record(alt.record, alt.score, alt.exact)
-        if (
-            m
-            and badge is not None
-            and not m.exact
-            and badge.name == m.record.get("name")
-            and badge.type == "journal"
-            and _JOURNAL_FORM.search(badge.name or "")
-            and not _JOURNAL_FORM.search(raw_s)
-            and (_NOT_A_JOURNAL.search(raw_s) or _CONFERENCE_CUE.search(raw_s))
-        ):
-            # The generic words differ: "Society for Neuroscience" is not the "Journal of
-            # Neuroscience", even if both reduce to "neuroscience".
-            badge = None
+        conference_text = type_hint == "conference" or bool(_CONFERENCE_CUE.search(raw_s))
+        if m is not None and badge is not None and badge.type == "journal":
+            if conference_text:
+                badge = self._conference_alt(m, badge, match_venue) or badge
+            if _drop_generic_journal(m, badge, raw_s):
+                badge = None
         # A conference text approximately matching a journal: "Conference of the
         # International Speech Communication Association (INTERSPEECH)" is not the journal
         # "Speech Communication".
         conference_as_journal = (
-            m is not None
+            conference_text
+            and m is not None
             and badge is not None
             and badge.type == "journal"
             and not m.exact
-            and (type_hint == "conference" or bool(_CONFERENCE_CUE.search(raw_s)))
         )
         if (not is_ranked(badge) or conference_as_journal) and acronym and st.source_on("core"):
-            # DBLP-style "(ACRONYM)" suffixes resolve to CORE by alias,
-            # e.g. "AAAI Conference on AI (AAAI)" whose CORE name differs. The names must
-            # still overlap, or the CORE name carry the acronym ("Interspeech (combined
-            # EuroSpeech and ICSLP in 2000)"): "IC" is also "International Conference on
-            # Internet Computing".
-            # A joint conference ("LREC-COLING") is tried with each of its acronyms.
-            parts = (
-                [acronym, *re.split(r"[-/+&]", acronym)]
-                if re.search(r"[-/+&]", acronym)
-                else [acronym]
-            )
-            for part in dict.fromkeys(p.strip() for p in parts if p.strip()):
-                am = self.matcher.match(part, None, "conference")
-                if (
-                    am
-                    and am.exact
-                    and am.record["source"] == "core"
-                    and (
-                        _name_overlap(match_venue, am.record.get("name"))
-                        or normalize(part) in tokenize(am.record.get("name"))
-                    )
-                ):
-                    badge = badge_from_record(am.record, am.score, am.exact)
-                    break
+            badge = self._core_by_acronym(acronym, match_venue) or badge
         if badge is None and st.source_on("openalex") and match_venue:
             try:
                 badge = await self._openalex(match_venue)
@@ -524,24 +481,77 @@ class RankingService:
 
         if badge and findings:
             badge.findings = True
-
         if st.source_on("predatory"):
-            ph = self.predatory.match(match_venue, issn)
-            if ph and (ph.exact or ph.score >= 0.9):
-                if badge is None:
-                    badge = Badge(
-                        name=ph.record["name"],
-                        source="predatory",
-                        type="journal",
-                        score=ph.score,
-                        exact=ph.exact,
-                    )
-                badge.predatory = True
-                badge.predatoryUrl = ph.record.get("url")
+            badge = self._predatory_flag(badge, match_venue, issn)
 
         if cacheable:
             self._cache_set(key, badge)
         return with_corrected(badge)
+
+    def _conference_alt(self, m: MatchResult, badge: Badge, match_venue: str) -> Badge | None:
+        """A conference text fuzzily matching a journal ("International Conference on
+        Language Resources and Evaluation" vs the journal "Language Resources and
+        Evaluation"): a close enough conference record instead, if any."""
+        # A fuzzy journal match, or one without a real quartile (Scimago lists some
+        # proceedings, e.g. ACL's, with none).
+        if m.exact and badge.quartile in ("Q1", "Q2", "Q3", "Q4"):
+            return None
+        st = self.settings
+        alt = next(
+            (
+                c
+                for c in self.matcher.candidates(match_venue, None, 10)
+                if c.record.get("type") == "conference"
+                and c.score >= st.conference_alt_score
+                and st.source_on(c.record["source"])
+            ),
+            None,
+        )
+        return badge_from_record(alt.record, alt.score, alt.exact) if alt else None
+
+    def _core_by_acronym(self, acronym: str, match_venue: str) -> Badge | None:
+        """The CORE record of a DBLP-style "(ACRONYM)" suffix, by alias (e.g. "AAAI
+        Conference on AI (AAAI)" whose CORE name differs).
+
+        The names must still overlap, or the CORE name carry the acronym ("Interspeech
+        (combined EuroSpeech and ICSLP in 2000)"): "IC" is also "International Conference on
+        Internet Computing". A joint conference ("LREC-COLING") is tried with each of its
+        acronyms."""
+        parts = (
+            [acronym, *re.split(r"[-/+&]", acronym)] if re.search(r"[-/+&]", acronym) else [acronym]
+        )
+        for part in dict.fromkeys(p.strip() for p in parts if p.strip()):
+            am = self.matcher.match(part, None, "conference")
+            if (
+                am
+                and am.exact
+                and am.record["source"] == "core"
+                and (
+                    _name_overlap(match_venue, am.record.get("name"))
+                    or normalize(part) in tokenize(am.record.get("name"))
+                )
+            ):
+                return badge_from_record(am.record, am.score, am.exact)
+        return None
+
+    def _predatory_flag(
+        self, badge: Badge | None, match_venue: str, issn: str | None
+    ) -> Badge | None:
+        """The badge flagged when the venue is in the predatory list (one made if none)."""
+        ph = self.predatory.match(match_venue, issn)
+        if not ph or not (ph.exact or ph.score >= self.settings.predatory_min_score):
+            return badge
+        if badge is None:
+            badge = Badge(
+                name=ph.record["name"],
+                source="predatory",
+                type="journal",
+                score=ph.score,
+                exact=ph.exact,
+            )
+        badge.predatory = True
+        badge.predatoryUrl = ph.record.get("url")
+        return badge
 
     def candidates(self, raw: str, issn: str | None = None, limit: int = 8) -> list[Badge]:
         """Candidate records for the manual picker (cleaned name + detected acronyms)."""

@@ -19,13 +19,14 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Callable, Iterable, Iterator
-from contextlib import contextmanager
+from collections.abc import Iterable
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
 from ..i18n import language
+from .inforce import InForce, leftmost
+from .normalize import safe_compile
 
 FINDINGS_ID = "findings"
 # A publication's track override meaning "the main track" (no satellite track): see
@@ -46,10 +47,7 @@ class TrackRule(BaseModel):
 
     def compiled(self) -> re.Pattern[str] | None:
         """Its regex; none when invalid."""
-        try:
-            return re.compile(self.pattern, re.I if self.ignore_case else 0)
-        except re.error:
-            return None
+        return safe_compile(self.pattern, self.ignore_case)
 
 
 class NameRule(BaseModel):
@@ -64,10 +62,7 @@ class NameRule(BaseModel):
 
     def compiled(self) -> re.Pattern[str] | None:
         """Its regex; none when invalid."""
-        try:
-            return re.compile(self.pattern, re.I if self.ignore_case else 0)
-        except re.error:
-            return None
+        return safe_compile(self.pattern, self.ignore_case)
 
     def apply(self, text: str) -> str:
         rx = self.compiled() if self.pattern else None
@@ -126,9 +121,10 @@ DEFAULT_NAME_RULES_OF: dict[str, list[NameRule]] = {
     FINDINGS_ID: [
         _name_rule(
             "name_findings_of",
-            r"^findings\s+of(?:\s+the)?\s+",
+            r"^\s*findings\s+(?:of(?:\s+the)?\s+)?",
             "",
             "Findings of the Association for Computational Linguistics: ACL 2023",
+            "Findings EMNLP 2021",
         ),
         _name_rule(
             "name_findings_part", _IN_PARENS.format(words="findings"), "", "WIDG (Findings)"
@@ -315,10 +311,7 @@ def rule_origin(rule: TrackRule) -> str:
 
 
 # ---- the tracks in force ------------------------------------------------------------------
-
 # Those of the settings (``use``), with their regexes, compiled on first use.
-_source: Callable[[], Iterable[Track]] | None = None
-_compiled: tuple[list[Track], dict[str, list[re.Pattern[str]]]] | None = None
 
 
 def _compile(tracks: Iterable[Track]) -> tuple[list[Track], dict[str, list[re.Pattern[str]]]]:
@@ -335,36 +328,11 @@ def _compile(tracks: Iterable[Track]) -> tuple[list[Track], dict[str, list[re.Pa
     return tracks, regexes
 
 
-def _in_force() -> tuple[list[Track], dict[str, list[re.Pattern[str]]]]:
-    global _compiled
-    if _compiled is None:
-        _compiled = _compile(_source() if _source else ())
-    return _compiled
-
-
-def use(source: Callable[[], Iterable[Track]] | None) -> None:
-    """Take the tracks in force from ``source`` (the settings), from their next use."""
-    global _source
-    _source = source
-    reset()
-
-
-def reset() -> None:
-    """Forget the compiled tracks (the settings changed)."""
-    global _compiled
-    _compiled = None
-
-
-@contextmanager
-def using(tracks: Iterable[Track]) -> Iterator[None]:
-    """The given tracks in force meanwhile (a preview of edited ones)."""
-    global _compiled
-    before = _compiled
-    _compiled = _compile(tracks)
-    try:
-        yield
-    finally:
-        _compiled = before
+_IN_FORCE: InForce[tuple[list[Track], dict[str, list[re.Pattern[str]]]]] = InForce(_compile)
+use = _IN_FORCE.use
+reset = _IN_FORCE.reset
+using = _IN_FORCE.using
+_in_force = _IN_FORCE.get
 
 
 def tracks() -> list[Track]:
@@ -406,8 +374,7 @@ def position(track_id: str) -> int | None:
 
 def matches(track_id: str, text: str | None) -> re.Match[str] | None:
     """The leftmost match of the track's rules in ``text``."""
-    found = (rx.search(text or "") for rx in _in_force()[1].get(track_id, ()))
-    return min((m for m in found if m), key=lambda m: m.start(), default=None)
+    return leftmost(_in_force()[1].get(track_id, ()), text or "")
 
 
 def detect(text: str | None, *, findings: bool = True) -> str | None:
