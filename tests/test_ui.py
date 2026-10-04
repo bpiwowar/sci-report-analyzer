@@ -1108,6 +1108,70 @@ async def test_venue_opens_in_place_with_merge_suggestions(user: User) -> None:
     assert va == vb
 
 
+WIDG = "Conference on Widget Processing (WIDG)"
+WIDG_DEMO = "WIDG (Demonstration) Conference on Widget Processing (WIDG)"
+
+
+async def test_venue_searched_and_made_its_demo_track(user: User) -> None:
+    from sci_report_analyzer.db.models import Publication, Venue, VenueKey
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = make_person("Jane Doe")
+    papers = [pub("a", "Paper A", 2023, WIDG, authors=["Jane Doe"])]
+    papers.append(pub("d", "Paper D", 2023, WIDG_DEMO, authors=["Jane Doe"]))
+    add_source(pid, "hal", "jd", papers)
+    await user.open(f"/person/{pid}")
+    await user.should_see("Paper D")
+    with session_scope() as s:
+        demo = s.get(Publication, _pub_id("Paper D")).venue_id
+        main = s.get(Publication, _pub_id("Paper A")).venue_id
+    await user.open(f"/venues?focus={demo}")
+    user.find("venue-tab-merge").click()
+    user.find("venue-merge-search").type("widget")
+    await user.should_see(marker="venue-merge-relate-0")
+    user.find("venue-merge-relate-0").click()
+    await user.should_see(marker="venue-relate-choice")
+    (select,) = user.find("venue-relate-choice").elements
+    assert select.value == "~track:demo"  # guessed from "(Demonstration)"
+    user.find("venue-relate-ok").click()
+    for _ in range(50):
+        with session_scope() as s:
+            if s.get(Venue, demo) is None:
+                break
+        await asyncio.sleep(0.02)
+    with session_scope() as s:
+        assert s.get(Venue, demo) is None
+        assert s.get(Publication, _pub_id("Paper D")).venue_id == main
+        tracks = {k.example: k.track for k in s.query(VenueKey).filter_by(venue_id=main)}
+    assert tracks[WIDG_DEMO] == "demo" and tracks[WIDG] is None
+
+
+async def test_venue_marked_as_a_demo_track(user: User) -> None:
+    from sci_report_analyzer.db.models import Publication, Venue, VenueKey
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = make_person("Jane Doe")
+    add_source(pid, "hal", "jd", [pub("d", "Paper D", 2023, WIDG_DEMO, authors=["Jane Doe"])])
+    await user.open(f"/person/{pid}")
+    await user.should_see("Paper D")
+    with session_scope() as s:
+        demo = s.get(Publication, _pub_id("Paper D")).venue_id
+    await user.open(f"/venues?focus={demo}")
+    user.find("venue-tab-merge").click()
+    await user.should_see(marker="venue-as-track")
+    (select,) = user.find("venue-as-track-choice").elements
+    assert select.value == "demo"
+    user.find("venue-as-track").click()
+    await user.should_see(marker="venue-as-track-name")
+    (name,) = user.find("venue-as-track-name").elements
+    assert name.value == WIDG  # its track part removed (to edit)
+    user.find("venue-as-track-ok").click()
+    await user.should_see("Marked as the Demo track")
+    with session_scope() as s:
+        assert s.get(Venue, demo).name == WIDG
+        assert {k.track for k in s.query(VenueKey).filter_by(venue_id=demo)} == {"demo"}
+
+
 async def test_venue_suggestion_as_a_track(user: User) -> None:
     pid = make_person("Jane Doe")
     add_source(

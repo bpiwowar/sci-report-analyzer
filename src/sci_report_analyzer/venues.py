@@ -1057,11 +1057,13 @@ def guess_relation(row: VenueRow, other: VenueRow) -> str:
     return "same"
 
 
-def relation_choices(guess: str) -> list[str]:
+def relation_choices(guess: str, *, both: bool = False) -> list[str]:
     """The relations to offer: the guess, the same venue, and each relation both ways (the
-    tracks only in the guessed direction)."""
+    tracks only in the guessed direction, unless ``both``)."""
     rev = "~" if guess.startswith("~") else ""
     tracks = [f"{rev}track:{t}" for t in TRACK_ORDER]
+    if both:
+        tracks += [f"{'' if rev else '~'}track:{t}" for t in TRACK_ORDER]
     out = ["same", *tracks, "joint", "~joint", "workshop", "~workshop"]
     return [guess, *(r for r in out if r != guess)]
 
@@ -1140,6 +1142,47 @@ def relate_venues(row_id: int, other_ids: list[int], relation: str) -> int:
     else:
         raise ValueError(f"unknown relation: {relation!r}")
     return row_id
+
+
+# A track part of a venue name: "(Demonstration)", "System Demonstrations", "Findings of"…
+_TRACK_WORDS = r"(?:findings|tutorials?|demos?|demonstrations?|short\s+papers?)"
+_TRACK_PARTS = (
+    re.compile(rf"[(\[][^)\]]*\b{_TRACK_WORDS}\b[^)\]]*[)\]]", re.I),
+    re.compile(r"\bfindings\s+of(?:\s+the)?\b", re.I),
+    re.compile(rf"\b(?:system\s+)?{_TRACK_WORDS}(?:\s+(?:track|session|papers?))?\b", re.I),
+)
+
+
+def track_free_name(name: str) -> str:
+    """A venue's name without its track part, for the conference it is a track of
+    ("WIDG (Demonstration) Conference on Widgets (WIDG)" → "Conference on Widgets (WIDG)")."""
+    out = name
+    for rx in _TRACK_PARTS:
+        out = rx.sub(" ", out)
+    out = re.sub(r"\s+", " ", out).strip(" :-–—,;/")
+    out = re.sub(r"^(?:of|at)(?:\s+the)?\s+", "", out, flags=re.I)  # ("Tutorials of …")
+    # An acronym in front of the track ("WIDG (Demonstration) Conference on …"): at the end,
+    # as in the conference's usual name ("Conference on … (WIDG)").
+    front = re.match(rf"(\S+)\s*[(\[][^)\]]*\b{_TRACK_WORDS}\b", name, re.I)
+    if front and _ACRONYM.fullmatch(front[1]) and out.startswith(f"{front[1]} "):
+        out = out[len(front[1]) + 1 :]
+        if f"({front[1]})" not in out:
+            out = f"{out} ({front[1]})"
+    out = re.sub(r"\s+([:,;)\]])", r"\1", re.sub(r"([(\[])\s+", r"\1", out))
+    return out or name
+
+
+def mark_as_track(venue_id: int, track: str, name: str | None = None) -> None:
+    """The venue is a track (demo…) of a conference with no venue of its own: all its texts
+    are marked as that track, the venue standing for the conference (renamed to ``name``)."""
+    with session_scope() as s:
+        renamed = bool(name) and name != s.get(Venue, venue_id).name
+    if renamed:
+        update_venue(venue_id, name=name)  # (its former name stays a variant: marked too)
+    with session_scope() as s:
+        for vk in s.scalars(select(VenueKey).where(VenueKey.venue_id == venue_id)):
+            vk.track = track
+    _changed(rematch=True)
 
 
 def venue_options() -> dict[int, str]:

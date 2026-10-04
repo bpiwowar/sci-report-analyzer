@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 10:37+0200\n"
+"POT-Creation-Date: 2026-10-04 10:58+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -178,6 +178,9 @@ msgstr ""
 "aident toujours à trouver son canal de publication. S’applique aux "
 "personnes ayant un profil validé sur cette source ; un dossier peut en "
 "utiliser une autre."
+
+msgid "A part of it (it is a joint conference including this venue)"
+msgstr "Une de ses parties (c'est une conférence jointe incluant ce canal)"
 
 msgid "A part of this joint conference"
 msgstr "Une composante de cette conférence commune"
@@ -387,6 +390,15 @@ msgstr "Variantes enregistrées (rechargez les publications pour les voir)"
 
 msgid "All"
 msgstr "Tout"
+
+#, python-brace-format
+msgid ""
+"All its texts are marked as the {track} track: its papers show as such. "
+"It stays the venue of its conference, renamed to its conference's name."
+msgstr ""
+"Tous ses textes sont marqués comme session {track} : ses publications "
+"apparaissent ainsi. Il reste le canal de sa conférence, renommé du nom de"
+" la conférence."
 
 msgid "All people"
 msgstr "Toutes les personnes"
@@ -1572,6 +1584,16 @@ msgstr ""
 msgid "Italic (⌘/Ctrl-I)"
 msgstr "Italique (⌘/Ctrl-I)"
 
+msgid "Its demo track, one of its workshops…"
+msgstr "Sa session démo, un de ses ateliers…"
+
+msgid "Its main conference (it is a workshop of this venue)"
+msgstr "Sa conférence principale (c'est un atelier de ce canal)"
+
+#, python-brace-format
+msgid "Its main venue (it is this venue's {track} track)"
+msgstr "Son canal principal (c'est la session {track} de ce canal)"
+
 msgid ""
 "Its quotes, joined; edited, it is the text of the group (its excerpts: "
 "their places only). Blank: its quotes again."
@@ -1799,11 +1821,18 @@ msgstr ""
 msgid "Manual level saved for this paper"
 msgstr "Niveau manuel enregistré pour cet article"
 
+msgid "Mark as a track…"
+msgstr "Marquer comme session…"
+
 msgid "Mark papers as"
 msgstr "Marquer les articles comme"
 
 msgid "Markdown list"
 msgstr "Liste Markdown"
+
+#, python-brace-format
+msgid "Marked as the {track} track"
+msgstr "Marqué comme session {track}"
 
 msgid "Match cache"
 msgstr "Cache des appariements"
@@ -1956,6 +1985,9 @@ msgstr "Variantes du nom (une par ligne)"
 msgid "Name and ranking"
 msgstr "Nom et classement"
 
+msgid "Name of the conference"
+msgstr "Nom de la conférence"
+
 msgid "Name of the merged venue"
 msgstr "Nom du canal fusionné"
 
@@ -2083,6 +2115,9 @@ msgstr "Aucun élément dans le texte"
 
 msgid "No main conference: its papers are not ranked."
 msgstr "Pas de conférence principale : ses articles ne sont pas classés."
+
+msgid "No main venue? This venue is a track of its conference:"
+msgstr "Pas de canal principal ? Ce canal est une session de sa conférence :"
 
 msgid "No match in the ranking datasets."
 msgstr "Aucune correspondance dans les classements."
@@ -3010,6 +3045,15 @@ msgstr "Fichier de paramètres (.json)"
 msgid "Settings → API keys"
 msgstr "Paramètres → Clés d’API"
 
+msgid "Shared task"
+msgstr "Campagne d'éval."
+
+msgid "Shared task / evaluation campaign"
+msgstr "Campagne d'évaluation (shared task)"
+
+msgid "Shared tasks"
+msgstr "Campagnes d'évaluation"
+
 msgid "Short"
 msgstr "Court"
 
@@ -3303,6 +3347,9 @@ msgstr "Le même canal"
 msgid "The same venue (merged into the primary one)"
 msgstr "Le même canal (fusionné dans le principal)"
 
+msgid "The same venue (merged into this one)"
+msgstr "Le même canal (fusionné dans celui-ci)"
+
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
 
@@ -3428,6 +3475,17 @@ msgstr[1] "Cela supprime, pour {n} personnes :"
 
 msgid "This venue has no paper any more"
 msgstr "Ce canal n'a plus d'article"
+
+#, python-brace-format
+msgid "This venue is a {track} track"
+msgstr "Ce canal est une session {track}"
+
+#, python-brace-format
+msgid "This venue is its {track} track"
+msgstr "Ce canal est sa session {track}"
+
+msgid "This venue is…"
+msgstr "Ce canal est…"
 
 #, python-brace-format
 msgid "This venue's {track} track"
@@ -3716,6 +3774,10 @@ msgstr "Site web"
 
 msgid "What became of them (position, employer…)"
 msgstr "Devenir (poste, employeur…)"
+
+#, python-brace-format
+msgid "What is this venue for “{name}”?"
+msgstr "Qu'est ce canal pour « {name} » ?"
 
 msgid ""
 "What this publication is (e.g. edited proceedings: not ranked as a paper "
@@ -4820,6 +4882,10 @@ msgstr[1] ""
 "d'abord."
 
 #, python-brace-format
+msgid "“{other}” is merged into “{name}”."
+msgstr "« {other} » est fusionné dans « {name} »."
+
+#, python-brace-format
 msgid ""
 "“{sat}” becomes a joint conference including “{main}”: its papers take "
 "its level."
@@ -4914,12 +4980,3 @@ msgstr "✓ C'est {name}"
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
 
-
-msgid "Shared task / evaluation campaign"
-msgstr "Campagne d'évaluation (shared task)"
-
-msgid "Shared task"
-msgstr "Campagne d'éval."
-
-msgid "Shared tasks"
-msgstr "Campagnes d'évaluation"
