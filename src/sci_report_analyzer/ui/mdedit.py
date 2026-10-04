@@ -24,8 +24,18 @@ TOOLS = [
     ("functions", N_("LaTeX ($…$ inline, $$…$$ display)"), "wrap", ("$", "$", "x^2")),
 ]
 
-MODES = {"edit": N_("Edit"), "split": N_("Split"), "preview": N_("Preview")}
-MODE_ICONS = {"edit": "edit_note", "split": "vertical_split", "preview": "visibility"}
+MODES = {
+    "edit": N_("Edit"),
+    "split": N_("Split"),
+    "preview": N_("Preview"),
+    "side": N_("Papers"),  # (only with a side pane: see MarkdownEditor)
+}
+MODE_ICONS = {
+    "edit": "edit_note",
+    "split": "vertical_split",
+    "preview": "visibility",
+    "side": "checklist",
+}
 
 
 class _ModeToggle(ui.toggle):
@@ -60,11 +70,14 @@ class MarkdownEditor:
         toolbar: Callable[[], None] | None = None,
         stacked: bool = False,
         fill: bool = False,
+        side: Callable[[], None] | None = None,
+        side_tip: str = "",
     ) -> None:
         """``render``: the Markdown shown in the preview (e.g. with citations substituted);
         ``toolbar``: more buttons, at the toolbar's right; ``stacked``: the preview below the
         editor (else beside it); ``fill``: the height left in its (flex) column, rather than
-        ``height``."""
+        ``height``; ``side``: builds a pane shown in place of the preview in the mode "side"
+        (``side_tip``: what it shows, e.g. the papers to cite)."""
         self._render = render or (lambda t: t)
         # (set by the note editors saving it: unsaved text typed, and a text saved elsewhere)
         self.is_dirty: Callable[[], bool] = lambda: False
@@ -87,10 +100,14 @@ class MarkdownEditor:
                 ui.space()
                 if toolbar:
                     toolbar()
+                modes = [m for m in MODES if m != "side" or side]
                 self.mode = (
-                    _ModeToggle(list(MODES), value=mode, on_change=lambda: self._layout())
+                    _ModeToggle(modes, value=mode, on_change=lambda: self._layout())
                     .props("dense flat size=sm")
-                    .tooltip(_("Edit, edit beside the preview, or the preview only"))
+                    .tooltip(
+                        _("Edit, edit beside the preview, or the preview only")
+                        + (f" · {side_tip}" if side_tip else "")
+                    )
                 )
                 if mark:
                     self.mode.mark(f"{mark}-mode")
@@ -124,6 +141,15 @@ class MarkdownEditor:
                     .classes("w-full vr-note overflow-auto border rounded px-3")
                     .style(f"height:{height}" + (_SHARE if fill and stacked else ""))
                 )
+                self.side: ui.column | None = None
+                if side:
+                    with (
+                        ui.column()
+                        .classes("w-full gap-0 no-wrap overflow-auto border rounded px-2")
+                        .style(f"height:{height}" + (_SHARE if fill and stacked else ""))
+                    ) as self.side:
+                        side()
+        self.on_mode: list[Callable[[str], None]] = []
         self._layout()
         self._sync_scroll()
 
@@ -154,7 +180,7 @@ class MarkdownEditor:
         self.editor.value = text
 
     def _changed(self, text: str) -> None:
-        if self.mode.value != "edit":
+        if self.mode.value in ("split", "preview"):
             self.refresh_preview()
         if self._on_change:
             self._on_change(text or "")
@@ -165,9 +191,13 @@ class MarkdownEditor:
     def _layout(self) -> None:
         mode = self.mode.value or "edit"
         self.editor.set_visibility(mode != "preview")
-        self.preview.set_visibility(mode != "edit")
-        if mode != "edit":
+        self.preview.set_visibility(mode in ("split", "preview"))
+        if self.side is not None:
+            self.side.set_visibility(mode == "side")
+        if mode in ("split", "preview"):
             self.refresh_preview()
+        for f in self.on_mode:
+            f(mode)
 
     # ---- Editing at the cursor (in the browser) ----
 

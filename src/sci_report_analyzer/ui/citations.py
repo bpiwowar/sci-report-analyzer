@@ -157,20 +157,47 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
                 .props("dense outlined")
                 .classes("w-48")
                 .tooltip(
-                    _("How a number is written ({index}: the number; default: {default})").format(
-                        index="{index}", default=reports.REFERENCE_FORMAT
-                    )
+                    _(
+                        "How a number is written ({index}: the number; default: {default}): "
+                        "[@key], and .number in the templates"
+                    ).format(index="{index}", default=reports.REFERENCE_FORMAT)
                 )
                 .mark("folder-number-format")
             )
+            listed = (
+                ui.input(
+                    _("Number of a listed paper"),
+                    value=n.listed_format,
+                    placeholder=reports.NUMBER_FORMAT,
+                )
+                .props("dense outlined")
+                .classes("w-48")
+                .tooltip(
+                    _(
+                        "How the number of a paper with the tag is written ({index}: the "
+                        "number; default: {default}): [@key], and .number in the templates; "
+                        "the others: the number format"
+                    ).format(index="{index}", default=reports.NUMBER_FORMAT)
+                )
+                .mark("folder-listed-format")
+            )
             ui.button(
-                icon="restart_alt", on_click=lambda: fmt.set_value(reports.REFERENCE_FORMAT)
-            ).props("flat round dense").tooltip(_("The default format"))
+                icon="restart_alt",
+                on_click=lambda: (
+                    fmt.set_value(reports.REFERENCE_FORMAT),
+                    listed.set_value(reports.NUMBER_FORMAT),
+                ),
+            ).props("flat round dense").tooltip(_("The default formats"))
         ui.label(_("Templates of the folder")).classes("font-medium mt-2")
         ui.markdown(
             _(
                 "Each named: it is used as `.name` in the folder's notes, instead of the "
                 "general template of that name (Settings → Citation templates)."
+            )
+            + " "
+            + _(
+                "`.number`: the number written as set above (e.g. `{(.number .short-venue "
+                ".year)}`), `.index`: the bare number (e.g. `{**#.index**}`)."
             )
             + (
                 " "
@@ -194,7 +221,10 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
             except ValueError as e:
                 ui.notify(str(e), type="negative")
                 return
-            reports.save_numbering(folder_id, reports.Numbering(tag.value or None, fmt.value or ""))
+            reports.save_numbering(
+                folder_id,
+                reports.Numbering(tag.value or None, fmt.value or "", listed.value or ""),
+            )
             dlg.close()
             ui.notify(_("Saved"), type="positive")
             if on_saved:
@@ -224,7 +254,7 @@ def _paper(p: reports.Paper, ctx: reports.Context) -> str:
 
 class CitationStatus:
     """An icon coloured by whether the notes cite the papers to discuss (all of them, some
-    not of the period's years or not to discuss, some not), the details on hover."""
+    not of the period's years, some not), the details on hover."""
 
     def __init__(self, on_click: Callable[[], None] | None = None) -> None:
         self.state: reports.Status | None = None
@@ -252,7 +282,6 @@ class CitationStatus:
             for title, papers in (
                 (_("Not cited:"), st.missing),
                 (_("Cited, but not of the period's years:"), st.off),
-                (_("Cited, but not to discuss:"), st.outside),
             ):
                 if papers:
                     ui.label(title).classes("mt-1")

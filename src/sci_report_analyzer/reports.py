@@ -2,7 +2,7 @@
 syntax, substituted when shown or copied.
 
 - ``[@key]`` (or ``[@a; @b]``, ``[see @a, p. 3]``): the paper's number (``**#6**``,
-  see ``number_format``);
+  see ``number_format``; a listed paper's, ``listed_format``);
 - ``@key``, or ``[@key]{.full}``: its number, title, venue, year and category;
 - ``[@key]{.notes}``: that, then its notes; ``[@key]{.tags}``: with its tags (#tags), and
   ``[@key]{.notes .tags}`` both;
@@ -158,6 +158,7 @@ class Context:
     hide_tags: set[int] = field(default_factory=set)  # (the numbered tag: not repeated)
     period_id: int | None = None
     number_format: str = NUMBER_FORMAT
+    listed_format: str | None = None  # (that of the numbered papers, if not number_format)
     templates: dict[str, str] = field(default_factory=dict)  # named ones: name -> {attrs}
     # The papers each to be cited (by default, the numbered ones; see citation_status).
     discuss: list[Paper] | None = None
@@ -177,8 +178,10 @@ class Context:
         return p
 
     def number(self, p: Paper) -> str:
-        """Its number, formatted (``{index}``, or ``{n}``: the number)."""
-        fmt = self.number_format or NUMBER_FORMAT
+        """Its number, formatted (``{index}``, or ``{n}``: the number): as a listed paper
+        (one of the numbered ones), or as the others."""
+        listed = p.in_report and self.listed_format
+        fmt = (self.listed_format if listed else self.number_format) or NUMBER_FORMAT
         return fmt.replace("{index}", str(p.number)).replace("{n}", str(p.number))
 
     def hashtags(self, p: Paper) -> str:
@@ -440,10 +443,12 @@ def uncited(ctx: Context, cited: Counter) -> list[Paper]:
 class Numbering:
     """How a folder's notes number papers: those with ``tag_id`` (within the person's
     period), as listed (else by year), then the others as first cited; ``format``: how a
-    number is written (``{index}``: the number). No tag: every paper as first cited."""
+    number is written (``{index}``: the number), ``listed_format``: that of the papers with
+    the tag. No tag: every paper as first cited."""
 
     tag_id: int | None = None
     format: str = REFERENCE_FORMAT
+    listed_format: str = NUMBER_FORMAT
 
 
 def _citations(folder_id: int | None) -> dict:
@@ -462,11 +467,20 @@ def _save_citations(folder_id: int, **values) -> None:
 
 def numbering(folder_id: int | None) -> Numbering:
     c = _citations(folder_id)
-    return Numbering(c.get("tag_id"), c.get("format") or REFERENCE_FORMAT)
+    return Numbering(
+        c.get("tag_id"),
+        c.get("format") or REFERENCE_FORMAT,
+        c.get("listed_format") or NUMBER_FORMAT,
+    )
 
 
 def save_numbering(folder_id: int, n: Numbering) -> None:
-    _save_citations(folder_id, tag_id=n.tag_id, format=n.format.strip() or REFERENCE_FORMAT)
+    _save_citations(
+        folder_id,
+        tag_id=n.tag_id,
+        format=n.format.strip() or REFERENCE_FORMAT,
+        listed_format=n.listed_format.strip() or NUMBER_FORMAT,
+    )
 
 
 def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
@@ -500,6 +514,7 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
         hide_tags={tag} if tag else set(),
         period_id=period_id,
         number_format=n.format,
+        listed_format=n.listed_format if tag else None,
         templates=load_templates(folder_id).names,
         discuss=discuss,
     )
@@ -518,7 +533,7 @@ class Status:
     def colour(self) -> str:
         if self.missing:
             return "negative"
-        if self.off or self.outside:
+        if self.off:
             return "warning"
         return "positive" if self.discuss else "grey"
 

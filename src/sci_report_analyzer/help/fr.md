@@ -190,22 +190,26 @@ Les notes sont en Markdown, avec **LaTeX** : `$x^2$` en ligne, `$$\sum_i x_i$$`
 Un saut de ligne est conservé (comme dans Obsidian). Elles sont éditées avec un éditeur Markdown (barre d'outils,
 ⌘B / ⌘I, un aperçu à côté ou à la place).
 
-**Rapport** (✒ dans le panneau, une période / un dossier étant choisi ; un nouvel onglet) : un rapport Markdown sur
-la personne, citant ses articles avec la syntaxe de Pandoc : `[@key]` le numéro de l'article (`**#6**`,
-le format peut être modifié), `[@a; @b]` plusieurs, `@key` ses titre, canal, année et catégorie,
-`[@key]{.notes}` avec ses notes, `[@key]{.tags}` avec ses étiquettes (`{.notes .tags}` les deux), et des
-modèles : `[@key]{.short-venue (.year)}` donne `EMNLP (2026)` (champs : `.number`, `.index`
-le numéro seul comme dans `{#.index}`, `.title`, `.venue`, `.short-venue` l'acronyme, `.year`,
-`.tags`, `.notes`, comme dans `{**#.index** (.short-venue .year): .notes}` ; un crochet sans
-valeur est supprimé). « Citer comme » choisit comment un article est inséré quand on clique dessus dans
-le panneau latéral (ou avec Enter), parmi les modèles définis dans Paramètres → Modèles de rapport. Les
-articles à discuter sont ceux qui ont certaines étiquettes (sinon ceux des années de la période), numérotés selon
-la liste à partir de laquelle une étiquette a été posée (sinon par année) ; le panneau latéral les liste, en rouge tant qu'ils ne sont pas cités, avec une recherche
-rapide (⌘K / Ctrl-K, Enter cite la première correspondance ; les autres articles de la personne aussi). Les articles
-étiquetés hors des années de la période sont listés à part, en bas (en orange tant qu'ils ne sont pas cités), et
-comptés à part. « Les citer » insère ceux de la période qui ne sont pas encore discutés. Copier (ou télécharger)
-remplace les citations, éventuellement suivies de la liste des articles. Le rapport est enregistré
-au fil de la saisie.
+**Citations dans les notes du dossier** (l'onglet du dossier à côté d'un PDF) : les notes
+de la personne dans le dossier citent ses articles avec la syntaxe de Pandoc : `[@key]` le
+numéro de l'article, `[@a; @b]` plusieurs, `@key` ses titre, canal, année et catégorie,
+`[@key]{.notes}` avec ses notes, `[@key]{.tags}` avec ses étiquettes (`{.notes .tags}` les
+deux), et des modèles : `[@key]{.short-venue (.year)}` donne `EMNLP (2026)` (champs :
+`.number` le numéro tel que le dossier l'écrit, `.index` le numéro seul comme dans
+`{**#.index**}`, `.title`, `.venue`, `.short-venue` l'acronyme, `.year`, `.tags`, `.notes` ;
+un crochet sans valeur est supprimé). Les modèles nommés (Paramètres → Modèles de citation,
+ou ceux du dossier) s'utilisent comme `.nom`. Les réglages du dossier (l'icône ✓ de ses notes,
+ou sa fenêtre) fixent l'étiquette dont les articles sont numérotés (dans l'ordre de la liste,
+sinon par année ; les autres dans l'ordre de citation) et l'écriture des numéros : un format
+pour les articles de la liste (`**#{index}**`), un pour les autres (`[{index}]`). Les articles
+à discuter sont ceux de la liste (sinon ceux des années de la période) ; l'icône ✓ est rouge
+tant que chacun n'est pas cité, orange si un article cité n'est pas des années de la période.
+Le mode « Articles » de l'éditeur montre, à la place de l'aperçu, les articles à discuter avec
+leurs numéros (rouge tant qu'ils ne sont pas cités, orange : hors des années de la période ;
+un clic le cite, le menu ⋮ avec un modèle), celui sous le curseur mis en évidence, une
+recherche (Entrée cite le premier ; les autres articles de la personne aussi), et « Les citer »
+(ceux pas encore cités). Copier remplace les citations, suivies des références, numérotées
+comme citées.
 
 **PDF** : l'icône PDF à côté d'un titre ouvre le PDF stocké de l'article dans une nouvelle fenêtre (rouge ;
 ✎ une fois annoté). Une icône grise signifie qu'un lien en accès ouvert (ou un DOI) est connu : cliquez dessus pour

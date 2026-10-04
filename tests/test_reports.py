@@ -208,6 +208,17 @@ def test_folder_numbering_templates_and_status():
     assert r.text == "**#2** **#3**"
     st = reports.citation_status(ctx, r.cited)
     assert [p.key for p in st.missing] == [keys[a]] and [p.key for p in st.outside] == [keys[c]]
+    assert st.colour == "negative"
+    # Copied: the references numbered as cited, the listed papers apart from the others.
+    reports.save_numbering(fid, reports.Numbering(star, "[{index}]", "**#{index}**"))
+    ctx = reports.folder_context(stats, period)
+    out = reports.with_references(f"[@{keys[b]}] [@{keys[c]}]", ctx)
+    assert out.startswith("**#2** [3]\n")
+    refs = out.split("References")[1]
+    assert "- **#1** **Deep ranking for search**" in refs
+    assert "- **#2** **The neural retrieval**" in refs and "- [3] **Deep ranking again**" in refs
+    reports.save_numbering(fid, reports.Numbering(star, "**#{index}**"))
+    ctx = reports.folder_context(stats, period)
     r = reports.render(f"[@{keys[a]}; @{keys[b]}]", ctx)
     assert reports.citation_status(ctx, r.cited).colour == "positive"
     # The period's years: a paper with the tag of another year, cited, is out of the range.
@@ -250,7 +261,7 @@ async def test_folder_notes_citation_status(user: User, monkeypatch, tmp_path):
     star = annotations.starred_tag_id()
     annotations.toggle_tag(a, star, period)
     fid = folders.folder_of_period(period)[0]
-    reports.save_numbering(fid, reports.Numbering(star, "#{index}"))
+    reports.save_numbering(fid, reports.Numbering(star, "#{index}", "#{index}"))
     pdfs.save(a, b"%PDF-1.4\n%%EOF\n", None)
     await user.open(f"/pdf/{a}?period={period}")
     await user.should_see(marker="citation-status")
@@ -266,9 +277,22 @@ async def test_folder_notes_citation_status(user: User, monkeypatch, tmp_path):
     user.find(marker="citation-status").click()
     await user.should_see(marker="folder-number-tag")
     user.find(marker="folder-number-format").clear().type("[{index}]")
+    user.find(marker="folder-listed-format").clear().type("§{index}")
     user.find(marker="folder-citations-save").click()
-    await user.should_see("Good: [1].")
-    assert reports.numbering(fid) == reports.Numbering(star, "[{index}]")
+    await user.should_see("Good: §1.")
+    assert reports.numbering(fid) == reports.Numbering(star, "[{index}]", "§{index}")
+    # Beside the papers (in place of the preview): those to discuss, whether cited.
+    user.find(marker="folder-note-mode").elements.pop().value = "side"
+    await user.should_see("1 of the 1 papers to discuss cited", marker="folder-papers-count")
+    await user.should_see(marker=f"folder-papers-cite-{keys[a]}")
+    user.find(marker="folder-note").elements.pop().value = "Nothing yet."
+    await user.should_see("0 of the 1 papers to discuss cited", marker="folder-papers-count")
+    await user.should_see(marker="folder-papers-cite-missing")
+    # A search: the person's other papers too.
+    b = next(k for s, k in ((s, keys[s.id]) for s in stats) if s.title == "The neural retrieval")
+    user.find(marker="folder-papers-search").type("neural")
+    await user.should_see(marker=f"folder-papers-cite-{b}")
+    await user.should_not_see(marker=f"folder-papers-cite-{keys[a]}")
 
 
 def test_python_style_templates_converted_back():
