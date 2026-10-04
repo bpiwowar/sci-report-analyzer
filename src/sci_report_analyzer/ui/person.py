@@ -35,21 +35,7 @@ from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .documents_page import documents_view
 from .folder_notes import NOTES_TIP, notes_url
 from .panel import PublicationsPanel, period_label
-from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, source_tag
-
-
-def _refresh(r) -> None:
-    """Refresh a module-level refreshable, skipping instances of pages that are gone."""
-
-    def alive(target) -> bool:
-        try:
-            target.container.client  # noqa: B018 - raises once the client was deleted
-        except RuntimeError:
-            return False
-        return not target.container.is_deleted
-
-    r.targets = [t for t in r.targets if alive(t)]
-    r.refresh()
+from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
 
 def _load(person_id: int) -> Person | None:
@@ -318,8 +304,8 @@ def stale_banner(person_id: int) -> None:
 def _sync(person_id: int, *, only_stale: bool = False) -> None:
     if not start_sync(person_id, only_stale=only_stale):
         ui.notify(_("A sync is already running"))
-    _refresh(stale_banner)
-    _refresh(sources_list)
+    refresh_alive(stale_banner)
+    refresh_alive(sources_list)
 
 
 # ---- sources -------------------------------------------------------------------------------
@@ -342,7 +328,7 @@ def sources_view(person_id: int, on_change) -> None:
                     type="warning",
                     multi_line=True,
                 )
-            _refresh(sources_list)
+            refresh_alive(sources_list)
 
         ui.button(_("Search sources again"), icon="search", on_click=search_again).props("outline")
         url = ui.input(_("Add a profile by URL or id")).classes("w-96").props("dense clearable")
@@ -365,8 +351,8 @@ def sources_view(person_id: int, on_change) -> None:
                     )
                     url.value = ""
                     background_tasks.create(_sync_one(person_id, None, name, ext))
-                    _refresh(sources_list)
-                    _refresh(stale_banner)
+                    refresh_alive(sources_list)
+                    refresh_alive(stale_banner)
                     return
             ui.notify(_("Could not recognise this URL / id"), type="warning")
 
@@ -379,8 +365,8 @@ def sources_view(person_id: int, on_change) -> None:
             ln.sync_state == "running" for ln in _load(person_id).links
         )
         if running or state["was_running"]:
-            _refresh(sources_list)
-            _refresh(stale_banner)
+            refresh_alive(sources_list)
+            refresh_alive(stale_banner)
         state["was_running"] = running
         # Reload the publications whenever a merge happened since they were loaded (a quick
         # sync can start and finish between two ticks).
@@ -388,8 +374,8 @@ def sources_view(person_id: int, on_change) -> None:
             merged = s.get(Person, person_id).last_merged_at
         if merged != state.get("merged_at"):
             if "merged_at" in state:
-                _refresh(sources_list)
-                _refresh(stale_banner)
+                refresh_alive(sources_list)
+                refresh_alive(stale_banner)
                 background_tasks.create(on_change())
             state["merged_at"] = merged
 
@@ -441,7 +427,7 @@ def sources_list(person_id: int) -> None:
                     _("ORCID {orcid} set: candidates with it are shown in green").format(orcid=o)
                 )
                 set_orcid(person_id, o)
-                _refresh(sources_list)
+                refresh_alive(sources_list)
 
             ui.button(_("Use it"), icon="check", on_click=use).props("dense").mark("orcid-use")
     ui.label(_("Validated sources")).classes("text-lg mt-2")
@@ -490,7 +476,7 @@ def _added_list(person_id: int, items: list[manual.AddedItem]) -> None:
                 async def remove(i=it) -> None:
                     await manual.remove(person_id, i)
                     ui.notify(_("Removed {id}").format(id=i.id))
-                    _refresh(sources_list)
+                    refresh_alive(sources_list)
 
                 ui.button(icon="delete", on_click=remove).props(
                     "flat round dense color=negative"
@@ -501,8 +487,8 @@ def _added_list(person_id: int, items: list[manual.AddedItem]) -> None:
 
 def _set(person_id: int, link_id: int, status: str) -> None:
     set_link_status(link_id, status)
-    _refresh(sources_list)
-    _refresh(stale_banner)
+    refresh_alive(sources_list)
+    refresh_alive(stale_banner)
 
 
 def _validated_card(person_id: int, ln: SourceLink) -> None:
@@ -573,8 +559,8 @@ def _scholar_dialog(ln: SourceLink) -> None:
             ui.notify(
                 ngettext("Imported {n} publication", "Imported {n} publications", n).format(n=n)
             )
-            _refresh(sources_list)
-            _refresh(stale_banner)
+            refresh_alive(sources_list)
+            refresh_alive(stale_banner)
             return True
 
         ui.upload(on_upload=ok_handler(dlg, handle), auto_upload=True, max_files=1).props(
@@ -660,7 +646,7 @@ async def _probe(person_id: int, link_id: int) -> None:
     except Exception as e:
         ui.notify(_("Could not fetch its papers: {error}").format(error=e), type="warning")
         return
-    _refresh(sources_list)
+    refresh_alive(sources_list)
 
 
 def _validate(person_id: int, link_id: int) -> None:
