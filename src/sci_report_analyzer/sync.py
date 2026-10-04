@@ -176,7 +176,7 @@ def finish_link(link_id: int, result: FetchResult) -> None:
 # ---- syncing -------------------------------------------------------------------------------
 
 
-def _doi_link(s, person: Person) -> SourceLink:
+def doi_link(s, person: Person) -> SourceLink:
     link = next((ln for ln in person.links if ln.source == "doi"), None)
     if link is None:
         link = SourceLink(
@@ -233,7 +233,7 @@ async def sync_dois(person_id: int, *, refresh: bool = False, remerge: bool = Tr
         link = next((ln for ln in person.links if ln.source == "doi"), None)
         if not dois and link is None:
             return
-        link_id = _doi_link(s, person).id
+        link_id = doi_link(s, person).id
     _set_state(link_id, sync_state="running", last_error=None)
     try:
         counts = await doi_source.ensure(list(dois), refresh=refresh)
@@ -348,6 +348,11 @@ def purge(person_ids: Iterable[int]) -> dict[str, int]:
 def is_syncing(person_id: int) -> bool:
     task = _running.get(person_id)
     return bool(task and not task.done())
+
+
+def any_running() -> bool:
+    """Whether a sync is running (of anyone)."""
+    return any(not t.done() for t in _running.values())
 
 
 # ---- auto-matching -------------------------------------------------------------------------

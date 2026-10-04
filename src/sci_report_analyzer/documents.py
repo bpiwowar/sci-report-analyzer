@@ -22,7 +22,7 @@ from .db.models import Period, PeriodDocument, utcnow
 from .db.session import session_scope
 from .files import atomic_write
 from .i18n import _
-from .pdfs import PdfError, _slug, is_pdf, pdf_dir
+from .pdfs import PdfError, is_pdf, pdf_dir, slug
 from .ranking.normalize import normalize
 
 SUBDIR = "documents"
@@ -51,7 +51,7 @@ def add(period_id: int, name: str, data: bytes) -> int:
         doc = PeriodDocument(period_id=period_id, name=name, path="")
         s.add(doc)
         s.flush()
-        doc.path = f"{SUBDIR}/{period.person_id}/{doc.id}-{_slug(name)}.pdf"
+        doc.path = f"{SUBDIR}/{period.person_id}/{doc.id}-{slug(name)}.pdf"
         atomic_write(pdf_dir() / doc.path, data)
         return doc.id
 
@@ -269,15 +269,15 @@ def _by_title(lines: list[dict[str, Any]], rows: list) -> list[Mention]:
 
 def _by_id(lines: list[dict[str, Any]], rows: list, near: list[Mention]) -> list[Mention]:
     """By DOI / HAL id, unless the title was found just before (the same reference)."""
-    from .reflist import _ids, _item
+    from .reflist import item_of, paper_ids
 
-    ids = {r.id: _ids(r) for r in rows}
+    ids = {r.id: paper_ids(r) for r in rows}
     seen: dict[int, list[int]] = {}
     for m in near:
         seen.setdefault(m.pub_id, []).append(m.line)
     out = []
     for i, ln in enumerate(lines):
-        item = _item(None, ln["t"])
+        item = item_of(None, ln["t"])
         if not (item.hal or item.doi):
             continue
         for r in rows:
@@ -610,10 +610,10 @@ def reject(doc_id: int, m: Mention) -> None:
 
 def selection_item(text: str):
     """A selection of the document as a reference (reflist.Item) to look for."""
-    from .reflist import _item, _join
+    from .reflist import item_of, join_wrapped
 
-    joined = _join(text.splitlines())
-    return _item(None, _LABEL.sub("", joined, count=1) or joined)
+    joined = join_wrapped(text.splitlines())
+    return item_of(None, _LABEL.sub("", joined, count=1) or joined)
 
 
 # ---- Bookmarks (of a document, or of a paper's stored PDF) ----------------------------------
