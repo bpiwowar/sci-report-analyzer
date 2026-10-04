@@ -54,7 +54,7 @@ OPENALEX_BACKOFF = timedelta(minutes=15)
 
 
 # Bumped when the matching logic changes, so that cached matches are recomputed.
-MATCH_VERSION = "m8"
+MATCH_VERSION = "m9"
 # Words saying a venue text is a conference (not a journal).
 _CONFERENCE_CUE = re.compile(
     r"\b(?:conf(?:erence|\.)?|conférence|symposium|workshops?|congress|colloque|"
@@ -480,10 +480,22 @@ class RankingService:
             # The generic words differ: "Society for Neuroscience" is not the "Journal of
             # Neuroscience", even if both reduce to "neuroscience".
             badge = None
-        if not is_ranked(badge) and acronym and st.source_on("core"):
+        # A conference text approximately matching a journal: "Conference of the
+        # International Speech Communication Association (INTERSPEECH)" is not the journal
+        # "Speech Communication".
+        conference_as_journal = (
+            m is not None
+            and badge is not None
+            and badge.type == "journal"
+            and not m.exact
+            and (type_hint == "conference" or bool(_CONFERENCE_CUE.search(raw_s)))
+        )
+        if (not is_ranked(badge) or conference_as_journal) and acronym and st.source_on("core"):
             # DBLP-style "(ACRONYM)" suffixes resolve to CORE by alias,
             # e.g. "AAAI Conference on AI (AAAI)" whose CORE name differs. The names must
-            # still overlap: "IC" is also "International Conference on Internet Computing".
+            # still overlap, or the CORE name carry the acronym ("Interspeech (combined
+            # EuroSpeech and ICSLP in 2000)"): "IC" is also "International Conference on
+            # Internet Computing".
             # A joint conference ("LREC-COLING") is tried with each of its acronyms.
             parts = (
                 [acronym, *re.split(r"[-/+&]", acronym)]
@@ -496,7 +508,10 @@ class RankingService:
                     am
                     and am.exact
                     and am.record["source"] == "core"
-                    and _name_overlap(match_venue, am.record.get("name"))
+                    and (
+                        _name_overlap(match_venue, am.record.get("name"))
+                        or normalize(part) in tokenize(am.record.get("name"))
+                    )
                 ):
                     badge = badge_from_record(am.record, am.score, am.exact)
                     break
