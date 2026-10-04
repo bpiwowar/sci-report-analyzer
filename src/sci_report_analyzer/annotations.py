@@ -1,5 +1,5 @@
-"""User annotations on publications: flags, tags (global or per period, stars included),
-notes, forced venue matches."""
+"""User annotations on publications: tags (global or per period, stars included), notes,
+forced venue matches, kinds and tracks set by hand."""
 
 from __future__ import annotations
 
@@ -10,69 +10,14 @@ from sqlalchemy import select
 from .db.models import (
     STARRED,
     AppSetting,
-    Flag,
     Period,
     PeriodNote,
     PeriodTag,
     Publication,
-    PublicationFlag,
     PublicationTag,
     Tag,
 )
 from .db.session import session_scope
-
-DEFAULT_FLAGS = (
-    ("short", "#d4a72c", "short"),
-    ("demo", "#8a6fd0", "demo"),
-    ("tutorial", "#1a7f37", "tutorial"),
-)
-
-
-def seed_flags() -> None:
-    with session_scope() as s:
-        if s.scalar(select(Flag.id).limit(1)) is None:
-            for name, colour, track in DEFAULT_FLAGS:
-                s.add(Flag(name=name, colour=colour, track=track))
-
-
-def all_flags() -> list[Flag]:
-    with session_scope() as s:
-        return list(s.scalars(select(Flag).order_by(Flag.name)))
-
-
-TRACK_FALLBACK_COLOUR = "#2f6fb0"  # (a track no flag marks: Findings)
-
-
-def track_colours() -> dict[str, str]:
-    """Each track's colour: that of a flag marking it, else of the default flags."""
-    out = {track: colour for _name, colour, track in DEFAULT_FLAGS}
-    out.update({f.track: f.colour for f in all_flags() if f.track and f.colour})
-    return out
-
-
-def save_flag(name: str, colour: str, track: str | None, flag_id: int | None = None) -> None:
-    with session_scope() as s:
-        f = s.get(Flag, flag_id) if flag_id else Flag(name=name)
-        if flag_id is None:
-            s.add(f)
-        f.name, f.colour, f.track = name, colour, track or None
-
-
-def delete_flag(flag_id: int) -> None:
-    with session_scope() as s:
-        if f := s.get(Flag, flag_id):
-            s.delete(f)
-
-
-def toggle_flag(pub_id: int, flag_id: int) -> bool:
-    with session_scope() as s:
-        row = s.get(PublicationFlag, (pub_id, flag_id))
-        if row:
-            s.delete(row)
-            return False
-        s.add(PublicationFlag(publication_id=pub_id, flag_id=flag_id))
-        return True
-
 
 # ---- tags and notes -------------------------------------------------------------------------
 
@@ -342,6 +287,41 @@ def _unreject(p, key: str, name: str) -> None:
 def set_kind_override(pub_id: int, kind: str | None) -> None:
     with session_scope() as s:
         s.get(Publication, pub_id).kind_override = kind or None
+
+
+def set_track_override(pub_id: int, track: str | None) -> None:
+    """The paper's track set by hand: a track's id, ``tracks.MAIN`` (the main track), or
+    None (automatic)."""
+    with session_scope() as s:
+        s.get(Publication, pub_id).track_override = track or None
+
+
+def forget_tracks(track_ids: set[str]) -> int:
+    """Remove the tracks deleted from where they are set (the papers' tracks set by hand,
+    the variants', the venue rules'): those papers, variants and rules get theirs
+    automatically again. Returns how many were changed."""
+    from sqlalchemy import update
+
+    from .db.models import Venue, VenueKey
+
+    if not track_ids:
+        return 0
+    with session_scope() as s:
+        n = s.execute(
+            update(Publication)
+            .where(Publication.track_override.in_(track_ids))
+            .values(track_override=None)
+        ).rowcount
+        n += s.execute(
+            update(VenueKey).where(VenueKey.track.in_(track_ids)).values(track=None)
+        ).rowcount
+        for v in s.scalars(select(Venue).where(Venue.patterns.is_not(None))):
+            if any(p.get("track") in track_ids for p in v.patterns or []):
+                v.patterns = [
+                    {**p, "track": None} if p.get("track") in track_ids else p for p in v.patterns
+                ]
+                n += 1
+        return n
 
 
 def remove_alias(person_id: int, name: str, student: str | None = None) -> None:

@@ -29,9 +29,9 @@ from .db.models import (
 from .db.session import session_scope
 from .i18n import N_, Labels, _, language
 from .merge import main_members
+from .ranking import tracks
 from .ranking.badge import (
     BASE_CATEGORIES,
-    FINDINGS_RE,
     KIND_ORDER,
     Badge,
     Category,
@@ -39,7 +39,6 @@ from .ranking.badge import (
     category_label,
     category_of,
     category_order,
-    detect_track,
 )
 from .ranking.kinds import (
     CONFERENCE_LIKE,
@@ -54,6 +53,7 @@ from .ranking.kinds import (
 )
 from .ranking.normalize import is_non_venue, normalize
 from .ranking.service import is_ranked, service
+from .ranking.tracks import FINDINGS_ID, MAIN
 from .source_settings import active_links
 from .sources import ADAPTERS, PRIORITY
 from .sources.base import to_year
@@ -115,7 +115,6 @@ class PubStat:
     pdf_urls: list[str]
     sources: list[str]
     members: list[MemberView]
-    flags: list[tuple[int, str, str]]  # (id, name, colour)
     venue_id: int | None
     venue_manual: bool
     venue_source: str | None  # source validated by hand for the venue
@@ -129,6 +128,10 @@ class PubStat:
     disagree: bool
     # The sources give different tracks (e.g. demo and short), not settled by hand.
     track_conflict: bool = False
+    # The track set by hand (a track's id, or tracks.MAIN: the main track; None: automatic),
+    # and the one found automatically (which the former replaces).
+    track_override: str | None = None
+    auto_track: str | None = None
     tags: set[int] = field(default_factory=set)  # global tags (ids)
     period_tags: dict[int, set[int]] = field(default_factory=dict)  # period id -> tag ids
     period_notes: dict[int, str] = field(default_factory=dict)  # period id -> note
@@ -203,7 +206,7 @@ class PubStat:
         if self.disagree and not self.overridden:
             out.append(_("sources give different venues — pick one in the details"))
         if self.track_conflict:
-            out.append(_("sources give different tracks — pick one in the details or flag it"))
+            out.append(_("sources give different tracks — pick one in the details"))
         if self.missing:
             out.append(_("no longer in any source"))
         return out
@@ -450,7 +453,7 @@ async def workshop_badge(
 
 
 def _text_track(text: str | None) -> str | None:
-    return detect_track(text) or ("findings" if text and FINDINGS_RE.search(text) else None)
+    return tracks.detect(text)
 
 
 def _has_decision(v: Venue | None) -> bool:
@@ -777,20 +780,18 @@ async def load_stats(person_id: int) -> list[PubStat]:
                 name = venue.name if venue else None
                 badge = badge_from_level({"type": vtype, "rank": level, "name": name})
                 badge.extra["kind_default"] = kind
-            flag_track = next((f.track for f in pub.flags if f.track), None)
             text = best.venue if best else None
             # The track of the source whose venue is used (a track wins over none, unless
             # the source without is validated by hand; different tracks: a disagreement).
             validated = best is not None and best.source == pub.venue_source
-            track = (
-                flag_track
-                or (
-                    (best.eff_track if validated else track_of(best, venue_members(views)))
-                    if best
-                    else None
-                )
-                or ("findings" if badge and badge.findings else None)
-            )
+            auto_track = (
+                (best.eff_track if validated else track_of(best, venue_members(views)))
+                if best
+                else None
+            ) or (FINDINGS_ID if badge and badge.findings else None)
+            # Set by hand, it wins (the main track: none).
+            override = pub.track_override
+            track = (None if override == MAIN else override) if override else auto_track
             pos, num, authors, pos_exact = _authorship(members)
             if pub.author_pos_override is not None:  # (0: the order does not matter)
                 pos, pos_exact = pub.author_pos_override, True
@@ -805,11 +806,11 @@ async def load_stats(person_id: int) -> list[PubStat]:
                 for v in venue_members(views)
                 if not v.archival and v.venue_id and not v.minor
             }
-            # Different tracks: to be settled by hand (a flag with a track, or a source
+            # Different tracks: to be settled by hand (the paper's track, or a source
             # validated), even when a DOI record gives the venue.
             track_conflict = (
                 len(paper_tracks(venue_members(views))) > 1
-                and not flag_track
+                and not override
                 and not validated
                 and not pub.rank_override
                 and not no_venue
@@ -847,13 +848,14 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     pdf_urls=pdf_links,
                     sources=list(dict.fromkeys(v.source for v in views)),
                     members=views,
-                    flags=[(f.id, f.name, f.colour) for f in pub.flags],
                     missing=pub.missing,
                     hidden=pub.hidden,
                     archival_only=archival_only,
                     # With a DOI record, its venue is the paper's: no disagreement.
                     disagree=len(venue_ids) > 1 and (dm is None or dm.minor) and not no_venue,
                     track_conflict=track_conflict,
+                    track_override=override,
+                    auto_track=auto_track,
                     tags={tg.id for tg in pub.tags},
                     period_tags=period_tags.get(pub.id, {}),
                     period_notes=period_notes.get(pub.id, {}),
@@ -1005,7 +1007,6 @@ _FR_KINDS = {
     "thesis": "Thèse",
     "other": "Autre",
 }
-_FR_TRACKS = {"findings": "Findings", "short": "Court", "demo": "Démo", "tutorial": "Tutoriel"}
 
 
 def _fr_category(cat: Category, kind: str | None, n: int) -> str:
@@ -1026,7 +1027,7 @@ def _fr_category(cat: Category, kind: str | None, n: int) -> str:
     if cat.edited and kind != "proceedings":
         label = f"Actes (éd.) {label}"
     if cat.track:
-        label = f"{_FR_TRACKS.get(cat.track, cat.track)} {label}"
+        label = f"{tracks.name(cat.track, 'fr')} {label}"
     return label
 
 

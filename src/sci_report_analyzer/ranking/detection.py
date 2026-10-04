@@ -1,5 +1,6 @@
 """Detection rules: the regexes classifying venues (workshops and their main conference,
-conferences vs journals, tracks, joint conferences).
+conferences vs journals, joint conferences); those of the tracks are the tracks' own
+(``ranking.tracks``).
 
 Their defaults are here; the patterns in force are the settings' (``MatchSettings.
 detection_rules``, Settings → Detection rules), a rule missing from them or invalid taking
@@ -59,7 +60,6 @@ DETECTION_GROUPS = Labels(
     {
         "workshop": N_("Workshops"),
         "form": N_("Conference or journal"),
-        "track": N_("Tracks"),
         "joint": N_("Joint conferences"),
     }
 )
@@ -165,76 +165,6 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         language="fr",
         part_of="journal",
         examples=("Revue des gadgets",),
-    ),
-    # Tracks, in this order (Findings: see below).
-    DetectionDefault(
-        id="track_tutorial",
-        group="track",
-        name=N_("Tutorial track"),
-        description=N_("A venue text naming a tutorial track."),
-        pattern=r"\btutorials?\b",
-        language="en",
-        examples=("ECIR 2024 Tutorials",),
-    ),
-    DetectionDefault(
-        id="track_tutorial_fr",
-        group="track",
-        name=N_("Tutorial track"),
-        description=N_("A venue text naming a tutorial track."),
-        pattern=r"\btutoriels?\b",
-        language="fr",
-        part_of="track_tutorial",
-        examples=("Foo 2024, tutoriels",),
-    ),
-    DetectionDefault(
-        id="track_demo",
-        group="track",
-        name=N_("Demo track"),
-        description=N_("A venue text naming a demo track."),
-        pattern=r"\b(?:demos?|demonstrations?)\b",
-        language="en",
-        examples=("ACL 2023 (System Demonstrations)",),
-    ),
-    DetectionDefault(
-        id="track_demo_fr",
-        group="track",
-        name=N_("Demo track"),
-        description=N_("A venue text naming a demo track."),
-        pattern=r"\b(?:démos?|démonstrations?)\b",
-        language="fr",
-        part_of="track_demo",
-        examples=("Foo 2024 (Démonstrations)",),
-    ),
-    DetectionDefault(
-        id="track_short",
-        group="track",
-        name=N_("Short paper track"),
-        description=N_("A venue text naming a short paper track."),
-        pattern=r"\bshort papers?\b",
-        language="en",
-        examples=("ACL 2022 (Volume 2: Short Papers)",),
-    ),
-    DetectionDefault(
-        id="track_short_fr",
-        group="track",
-        name=N_("Short paper track"),
-        description=N_("A venue text naming a short paper track."),
-        pattern=r"\barticles? courts?\b",
-        language="fr",
-        part_of="track_short",
-        examples=("Foo 2024 (Articles courts)",),
-    ),
-    DetectionDefault(
-        id="track_findings",
-        group="track",
-        name=N_("Findings"),
-        description=N_(
-            "A venue text naming a Findings volume (ACL's, EMNLP's…): ranked apart from the "
-            "main conference."
-        ),
-        pattern=r"\bfindings\b",
-        language="en",
-        examples=("Findings of the Association for Computational Linguistics: ACL 2023",),
     ),
     # Two conferences joined by "and" ("… Conference on X and the International Joint
     # Conference on Y"); IJCAI, a single "International Joint Conference", is not one.

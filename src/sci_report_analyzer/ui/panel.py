@@ -1,4 +1,4 @@
-"""Publications panel: statistics, with periods, flags, tags and notes."""
+"""Publications panel: statistics, with periods, tags and notes."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from ..pubview import (
     summary_settings,
     year_bin_defs,
 )
-from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR, TRACK_LABEL
+from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR
 from ..ranking.kinds import KIND_SHORT
 from ..sources import ADAPTERS
 from .pdf_viewer import download_dialog, pdf_button, watch
@@ -37,7 +37,7 @@ from .pub_details import open_details, source_badge
 from .reflist import tag_from_list
 from .report import page_url as report_url
 from .tags import tag_chip, tags_dialog
-from .theme import DIM_OPACITY, NOTE_EXTRAS, author_html, chip_text, rank_chip, span
+from .theme import DIM_OPACITY, NOTE_EXTRAS, author_html, rank_chip, span, stripes, track_chip
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,6 @@ class PublicationsPanel:
         self.period_id: int | None = None
         # Tags to show (any of them): global ones, and ones within the period.
         self.tag_filter: list[int] = []
-        self.flag_filter: list[int] = []
         self.text = ""
         self.hide_preprints = False
         self.show_hidden = False
@@ -97,7 +96,6 @@ class PublicationsPanel:
         self.open_pub: int | None = None  # a publication to open once loaded
         # Called on each render (e.g. the Theses tab, which follows the period).
         self.on_render: list[Callable[[], None]] = []
-        self.flags = annotations.all_flags()
         self.tags = annotations.all_tags()
         self.starred_id = annotations.starred_tag_id()
         self.categories = annotations.author_categories()
@@ -144,10 +142,6 @@ class PublicationsPanel:
             self.lo = _int(q["from"])
         if "to" in q:
             self.hi = _int(q["to"])
-        known = {f.id for f in self.flags}
-        self.flag_filter = [
-            f for f in (_int(x) for x in q.get("flags", "").split(",")) if f in known
-        ]
         self.text = q.get("q", "")
         self.hide_preprints = q.get("nopre") == "1"
         self.show_hidden = q.get("hidden") == "1"
@@ -170,8 +164,6 @@ class PublicationsPanel:
             out["from"] = ""
         if p and self.hi is None and p.end_year is not None:
             out["to"] = ""
-        if self.flag_filter:
-            out["flags"] = ",".join(map(str, self.flag_filter))
         if self.text:
             out["q"] = self.text
         for key, on in (
@@ -260,15 +252,13 @@ class PublicationsPanel:
     # ---- filtering ----------------------------------------------------------------------
 
     def base_rows(self, *, problems_filter: bool = True) -> list[PubStat]:
-        """Rows after the non-crossfilter filters (year range, period, tags, flags, text)."""
+        """Rows after the non-crossfilter filters (year range, period, tags, text)."""
         rows = []
         text = self.text.lower().strip()
         for s in self.stats:
             if not self.in_years(s):
                 continue
             if self.tag_filter and not s.tags_in(self.period_id) & set(self.tag_filter):
-                continue
-            if self.flag_filter and not {f[0] for f in s.flags} & set(self.flag_filter):
                 continue
             if self.hide_preprints and s.archival_only:
                 continue
@@ -471,20 +461,6 @@ class PublicationsPanel:
             ui.button(icon="sell", on_click=self.manage_tags).props("flat round dense").tooltip(
                 _("Manage tags (names, colours)")
             ).mark("manage-tags-panel")
-            if self.flags:
-
-                def set_flags(e) -> None:
-                    self.flag_filter = list(e.value or [])
-                    self.sel = None
-                    self.render()
-
-                ui.select(
-                    {f.id: f.name for f in self.flags},
-                    value=self.flag_filter,
-                    multiple=True,
-                    label=_("flags"),
-                    on_change=set_flags,
-                ).props("dense outlined use-chips clearable").classes("min-w-32")
 
             def set_text(e) -> None:
                 self.text = e.value or ""
@@ -499,7 +475,7 @@ class PublicationsPanel:
                 self.render()
 
             ui.switch(_("hide preprints"), value=self.hide_preprints, on_change=set_hide)
-            # Within the current filters (year range, period, flags, search…).
+            # Within the current filters (year range, period, tags, search…).
             n_problems = sum(bool(s.problems) for s in self.base_rows(problems_filter=False))
             if n_problems or self.problems_only:
 
@@ -858,7 +834,8 @@ class PublicationsPanel:
                     span(
                         f'<span class="{"vr-track" if c.striped else ""}'
                         f'{" vr-dim" if dim else ""}" '
-                        f'style="display:block;height:24px;width:100%;background:{c.colour}"></span>'
+                        f'style="display:block;height:24px;width:100%;background:{c.colour}'
+                        f'{stripes(c)}"></span>'
                     )
                     .classes("cursor-pointer")
                     .style(f"width:{100 * n / max(total, 1)}%")
@@ -866,17 +843,16 @@ class PublicationsPanel:
                 seg.tooltip(f"{c.label}: {pct(n)} ({n})")
                 seg.on("click", lambda c=c: self.pick(Sel("category", c.label, key=c.key)))
         with ui.row().classes("w-full gap-3"):
-            items = [(c.key, c.label, c.colour, c.striped, counts[c.key]) for c in present]
+            items = [(c.key, c.label, c.colour, stripes(c), counts[c.key]) for c in present]
             if predatory:
-                items.append(("predatory", _("⚠ predatory"), PREDATORY_COLOUR, False, predatory))
-            for key, label, colour, track, n in items:
+                items.append(("predatory", _("⚠ predatory"), PREDATORY_COLOUR, "", predatory))
+            for key, label, colour, striped, n in items:
                 dim = owns and sel.key != key
                 dim_cls = "vr-dim" if dim else ""
-                track_cls = "vr-track" if track else ""
                 el = span(
-                    f'<span class="{dim_cls}"><i class="{track_cls}"'
+                    f'<span class="{dim_cls}"><i'
                     f' style="display:inline-block;width:10px;height:10px;background:{colour};'
-                    f'margin-right:4px"></i>{escape(label)} {pct(n)} <b>({n})</b></span>'
+                    f'margin-right:4px{striped}"></i>{escape(label)} {pct(n)} <b>({n})</b></span>'
                 ).classes("cursor-pointer text-sm")
                 el.on("click", lambda k=key, lab=label: self.pick(Sel("category", lab, key=k)))
 
@@ -905,7 +881,7 @@ class PublicationsPanel:
                         "dashArrayX": [1, 0],
                         "dashArrayY": [2, 4],
                         "rotation": 0.8,
-                        "color": "rgba(255,255,255,0.45)",
+                        "color": c.stripe if c.track else "rgba(255,255,255,0.45)",
                     }
                 series.append(
                     {
@@ -1276,24 +1252,14 @@ class PublicationsPanel:
                                         source=m.source, url=m.pdf_url
                                     )
                                 )
-                    for _fid, name, colour in s.flags:
-                        span(
-                            f'<span class="vr-chip" '
-                            f'style="background:{colour};color:{chip_text(colour)}">'
-                            f"{escape(name)}</span>"
-                        )
+                    if s.track:
+                        track_chip(s.track, f"pub-track-{s.id}")
                     pid = period.id if period else None
                     mine = s.tags_in(pid)
                     for tag in self.tags:
                         number = s.number_of(tag.id, pid)
                         if tag.id in mine and (tag.id != self.starred_id or number is not None):
                             tag_chip(tag, number)
-                    if (
-                        s.track
-                        and s.track in TRACK_LABEL
-                        and not any(f[1] == s.track for f in s.flags)
-                    ):
-                        ui.label(TRACK_LABEL[s.track]).classes("text-xs text-grey")
 
     @property
     def period(self):

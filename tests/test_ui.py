@@ -131,7 +131,8 @@ async def test_period_filter(user: User) -> None:
         "rules",
         "kinds",
         "detection",
-        "flags",
+        "tracks",
+        "tags",
         "data",
         "keys",
         "io",
@@ -170,11 +171,11 @@ async def test_hide_from_details(user: User) -> None:
     await user.should_see("show hidden (1)")
 
 
-async def test_flag_and_star(user: User) -> None:
+async def test_track_and_star(user: User) -> None:
     from sqlalchemy import select
 
     from sci_report_analyzer import annotations
-    from sci_report_analyzer.db.models import PeriodTag, PublicationFlag
+    from sci_report_analyzer.db.models import PeriodTag, Publication
     from sci_report_analyzer.db.session import session_scope
 
     pid = _seed()
@@ -183,14 +184,14 @@ async def test_flag_and_star(user: User) -> None:
     await user.open(f"/person/{pid}")
     await user.should_see("Deep ranking for search")
     user.find(f"pub-{pub_id}").click()
-    user.find("flag-short").click()
+    # The paper's track, set by hand: automatic, the main track or one of the tracks.
+    (track,) = user.find("paper-track").elements
+    assert track.value == "" and "Automatic (currently: " in track.options[""]
+    assert "#d4a72c" in track.options["short"]  # (each track's chip, in its colour)
+    track.value = "short"
     with session_scope() as s:
-        assert (
-            s.scalar(
-                select(PublicationFlag.flag_id).where(PublicationFlag.publication_id == pub_id)
-            )
-            is not None
-        )
+        assert s.get(Publication, pub_id).track_override == "short"
+    await user.should_see(marker=f"pub-track-{pub_id}")  # its chip in the list
     # choosing the period shows the star toggles
     period_select = next(e for e in user.find(ui.select).elements if 0 in e.options)
     period_select.value = next(k for k in period_select.options if k)
@@ -779,7 +780,7 @@ async def test_detection_rules(user: User) -> None:
 
     await user.open("/settings?tab=detection")
     await user.should_see("Detection rules")
-    await user.should_see("Short paper track")
+    await user.should_see("Joint conference")
     # By language: a rule of a language says which it is part of.
     await user.should_see("Any language")
     await user.should_see("part of the rule “Workshop · English”")
@@ -796,6 +797,45 @@ async def test_detection_rules(user: User) -> None:
     await user.should_not_see(marker="origin-edited")
     user.find("detect-save").click()
     assert workshop() == DEFAULTS["workshop"].pattern
+
+
+async def test_tracks_settings(user: User) -> None:
+    """A track is added (named, with a rule), a built-in one edited (marked, reset), and the
+    edited tracks previewed and saved."""
+    from sci_report_analyzer.ranking import tracks
+    from sci_report_analyzer.ranking.service import load_settings
+
+    await user.open("/settings?tab=tracks")
+    await user.should_see(marker="track-short")
+    await user.should_not_see(marker="origin-edited")
+    user.find("track-try").type("WIDG 2024 (System Demonstrations)")
+    await user.should_see("Demo")
+    # A built-in track's colour changed: edited (its reset back).
+    user.find("track-colour-short").elements.pop().value = "#123456"
+    await user.should_see(marker="origin-edited")
+    user.find("track-reset-short").click()
+    await user.should_not_see(marker="origin-edited")
+    # A track added, with a rule (French name too).
+    user.find("track-new-name").type("Industry papers")
+    user.find("track-add").click()
+    await user.should_see(marker="track-industry_papers")
+    user.find("track-name-industry_papers-fr").elements.pop().value = "Articles industriels"
+    user.find("track-add-rule-industry_papers").click()
+    await user.should_see(marker="track-pattern-industry_papers_1")
+    user.find("track-pattern-industry_papers_1").elements.pop().value = r"\bindustry track\b"
+    user.find("track-colour-short").elements.pop().value = "#123456"
+    user.find("tracks-save").click()
+    await user.should_see("Tracks saved")
+    st = load_settings()
+    industry = next(t for t in st.tracks if t.id == "industry_papers")
+    assert industry.names == {"en": "Industry papers", "fr": "Articles industriels"}
+    assert [r.pattern for r in industry.rules] == [r"\bindustry track\b"]
+    assert next(t for t in st.tracks if t.id == "short").colour == "#123456"
+    assert tracks.detect("WIDG 2024, Industry Track") == "industry_papers"
+    # Deleted (saved): no paper is of it any more.
+    user.find("track-delete-industry_papers").click()
+    user.find("tracks-save").click()
+    assert "industry_papers" not in [t.id for t in load_settings().tracks]
 
 
 async def test_rule_origins(user: User) -> None:
@@ -1248,7 +1288,7 @@ async def test_venue_marked_as_a_demo_track(user: User) -> None:
     await user.should_see(marker="venue-as-track")
     (chip,) = user.find("venue-as-track-choice").elements
     assert chip.value == "demo" and chip.text == "Demo"
-    assert "#8a6fd0" in chip.style.get("background", "")  # the demo flag's colour
+    assert "#8a6fd0" in chip.style.get("background", "")  # the demo track's colour
     user.find("venue-as-track").click()
     await user.should_see(marker="venue-as-track-name")
     (name,) = user.find("venue-as-track-name").elements
@@ -1307,7 +1347,7 @@ async def test_venue_variants_grouped_by_track_with_their_raw_texts(user: User) 
     await user.open(f"/venues?focus={vid}")
     user.find("venue-tab-matching").click()
     await user.should_see(marker="venue-variant-group-demo")
-    # The main venue first, then each track (its chip in the flag's colour).
+    # The main venue first, then each track (its chip in the track's colour).
     (main,) = user.find("venue-variant-group-none").elements
     (group,) = user.find("venue-variant-group-demo").elements
     assert main.id < group.id < user.find(f"venue-variant-{demo}").elements.pop().id

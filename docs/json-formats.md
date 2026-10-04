@@ -16,28 +16,29 @@ Code: `settings_io.py` (settings file), `ranking/datasets.py` (datasets), `confi
 
 ## Settings file
 
-Shareable matching settings: the matching settings, the venues with manual decisions, the
-flag definitions and, optionally, the imported JCR rows. People, publications and their
-annotations are never in it. Pydantic models: `settings_io.SettingsFile` and the classes it
+Shareable matching settings: the matching settings (tracks included), the venues with
+manual decisions and, optionally, the imported JCR rows. People, publications and their
+annotations (a paper's track set by hand included) are never in it. Pydantic models: `settings_io.SettingsFile` and the classes it
 uses.
 
 ### Versioning
 
 `format` must be `"sci-report-analyzer-settings"`, or the file is rejected. `version` (now
-`4`) is written but not checked on import. Every other field is optional: a missing one takes
+`5`) is written but not checked on import. Every other field is optional: a missing one takes
 its default, an unknown one is ignored. Older files therefore import as long as their fields
-kept their meaning.
+kept their meaning. A file of version 4 or before may have `flags` (`{"name", "colour",
+"track"}`; gone since version 5, see [Tracks](#track)): when its `matching` has no `tracks`,
+the colour of a flag with a track becomes that track's; the other flags are ignored.
 
 ### Top level
 
 | Field | Type | Default | |
 |-------|------|---------|-|
 | `format` | `"sci-report-analyzer-settings"` | that | required in effect (the only accepted value) |
-| `version` | int | `4` | informative |
+| `version` | int | `5` | informative |
 | `exported_at` | string \| null | null | ISO 8601, UTC, seconds (`2026-10-04T09:00:00+00:00`) |
 | `matching` | [Matching](#matching) | defaults | |
 | `venues` | list of [Venue](#venue) | `[]` | only venues with a manual decision or a manual variant are exported |
-| `flags` | list of [Flag](#flag) | `[]` | |
 | `jcr` | list of [ranking records](#ranking-records) \| null | null | JCR rows, when *Include imported JCR rows* is checked |
 
 ### Matching
@@ -54,6 +55,7 @@ kept their meaning.
 | `unknown_scope` | `"international"` \| `"national"` | `"international"` | scope of a venue without a clue |
 | `kind_levels` | object: kind → level | `{}` | default level per [kind](#venue-kinds), e.g. `{"natl_conference": "C"}`; levels `A*`, `A`, `B`, `C`, `Q1`…`Q4` or any typed text |
 | `detection_rules` | list of [DetectionRule](#detectionrule) | the built-in rules | regexes classifying venues, by `id`; a missing one takes its default |
+| `tracks` | list of [Track](#track) | the built-in tracks | the satellite tracks, in their order; a built-in one missing is appended with its default |
 | `core_edition` | `"publication"` \| `"latest"` | `"publication"` | CORE edition giving a paper its rank |
 
 #### NormRule
@@ -104,12 +106,40 @@ leftmost match counts).
 | `conference_fr` | fr | `conference` | likewise |
 | `journal` | en | | a journal, likewise (after `conference`) |
 | `journal_fr` | fr | `journal` | likewise |
-| `track_tutorial`, `track_demo`, `track_short` | en | | a track, tried in this order |
-| `track_tutorial_fr`, `track_demo_fr`, `track_short_fr` | fr | the English one | likewise |
-| `track_findings` | en | | a Findings volume |
 | `joint` | en | | a joint conference (its parts looked for) |
 
-A shared task (`shared_task`) is never detected: it is set by hand.
+A shared task (`shared_task`) is never detected: it is set by hand. The tracks' rules are
+the tracks' own ([Track](#track)); `track_*` rules saved here before version 5 are dropped
+(the database migration moved them into the tracks).
+
+#### Track
+
+A satellite track of the conferences (`ranking.tracks.Track`; Settings → Tracks): a paper of
+a track is counted apart ("Short CORE A*"), its category striped in the track's colour. The
+tracks are tried in their order (Findings last, `findings` being also ranked as its main
+conference); the first whose rules match a venue text gives its track.
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `id` | string | required | identity (a merge import compares tracks by id); `[a-z0-9_]`, never `main` |
+| `names` | object: language → string | `{}` | its name by language (`{"en": "Short", "fr": "Court"}`); a missing one: the English one, else the id |
+| `colour` | string | `"#2f6fb0"` | CSS colour (its chips, its categories' stripes) |
+| `rules` | list of [TrackRule](#trackrule) | `[]` | |
+
+The built-in tracks (`ranking.tracks.DEFAULT_TRACKS`): `findings` (`#2f6fb0`), `tutorial`
+(`#1a7f37`), `demo` (`#8a6fd0`), `short` (`#d4a72c`); they cannot be deleted. A variant's,
+a venue rule's or a paper's track (set by hand: `publication.track_override` in the
+database, `"main"` for the main track) is a track's `id`.
+
+#### TrackRule
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `id` | string | required | a built-in rule's id (`track_short`, `track_short_fr`…: its default known), else an added one's (`<track>_<n>`) |
+| `pattern` | string | required | Python regex (`re.search`); `""`: matches nothing; invalid: a built-in rule's default, an added one ignored |
+| `ignore_case` | bool | true | |
+| `language` | string \| null | null | the language of its words (`en`, `fr`); null: general |
+| `examples` | list of string | `[]` | venue texts it should match (shown in Settings) |
 
 ### Venue
 
@@ -142,7 +172,7 @@ A raw venue text of the venue (`VariantIO`).
 | `raw` | string | required | the raw text; its key is computed on import |
 | `source` | string \| null | null | its source (`dblp`, `hal`, `orcid`, `openalex`, `semanticscholar`, `scholar`, `doi`, `thesesfr`): that source's rules apply |
 | `manual` | bool | true | assigned by hand (never re-assigned automatically) |
-| `track` | string \| null | null | `findings`, `tutorial`, `demo`, `short` |
+| `track` | string \| null | null | a [track](#track)'s `id` (`findings`, `tutorial`, `demo`, `short`…) |
 
 A variant already in another local venue moves only with *Replace*, or when its conflict is
 taken in a merge.
@@ -157,7 +187,7 @@ A regex: the source venue texts it matches (`re.search`) belong to the venue
 | `pattern` | string | required | |
 | `ignore_case` | bool | true | |
 | `sources` | list of string | `[]` | sources it applies to (empty: all) |
-| `track` | string \| null | null | track of the matching papers |
+| `track` | string \| null | null | [track](#track) of the matching papers (its `id`) |
 | `note` | string \| null | null | |
 
 #### Host
@@ -185,24 +215,17 @@ Keys of `ranking.kinds.KINDS`: `intl_conference`, `intl_workshop`, `intl_journal
 `chapter`, `proceedings`, `software`, `dataset`, `thesis`, `other`. `proceedings` and
 `thesis` are publication kinds only: valid in `kind_levels`, not as a venue's `kind`.
 
-### Flag
-
-| Field | Type | Default | |
-|-------|------|---------|-|
-| `name` | string | required | identity |
-| `colour` | string | `"#57606a"` | CSS colour |
-| `track` | string \| null | null | set: the flag acts as a satellite track (`short`, `demo`…) |
-
 ### Import modes
 
 - **Replace**: erases every venue decision (kind, level, record, search text, short name,
   URL, rules, identifiers, hosts, manual joint; variants and paper links are kept), the JCR
   rows when the file has `jcr`, then applies the file; the matching settings are replaced
-  as a whole. When the file has flags, local flags absent from it are deleted unless papers
-  carry them.
+  as a whole, except the local tracks added by hand that the file lacks (papers, variants
+  or venue rules may be of them): they are kept, after the file's.
 - **Merge**: keeps local values and adds the imported ones. A value set on both sides and
-  different is a conflict (matching field, cleaning or detection rule by `id`, venue field,
-  variant, flag); the local value stays unless the imported one is taken. JCR rows whose
+  different is a conflict (matching field, cleaning or detection rule or track by `id`,
+  venue field, variant); the local value stays unless the imported one is taken. A track
+  only in the file is added (after the local ones). JCR rows whose
   `name` is already there are skipped.
 
 ### Example
@@ -210,7 +233,7 @@ Keys of `ranking.kinds.KINDS`: `intl_conference`, `intl_workshop`, `intl_journal
 ```json
 {
   "format": "sci-report-analyzer-settings",
-  "version": 4,
+  "version": 5,
   "exported_at": "2026-10-04T09:00:00+00:00",
   "matching": {
     "sources": {"scimago": true, "core": true, "jcr": true, "openalex": false, "predatory": true},
@@ -236,6 +259,23 @@ Keys of `ranking.kinds.KINDS`: `intl_conference`, `intl_workshop`, `intl_journal
     "detection_rules": [
       {"id": "workshop", "pattern": "\\bworkshops?\\b|\\bseminars?\\b", "ignore_case": true}
     ],
+    "tracks": [
+      {
+        "id": "short",
+        "names": {"en": "Short", "fr": "Court"},
+        "colour": "#d4a72c",
+        "rules": [
+          {"id": "track_short", "pattern": "\\bshort papers?\\b", "ignore_case": true, "language": "en", "examples": []},
+          {"id": "track_short_fr", "pattern": "\\barticles? courts?\\b", "ignore_case": true, "language": "fr", "examples": []}
+        ]
+      },
+      {
+        "id": "industry",
+        "names": {"en": "Industry", "fr": "Industriel"},
+        "colour": "#bf3989",
+        "rules": [{"id": "industry_1", "pattern": "\\bindustry track\\b", "ignore_case": true, "language": "en", "examples": []}]
+      }
+    ],
     "core_edition": "publication"
   },
   "venues": [
@@ -254,7 +294,6 @@ Keys of `ranking.kinds.KINDS`: `intl_conference`, `intl_workshop`, `intl_journal
       "identifiers": {"issn": ["1234-5678"]}
     }
   ],
-  "flags": [{"name": "short paper", "colour": "#57606a", "track": "short"}],
   "jcr": null
 }
 ```

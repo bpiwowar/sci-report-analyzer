@@ -15,7 +15,7 @@ notes, stored PDFs and reports. Venues are ranked with Scimago, CORE (every edit
   version, PDF links, manual split / merge / hide.
 - **Publications panel**: distribution, publications by year,
   co-authors, author position, "with PhD student", cross-filtering, named **periods** with
-  **stars**, **flags** (short, demo…) that stick to papers, **tags** (global or within a
+  **stars**, a paper's **track** (short, demo…) set by hand, **tags** (global or within a
   period) and Markdown **notes**, with a Markdown listing of the noted / tagged papers;
   **tag from a pasted list** (e.g. a report's numbered list: matched by HAL id / DOI / title,
   missing papers searched on HAL and added, the list's numbers kept for reporting).
@@ -42,7 +42,8 @@ notes, stored PDFs and reports. Venues are ranked with Scimago, CORE (every edit
 - Author highlighting: the person (with aliases) and their PhD students (from theses.fr),
   with potential matches to confirm.
 - **Settings**: ranking sources, confidence threshold, rewrite and cleaning rules, venue
-  kinds, flags, datasets, JCR import, API keys, and **import / export** (replace, or merge
+  kinds, **tracks** (names, colours, detection rules), datasets, JCR import, API keys, and
+  **import / export** (replace, or merge
   with per-conflict choices) to share them.
 
 ## Usage

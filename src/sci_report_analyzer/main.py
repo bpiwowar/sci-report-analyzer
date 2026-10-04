@@ -10,7 +10,6 @@ from pathlib import Path
 from nicegui import app, background_tasks, ui
 
 from . import config, i18n, livereload, stop, venue_match
-from .annotations import seed_flags
 from .db import backup
 from .db.session import init_engine
 from .ranking import datasets
@@ -40,7 +39,6 @@ def setup() -> None:
         backup.daily(db)
     reset_running_states()
     i18n.load_language()
-    seed_flags()
     venue_match.refresh()
     persons.register()
     person.register()

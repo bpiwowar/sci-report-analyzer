@@ -255,8 +255,8 @@ def manual_counts() -> dict[str, int]:
 def clear_manual(*, venues: bool, papers: bool) -> dict[str, int]:
     """Erase the manual decisions on the venues (kind, level, record, search text, short
     name, venue rules, identifiers, variants set by hand) and / or on the papers (venue,
-    validated source, rank, kind, year, author position, note), then recompute everything
-    automatically. Flags, stars, hidden papers and manual merges are kept."""
+    validated source, rank, kind, track, year, author position, note), then recompute everything
+    automatically. Tags, stars, hidden papers and manual merges are kept."""
     counts = manual_counts()
     with session_scope() as s:
         if venues:
@@ -282,6 +282,7 @@ def clear_manual(*, venues: bool, papers: bool) -> dict[str, int]:
                     rank_override=None,
                     rank_note=None,
                     kind_override=None,
+                    track_override=None,
                     year_override=None,
                     author_pos_override=None,
                     note=None,

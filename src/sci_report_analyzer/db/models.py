@@ -170,6 +170,10 @@ class Publication(Base):
     rank_note: Mapped[str | None]
     # Venue kind set by hand for this publication (intl_conference, natl_journal, preprint...).
     kind_override: Mapped[str | None] = mapped_column(String(32))
+    # Track set by hand for this publication: a track's id (ranking.tracks), or "main" (the
+    # main track: no satellite track, whatever the sources say); None: automatic (from the
+    # variants, the venue rules and the venue texts). It settles the sources' disagreements.
+    track_override: Mapped[str | None] = mapped_column(String(32))
     # DOI given by hand (its record then belongs to this publication).
     doi_manual: Mapped[str | None]
     year_override: Mapped[int | None]
@@ -189,7 +193,6 @@ class Publication(Base):
         back_populates="publication", passive_deletes=True
     )
     venue: Mapped[Venue | None] = relationship()
-    flags: Mapped[list[Flag]] = relationship(secondary="publication_flag", lazy="selectin")
     # Global tags (per-period ones: PeriodTag).
     tags: Mapped[list[Tag]] = relationship(secondary="publication_tag", lazy="selectin")
 
@@ -201,32 +204,12 @@ class Publication(Base):
             or self.venue_source
             or self.rank_override
             or self.kind_override
+            or self.track_override
             or self.year_override
             or self.author_pos_override is not None
             or self.note
             or self.doi_manual
         )
-
-
-class Flag(Base):
-    __tablename__ = "flag"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(unique=True)
-    colour: Mapped[str] = mapped_column(default="#57606a")
-    # When set, the flag acts as a satellite track in the distribution (short, demo, ...).
-    track: Mapped[str | None]
-
-
-class PublicationFlag(Base):
-    __tablename__ = "publication_flag"
-
-    publication_id: Mapped[int] = mapped_column(
-        ForeignKey("publication.id", ondelete="CASCADE"), primary_key=True
-    )
-    flag_id: Mapped[int] = mapped_column(
-        ForeignKey("flag.id", ondelete="CASCADE"), primary_key=True
-    )
 
 
 class Period(Base):

@@ -24,7 +24,8 @@ from ..pubview import (
     track_of,
     venue_members,
 )
-from ..ranking.badge import TRACK_LABEL, Badge
+from ..ranking import tracks
+from ..ranking.badge import Badge
 from ..ranking.kinds import (
     CONFERENCE_LIKE,
     KINDS,
@@ -41,7 +42,6 @@ from . import scimago_years
 from .theme import (
     author_html,
     badge_details,
-    chip_style,
     level_hint,
     level_legend,
     level_options,
@@ -49,6 +49,8 @@ from .theme import (
     rank_chip,
     source_tag,
     span,
+    track_chip,
+    track_chip_html,
 )
 
 if TYPE_CHECKING:
@@ -271,7 +273,7 @@ def venue_rule_dialog(
             icase = ui.checkbox(_("ignore case"), value=old.ignore_case if old else True)
             track = (
                 ui.select(
-                    {"": _("no track"), **TRACK_LABEL},
+                    {"": _("no track"), **tracks.names()},
                     value=(old.track or "") if old else "",
                     label=_("Mark papers as"),
                 )
@@ -341,7 +343,7 @@ def venue_rule_dialog(
                 if rule.track:
                     ui.label(
                         _("Their publications are marked {track}.").format(
-                            track=TRACK_LABEL.get(rule.track, rule.track)
+                            track=tracks.name(rule.track)
                         )
                     ).classes("text-sm")
                 effects = venues.pattern_effects(target.value, rule, index)
@@ -853,23 +855,6 @@ def _publication_tab(panel: PublicationsPanel, s: PubStat, done) -> None:
             "hide-publication"
         )
 
-    # -- flags -----------------------------------------------------------------------------
-    current = {f[0] for f in s.flags}
-    with ui.row().classes("items-center gap-1"):
-        ui.label(_("Flags")).classes("font-medium mr-2")
-        for f in panel.flags:
-
-            def toggle(fid=f.id) -> None:
-                on = annotations.toggle_flag(s.id, fid)
-                (current.add if on else current.discard)(fid)
-                background_tasks.create(panel.reload())
-
-            ui.chip(f.name, selectable=True, selected=f.id in current, on_click=toggle).style(
-                chip_style(f.colour, f.id in current)
-            ).props("dense " + ("color=primary" if f.id in current else "")).mark(
-                f"flag-{f.name}"
-            ).tooltip(_("track: {track}").format(track=f.track) if f.track else "")
-
     _authors_section(panel, s, done)
 
     # -- sources ---------------------------------------------------------------------------
@@ -955,6 +940,7 @@ def _corrections_section(s: PubStat, done) -> None:
             )
 
         kind.on_value_change(save_kind)
+        _track_editor(s, done)
     with ui.row().classes("w-full items-center gap-2"):
         year = (
             ui.number(_("Year"), value=s.year if s.year_manual else None, format="%d")
@@ -1386,10 +1372,10 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
             with ui.row().classes("items-center gap-2").mark("validate-what"):
                 rank_chip(m.badge, track, s.kind)
                 if track:
-                    ui.badge(TRACK_LABEL.get(track, track), color="purple-7")
+                    track_chip(track)
                 what = (
                     _("the venue from {source}, {track} track").format(
-                        source=label, track=TRACK_LABEL.get(track, track)
+                        source=label, track=tracks.name(track)
                     )
                     if track
                     else _("the venue from {source}, main track").format(source=label)
@@ -1541,9 +1527,9 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
                             why = _("{why}; it wins over the sources giving no track").format(
                                 why=why
                             )
-                        ui.badge(TRACK_LABEL.get(track, track), color="purple-7").tooltip(
+                        track_chip(track, f"group-track-{suffix}").tooltip(
                             _("Track: {why}").format(why=why)
-                        ).mark(f"group-track-{suffix}")
+                        )
                     if all(m.minor for m in members):
                         ui.label(_("main conference of the workshop")).classes(
                             "text-xs text-grey shrink-0"
@@ -1738,14 +1724,13 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
 
 def _track_line(s: PubStat) -> None:
     """Where the paper's track (demo, findings...) comes from."""
-    name = TRACK_LABEL.get(s.track, s.track)
-    flag = next((f for f in s.flags if f[1] == s.track), None)
+    name = tracks.name(s.track)
     giving = [m for m in s.members if m.venue_id == s.venue_id and m.eff_track == s.track]
     silent = [
         m for m in s.members if m.venue_id == s.venue_id and not m.eff_track and not m.archival
     ]
-    if flag is not None:
-        why = _("set by the flag “{flag}”").format(flag=flag[1])
+    if s.track_override:
+        why = _("set for this paper")
     elif giving:
         why = _("given by {sources}").format(
             sources=", ".join(dict.fromkeys(ADAPTERS[m.source].label for m in giving))
@@ -1760,8 +1745,43 @@ def _track_line(s: PubStat) -> None:
     else:
         why = _("given by the sources")
     with ui.row().classes("items-center gap-2 no-wrap").mark("kind-track"):
-        ui.badge(name, color="purple-7")
+        track_chip(s.track)
         ui.label(_("{track} track: {why}").format(track=name, why=why)).classes("text-xs")
+
+
+def _track_editor(s: PubStat, done: Callable[..., None]) -> None:
+    """The paper's track set by hand: automatic (the one found), the main track (none),
+    or one of the tracks (it wins over the sources, and settles their disagreements)."""
+    auto = _("Automatic (currently: {track})").format(track=track_chip_html(s.auto_track))
+    options = {
+        "": auto,
+        tracks.MAIN: track_chip_html(None),
+        **{t: track_chip_html(t) for t in tracks.track_ids()},
+    }
+    value = s.track_override if s.track_override in options else ""
+    pick = (
+        ui.select(options, value=value, label=_("Track"))
+        .props("dense outlined options-html display-value-html")
+        .classes("w-72")
+        .tooltip(
+            _(
+                "The paper's track (e.g. a demo): counted apart in the distribution; "
+                "automatic: from the variants, the venue rules and the venue texts"
+            )
+        )
+        .mark("paper-track")
+    )
+
+    def save(e) -> None:
+        annotations.set_track_override(s.id, e.value or None)
+        if not e.value:
+            done(_("Track back to automatic"))
+        elif e.value == tracks.MAIN:
+            done(_("Track: main track"))
+        else:
+            done(_("Track: {track}").format(track=tracks.name(e.value)))
+
+    pick.on_value_change(save)
 
 
 SOURCE_SITES = Labels({"scimago": "Scimago", "core": N_("the CORE portal"), "jcr": "JCR"})

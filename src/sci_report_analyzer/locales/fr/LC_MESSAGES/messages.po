@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 12:31+0200\n"
+"POT-Creation-Date: 2026-10-04 12:54+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -112,11 +112,24 @@ msgstr " ; les ex æquo sont départagés par la priorité des sources ({order})
 msgid "A DOI starts with 10. (e.g. 10.1145/3404835.3462812)"
 msgstr "Un DOI commence par 10. (p. ex. 10.1145/3404835.3462812)"
 
+msgid ""
+"A Findings volume is ranked as its main conference; it is detected after "
+"the other tracks."
+msgstr ""
+"Un volume Findings est classé comme sa conférence principale ; il est "
+"détecté après les autres sessions."
+
 msgid "A built-in rule, as by default"
 msgstr "Une règle prédéfinie, telle que par défaut"
 
 msgid "A built-in rule, changed from its default"
 msgstr "Une règle prédéfinie, modifiée par rapport à sa valeur par défaut"
+
+msgid "A built-in track, as by default"
+msgstr "Une session prédéfinie, telle que par défaut"
+
+msgid "A built-in track, changed from its default"
+msgstr "Une session prédéfinie, modifiée par rapport à sa valeur par défaut"
 
 msgid "A category cannot go within itself"
 msgstr "Une catégorie ne peut pas aller dans elle-même"
@@ -217,6 +230,9 @@ msgstr "Une synchronisation est déjà en cours"
 msgid "A sync is running and would be interrupted."
 msgstr "Une synchronisation est en cours et serait interrompue."
 
+msgid "A track added by hand"
+msgstr "Une session ajoutée à la main"
+
 msgid "A venue already has this name"
 msgstr "Un canal porte déjà ce nom"
 
@@ -254,30 +270,14 @@ msgstr ""
 "cherchées parmi les canaux)."
 
 msgid ""
-"A venue text naming a Findings volume (ACL's, EMNLP's…): ranked apart "
-"from the main conference."
-msgstr ""
-"Un texte de canal nommant un volume Findings (d'ACL, d'EMNLP…) : classé à"
-" part de la conférence principale."
-
-msgid ""
 "A venue text naming a conference, when neither the rankings nor the "
 "sources say whether it is a conference or a journal."
 msgstr ""
 "Un texte de canal nommant une conférence, quand ni les classements ni les"
 " sources ne disent si c'est une conférence ou une revue."
 
-msgid "A venue text naming a demo track."
-msgstr "Un texte de canal nommant une session de démonstrations."
-
 msgid "A venue text naming a journal (after the conference rule)."
 msgstr "Un texte de canal nommant une revue (après la règle des conférences)."
-
-msgid "A venue text naming a short paper track."
-msgstr "Un texte de canal nommant une session d'articles courts."
-
-msgid "A venue text naming a tutorial track."
-msgstr "Un texte de canal nommant une session de tutoriels."
 
 msgid "A venue text naming a workshop (ranked as its main conference)."
 msgstr ""
@@ -364,6 +364,9 @@ msgstr "Ajouter une sous-catégorie"
 
 msgid "Add a template"
 msgstr "Ajouter un modèle"
+
+msgid "Add a track"
+msgstr "Ajouter une session"
 
 msgid "Add a variant (a raw venue text)"
 msgstr "Ajouter une variante (un texte de canal brut)"
@@ -550,6 +553,10 @@ msgstr "Auteurs"
 
 msgid "Automatic"
 msgstr "Automatique"
+
+#, python-brace-format
+msgid "Automatic (currently: {track})"
+msgstr "Automatique (actuellement : {track})"
 
 #, python-brace-format
 msgid "Automatic ({kind})"
@@ -804,8 +811,8 @@ msgid ""
 "venues and their variants, which venue each source text belongs to, the "
 "papers' automatic venues and kinds, and the cached ranking matches. "
 "Everything set by hand is kept (venue levels, records, kinds, names, "
-"variants and rules; papers' venues, validated sources, ranks, "
-"corrections, flags, tags and notes). Then everything is matched again."
+"variants and rules; papers' venues, validated sources, ranks, tracks, "
+"corrections, tags and notes). Then everything is matched again."
 msgstr ""
 "Effacer tout ce qui a été calculé automatiquement, pour tous les articles"
 " : les canaux de publication automatiques et leurs variantes, le canal "
@@ -813,7 +820,7 @@ msgstr ""
 "automatiques des articles, et les appariements de classement en cache. "
 "Tout ce qui a été défini à la main est conservé (niveaux, notices, types,"
 " noms, variantes et règles des canaux ; canaux, sources validées, rangs, "
-"corrections, signalements, étiquettes et notes des articles). Tout est "
+"sessions, corrections, étiquettes et notes des articles). Tout est "
 "ensuite apparié de nouveau."
 
 msgid "Clear out the automatic settings of all papers?"
@@ -1032,26 +1039,32 @@ msgstr ""
 "Supprimer les fichiers des articles qui ne sont plus dans la base, et "
 "oublier les PDF dont le fichier a été supprimé à la main"
 
+msgid "Delete the rule"
+msgstr "Supprimer la règle"
+
 msgid "Delete the tag (from every paper)"
 msgstr "Supprimer l'étiquette (de tous les articles)"
 
+msgid "Delete the track"
+msgstr "Supprimer la session"
+
 #, python-brace-format
-msgid "Delete {name} and all their data (flags, stars, periods)?"
-msgstr "Supprimer {name} et toutes ses données (signalements, étoiles, périodes) ?"
+msgid "Delete {name} and all their data (tags, stars, periods)?"
+msgstr "Supprimer {name} et toutes ses données (étiquettes, étoiles, périodes) ?"
 
 #, python-brace-format
 msgid ""
-"Delete {n} person(s) and all their data (sources, publications, flags, "
+"Delete {n} person(s) and all their data (sources, publications, tags, "
 "stars, periods)?"
 msgid_plural ""
-"Delete {n} person(s) and all their data (sources, publications, flags, "
+"Delete {n} person(s) and all their data (sources, publications, tags, "
 "stars, periods)?"
 msgstr[0] ""
 "Supprimer {n} personne et toutes ses données (sources, publications, "
-"signalements, étoiles, périodes) ?"
+"étiquettes, étoiles, périodes) ?"
 msgstr[1] ""
 "Supprimer {n} personnes et toutes leurs données (sources, publications, "
-"signalements, étoiles, périodes) ?"
+"étiquettes, étoiles, périodes) ?"
 
 #, python-brace-format
 msgid "Delete “{name}” and its subcategories?"
@@ -1067,12 +1080,6 @@ msgstr "Supprimer « {name} » ?"
 
 msgid "Deletes the folder and its periods (people are kept)"
 msgstr "Supprime le dossier et ses périodes (les personnes sont conservées)"
-
-msgid "Demo"
-msgstr "Démo"
-
-msgid "Demo track"
-msgstr "Session de démonstrations"
 
 msgid "Details"
 msgstr "Détails"
@@ -1242,15 +1249,15 @@ msgstr "Fin"
 
 msgid ""
 "Erase what was set by hand, on the venues and / or on the papers; "
-"everything is then matched automatically again. Flags, tags, notes, "
-"hidden papers and manual merges are kept. Export the settings first to "
-"keep a copy of the venue decisions."
+"everything is then matched automatically again. Tags, notes, hidden "
+"papers and manual merges are kept. Export the settings first to keep a "
+"copy of the venue decisions."
 msgstr ""
 "Effacer ce qui a été défini à la main, sur les canaux de publication et /"
 " ou sur les articles ; tout est ensuite apparié automatiquement de "
-"nouveau. Les signalements, étiquettes, notes, articles masqués et fusions"
-" manuelles sont conservés. Exportez d’abord les paramètres pour garder "
-"une copie des décisions sur les canaux."
+"nouveau. Les étiquettes, notes, articles masqués et fusions manuelles "
+"sont conservés. Exportez d’abord les paramètres pour garder une copie des"
+" décisions sur les canaux."
 
 #, python-brace-format
 msgid ""
@@ -1370,29 +1377,12 @@ msgstr "Trouver les articles"
 msgid "Find the papers first"
 msgstr "Trouvez d'abord les articles"
 
-msgid "Findings"
-msgstr "Findings"
-
 msgid "Findings track (host conference rank)"
 msgstr "Session Findings (rang de la conférence hôte)"
 
 #, python-brace-format
 msgid "First, {names} are merged into “{name}”."
 msgstr "D'abord, {names} sont fusionnés dans « {name} »."
-
-msgid "Flags"
-msgstr "Signalements"
-
-msgid ""
-"Flags stick to publications. A flag with a track makes the paper a "
-"satellite category (e.g. “Short CORE A*”) in the distribution."
-msgstr ""
-"Les signalements s’attachent aux publications. Un signalement avec une "
-"session place l’article dans une catégorie satellite (p. ex. « Court CORE"
-" A* ») dans la distribution."
-
-msgid "Flags, tags & categories"
-msgstr "Signalements, étiquettes et catégories"
 
 msgid "Folders"
 msgstr "Dossiers"
@@ -1951,12 +1941,12 @@ msgid "Matching (rules and variants)"
 msgstr "Reconnaissance (règles et variantes)"
 
 msgid ""
-"Matching settings, cleaning rules, corrections, manual levels and flag "
-"definitions. People and publications are never exported."
+"Matching settings (cleaning and detection rules, tracks…) and the venues'"
+" manual decisions. People and publications are never exported."
 msgstr ""
-"Paramètres d’appariement, règles de nettoyage, corrections, niveaux "
-"manuels et définitions des signalements. Les personnes et les "
-"publications ne sont jamais exportées."
+"Paramètres d’appariement (règles de nettoyage et de détection, sessions…)"
+" et décisions manuelles sur les canaux de publication. Les personnes et "
+"les publications ne sont jamais exportées."
 
 msgid "Merge"
 msgstr "Fusionner"
@@ -2150,9 +2140,6 @@ msgstr "Nouvelle catégorie…"
 msgid "New co-author category"
 msgstr "Nouvelle catégorie de co-auteurs"
 
-msgid "New flag"
-msgstr "Nouveau signalement"
-
 msgid "New folder"
 msgstr "Nouveau dossier"
 
@@ -2170,6 +2157,9 @@ msgstr "Nouvelle étiquette"
 
 msgid "New template"
 msgstr "Nouveau modèle"
+
+msgid "New track (its English name)"
+msgstr "Nouvelle session (son nom en anglais)"
 
 msgid "New venue"
 msgstr "Nouveau canal"
@@ -2760,21 +2750,23 @@ msgstr ""
 msgid ""
 "Python regular expressions classifying the venues when no decision was "
 "made by hand: workshops and their main conference, conference or journal,"
-" tracks, joint conferences. A rule matching words of a language is part "
-"of another (“atelier”, of the workshop rule): a venue text matching it "
-"matches the latter. {rule:<id>} in a pattern stands for the pattern of "
-"the rule with that id; (?-i:…) makes a part case-sensitive. Each rule "
-"shows whether it is a default one, and its default when changed."
+" joint conferences (those of the tracks: Settings → Tracks). A rule "
+"matching words of a language is part of another (“atelier”, of the "
+"workshop rule): a venue text matching it matches the latter. {rule:<id>} "
+"in a pattern stands for the pattern of the rule with that id; (?-i:…) "
+"makes a part case-sensitive. Each rule shows whether it is a default one,"
+" and its default when changed."
 msgstr ""
 "Expressions régulières Python classant les canaux quand aucune décision "
 "n'a été prise à la main : ateliers et leur conférence principale, "
-"conférence ou revue, sessions, conférences conjointes. Une règle "
-"reconnaissant des mots d'une langue fait partie d'une autre (« atelier »,"
-" de la règle des ateliers) : un texte de canal qu'elle reconnaît est "
-"reconnu par cette dernière. {rule:<id>} dans un motif représente le motif"
-" de la règle de cet identifiant ; (?-i:…) rend une partie sensible à la "
-"casse. Chaque règle indique si c'est une règle par défaut, et sa valeur "
-"par défaut quand elle est modifiée."
+"conférence ou revue, conférences conjointes (celles des sessions : "
+"Paramètres → Sessions). Une règle reconnaissant des mots d'une langue "
+"fait partie d'une autre (« atelier », de la règle des ateliers) : un "
+"texte de canal qu'elle reconnaît est reconnu par cette dernière. "
+"{rule:<id>} dans un motif représente le motif de la règle de cet "
+"identifiant ; (?-i:…) rend une partie sensible à la casse. Chaque règle "
+"indique si c'est une règle par défaut, et sa valeur par défaut quand elle"
+" est modifiée."
 
 #, python-brace-format
 msgid "Quartile {quartile}"
@@ -2937,6 +2929,12 @@ msgstr "Rapport · {person} · {period}"
 msgid "Reports"
 msgstr "Rapports"
 
+msgid "Reset the built-in tracks"
+msgstr "Rétablir les sessions prédéfinies"
+
+msgid "Reset the track to its default"
+msgstr "Rétablir la session par défaut"
+
 msgid "Reset to the default"
 msgstr "Revenir à la valeur par défaut"
 
@@ -3001,6 +2999,9 @@ msgstr ""
 
 msgid "Save the rules"
 msgstr "Enregistrer les règles"
+
+msgid "Save the tracks"
+msgstr "Enregistrer les sessions"
 
 msgid "Saved"
 msgstr "Enregistré"
@@ -3198,9 +3199,6 @@ msgstr "Nom court (acronyme)"
 msgid "Short names"
 msgstr "Noms courts"
 
-msgid "Short paper track"
-msgstr "Session d'articles courts"
-
 msgid "Show"
 msgstr "Afficher"
 
@@ -3356,6 +3354,9 @@ msgstr "Étiquette à poser"
 msgid "Tags"
 msgstr "Étiquettes"
 
+msgid "Tags & categories"
+msgstr "Étiquettes et catégories"
+
 msgid "Tags & notes"
 msgstr "Étiquettes et notes"
 
@@ -3449,6 +3450,9 @@ msgstr ""
 msgid "The language of the rule's words"
 msgstr "La langue des mots de la règle"
 
+msgid "The language of the rule's words (any: a general rule)"
+msgstr "La langue des mots de la règle (toutes : une règle générale)"
+
 msgid "The language whose words the rule removes (any: a general rule)"
 msgstr "La langue dont la règle retire des mots (toutes : une règle générale)"
 
@@ -3489,6 +3493,14 @@ msgstr ""
 msgid "The other way round"
 msgstr "Dans l'autre sens"
 
+msgid ""
+"The paper's track (e.g. a demo): counted apart in the distribution; "
+"automatic: from the variants, the venue rules and the venue texts"
+msgstr ""
+"La session de l'article (p. ex. une démo) : comptée à part dans la "
+"répartition ; automatique : d'après les variantes, les règles de canal et"
+" les textes de canal"
+
 msgid "The period whose tags and notes are shown (e.g. a folder's)"
 msgstr ""
 "La période dont les étiquettes et notes sont affichées (p. ex. celle d'un"
@@ -3510,6 +3522,26 @@ msgstr "Le même canal (fusionné dans le principal)"
 
 msgid "The same venue (merged into this one)"
 msgstr "Le même canal (fusionné dans celui-ci)"
+
+msgid ""
+"The satellite tracks of the conferences (Findings, tutorials, demos, "
+"short papers…): a paper of a track is counted apart (e.g. “Short CORE "
+"A*”, striped in the track's colour). A venue text is of a track when one "
+"of its rules (Python regular expressions, each general or of a language) "
+"matches it; the tracks are tried in their order, Findings last. A "
+"variant, a venue rule or a paper (in its details) can also be set to a "
+"track by hand. Each track and rule shows whether it is a default one, "
+"changed from its default or added."
+msgstr ""
+"Les sessions satellites des conférences (Findings, tutoriels, démos, "
+"articles courts…) : un article d'une session est compté à part (p. ex. « "
+"Court CORE A* », rayé de la couleur de la session). Un texte de canal est"
+" d'une session quand l'une de ses règles (expressions régulières Python, "
+"chacune générale ou d'une langue) le reconnaît ; les sessions sont "
+"essayées dans leur ordre, Findings en dernier. Une variante, une règle de"
+" canal ou un article (dans ses détails) peut aussi être mis dans une "
+"session à la main. Chaque session et règle indique si elle est par "
+"défaut, modifiée par rapport à sa valeur par défaut ou ajoutée."
 
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
@@ -3534,6 +3566,9 @@ msgstr ""
 
 msgid "The text of the group (edit it with its pencil)"
 msgstr "Le texte du groupe (modifiez-le avec son crayon)"
+
+msgid "The track's identifier (in the exported settings)"
+msgstr "L'identifiant de la session (dans les paramètres exportés)"
 
 #, python-brace-format
 msgid "The validated profiles give the ORCID {orcid}."
@@ -3670,6 +3705,9 @@ msgstr "À (année)"
 msgid "Track"
 msgstr "Session"
 
+msgid "Track back to automatic"
+msgstr "Session redevenue automatique"
+
 msgid "Track of the papers with this variant"
 msgstr "Session des articles ayant cette variante"
 
@@ -3681,6 +3719,13 @@ msgstr ""
 msgid "Track saved"
 msgstr "Session enregistrée"
 
+msgid "Track: main track"
+msgstr "Session : session principale"
+
+#, python-brace-format
+msgid "Track: {track}"
+msgstr "Session : {track}"
+
 #, python-brace-format
 msgid "Track: {why}"
 msgstr "Session : {why}"
@@ -3688,14 +3733,11 @@ msgstr "Session : {why}"
 msgid "Tracks"
 msgstr "Sessions"
 
+msgid "Tracks saved"
+msgstr "Sessions enregistrées"
+
 msgid "Try a venue text"
 msgstr "Essayer un texte de canal de publication"
-
-msgid "Tutorial"
-msgstr "Tutoriel"
-
-msgid "Tutorial track"
-msgstr "Session de tutoriels"
 
 msgid "Two roles have the same name"
 msgstr "Deux rôles ont le même nom"
@@ -4189,9 +4231,6 @@ msgstr "filtrer"
 msgid "filter venues"
 msgstr "filtrer les canaux"
 
-msgid "flags"
-msgstr "signalements"
-
 msgid "folder"
 msgstr "dossier"
 
@@ -4348,6 +4387,9 @@ msgstr "conférence principale de l'atelier"
 msgid "main conference: “{host}”"
 msgstr "conférence principale : « {host} »"
 
+msgid "main track"
+msgstr "session principale"
+
 msgid "manual"
 msgstr "manuel"
 
@@ -4371,6 +4413,10 @@ msgstr "absent des sources"
 
 msgid "name"
 msgstr "nom"
+
+#, python-brace-format
+msgid "name ({language})"
+msgstr "nom ({language})"
 
 msgid "national"
 msgstr "national"
@@ -4411,6 +4457,9 @@ msgstr "période introuvable"
 
 msgid "no track"
 msgstr "session normale"
+
+msgid "no track: the main conference"
+msgstr "pas de session : la conférence principale"
 
 msgid "no validated source"
 msgstr "aucune source validée"
@@ -4589,10 +4638,6 @@ msgstr "secondaire"
 msgid "set by hand"
 msgstr "fixée à la main"
 
-#, python-brace-format
-msgid "set by the flag “{flag}”"
-msgstr "définie par le signalement « {flag} »"
-
 msgid "set by the venue's variant / rule"
 msgstr "définie par la variante / règle du canal de publication"
 
@@ -4629,10 +4674,10 @@ msgstr "source"
 msgid "source text: “{text}”"
 msgstr "texte de la source : « {text} »"
 
-msgid "sources give different tracks — pick one in the details or flag it"
+msgid "sources give different tracks — pick one in the details"
 msgstr ""
 "les sources donnent des sessions différentes — choisissez-en une dans les"
-" détails ou ajoutez un signalement"
+" détails"
 
 msgid "sources give different venues — pick one in the details"
 msgstr ""
@@ -4757,12 +4802,6 @@ msgstr "propre à une période"
 #, python-brace-format
 msgid "within {period}"
 msgstr "dans {period}"
-
-#, python-brace-format
-msgid "{corrections} corrections · {levels} manual levels · {flags} flags"
-msgstr ""
-"{corrections} corrections · {levels} niveaux manuels · {flags} "
-"signalements"
 
 #, python-brace-format
 msgid "{files} files deleted, {forgotten} PDFs forgotten"
@@ -5069,6 +5108,10 @@ msgid "{track} {category}"
 msgstr "{track} {category}"
 
 #, python-brace-format
+msgid "{venues} venues · {tracks} tracks"
+msgstr "{venues} canaux · {tracks} sessions"
+
+#, python-brace-format
 msgid "{what} (not ranked)"
 msgstr "{what} (non classé)"
 
@@ -5085,9 +5128,6 @@ msgid "{why}; it wins over {sources} (no track: the main conference)"
 msgstr ""
 "{why} ; elle l'emporte sur {sources} (session normale : la conférence "
 "principale)"
-
-msgid "— (no track)"
-msgstr "— (session normale)"
 
 msgid "— automatic"
 msgstr "— automatique"
@@ -5153,14 +5193,14 @@ msgstr "« {venue} » prend le niveau de « {name} »"
 
 #, python-brace-format
 msgid ""
-"• everything set on these papers: {n} paper(s) have flags, stars, a venue"
-" / rank / kind set by hand, corrections, a note, are hidden or were "
-"merged / split by hand"
+"• everything set on these papers: {n} paper(s) have tags, stars, a venue "
+"/ rank / kind / track set by hand, corrections, a note, are hidden or "
+"were merged / split by hand"
 msgstr ""
 "• tout ce qui a été défini sur ces articles : {n} article(s) ont des "
-"signalements, des étoiles, un canal de publication / rang / type fixé à "
-"la main, des corrections, une note, sont masqués ou ont été fusionnés / "
-"séparés à la main"
+"étiquettes, des étoiles, un canal de publication / rang / type / session "
+"fixé à la main, des corrections, une note, sont masqués ou ont été "
+"fusionnés / séparés à la main"
 
 #, python-brace-format
 msgid "• {papers} paper(s) and {records} source record(s)"

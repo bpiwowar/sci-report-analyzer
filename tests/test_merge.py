@@ -92,8 +92,7 @@ def test_ids_stable_and_annotations_survive_resync():
     link = add_source(pid, "dblp", "x/1", [pub("a", "A stable paper title here", 2020)])
     with session_scope() as s:
         pub_id = s.scalar(select(Publication.id))
-    flag = annotations.all_flags()[0]
-    annotations.toggle_flag(pub_id, flag.id)
+    annotations.set_track_override(pub_id, "demo")
     period = annotations.save_period(pid, "HDR", 2015, 2024)
     annotations.toggle_star(period, pub_id)
     # Re-sync with one more record
@@ -110,7 +109,7 @@ def test_ids_stable_and_annotations_survive_resync():
     )
     with session_scope() as s:
         p = s.get(Publication, pub_id)
-        assert p is not None and [f.name for f in p.flags] == [flag.name]
+        assert p is not None and p.track_override == "demo"
     # The record disappears from the source: publication is kept (annotated) as missing
     sync.finish_link(link, FetchResult(publications=[pub("b", "A new one appears", 2021)]))
     with session_scope() as s:

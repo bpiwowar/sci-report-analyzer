@@ -3,7 +3,7 @@
 Records are linked when they share a DOI, or when their normalized titles match (exactly or
 with a high token overlap) and their years are close. Archival versions (arXiv, HAL
 preprints...) fold into the published version regardless of year. Publication ids are
-kept stable across re-merges so that flags, tags, notes and forced matches survive a re-sync.
+kept stable across re-merges so that tags, notes and forced matches survive a re-sync.
 """
 
 from __future__ import annotations
@@ -205,8 +205,8 @@ def merge_person(session: Session, person: Person) -> dict[str, int]:
         if pub_id in used:
             continue
         if pub_id in absorbed:
-            # The same paper as another one now (e.g. a source joined them): its flags,
-            # tags and notes go with it.
+            # The same paper as another one now (e.g. a source joined them): its tags,
+            # notes and track go with it.
             move_annotations(session, pub, absorbed[pub_id])
         if _has_user_data(session, pub):
             pub.missing = True  # keep annotations; shown as "missing from sources"
@@ -222,7 +222,7 @@ def merge_person(session: Session, person: Person) -> dict[str, int]:
 def _has_user_data(session: Session, pub: Publication) -> bool:
     from .db.models import PeriodNote, PeriodTag, PublicationPdf
 
-    if pub.flags or pub.tags or pub.has_overrides or pub.merge_locked or pub.hidden:
+    if pub.tags or pub.has_overrides or pub.merge_locked or pub.hidden:
         return True
     pdf = session.get(PublicationPdf, pub.id)
     if pdf is not None and (pdf.origin is None or pdf.edited_at is not None):
@@ -252,18 +252,18 @@ def split_member(session: Session, sp: SourcePub) -> Publication:
 
 
 def move_annotations(session: Session, source: Publication, target: Publication) -> None:
-    """Move the flags, tags, notes (also those within periods) and PDF of ``source`` to
-    ``target``; notes are put together."""
+    """Move the tags, notes (also those within periods), track set by hand and PDF of
+    ``source`` to ``target``; notes are put together."""
     from . import categories, pdfs
     from .db.models import PeriodNote, PeriodTag
 
-    for f in source.flags:
-        if f not in target.flags:
-            target.flags.append(f)
     for tag in source.tags:
         if tag not in target.tags:
             target.tags.append(tag)
-    source.flags, source.tags = [], []
+    source.tags = []
+    if source.track_override and not target.track_override:
+        target.track_override = source.track_override
+    source.track_override = None
     for pt in session.scalars(select(PeriodTag).where(PeriodTag.publication_id == source.id)):
         if not session.get(PeriodTag, (pt.period_id, target.id, pt.tag_id)):
             session.add(

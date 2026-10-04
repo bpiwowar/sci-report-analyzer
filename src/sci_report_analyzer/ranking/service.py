@@ -18,7 +18,7 @@ from ..db.models import AppSetting, JcrRecord, VenueCache, utcnow
 from ..db.session import session_scope
 from ..sources.base import SourceError, user_agent
 from ..sources.openalex import params as openalex_params
-from . import datasets, detection
+from . import datasets, detection, tracks
 from .badge import (
     FINDINGS_RE,
     TOGGLABLE_SOURCES,
@@ -39,6 +39,7 @@ from .normalize import (
     tokens_match,
     without_ordinal_marks,
 )
+from .tracks import Track, default_tracks
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +193,9 @@ class MatchSettings(BaseModel):
     # The regexes classifying venues (kinds, workshops, tracks, joint
     # conferences), each by id; one missing takes its default (``ranking.detection``).
     detection_rules: list[DetectionRule] = Field(default_factory=default_detection_rules)
+    # The tracks (Findings, demo, short…), in their order, with their names, colours and
+    # rules; a built-in one missing takes its default (``ranking.tracks``).
+    tracks: list[Track] = Field(default_factory=default_tracks)
     # CORE rank of a paper: the edition in force when it was published, or the latest.
     core_edition: Literal["publication", "latest"] = "publication"
 
@@ -199,6 +203,11 @@ class MatchSettings(BaseModel):
     @classmethod
     def _every_detection_rule(cls, rules: list[DetectionRule]) -> list[DetectionRule]:
         return detection.completed(rules)
+
+    @field_validator("tracks")
+    @classmethod
+    def _every_track(cls, defs: list[Track]) -> list[Track]:
+        return tracks.completed(defs)
 
     def source_on(self, source: str) -> bool:
         # manual / archival are always on
@@ -240,6 +249,7 @@ class RankingService:
         """Drop in-memory state after a settings change (optionally the badge cache)."""
         self._settings = None
         detection.reset()
+        tracks.reset()
         if data:
             self._matcher = self._predatory = None
         if clear_cache:
@@ -551,3 +561,4 @@ class RankingService:
 
 service = RankingService()
 detection.use(lambda: service.settings.detection_rules)
+tracks.use(lambda: service.settings.tracks)

@@ -8,7 +8,7 @@ from typing import Any
 from urllib.parse import quote
 
 from ..i18n import N_, Labels, _
-from .detection import Rule
+from . import tracks
 from .matcher import Record, record_key
 
 SOURCES = ("scimago", "core", "jcr", "openalex", "predatory", "manual", "archival")
@@ -278,6 +278,11 @@ class Category:
     def striped(self) -> bool:
         return bool(self.track or self.workshop or self.edited)
 
+    @property
+    def stripe(self) -> str:
+        """The colour of its stripes: its track's (a workshop's, an edited volume's: white)."""
+        return tracks.colour(self.track) if self.track else "rgba(255,255,255,.35)"
+
 
 # One hue ramp per family, darkest for the best level: journals from dark green to light
 # yellow-green, conferences from dark violet to light blue.
@@ -340,26 +345,14 @@ OTHER_COLOUR = "#57606a"
 UNRANKED_COLOUR = "#d0d7de"
 PREDATORY_COLOUR = "#cf222e"
 
-TRACK_LABEL = Labels(
-    {
-        "findings": "Findings",
-        "tutorial": N_("Tutorial"),
-        "demo": N_("Demo"),
-        "short": N_("Short"),
-    }
-)
-# Workshops are a venue kind (ranked as their main conference), not a track.
-TRACK_ORDER = ("findings", "tutorial", "demo", "short")
-# Their regexes (Settings → Detection rules), tried in this order.
-_TRACK_RE = tuple((Rule(f"track_{t}"), t) for t in ("tutorial", "demo", "short"))
-FINDINGS_RE = Rule("track_findings")
+# Workshops are a venue kind (ranked as their main conference), not a track. The tracks
+# (their names, colours and rules): Settings → Tracks (``ranking.tracks``).
+FINDINGS_RE = tracks.TrackRegex(tracks.FINDINGS_ID)
 
 
 def detect_track(venue: str | None) -> str | None:
-    for rx, track in _TRACK_RE:
-        if rx.search(venue or ""):
-            return track
-    return None
+    """The track a venue text names, Findings aside (see ``FINDINGS_RE``)."""
+    return tracks.detect(venue, findings=False)
 
 
 def _base(badge: Badge | None) -> tuple[str, str, str]:
@@ -409,7 +402,7 @@ def category_label(cat: Category) -> str:
         return _("Proc. (ed.) {category}").format(category=base_label)
     if not cat.track:
         return base_label
-    name = TRACK_LABEL.get(cat.track, cat.track.title())
+    name = tracks.name(cat.track)
     # An unranked conference track reads "Intl. demo", not "Demo Intl. conf.".
     if base == "k_intl_conference":
         return _("Intl. {track}").format(track=name.lower())
@@ -419,12 +412,16 @@ def category_label(cat: Category) -> str:
 
 
 def category_order(c: Category) -> int:
-    track_pos = (TRACK_ORDER.index(c.track) + 1 if c.track in TRACK_ORDER else 6) if c.track else 0
+    """Each rank, then its tracks (in their order), its workshops and edited volumes."""
+    track_pos = 0
+    if c.track:
+        pos = tracks.position(c.track)
+        track_pos = 1 + (pos if pos is not None else 90)
     if c.workshop:
-        track_pos = 8
+        track_pos = 98
     if c.edited:
-        track_pos = 9
-    return RANK_ORDER.index(c.base_key) * 10 + track_pos
+        track_pos = 99
+    return RANK_ORDER.index(c.base_key) * 100 + track_pos
 
 
 # What each level means (shown next to manual-level editors and on the help page).

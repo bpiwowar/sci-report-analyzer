@@ -407,9 +407,9 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
             ui.label(
                 ngettext(
                     "Delete {n} person(s) and all their data (sources, publications, "
-                    "flags, stars, periods)?",
+                    "tags, stars, periods)?",
                     "Delete {n} person(s) and all their data (sources, publications, "
-                    "flags, stars, periods)?",
+                    "tags, stars, periods)?",
                     len(ids),
                 ).format(n=len(ids))
             )
