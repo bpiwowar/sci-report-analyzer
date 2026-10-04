@@ -226,6 +226,8 @@ class Period(Base):
     end_year: Mapped[int | None]
     # Tags of the person within the folder (e.g. "shortlisted"); only used by folder periods.
     tags: Mapped[list[Any]] = mapped_column(default=list)
+    # The person's notes within the folder (Markdown), for all their documents and papers.
+    notes: Mapped[str | None]
 
     person: Mapped[Person] = relationship(back_populates="periods")
     folder: Mapped[Folder | None] = relationship(back_populates="periods")

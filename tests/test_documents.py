@@ -326,7 +326,11 @@ async def test_folder_notes(user: User, monkeypatch, tmp_path):
     await user.should_see(marker="folder-note")
     user.find(marker="folder-note").elements.pop().value = "Shortlist: **two** papers"
     await note_saved(user, "folder-note")
-    assert folders.notes_of(folder) == "Shortlist: **two** papers"
+    assert folders.notes_of(period) == "Shortlist: **two** papers"
+    # The person's within the folder: not another person's, not the folder's own notes.
+    other_period = folders.add_person(folder, make_person("Ann Smith"))
+    assert folders.notes_of(other_period) == ""
+    assert not next(f for f in folders.folders() if f.id == folder).notes
     user.find(marker="note-quote").click()
     for _i in range(50):
         if inserted:

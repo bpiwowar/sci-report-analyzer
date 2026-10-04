@@ -1,15 +1,15 @@
-"""The old reports, moved into the folders' notes (once, when the app starts after the
-migration asking for it: c8d1f5a3e7b2).
+"""The old reports, moved into the notes of the people in the folders (once, when the app
+starts after the migration asking for it: e2a6c9f4b871).
 
 The report on a person within a folder (a Markdown text citing their papers, and the
-papers to discuss with their notes) had its own view, now merged into the folder's notes:
-each folder's notes get a last section, "Starred papers", with per person in the folder
-the report's text and each of its papers (those with the report's tags, else the starred
+papers to discuss with their notes) had its own view, now merged into the person's notes
+within the folder: they get a last section, "Starred papers", with the report's text and
+each of its papers (those with the report's tags, else the starred
 ones: the built-in ★ tag), cited (``[@key]``, numbered by the folder's settings) and
 described (title, venue, year…), then their notes (the paper's, and within the folder).
 
 Appended only (the notes' text is kept as it is), and once per folder: the folders done are
-recorded with their notes, in the same transaction.
+recorded with their people's notes, in the same transaction.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ async def _person_section(
         return ""
     names = {t.id: t.name for t in annotations.all_tags()}
     ctx = reports.Context(papers, stats, keys, names, set(tag_ids), period_id, number_format=fmt)
-    out = [f"### {name}"]
+    out = []
     if text:
         out.append(text)
     items = []
@@ -81,8 +81,8 @@ async def _person_section(
 
 
 async def migrate() -> int:
-    """Append the old reports to their folders' notes, if asked by the migration and not
-    done yet; returns the number of folders whose notes were appended to."""
+    """Append the old reports to the notes of the people in their folders, if asked by the
+    migration and not done yet; returns the number of people whose notes were appended to."""
     state = _state()
     if not state.get("pending"):
         return 0
@@ -93,18 +93,18 @@ async def migrate() -> int:
     for folder_id in folder_ids:
         if folder_id in done:
             continue
-        sections = [await _person_section(*p) for p in _periods(folder_id)]
-        section = "\n\n".join(x for x in sections if x)
+        sections = {p[0]: await _person_section(*p) for p in _periods(folder_id)}
         done.add(folder_id)
         with session_scope() as s:  # (the notes and the folder done: together)
-            if section and (f := s.get(Folder, folder_id)) is not None:
-                notes = (f.notes or "").rstrip()
-                f.notes = (notes + "\n\n" if notes else "") + f"## {_('Starred papers')}\n\n"
-                f.notes += section + "\n"
-                changed += 1
+            for period_id, section in sections.items():
+                if section and (p := s.get(Period, period_id)) is not None:
+                    notes = (p.notes or "").rstrip()
+                    p.notes = (notes + "\n\n" if notes else "") + f"## {_('Starred papers')}\n\n"
+                    p.notes += section + "\n"
+                    changed += 1
             s.merge(AppSetting(key=PENDING_KEY, value={"pending": True, "done": sorted(done)}))
     with session_scope() as s:
         s.merge(AppSetting(key=PENDING_KEY, value={"pending": False, "done": sorted(done)}))
     if changed:
-        logger.info("The old reports appended to the notes of %d folder(s)", changed)
+        logger.info("The old reports appended to the notes of %d person(s)", changed)
     return changed

@@ -262,15 +262,15 @@ class Side:
         self.box.client.run_javascript(f"vrDoc.mark({json.dumps(marks)})")
 
     def folder_notes(self) -> None:
-        """The notes of the folder (one text for all its documents and papers), if the PDF is
-        in a folder: in their own tab, and where quotes go by default."""
-        if self.folder is None:
+        """The person's notes within the folder (one text for all their documents and papers
+        in it), if the PDF is in a folder: in their own tab, and where quotes go by default."""
+        if self.folder is None or self.period_id is None:
             return
         from .citations import CitationStatus, folder_citations_dialog
         from .folder_notes import folder_notes_editor
 
         folder_id, name = self.folder
-        tip = _("Notes of the folder {folder} (all its documents and papers)")
+        tip = _("Notes of the folder {folder} on this person (all their documents and papers)")
         status: list[CitationStatus] = []
 
         def tools() -> None:
@@ -288,7 +288,7 @@ class Side:
             self.folder_editor.refresh_preview()
 
         with self.section("folder-notes", "folder_open", tip.format(folder=name), fill=True):
-            self.folder_editor = folder_notes_editor(folder_id, render, toolbar=tools)
+            self.folder_editor = folder_notes_editor(self.period_id, render, toolbar=tools)
             self.folder_editor.editor.on_value_change(
                 lambda: (
                     render(self.folder_editor.value)
