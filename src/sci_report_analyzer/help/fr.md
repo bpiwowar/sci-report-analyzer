@@ -261,7 +261,10 @@ chacune avec des années facultatives ; une catégorie contenant des extraits (
 n'est supprimée qu'une fois ceux-ci déplacés vers une autre, choisie à ce moment-là. Dans le PDF d'un document (un rapport,
 un dossier de candidature… pas celui d'un article), sélectionnez un passage (ou cliquez sur un surlignage), puis « ajouter à une
 catégorie » (en-tête, ou touche E) : cliquez sur une catégorie, ou tapez pour la trouver (Enter : la première ;
-un nouveau nom la crée, la boîte de dialogue restant ouverte), avec les années concernées et, le cas échéant, si
+un nouveau nom la crée, la boîte de dialogue restant ouverte), avec les années concernées (celles trouvées
+dans le passage, par exemple « 2026-32 » : 2026–2032, et retirées de son texte quand elles le commencent
+suivies de deux-points ou le terminent après eux ; son calendrier barré les efface, le texte redevenant celui
+sélectionné) et, le cas échéant, si
 elle témoigne du rayonnement de la personne (« rayonnement ») ; lorsqu'il pourrait déjà s'agir d'un extrait
 existant (mots similaires, signalé par un avertissement ; ou trouvé en tapant ses mots), fusionnez-le plutôt avec
 celui-ci, en conservant son texte ou seulement son emplacement (une référence). L'onglet des catégories liste

@@ -210,7 +210,7 @@ class Side:
         category_picker(
             self,
             sel["text"],
-            lambda cat_id, **props: self.file_excerpt(cat_id, sel["text"], page, rects, **props),
+            lambda cat_id, text, **props: self.file_excerpt(cat_id, text, page, rects, **props),
             properties=True,
             merge=lambda lead, ref_only: self.merge_excerpt(
                 lead, sel["text"], page, rects, ref_only=ref_only
@@ -732,10 +732,21 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
 
 
 def excerpt_properties(
-    start: int | None = None, end: int | None = None, influence: bool = False
+    start: int | None = None,
+    end: int | None = None,
+    influence: bool = False,
+    *,
+    cleared: Callable[[], None] | None = None,
 ) -> Callable[[], dict]:
-    """The fields of an excerpt's years and influence flag; returns their values (the
-    keywords of categories.add_excerpt / update_excerpt)."""
+    """The fields of an excerpt's years (a button clears them, then calls ``cleared``) and
+    influence flag; returns their values (the keywords of categories.add_excerpt /
+    update_excerpt)."""
+
+    def clear() -> None:
+        start_in.set_value(None)
+        end_in.set_value(None)
+        if cleared:
+            cleared()
 
     def year(v: float | None) -> int | None:
         return int(v) if v else None
@@ -745,6 +756,9 @@ def excerpt_properties(
         start_in.classes("w-32").mark("excerpt-start")
         end_in = ui.number(_("To (year)"), value=end, format="%d").props("dense outlined")
         end_in.classes("w-32").mark("excerpt-end")
+        ui.button(icon="event_busy", on_click=clear).props("flat dense round size=sm").classes(
+            "-ml-1"
+        ).tooltip(_("Clear the years")).mark("excerpt-years-clear")
         flag = ui.checkbox(_("Influence"), value=influence).mark("excerpt-influence")
         flag.tooltip(_("Shows the person's influence (“rayonnement”: invited talks, prizes…)"))
         ui.icon("public", size="xs", color="teal").classes("-ml-2")
@@ -836,19 +850,33 @@ def category_picker(
     """Choose the category of an excerpt (``chosen`` is called with it): click it, or type to
     find it (Enter: the first one), or name a new one. ``title``, ``done`` (its
     ``{category}`` named): marked with ``N_``, translated here. ``current``: its category, shown;
-    ``properties``: also its years and influence flag (passed to ``chosen`` as keywords);
+    ``properties``: also its years (those found in the text, then taken out of it if leading
+    or ending it: see categories.split_years; cleared, the text as it was) and influence flag
+    (passed to ``chosen`` as keywords, with ``text``, so taken out or not);
     ``merge``: or merge it with an excerpt (called with it, and whether only its place is
     cited), the similar ones shown with a warning."""
     folder_id, folder_name = side.folder
     with side.host.dialogs, ui.dialog() as dlg, ui.card().classes("w-full max-w-xl"):
         ui.label(_(title)).classes("text-lg font-medium")
-        short = text if len(text) <= 300 else text[:299] + "…"
-        ui.label(f"“{' '.join(short.split())}”").classes("text-sm text-grey").mark("excerpt-text")
+        years, filed = categories.split_years(text) if properties else (None, text)
+        quote = ui.label().classes("text-sm text-grey").mark("excerpt-text")
+
+        def show(t: str) -> None:
+            nonlocal filed
+            filed = t
+            short = t if len(t) <= 300 else t[:299] + "…"
+            quote.set_text(f"“{' '.join(short.split())}”")
+
+        show(filed)
         if merge is not None and side.period_id is not None:
             similar_excerpts(
                 side, text, lambda lead, ref_only: (dlg.close(), merge(lead, ref_only))
             )
-        props = excerpt_properties() if properties else dict
+        props = (
+            excerpt_properties(*(years or (None, None)), cleared=lambda: show(text))
+            if properties
+            else dict
+        )
         search = (
             ui.input(
                 placeholder=_("Find a category of {folder} (Enter: the first one)").format(
@@ -868,7 +896,7 @@ def category_picker(
         def pick(cat_id: int) -> None:
             if cat_id == current:
                 return
-            chosen(cat_id, **props())
+            chosen(cat_id, **({"text": filed} if properties else {}), **props())
             dlg.close()
             name = next((n.path for n in categories.tree(folder_id) if n.id == cat_id), "")
             ui.notify(_(done).format(category=name))

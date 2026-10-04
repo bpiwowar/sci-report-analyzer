@@ -891,6 +891,9 @@ msgstr "Effacer les filtres (la période et ses années sont conservées)"
 msgid "Clear the notes"
 msgstr "Effacer les notes"
 
+msgid "Clear the years"
+msgstr "Effacer les années"
+
 msgid ""
 "Click a folder to show it. Drag a folder onto another one to put it "
 "within it (onto its top or bottom: next to it). A folder uses the "

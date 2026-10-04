@@ -30,6 +30,70 @@ def years_label(a: int | None, b: int | None) -> str:
     return _("until {year}").format(year=b) if b else ""
 
 
+# A year (1900–2099) not within a longer number, a decimal, a date, a DOI…
+_YEAR = r"(?<![\w.,/:–—-])((?:19|20)\d\d)"
+_SINGLE = re.compile(_YEAR + r"(?!\d|[.,/]\d)")
+_RANGE = re.compile(
+    _YEAR + r"(\s*[-–—/]\s*|\s+(?:to|until|till|à|au|jusqu'en|jusqu’en)\s+)"
+    r"((?:19|20)\d\d|\d\d)(?!\d|[-/.,]\d)",
+    re.IGNORECASE,
+)
+_PAGES = re.compile(r"\b(?:pp?|pages?)\.?\s*$", re.IGNORECASE)
+
+
+def detect_years(text: str) -> tuple[int, int] | None:
+    """The years a passage is about, as (start, end): its first range ("2026-2032",
+    "2026–2032", "2026 - 2032", "2026/2027", "2026 to 2032", "de 2026 à 2032"; short:
+    "2026-32" is 2026–2032, "1998-03" 1998–2003), else the span of its years ("2026": 2026–2026;
+    "in 2019, then 2023": 2019–2023), else None. Years are 1900–2099 (a range's end not
+    before its start, a short end only right after a dash or slash); not part of a longer
+    number, a decimal, a date ("2026-05-12": 2026 alone) or a DOI, nor page numbers
+    ("pp. 2026-2032")."""
+
+    def pages(m: re.Match) -> bool:
+        return bool(_PAGES.search(text[: m.start()]))
+
+    for m in _RANGE.finditer(text):
+        a, sep, b = int(m[1]), m[2], int(m[3])
+        if len(m[3]) == 2:
+            if sep not in ("-", "–", "—", "/"):
+                continue  # (a short end: "2026-32" only)
+            b = a // 100 * 100 + int(m[3])
+            if b < a:
+                b += 100
+        if a <= b < 2100 and not pages(m):
+            return a, b
+    found = {int(m[1]) for m in _SINGLE.finditer(text) if not pages(m)}
+    return (min(found), max(found)) if found else None
+
+
+# Years ("2026", "2026-32", "2026 to 2032"…: see detect_years) leading a passage (with a
+# colon) or ending it (after a colon, a dash, or in brackets).
+_EXPR = (
+    r"(?:19|20)\d\d(?:(?:\s*[-–—/]\s*|\s+(?:to|until|till|à|au|jusqu'en|jusqu’en)\s+)"
+    r"(?:(?:19|20)\d\d|\d\d))?"
+)
+_LEADING = re.compile(rf"^\s*(?:(?:from|de|du)\s+)?({_EXPR})\s*:\s*", re.IGNORECASE)
+_TRAILING = re.compile(
+    rf"(?:(?<=[^\d\s])\s*(?::|—|\s[–-])\s*|\s*\()({_EXPR})\)?\s*(\.?)\s*$", re.IGNORECASE
+)
+
+
+def split_years(text: str) -> tuple[tuple[int, int] | None, str]:
+    """The years of a passage (see detect_years) and its text without them when they lead
+    it, with a colon ("2026-32: Led a project" → "Led a project"), or end it after a colon,
+    a dash or in brackets ("Led a project: 2026-32." → "Led a project."; the years leading
+    or ending it are its years then); years elsewhere stay in the text."""
+    for rx in (_LEADING, _TRAILING):
+        if (m := rx.search(text)) and (years := detect_years(m[1])):
+            rest = (text[: m.start()] + text[m.end() :]).strip()
+            if rx is _TRAILING and m[2] and rest and rest[-1] not in ".!?…":
+                rest += "."
+            if rest:
+                return years, rest
+    return detect_years(text), text
+
+
 @dataclass
 class Node:
     id: int
