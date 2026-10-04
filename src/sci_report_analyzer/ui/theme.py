@@ -67,6 +67,8 @@ CSS = """
 .vr-details .q-panel-parent, .vr-details .q-tab-panels, .vr-details .q-panel {
   overflow: visible; height: auto;
 }
+/* The side panel's notes tab: the folder's editor takes the height left, the rest keeps its own. */
+.q-tab-panel.flex > :not(.grow) { flex-shrink: 0; }
 /* Chips, source badges and icon buttons keep their size next to long texts. */
 .vr-details .row > :has(> .vr-chip), .vr-details .row > :has(> .vr-src),
 .vr-details .row > .q-btn--round { flex-shrink: 0; min-width: auto; }

@@ -116,6 +116,7 @@ def note_editor(
     height: str = "12rem",
     render: Callable[[str], str] | None = None,
     toolbar: Callable[[], None] | None = None,
+    fill: bool = False,
 ) -> MarkdownEditor:
     """A Markdown note, always open, saved as it is typed (once typing pauses, when the
     editor is left, and when the page is closed); ``mode``, ``stacked``, ``render``,
@@ -141,7 +142,9 @@ def note_editor(
         if state["typed"] is not None and time.monotonic() - state["at"] > 1.0:
             flush()
 
-    with ui.column().classes("w-full gap-0") as box:
+    with ui.column().classes("w-full gap-0" + (" grow min-h-0" if fill else "")) as box:
+        if fill:  # (at least ``height``, else the room left in the column)
+            box.style(f"flex:1 0 {height}")
         with ui.row().classes("w-full items-center gap-1"):
             ui.label(label).classes("text-sm text-grey")
             ui.space()
@@ -155,6 +158,7 @@ def note_editor(
             stacked=stacked,
             render=render,
             toolbar=toolbar,
+            fill=fill,
         )
 
     def adopt(text: str) -> None:  # (saved by another window)

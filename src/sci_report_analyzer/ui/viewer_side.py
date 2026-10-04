@@ -73,17 +73,20 @@ class Side:
     def attach(self, box: ui.column) -> None:
         self.box = box
         with box:
-            self.overview = ui.column().classes("w-full gap-1")
+            self.overview = ui.column().classes("w-full gap-1 no-wrap grow min-h-0")
             with self.overview:
                 self.tab_bar = (
                     ui.tabs(on_change=self._fit).props("dense align=left").classes("w-full")
                 )
-                self.panels = ui.tab_panels(self.tab_bar).classes("w-full")
+                self.panels = ui.tab_panels(self.tab_bar).classes("w-full grow min-h-0")
             self.details = ui.column().classes("w-full gap-2 vr-details").mark("pdf-details")
             self.details.visible = False
 
-    def section(self, name: str, icon: str, tip: str, *, wide: bool = False) -> ui.tab_panel:
-        """A tab of the side column (the first one is shown)."""
+    def section(
+        self, name: str, icon: str, tip: str, *, wide: bool = False, fill: bool = False
+    ) -> ui.tab_panel:
+        """A tab of the side column (the first one is shown); ``fill``: its content can take
+        the height of the column."""
         if wide:
             self.wide.add(name)
         with self.tab_bar:
@@ -91,7 +94,9 @@ class Side:
         if self.tab_bar.value is None:
             self.tab_bar.value = name
         with self.panels:
-            return ui.tab_panel(name).classes("p-0 gap-2")
+            return ui.tab_panel(name).classes(
+                "p-0 gap-2" + (" flex flex-col no-wrap h-full" if fill else "")
+            )
 
     def select(self, name: str) -> None:
         self.back()
