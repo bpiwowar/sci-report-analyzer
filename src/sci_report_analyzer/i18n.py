@@ -2,9 +2,9 @@
 (Settings → the header's language menu; ``SCI_REPORT_ANALYZER_LANG`` overrides it) by its
 catalog ``locales/<lang>/LC_MESSAGES/messages.po`` (none: English, the source language).
 
-Strings are extracted with ``scripts/i18n.sh`` (pybabel: ``_``, ``ngettext`` and ``N_``,
-which marks a string translated later, e.g. a label table built at import time: its
-entries are shown through ``_()``).
+Strings are extracted with ``scripts/i18n.sh`` (pybabel: ``_``, ``ngettext``, ``pgettext``
+and ``N_``, which marks a string translated later, e.g. a label table built at import time:
+its entries are shown through ``_()``).
 """
 
 from __future__ import annotations
@@ -96,6 +96,11 @@ def _(text: str) -> str:
 
 def ngettext(singular: str, plural: str, n: int) -> str:
     return _translation.ngettext(singular, plural, n)
+
+
+def pgettext(context: str, text: str) -> str:
+    """``text`` in a context: the same English, translated differently ("no venue")."""
+    return _translation.pgettext(context, text)
 
 
 def N_(text: str) -> str:

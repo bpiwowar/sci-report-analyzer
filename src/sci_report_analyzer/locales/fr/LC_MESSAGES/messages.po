@@ -4931,6 +4931,10 @@ msgstr "pas de session : la conférence principale"
 msgid "no validated source"
 msgstr "aucune source validée"
 
+msgctxt "summary"
+msgid "no venue"
+msgstr "sans canal"
+
 msgid "no venue"
 msgstr "aucun canal"
 
@@ -5274,6 +5278,11 @@ msgid "within {period}"
 msgstr "dans {period}"
 
 #, python-brace-format
+msgctxt "rank of a workshop's main conference"
+msgid "{category}"
+msgstr "dans une conf. {category}"
+
+#, python-brace-format
 msgid "{cited} of the {n} papers to discuss cited"
 msgstr "{cited} des {n} articles à discuter cités"
 
@@ -5458,6 +5467,12 @@ msgid "{n} source(s) not up to date"
 msgid_plural "{n} source(s) not up to date"
 msgstr[0] "{n} source pas à jour"
 msgstr[1] "{n} sources pas à jour"
+
+#, python-brace-format
+msgid "{n} unranked"
+msgid_plural "{n} unranked"
+msgstr[0] "{n} non classé"
+msgstr[1] "{n} non classés"
 
 #, python-brace-format
 msgid ""

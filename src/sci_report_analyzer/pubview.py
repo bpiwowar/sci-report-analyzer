@@ -27,7 +27,7 @@ from .db.models import (
     Venue,
 )
 from .db.session import session_scope
-from .i18n import N_, Labels, _, language
+from .i18n import N_, Labels, _, language, ngettext, pgettext
 from .merge import main_members
 from .ranking import tracks
 from .ranking.badge import (
@@ -1026,47 +1026,27 @@ def category_list(rows: list[PubStat]) -> list[Category]:
 
 
 SUMMARY_KEY = "summary"  # the summary dialog's last settings (an AppSetting)
-# Languages of the summary (English: the app's labels).
-SUMMARY_LANGUAGES = {"en": "English", "fr": "Français"}
-_FR_KINDS = {
-    "intl_conference": "Conf. int.",
-    "intl_workshop": "Atelier int.",
-    "intl_journal": "Revue int.",
-    "natl_conference": "Conf. nat.",
-    "natl_workshop": "Atelier nat.",
-    "natl_journal": "Revue nat.",
-    "shared_task": "Campagne d'éval.",
-    "preprint": "Prépublication",
-    "book": "Livre",
-    "chapter": "Chapitre",
-    "proceedings": "Actes (éd.)",
-    "software": "Logiciel",
-    "dataset": "Jeu de données",
-    "thesis": "Thèse",
-    "other": "Autre",
-}
+# Languages of the summary.
+SUMMARY_LANGUAGES = i18n.LANGUAGES
 
 
-def _fr_category(cat: Category, kind: str | None, n: int) -> str:
-    """A category's label in French ("Atelier CORE A*", "Court CORE A", "non classés"; in
-    the workshops' line, "dans une conf. CORE A")."""
-    unranked = "non classé" + ("s" if n > 1 else "")
-    base = cat.base_key
-    if base.startswith("k_"):
-        label = unranked if base == f"k_{kind}" else _FR_KINDS.get(base[2:], base[2:])
-    elif base in ("other", "unranked"):
-        label = "autre" if base == "other" else unranked
-    else:  # Q1, CORE A*: the same
-        label = next((lab for k, lab, _c in BASE_CATEGORIES if k == base), base)
-        if cat.workshop and kind in WORKSHOP_KINDS:  # (ranked by its main conference)
-            label = f"dans une conf. {label}"
-    if cat.workshop and kind not in WORKSHOP_KINDS:
-        label = f"Atelier {label}"
-    if cat.edited and kind != "proceedings":
-        label = f"Actes (éd.) {label}"
-    if cat.track:
-        label = f"{tracks.name(cat.track, 'fr')} {label}"
-    return label
+def _unranked(n: int) -> str:
+    return ngettext("{n} unranked", "{n} unranked", n).format(n=n)
+
+
+def _summary_category(cat: Category, kind: str | None, n: int) -> str:
+    """``n`` papers of a category in the summary, in the language of the moment; within
+    its kind, without what the kind says ("3 unranked"; a workshop's rank, that of its main
+    conference; an edited volume's)."""
+    rank = next((lab for k, lab, _c in BASE_CATEGORIES if k == cat.base_key), None)
+    if cat.base_key == "unranked" or (kind is not None and cat.key == f"k_{kind}"):
+        return _unranked(n)
+    if rank and cat.workshop and kind in WORKSHOP_KINDS:
+        label = pgettext("rank of a workshop's main conference", "{category}")
+        return f"{n} {label.format(category=rank)}"
+    if rank and cat.edited and kind == "proceedings":
+        return f"{n} {rank}"
+    return f"{n} {category_label(cat)}"
 
 
 def summary_settings() -> dict:
@@ -1108,10 +1088,20 @@ def summary_lines(
     a venue's papers are counted together ("3x Acoustica"); "off" categories are only
     counted in their kind. ``lang``: one of ``SUMMARY_LANGUAGES``; ``markdown``: a
     Markdown list (one item per line)."""
-    fr = lang == "fr"
-    no_venue = "sans canal" if fr else "no venue"
-    hidden = set(hidden)
-    details = details or {}
+    with i18n.using(lang):
+        return _summary_lines(rows, short, by_kind, years, set(hidden), details or {}, markdown)
+
+
+def _summary_lines(
+    rows: list[PubStat],
+    short: bool,
+    by_kind: bool,
+    years: bool,
+    hidden: set[str],
+    details: dict[str, str],
+    markdown: bool,
+) -> list[str]:
+    no_venue = pgettext("summary", "no venue")
 
     def detail(key: str) -> str:
         return details.get(key) or ("off" if key in hidden else "years" if years else "list")
@@ -1144,17 +1134,9 @@ def summary_lines(
             if level == "off":
                 continue
             members = [r for r in papers if r.category.key == cat.key]
-            if fr:
-                label = _fr_category(cat, kind, len(members))
-            else:
-                with i18n.using("en"):  # (the categories are labelled in the app's language)
-                    label = category_label(cat)
-                if kind is not None:  # within its kind: "unranked", "A*" for a workshop
-                    label = (
-                        "unranked" if cat.key == f"k_{kind}" else label.removeprefix("Workshop ")
-                    )
+            counted = _summary_category(cat, kind, len(members))
             if level == "count":
-                out.append(f"{len(members)} {label}")
+                out.append(counted)
                 continue
             with_years = level == "years"
             counts = Counter((venue_name(r), r.year if with_years else None) for r in members)
@@ -1169,7 +1151,7 @@ def summary_lines(
                 (f"{n}x " if n > 1 else "") + name + (f" {year}" if year else "")
                 for (name, year), n in items
             )
-            out.append(f"{len(members)} {label} ({venues})")
+            out.append(f"{counted} ({venues})")
         return out
 
     if not by_kind:
@@ -1180,14 +1162,9 @@ def summary_lines(
         papers = [r for r in rows if (r.kind if r.kind in KIND_ORDER else None) == kind]
         if not papers:
             continue
-        if fr:
-            label = _FR_KINDS.get(kind or "other", "Other")
-        else:
-            with i18n.using("en"):
-                label = KIND_SHORT.get(kind or "other", "Other")
+        label = KIND_SHORT[kind or "other"]
         items = category_items(papers, kind)
-        unranked = ("non classé" + ("s" if len(papers) > 1 else "")) if fr else "unranked"
-        only = f"{len(papers)} {unranked}"
+        only = _unranked(len(papers))
         head = f"{len(papers)} {label}"
         if len(items) == 1 and (items[0] == only or items[0].startswith(only + " ")):
             # "15 Preprint (arXiv …)"
