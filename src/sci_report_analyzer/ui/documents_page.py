@@ -177,8 +177,8 @@ class DocumentPage:
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
             self.side.categories = categories_section(self.side)
+        self.side.folder_notes()
         with self.side.section("notes", "sticky_note_2", _("Notes on the document"), fill=True):
-            self.side.folder_notes()
             self.note = note_editor(
                 _("Note (on the document)"),
                 d.note,
@@ -189,6 +189,7 @@ class DocumentPage:
                 height="14rem",
                 render=lambda text: reports.render(text, self._note_context()).text,
                 toolbar=self._note_tools,
+                fill=True,
             )
         with self.side.section("bookmarks", "bookmarks", _("Bookmarks")):
             self.side.bookmarks = bookmarks_section("doc", d.id)

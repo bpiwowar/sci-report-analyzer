@@ -239,21 +239,27 @@ class Side:
 
     def folder_notes(self) -> None:
         """The notes of the folder (one text for all its documents and papers), if the PDF is
-        in a folder: first in the notes' tab, and where quotes go by default."""
+        in a folder: in their own tab, and where quotes go by default."""
         if self.folder is None:
             return
         from .folder_notes import folder_notes_editor
 
-        folder_id = self.folder[0]
-        self.folder_editor = folder_notes_editor(
-            folder_id,
-            lambda text: (
-                reports.render(
-                    text, reports.note_context(self.stats, reports.citation_keys(self.stats))
-                ).text
-            ),
-            toolbar=lambda: self.quote_tool(lambda: self.folder_editor, first=True),
-        )
+        folder_id, name = self.folder
+        tip = _("Notes of the folder {folder} (all its documents and papers)")
+        with self.section("folder-notes", "folder_open", tip.format(folder=name), fill=True):
+            self.folder_editor = folder_notes_editor(
+                folder_id,
+                lambda text: (
+                    reports.render(
+                        text, reports.note_context(self.stats, reports.citation_keys(self.stats))
+                    ).text
+                ),
+                toolbar=lambda: self.quote_tool(lambda: self.folder_editor, first=True),
+            )
+
+    def tab_of(self, editor: MarkdownEditor) -> str:
+        """The tab a notes' editor is in."""
+        return "folder-notes" if editor is self.folder_editor else "notes"
 
     def cite_hint(self, s: PubStat) -> str:
         """The hover of a paper cited in the PDF: what clicking does, and (in a folder) its
@@ -279,7 +285,7 @@ class Side:
         if not notes or key is None:
             ui.notify(_("No notes to cite in"), type="warning")
             return
-        self.select("notes")
+        self.select(self.tab_of(notes[0]))
         notes[0].insert(f"[@{key}]")
 
     def source_link(self, page: int | None) -> tuple[str, str]:
@@ -329,7 +335,7 @@ class Side:
             if not notes:
                 return
             editor = notes[0]
-            self.select("notes")
+            self.select(self.tab_of(editor))
         sel = await ui.run_javascript("vrPdf.quoted()")
         if not sel or not (sel.get("text") or "").strip():
             ui.notify(
