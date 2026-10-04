@@ -869,8 +869,9 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     period_numbers=period_numbers.get(pub.id, {}),
                     venue_short=None
                     if archival_only or no_venue
-                    else (venue.short_name if venue else None)
-                    or auto_short_name(
+                    else venue.short_name
+                    if venue and venue.short_manual
+                    else auto_short_name(
                         badge,
                         [v.venue for v in venue_members(views)],
                         workshop=kind in WORKSHOP_KINDS,

@@ -4980,3 +4980,18 @@ msgstr "✓ C'est {name}"
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
 
+
+msgid "Empty: inferred (ranking record acronym, venue texts): “{short}”"
+msgstr "Vide : déduit (acronyme de l'entrée de classement, textes du canal) : « {short} »"
+
+msgid "Empty: inferred (ranking record acronym, venue texts)"
+msgstr "Vide : déduit (acronyme de l'entrée de classement, textes du canal)"
+
+msgid "Validate the inferred acronym (set it by hand)"
+msgstr "Valider l'acronyme déduit (le fixer à la main)"
+
+msgid "No acronym"
+msgstr "Pas d'acronyme"
+
+msgid "This venue has no acronym: none is inferred"
+msgstr "Ce canal n'a pas d'acronyme : aucun n'est déduit"

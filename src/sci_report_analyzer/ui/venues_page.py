@@ -1083,7 +1083,8 @@ def venue_dialog(
             return
         state = {
             "name": v.name,
-            "short_name": v.short_name or "",
+            "short_name": (v.short_name or "") if v.short_manual else "",
+            "no_short": v.short_manual and not v.short_name,
             "url": v.url or "",
             "kind": v.kind if v.kind_manual else "",
             "level_type": v.level_type
@@ -1146,16 +1147,37 @@ def venue_dialog(
             ).mark("venue-back")
         with ui.row().classes("w-full items-center justify-between no-wrap"):
             name = ui.input(_("Name"), value=state["name"]).classes("grow").mark("venue-name")
+            inferred = None if row.short_manual else row.short_name
             short = (
                 ui.input(
                     _("Short name"),
                     value=state["short_name"],
-                    placeholder=(row.short_name or _("e.g. ICLR")) if not row.short_manual else "",
+                    placeholder=inferred or _("e.g. ICLR"),
                 )
                 .classes("w-40")
-                .tooltip(_("Empty: found automatically (ranking record acronym, venue texts)"))
+                .tooltip(
+                    _("Empty: inferred (ranking record acronym, venue texts): “{short}”").format(
+                        short=inferred
+                    )
+                    if inferred
+                    else _("Empty: inferred (ranking record acronym, venue texts)")
+                )
                 .mark("venue-short")
             )
+            if inferred:
+                ui.button(icon="check", on_click=lambda: short.set_value(inferred)).props(
+                    "flat dense round size=sm"
+                ).tooltip(_("Validate the inferred acronym (set it by hand)")).mark(
+                    "venue-short-validate"
+                ).bind_visibility_from(short, "value", lambda v: not v)
+            no_short = (
+                ui.checkbox(_("No acronym"), value=state["no_short"])
+                .props("dense")
+                .classes("text-xs")
+                .tooltip(_("This venue has no acronym: none is inferred"))
+                .mark("venue-no-short")
+            )
+            short.bind_enabled_from(no_short, "value", lambda v: not v)
             ui.button(icon="close", on_click=dlg.close).props("flat round")
         ui.label(
             _("Renamed: “{name}” stays a variant, so its texts keep matching.").format(
@@ -1544,7 +1566,8 @@ def venue_dialog(
             venues.update_venue(
                 row.id,
                 name=name.value.strip() or row.name,
-                short_name=short.value.strip() or None,
+                short_name=None if no_short.value else (short.value or "").strip() or None,
+                short_manual=no_short.value or bool((short.value or "").strip()),
                 url=venues.normalize_url(url.value),
                 kind=kind.value or None,
                 level_type=ltype.value if lrank.value else None,

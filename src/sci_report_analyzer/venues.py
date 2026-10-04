@@ -103,6 +103,7 @@ def add_venue(
             kind=kind,
             kind_manual=True,
             short_name=short_name or None,
+            short_manual=bool(short_name),
             url=normalize_url(url),
         )
         s.add(v)
@@ -181,6 +182,8 @@ def update_venue(venue_id: int, **values: Any) -> None:
                 rematch = True
         for k, val in values.items():
             setattr(v, k, val)
+        if "short_name" in values and "short_manual" not in values:
+            v.short_manual = bool(values["short_name"])  # (none: inferred again)
         if "kind" in values:
             v.kind_manual = bool(values["kind"])
     _changed(rematch=rematch)
@@ -212,11 +215,12 @@ def merge_venues(
                 "level_rank",
                 "record_key",
                 "match_text",
-                "short_name",
                 "url",
             ):
                 if getattr(target, attr) is None:
                     setattr(target, attr, getattr(other, attr))
+            if other.short_manual and not target.short_manual:
+                target.short_name, target.short_manual = other.short_name, True
             if not target.kind_manual and other.kind_manual:
                 target.kind, target.kind_manual = other.kind, True
             if other.patterns:
@@ -340,7 +344,7 @@ def find_venues(query: str, limit: int = 10) -> list[VenueHit]:
                     v.name,
                     venue_id=v.id,
                     detail=_("venue"),
-                    short=v.short_name or paren_acronym(v.name),
+                    short=v.short_name or (None if v.short_manual else paren_acronym(v.name)),
                     kind=KINDS.get(v.kind or ""),
                 )
             )
@@ -763,6 +767,7 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
 
     # 2. Read-only: badges and kinds (resolutions write the cache meanwhile).
     auto_kinds: dict[int, str] = {}
+    auto_shorts: dict[int, str | None] = {}
     out = []
     with session_scope() as s:
         manual_pubs: dict[int, set[int]] = defaultdict(set)
@@ -840,21 +845,29 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
             row.variants.append((vk.key, vk.example, key_count.get(vk.key, 0), vk.manual, vk.track))
         row.raw_examples.update(m.venue for m in members)  # as in the sources
         row.source_texts.update((m.link.source, m.venue) for m in members)
-        row.short_manual = bool(v.short_name)
+        row.short_manual = v.short_manual
         row.url = v.url
-        row.short_name = v.short_name or auto_short_name(
-            badge,
-            [t for t, _n in row.raw_examples.most_common()],
-            workshop=row.kind in WORKSHOP_KINDS,
-        )
+        if v.short_manual or light:
+            row.short_name = v.short_name
+        else:
+            row.short_name = auto_short_name(
+                badge,
+                [*(t for t, _n in row.raw_examples.most_common()), v.name],
+                workshop=row.kind in WORKSHOP_KINDS,
+            )
+            if row.short_name != v.short_name:
+                auto_shorts[v.id] = row.short_name
         out.append(row)
 
-    # 3. Cache the automatic kinds.
-    if auto_kinds:
+    # 3. Cache the automatic kinds and acronyms ("inferred").
+    if auto_kinds or auto_shorts:
         with session_scope() as s:
             for vid, kind in auto_kinds.items():
                 if (v := s.get(Venue, vid)) is not None and not v.kind_manual:
                     v.kind = kind
+            for vid, short in auto_shorts.items():
+                if (v := s.get(Venue, vid)) is not None and not v.short_manual:
+                    v.short_name = short
     if detect and only is None and _store_parts(venues, detect_parts(out)):
         return await venue_rows(only, detect=False)
     return out
@@ -1192,14 +1205,20 @@ def venue_options() -> dict[int, str]:
 
 def venue_choices() -> dict[int, str]:
     """Venue labels to pick from, their acronym first ("[EMNLP] Conference on …") so that
-    typing it finds them: set by hand, else from its ranking record or its texts."""
+    typing it finds them: set by hand (or none), else inferred from its ranking record or
+    its texts."""
     out: dict[int, str] = {}
     with session_scope() as s:
         for v in s.scalars(select(Venue).options(selectinload(Venue.keys))):
-            short = v.short_name or auto_short_name(
-                service.badge_for_record(v.record_key) if v.record_key else None,
-                [v.name, *(k.example for k in v.keys)],
-                workshop=v.kind in WORKSHOP_KINDS,
+            short = (
+                v.short_name
+                if v.short_manual
+                else v.short_name  # (inferred, cached)
+                or auto_short_name(
+                    service.badge_for_record(v.record_key) if v.record_key else None,
+                    [v.name, *(k.example for k in v.keys)],
+                    workshop=v.kind in WORKSHOP_KINDS,
+                )
             )
             out[v.id] = f"[{short}] {v.name}" if short else v.name
     return dict(sorted(out.items(), key=lambda kv: kv[1].lstrip("[").lower()))
