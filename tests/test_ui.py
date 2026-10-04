@@ -2641,3 +2641,19 @@ async def test_multiple_selection(user: User) -> None:
     await shown("A journal paper")
     user.find("reset-filters").click()
     await shown(*titles)
+
+
+def test_earlier_ui_states_normalized() -> None:
+    from sci_report_analyzer import annotations
+    from sci_report_analyzer.pubview import save_summary_settings, summary_settings
+
+    pid = make_person("Jane Doe")
+    annotations.save_panel_state(pid, {"period_id": None, "starred_only": True})
+    save_summary_settings({"off_categories": ["q4"], "details": {"q1": "count"}, "years": True})
+    annotations.normalize_ui_state()
+    annotations.normalize_ui_state()  # (idempotent)
+    assert annotations.panel_state(pid) == {
+        "period_id": None,
+        "tag_filter": [annotations.starred_tag_id()],
+    }
+    assert summary_settings() == {"details": {"q4": "off", "q1": "count"}, "years": True}
