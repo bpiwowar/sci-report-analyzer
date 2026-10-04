@@ -70,6 +70,3 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
 
 - Mark some papers of a folder with tags (e.g. "starred"); several tags, each with its
   name.
-- Migration to the folder-wide notes: append to each folder's notes a final "Starred
-  papers" section holding everything the old per-paper notes / report had (each starred
-  paper with its citation and notes), so nothing is lost when that view goes.
