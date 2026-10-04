@@ -23,3 +23,13 @@ A variant matched by the rule but with another track (a demo variant, a rule wit
 track) conflicts with it: never save a rule in conflict with variants. Ask the user:
 remove those variants (they take the rule's track), or edit the regex so that it no
 longer matches them.
+
+## Tracks replace flags (in progress)
+
+- Tracks as editable definitions (Settings): a name, a colour used across the interface
+  (variant and paper chips, categories, distribution, reports), an order and their
+  matching rules (the track detection rules, by language, default / edited / added).
+- No more flags: a manual track override per paper (automatic / main track / a track).
+- Migration: a paper flagged with a track gets that track as its override, the flags'
+  colours become the tracks' colours, flags without a track become tags; then the flag
+  tables are dropped.
