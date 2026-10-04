@@ -34,7 +34,7 @@ from ..ranking.normalize import (
     normalize,
     rule_origin,
 )
-from ..ranking.service import load_settings, save_settings, service
+from ..ranking.service import MatchSettings, load_settings, save_settings, service
 from ..sources import ADAPTERS
 from . import scimago_years, unsaved
 from .colours import ColourInput
@@ -350,6 +350,161 @@ def _publication_sources() -> None:
     ).classes("w-48").mark("primary-source")
 
 
+# The other thresholds of the matching (MatchSettings fields): label, help, minimum,
+# maximum, step (an integer one: 1).
+THRESHOLDS = {
+    N_("Venue matching"): {
+        "conference_alt_score": (
+            N_("Conference instead of a journal"),
+            N_(
+                "Minimum score of a conference record replacing an approximate journal match "
+                "of a text naming a conference"
+            ),
+            0.4,
+            1.0,
+            0.05,
+        ),
+        "predatory_min_score": (
+            N_("Predatory venue"),
+            N_("Minimum score of a match in the list of predatory venues"),
+            0.4,
+            1.0,
+            0.05,
+        ),
+        "openalex_score": (
+            N_("OpenAlex match"),
+            N_("The score given to a venue found through OpenAlex"),
+            0.4,
+            1.0,
+            0.05,
+        ),
+    },
+    N_("A paper's records in the sources"): {
+        "merge_title_jaccard": (
+            N_("Shared title words"),
+            N_("Share of title words (Jaccard) two records need to be the same paper"),
+            0.5,
+            1.0,
+            0.05,
+        ),
+        "merge_year_slack": (
+            N_("Year gap"),
+            N_("Largest gap (in years) between the years of two records of the same paper"),
+            0,
+            5,
+            1,
+        ),
+    },
+    N_("Pasted list of references"): {
+        "reflist_match": (
+            N_("Match"),
+            N_("Share of a paper's title words to find in an item for a match"),
+            0.4,
+            1.0,
+            0.05,
+        ),
+        "reflist_suggest": (
+            N_("Suggestion"),
+            N_("Share of a paper's title words to find in an item to suggest the paper"),
+            0.1,
+            1.0,
+            0.05,
+        ),
+    },
+    N_("Similar venues"): {
+        "venue_merge_score": (
+            N_("Proposed for a merge"),
+            N_("Similarity (shared words, same acronym) of two venues proposed for a merge"),
+            0.1,
+            1.0,
+            0.05,
+        ),
+        "venue_similar_score": (
+            N_("Listed as similar"),
+            N_("Similarity of the venues listed as similar to a venue"),
+            0.1,
+            1.0,
+            0.05,
+        ),
+    },
+    N_("Students"): {
+        "former_student_after": (
+            N_("Former student after (years)"),
+            N_(
+                "A PhD student on a paper more than this many years after their defence: a "
+                "former one"
+            ),
+            0,
+            10,
+            1,
+        ),
+    },
+}
+
+
+def _thresholds(st) -> dict[str, ui.number]:
+    """The editors of the other thresholds (in an expansion), by field."""
+    inputs: dict[str, ui.number] = {}
+    with (
+        ui.expansion(_("Other thresholds"), icon="tune")
+        .classes("w-full mt-2")
+        .mark("match-thresholds")
+    ):
+        for group, fields in THRESHOLDS.items():
+            ui.label(_(group)).classes("font-medium mt-2")
+            with ui.row().classes("gap-3"):
+                for name, (label, help_, lo, hi, step) in fields.items():
+                    inputs[name] = (
+                        ui.number(
+                            _(label),
+                            value=getattr(st, name),
+                            min=lo,
+                            max=hi,
+                            step=step,
+                            format="%d" if step == 1 else "%.2f",
+                        )
+                        .props("dense outlined")
+                        .classes("w-56")
+                        .tooltip(_(help_))
+                        .mark(f"threshold-{name}")
+                    )
+        sources = {n: a.label for n, a in ADAPTERS.items() if a.provides_publications}
+        unreliable = (
+            ui.select(
+                sources,
+                value=[n for n in st.unreliable_venue_sources if n in sources],
+                multiple=True,
+                label=_("Venue text only as a fallback"),
+            )
+            .props("dense outlined use-chips")
+            .classes("w-96 mt-2")
+            .tooltip(
+                _(
+                    "The sources whose venue text is used only when no other source gives one "
+                    "(ORCID: a free text, often missing or wrong)"
+                )
+            )
+            .mark("threshold-unreliable_venue_sources")
+        )
+    inputs["unreliable_venue_sources"] = unreliable
+    return inputs
+
+
+def _threshold_values(inputs: dict) -> dict:
+    """The thresholds as edited (a cleared one: its default)."""
+    defaults = MatchSettings()
+    values = {}
+    for name, el in inputs.items():
+        if name == "unreliable_venue_sources":
+            values[name] = list(el.value or [])
+            continue
+        v = el.value
+        if v is None:
+            v = getattr(defaults, name)
+        values[name] = int(v) if isinstance(getattr(defaults, name), int) else float(v)
+    return values
+
+
 def matching_tab() -> None:
     st = load_settings()
     ui.label(_("Ranking sources")).classes("text-lg")
@@ -366,18 +521,28 @@ def matching_tab() -> None:
             "reported as not ranked."
         )
     ).classes("text-sm text-grey")
+    thresholds = _thresholds(st)
 
     def save() -> None:
         new = load_settings()
         new.sources = {k: b.value for k, b in boxes.items()}
         new.min_score = float(slider.value)
+        for name, v in _threshold_values(thresholds).items():
+            setattr(new, name, v)
         save_settings(new)
         ui.notify(_("Saved — cached matches cleared"), type="positive")
 
-    save = unsaved.track(lambda: ({k: b.value for k, b in boxes.items()}, slider.value), save)
+    save = unsaved.track(
+        lambda: (
+            {k: b.value for k, b in boxes.items()},
+            slider.value,
+            _threshold_values(thresholds),
+        ),
+        save,
+    )
     with ui.row().classes("gap-2 mt-2"):
         unsaved.cancel_button()
-        ui.button(_("Save"), icon="save", on_click=save)
+        ui.button(_("Save"), icon="save", on_click=save).mark("matching-save")
 
 
 # Where a rule comes from (its card's background, a marker): label, tooltip.
@@ -1246,6 +1411,13 @@ def detection_tab() -> None:
             "in a pattern stands for the pattern of the rule with that id; (?-i:…) makes a "
             "part case-sensitive. Each rule shows whether it is a default one, and its default "
             "when changed."
+        )
+    ).classes("text-grey text-sm")
+    ui.label(
+        _(
+            "The rules of “Matching the rankings” are used when looking a venue up in the "
+            "rankings: a text naming a society or an event is not matched to a journal; generic "
+            "words are left out when comparing a text with a record found by its acronym."
         )
     ).classes("text-grey text-sm")
     rules = {r.id: r.model_copy() for r in st.detection_rules}
