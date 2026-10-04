@@ -40,6 +40,16 @@ def all_flags() -> list[Flag]:
         return list(s.scalars(select(Flag).order_by(Flag.name)))
 
 
+TRACK_FALLBACK_COLOUR = "#2f6fb0"  # (a track no flag marks: Findings)
+
+
+def track_colours() -> dict[str, str]:
+    """Each track's colour: that of a flag marking it, else of the default flags."""
+    out = {track: colour for _name, colour, track in DEFAULT_FLAGS}
+    out.update({f.track: f.colour for f in all_flags() if f.track and f.colour})
+    return out
+
+
 def save_flag(name: str, colour: str, track: str | None, flag_id: int | None = None) -> None:
     with session_scope() as s:
         f = s.get(Flag, flag_id) if flag_id else Flag(name=name)

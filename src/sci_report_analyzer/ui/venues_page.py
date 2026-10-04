@@ -9,7 +9,7 @@ from html import escape
 from nicegui import background_tasks, ui
 from sqlalchemy.orm import selectinload
 
-from .. import venue_match, venues
+from .. import annotations, venue_match, venues
 from ..db.models import Venue
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
@@ -51,6 +51,46 @@ def _chip_html(row: venues.VenueRow) -> str:
     return f'<span class="vr-chip" style="{style}">{escape(label)}</span>' + (
         f' <span title="{escape(_("manual decision"))}">✎</span>' if row.manual else ""
     )
+
+
+def _track_style(track: str | None, colours: dict[str, str]) -> str:
+    """A track chip in its flag's colour; the main session (no track) discreet."""
+    if not track:
+        return "background:transparent;color:#8c959f;border:1px dashed #c8d1da"
+    colour = colours.get(track, annotations.TRACK_FALLBACK_COLOUR)
+    return f"background:{colour};color:{text_colour(colour)}"
+
+
+def _track_picker(
+    track: str | None,
+    on_pick: Callable[[str | None], object],
+    mark: str,
+    *,
+    main: bool = True,
+    colours: dict[str, str] | None = None,
+) -> ui.button:
+    """A track as a coloured chip with its full label, a menu to change it (``main``: the
+    main session, no track, offered)."""
+    colours = annotations.track_colours() if colours is None else colours
+    chip = ui.button().props("dense no-caps unelevated rounded size=sm").mark(mark)
+
+    def paint(t: str | None) -> None:
+        chip.text = TRACK_LABEL.get(t, t) if t else _("no track")
+        chip.style(replace=_track_style(t, colours) + ";padding:0 8px;min-height:20px")
+        chip.value = t
+
+    def pick(t: str | None) -> None:
+        paint(t)
+        on_pick(t)
+
+    with chip, ui.menu():
+        for k in (*([None] if main else []), *TRACK_LABEL):
+            label = TRACK_LABEL.get(k, k) if k else _("no track")
+            with ui.menu_item(on_click=lambda k=k: pick(k)).mark(f"{mark}-{k or 'none'}"):
+                style = _track_style(k, colours)
+                span(f'<span class="vr-chip" style="{style}">{escape(label)}</span>')
+    paint(track)
+    return chip
 
 
 def _core_history(badge, host: str | None = None) -> None:
@@ -1313,7 +1353,7 @@ def venue_dialog(
                 ui.label(_("Variants (raw texts, matched by their cleaned text)")).classes(
                     "font-medium mt-2"
                 )
-                tracks = {"": _("no track"), **TRACK_LABEL}
+                colours = annotations.track_colours()
                 workshop_keys = dict(venues.workshop_variants(row.id))
                 if workshop_keys:
                     with (
@@ -1355,16 +1395,15 @@ def venue_dialog(
                             + ngettext("{n} record", "{n} records", count).format(n=count)
                             + (" · " + _("set by hand") if manual else "")
                         ).classes("text-xs text-grey grow")
-                        ui.select(
-                            tracks,
-                            value=track or "",
-                            on_change=lambda e, k=key: (
-                                venues.set_variant_track(k, e.value or None),
+                        _track_picker(
+                            track,
+                            lambda t, k=key: (
+                                venues.set_variant_track(k, t),
                                 ui.notify(_("Track saved")),
                             ),
-                        ).props("dense borderless").classes("w-28").tooltip(
-                            _("Track of the papers with this variant")
-                        )
+                            f"venue-variant-track-{key}",
+                            colours=colours,
+                        ).tooltip(_("Track of the papers with this variant"))
                         if len(row.variants) > 1:
                             ui.button(
                                 icon="call_split",
@@ -1543,20 +1582,22 @@ def _relation_label(relation: str) -> str:
     }[kind]
 
 
-def _this_label(relation: str) -> str:
+def _this_label(relation: str, colours: dict[str, str]) -> str:
     """What the open venue is, for a venue searched (``relation``: how that one relates to
-    the open one, see ``venues.guess_relation``)."""
+    the open one, see ``venues.guess_relation``), as HTML (the track in its colour)."""
     kind, _sep, track = relation.partition(":")
-    track = TRACK_LABEL.get(track, track)
-    return {
+    text = {
         "same": _("The same venue (merged into this one)"),
-        "~track": _("This venue is its {track} track").format(track=track),
-        "track": _("Its main venue (it is this venue's {track} track)").format(track=track),
+        "~track": _("This venue is its {track} track"),
+        "track": _("Its main venue (it is this venue's {track} track)"),
         "~joint": _("A joint conference including it"),
         "joint": _("A part of it (it is a joint conference including this venue)"),
         "~workshop": _("One of its workshops"),
         "workshop": _("Its main conference (it is a workshop of this venue)"),
     }[kind]
+    label = escape(TRACK_LABEL.get(track, track))
+    chip = f'<span class="vr-chip" style="{_track_style(track, colours)}">{label}</span>'
+    return escape(text).format(track=chip)
 
 
 def _secondary_label(relation: str) -> str:
@@ -1797,12 +1838,13 @@ def _relate_dialog(row: venues.VenueRow, other: venues.VenueRow, merged) -> None
         ui.label(_("What is this venue for “{name}”?").format(name=other.name)).classes(
             "text-lg font-medium"
         )
+        colours = annotations.track_colours()
         rel = (
             ui.select(
-                {k: _this_label(k) for k in venues.relation_choices(guess, both=True)},
+                {k: _this_label(k, colours) for k in venues.relation_choices(guess, both=True)},
                 value=guess,
             )
-            .props("dense outlined")
+            .props("dense outlined options-html display-value-html")
             .classes("w-full")
             .mark("venue-relate-choice")
         )
@@ -1839,12 +1881,7 @@ def _track_box(row: venues.VenueRow, merged) -> None:
         ui.label(_("No main venue? This venue is a track of its conference:")).classes(
             "text-sm grow"
         )
-        track = (
-            ui.select(dict(TRACK_LABEL.items()), value=guess or "demo")
-            .props("dense outlined")
-            .classes("w-36")
-            .mark("venue-as-track-choice")
-        )
+        track = _track_picker(guess or "demo", lambda _t: None, "venue-as-track-choice", main=False)
         btn = ui.button(_("Mark as a track…"), icon="label").props("dense flat no-caps")
         btn.mark("venue-as-track")
 

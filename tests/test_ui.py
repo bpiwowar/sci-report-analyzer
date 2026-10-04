@@ -1159,8 +1159,9 @@ async def test_venue_marked_as_a_demo_track(user: User) -> None:
     await user.open(f"/venues?focus={demo}")
     user.find("venue-tab-merge").click()
     await user.should_see(marker="venue-as-track")
-    (select,) = user.find("venue-as-track-choice").elements
-    assert select.value == "demo"
+    (chip,) = user.find("venue-as-track-choice").elements
+    assert chip.value == "demo" and chip.text == "Demo"
+    assert "#8a6fd0" in chip.style.get("background", "")  # the demo flag's colour
     user.find("venue-as-track").click()
     await user.should_see(marker="venue-as-track-name")
     (name,) = user.find("venue-as-track-name").elements
@@ -1170,6 +1171,30 @@ async def test_venue_marked_as_a_demo_track(user: User) -> None:
     with session_scope() as s:
         assert s.get(Venue, demo).name == WIDG
         assert {k.track for k in s.query(VenueKey).filter_by(venue_id=demo)} == {"demo"}
+
+
+async def test_variant_track_as_a_coloured_chip(user: User) -> None:
+    from sci_report_analyzer.db.models import Publication, VenueKey
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = make_person("Jane Doe")
+    add_source(pid, "hal", "jd", [pub("a", "Paper A", 2023, WIDG, authors=["Jane Doe"])])
+    await user.open(f"/person/{pid}")
+    await user.should_see("Paper A")
+    with session_scope() as s:
+        vid = s.get(Publication, _pub_id("Paper A")).venue_id
+        (key,) = [k.key for k in s.query(VenueKey).filter_by(venue_id=vid)]
+    await user.open(f"/venues?focus={vid}")
+    user.find("venue-tab-matching").click()
+    mark = f"venue-variant-track-{key}"
+    await user.should_see(marker=mark)
+    (chip,) = user.find(mark).elements
+    assert chip.text == "no track" and "dashed" in chip.style.get("border", "")  # discreet
+    user.find(f"{mark}-tutorial").click()
+    await user.should_see("Track saved")
+    assert chip.text == "Tutorial" and "#1a7f37" in chip.style["background"]
+    with session_scope() as s:
+        assert s.get(VenueKey, key).track == "tutorial"
 
 
 async def test_venue_suggestion_as_a_track(user: User) -> None:
