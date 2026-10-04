@@ -102,11 +102,11 @@ MARKDOWN_CSS = """
 """
 CSS += MARKDOWN_CSS
 CSS += f".vr-dim {{ opacity:{DIM_OPACITY}; }}\n"
+ui.add_css(CSS, shared=True)  # (every page: also the PDF windows)
 
 
 @contextmanager
 def frame(title: str) -> Iterator[None]:
-    ui.add_css(CSS)
     ui.page_title(f"{title} · SciReport Analyzer")
     with ui.header().classes("items-center justify-between py-1"):
         with ui.row().classes("items-center gap-4"):

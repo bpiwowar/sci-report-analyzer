@@ -21,6 +21,15 @@ from .pdf_viewer import changed, page_url, watch
 from .pub_details import show_details
 from .reflist import tag_from_list
 
+ui.add_css(
+    ".vr-drop { outline: 2px dashed #ffa000; outline-offset: 1px; }"
+    " .vr-drop-before { box-shadow: inset 0 2px #ffa000; }"
+    " .vr-drop-after { box-shadow: inset 0 -2px #ffa000; }"
+    " .vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
+    " box-shadow: 0 0 0 2px #ffa000; }",
+    shared=True,
+)
+
 if TYPE_CHECKING:
     from ..pubview import PubStat
 
@@ -940,13 +949,6 @@ def categories_section(side: Side) -> Callable[[], None]:
     another one), edit, move, merge (drag one onto another, or its merge icon then a click
     on the other), remove, copy as Markdown; returns its refresh."""
     state: dict[str, categories.ExcerptView | None] = {"merging": None}
-    ui.add_css(
-        ".vr-drop { outline: 2px dashed #ffa000; outline-offset: 1px; }"
-        " .vr-drop-before { box-shadow: inset 0 2px #ffa000; }"
-        " .vr-drop-after { box-shadow: inset 0 -2px #ffa000; }"
-        " .vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
-        " box-shadow: 0 0 0 2px #ffa000; }"
-    )
 
     @ui.refreshable
     def listing() -> None:

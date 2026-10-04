@@ -22,7 +22,6 @@ from ..db.models import Publication
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
 from .dialogs import transient_dialog
-from .theme import MARKDOWN_CSS
 
 if TYPE_CHECKING:
     from ..pubview import PubStat
@@ -966,7 +965,6 @@ def viewer_frame(
         "saved": _("Saved at {time}"),
         "failed": _("Not saved: {error}"),
     }
-    ui.add_css(MARKDOWN_CSS)
     ui.add_head_html(_SPLITTER % {"min": SIDE_MIN})
     ui.add_head_html(pdftext.SCRIPT)
     ui.add_head_html(_SCRIPT % {"url": json.dumps(file_url), "texts": json.dumps(texts)} + script)
@@ -1123,7 +1121,6 @@ def _pane_frame(
     another screen): a header (the actions on the PDF's selection, the way back), the column
     (returned)."""
     ui.page_title(_("{title} · side panel").format(title=title))
-    ui.add_css(MARKDOWN_CSS)
     texts = {
         "closed": _("The PDF window is closed"),
         "back": _("The side panel is back in the PDF window: this one can be closed"),
