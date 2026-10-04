@@ -736,6 +736,42 @@ def test_joint_venue_parts_by_hand_and_merge():
         assert s.get(Venue, joint).joint == {"parts": [alpha, beta], "manual": True, "use": alpha}
 
 
+def test_joint_venue_named_after_its_conferences_in_order():
+    """Without a name, a joint venue takes its conferences' names and acronyms, in order;
+    renaming a conference renames it; a name typed is kept."""
+    _, alpha, beta, _joint = _joint_setup()
+    _rows()  # (the conferences' acronyms, inferred)
+    vid, created = venues.add_venue("", "natl_conference", parts=[beta, alpha])
+    assert created
+    with session_scope() as s:
+        names = s.get(Venue, beta).name, s.get(Venue, alpha).name
+        assert s.get(Venue, vid).name == " / ".join(names)
+    assert _rows()[vid].short_name == "BETA-ALPHA"
+
+    venues.set_joint_parts(vid, [alpha, beta])  # (the order changed)
+    venues.update_venue(alpha, name="Conférence Alpha renommée")
+    with session_scope() as s:
+        assert s.get(Venue, vid).name == f"Conférence Alpha renommée / {names[0]}"
+    assert _rows()[vid].short_name == "ALPHA-BETA"
+
+    venues.update_venue(vid, name="Rencontres communes")
+    venues.set_joint_parts(vid, [beta, alpha])
+    with session_scope() as s:
+        assert s.get(Venue, vid).name == "Rencontres communes"
+
+
+def test_joint_venue_named_after_its_conferences_keeps_its_old_name_as_variant():
+    _, alpha, beta, joint = _joint_setup()
+    _rows()  # (its parts found)
+    with session_scope() as s:
+        old = s.get(Venue, joint).name
+    venues.set_joint_parts(joint, None, auto_name=True)  # (its automatic parts kept)
+    with session_scope() as s:
+        v = s.get(Venue, joint)
+        assert v.parts == [alpha, beta] and v.name != old and " / " in v.name
+        assert s.get(VenueKey, service.key(old)).venue_id == joint
+
+
 def test_theses_have_no_venue():
     pid = make_person()
     add_source(

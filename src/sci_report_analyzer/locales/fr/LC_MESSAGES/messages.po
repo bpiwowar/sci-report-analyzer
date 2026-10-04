@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 16:28+0200\n"
+"POT-Creation-Date: 2026-10-04 17:02+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -143,11 +143,14 @@ msgstr "Un dossier ne peut pas aller en lui-même"
 msgid "A folder's template needs a name"
 msgstr "Un modèle de dossier doit avoir un nom"
 
+msgid "A joint conference"
+msgstr "Une conférence conjointe"
+
 msgid "A joint conference including it"
-msgstr "Une conférence commune qui l'inclut"
+msgstr "Une conférence conjointe qui l'inclut"
 
 msgid "A joint conference including this venue"
-msgstr "Une conférence commune incluant ce canal"
+msgstr "Une conférence conjointe incluant ce canal"
 
 #, python-brace-format
 msgid ""
@@ -265,12 +268,14 @@ msgid ""
 "A venue made of several conferences (e.g. CORIA-TALN), found from the "
 "acronyms of its texts. Its papers take the level its conferences share; "
 "when they differ, the one you choose (else the lowest). A level set by "
-"hand below wins."
+"hand below wins. Without a name, it is named after its conferences, in "
+"order."
 msgstr ""
 "Un canal regroupant plusieurs conférences (p. ex. CORIA-TALN), repérées "
 "d'après les acronymes de ses textes. Ses articles prennent le niveau "
 "commun à ses conférences ; s'ils diffèrent, celui que vous choisissez "
-"(sinon le plus bas). Un niveau fixé à la main ci-dessous prime."
+"(sinon le plus bas). Un niveau fixé à la main ci-dessous prime. Sans nom,"
+" il est nommé d'après ses conférences, dans l'ordre."
 
 msgid ""
 "A venue marked as this track (Venues → “Mark as a track”) is renamed to "
@@ -475,6 +480,9 @@ msgstr "Affiliation"
 msgid "Affiliation (optional, helps matching)"
 msgstr "Affiliation (facultative, aide à l'appariement)"
 
+msgid "After"
+msgstr "Après"
+
 msgid "After the PhD"
 msgstr "Après la thèse"
 
@@ -653,6 +661,9 @@ msgstr "Retour au DOI des sources"
 
 msgid "Back to the venue's rank"
 msgstr "Retour au rang du canal de publication"
+
+msgid "Before"
+msgstr "Avant"
 
 msgid "Bold (⌘/Ctrl-B)"
 msgstr "Gras (⌘/Ctrl-B)"
@@ -924,9 +935,6 @@ msgstr "Conférence ou revue"
 
 msgid "Conferences"
 msgstr "Conférences"
-
-msgid "Conferences saved"
-msgstr "Conférences enregistrées"
 
 #, python-brace-format
 msgid "Confirmed: {names}"
@@ -1312,6 +1320,9 @@ msgstr ""
 "Vide : déduit (acronyme de l'entrée de classement, textes du canal) : « "
 "{short} »"
 
+msgid "Empty: named after its conferences, in order"
+msgstr "Vide : nommé d'après ses conférences, dans l'ordre"
+
 msgid "Empty: texts of every source"
 msgstr "Vide : textes de toutes les sources"
 
@@ -1534,6 +1545,9 @@ msgstr "Indiquez un chemin absolu"
 
 msgid "Give the venue a name"
 msgstr "Donnez un nom au canal"
+
+msgid "Give the venue a name (or the conferences of a joint one)"
+msgstr "Donnez un nom au canal (ou les conférences d'un canal conjoint)"
 
 msgid ""
 "Google Scholar blocked automated access — save the profile page (after "
@@ -1775,6 +1789,13 @@ msgstr "Italique (⌘/Ctrl-I)"
 msgid "Its categories and the citations in its notes"
 msgstr "Ses catégories et les citations dans ses notes"
 
+msgid ""
+"Its conferences, in order: without a name, it is named after them (its "
+"acronym too, with dashes, e.g. CORIA-TALN)."
+msgstr ""
+"Ses conférences, dans l'ordre : sans nom, il est nommé d'après elles (son"
+" acronyme aussi, avec des tirets, p. ex. CORIA-TALN)."
+
 msgid "Its demo track, one of its workshops…"
 msgstr "Sa session démo, un de ses ateliers…"
 
@@ -1998,9 +2019,6 @@ msgstr "Recherche des articles…"
 
 msgid "Main conference"
 msgstr "Conférence principale"
-
-msgid "Main conferences saved"
-msgstr "Conférences principales enregistrées"
 
 msgid "Main venue"
 msgstr "Canal principal"
@@ -2460,6 +2478,9 @@ msgstr "Ce n’est pas un fichier de paramètres SciReport Analyzer : {error}"
 
 msgid "Not a joint venue"
 msgstr "Pas un canal conjoint"
+
+msgid "Not a joint venue (on saving)."
+msgstr "Pas un canal conjoint (à l'enregistrement)."
 
 msgid "Not an ORCID (e.g. 0000-0002-1825-0097)"
 msgstr "Ce n'est pas un ORCID (p. ex. 0000-0002-1825-0097)"
@@ -3155,9 +3176,6 @@ msgstr "Enregistrer"
 msgid "Save aliases"
 msgstr "Enregistrer les variantes"
 
-msgid "Save main conferences"
-msgstr "Enregistrer les conférences principales"
-
 msgid "Save rule"
 msgstr "Enregistrer la règle"
 
@@ -3181,6 +3199,9 @@ msgstr "Enregistré (rechargez la page d’une personne pour le voir)"
 #, python-brace-format
 msgid "Saved at {time}"
 msgstr "Enregistré à {time}"
+
+msgid "Saved with the venue."
+msgstr "Enregistré avec le canal."
 
 msgid "Saved — cached matches cleared"
 msgstr "Enregistré — appariements en cache effacés"
@@ -3639,6 +3660,9 @@ msgstr "La couleur de ses extraits (modifiez les catégories pour la changer)"
 
 msgid "The colour of its excerpts (their tint on the PDFs)"
 msgstr "La couleur de ses extraits (leur teinte dans les PDF)"
+
+msgid "The conferences found in its texts (on saving)."
+msgstr "Les conférences trouvées dans ses textes (à l'enregistrement)."
 
 msgid "The default"
 msgstr "Le modèle par défaut"
