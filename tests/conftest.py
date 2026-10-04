@@ -1,8 +1,10 @@
+import gc
 import gzip
 import json
 import os
 import shutil
 import tempfile
+import weakref
 from pathlib import Path
 
 import pytest
@@ -23,6 +25,17 @@ pytest_plugins = ["nicegui.testing.user_plugin"]
 def pytest_sessionfinish(session, exitstatus) -> None:
     """The session's data directory (ranking records, settings…) is removed at the end."""
     shutil.rmtree(_TMP, ignore_errors=True)
+    _detach_dialog_finalizers()
+
+
+def _detach_dialog_finalizers() -> None:
+    """A NiceGUI dialog deletes itself once a canary element is collected; at exit, those of
+    the test clients (deleted by then) would raise "The client this element belongs to has
+    been deleted": their finalizers are detached."""
+    for f in [o for o in gc.get_objects() if isinstance(o, weakref.finalize)]:
+        info = f.peek()
+        if info and info[1].__qualname__.startswith("Dialog.__init__"):
+            f.detach()
 
 
 def _write_datasets(d: Path) -> None:
