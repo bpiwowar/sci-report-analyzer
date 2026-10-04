@@ -8,8 +8,7 @@ Fetches every CORE edition from the ICORE portal and writes, in src/sci_report_a
 - conferences.past.json: the conferences only listed in past editions (dropped, merged),
   so that older papers still get their rank at the time.
 
-Add a new edition to ``CORE_EDITIONS`` (and to ``ranking.badge.CORE_EDITIONS``) when CORE
-publishes one.
+The editions are ``ranking.badge.CORE_EDITIONS``: add a new one there when CORE publishes it.
 """
 
 from __future__ import annotations
@@ -22,19 +21,9 @@ from pathlib import Path
 
 import httpx
 
+from sci_report_analyzer.ranking.badge import CORE_EDITIONS
+
 OUT = Path(__file__).resolve().parent.parent / "src" / "sci_report_analyzer" / "data"
-CORE_EDITIONS = [
-    "CORE2008",
-    "ERA2010",
-    "CORE2013",
-    "CORE2014",
-    "CORE2017",
-    "CORE2018",
-    "CORE2020",
-    "CORE2021",
-    "CORE2023",
-    "ICORE2026",
-]
 # The portal rejects requests without a browser-like User-Agent.
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
