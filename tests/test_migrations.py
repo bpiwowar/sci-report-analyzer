@@ -77,6 +77,7 @@ def test_citation_keys_from_the_surname(tmp_path):
             ),
         )
         c.execute("UPDATE publication SET note = '[@jane2020neural]' WHERE id IN (2, 5)")
+        c.execute("INSERT INTO app_setting VALUES ('ui.reflist.1.0.1', '[]'), ('ui.x', '1')")
     _upgrade(db, "7c1e4a9b2d30")
     with sqlite3.connect(db) as c:
         assert c.execute("SELECT notes FROM period").fetchone()[0] == (
@@ -87,3 +88,4 @@ def test_citation_keys_from_the_surname(tmp_path):
         notes = dict(c.execute("SELECT id, note FROM publication WHERE note IS NOT NULL"))
         # (person 2: their paper's key is doe2020other, no jane2020neural to rename)
         assert notes == {2: "[@doe2020neural]", 5: "[@jane2020neural]"}
+        assert c.execute("SELECT key FROM app_setting").fetchall() == [("ui.x",)]

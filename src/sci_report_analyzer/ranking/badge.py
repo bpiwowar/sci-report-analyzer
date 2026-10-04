@@ -11,7 +11,6 @@ from ..i18n import N_, Labels, _
 from . import tracks
 from .matcher import Record, record_key
 
-SOURCES = ("scimago", "core", "jcr", "openalex", "predatory", "manual", "archival")
 TOGGLABLE_SOURCES = ("scimago", "core", "jcr", "openalex", "predatory")
 SOURCE_LABELS = Labels(
     {

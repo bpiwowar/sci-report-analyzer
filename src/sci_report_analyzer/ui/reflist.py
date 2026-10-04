@@ -204,15 +204,12 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
             ui.notify(_("Choose a tag"), type="warning")
             return
         numbers: dict[int, int | None] = {}
-        entries = []
         for i, m in enumerate(state["matches"]):
             pub = state["chosen"].get(i, NONE)
             if pub != NONE:
                 numbers.setdefault(pub, m.item.number)
-            entries.append({"number": m.item.number, "text": m.item.words, "pub_id": pub or None})
         where = pid if chosen.per_period else None
         annotations.tag_numbered(chosen.id, numbers, where)
-        annotations.save_tag_list(panel.person_id, chosen.id, where, entries)
         dlg.close()
         if show_tagged:
             panel.tag_filter = [chosen.id]

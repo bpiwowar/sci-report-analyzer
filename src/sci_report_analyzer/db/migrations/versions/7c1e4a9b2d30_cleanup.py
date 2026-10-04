@@ -1,4 +1,4 @@
-"""Citation keys from the first author's surname, whatever the order of their name
+"""Citation keys from the surname, whatever the name order; data never read dropped
 
 The keys (``[@doe2020neural]``, see reports.citation_keys) took the last word of the first
 author's name: "Doe, Jane" gave ``jane2020neural`` and "NEVEOL Aurélie" ``aurelie2020…``.
@@ -6,6 +6,8 @@ They now take its surname (authors.surname): each person's texts citing a key wh
 gets another one are rewritten (their notes, their papers' notes, their notes within the
 folders, those of their documents, their excerpts). Both ways of making the keys are frozen
 here (the app's may change).
+
+Also dropped, as written but never read: the lists tags were put from (``ui.reflist.*``).
 
 Revision ID: 7c1e4a9b2d30
 Revises: f6b3d8a2c5e9
@@ -225,7 +227,10 @@ def _rewrite_keys(conn) -> None:
 
 
 def upgrade() -> None:
-    _rewrite_keys(op.get_bind())
+    conn = op.get_bind()
+    _rewrite_keys(conn)
+    # The lists tags were put from (annotations.tag_list): saved, never read.
+    conn.execute(sa.text("DELETE FROM app_setting WHERE key LIKE 'ui.reflist.%'"))
 
 
 def downgrade() -> None:
