@@ -28,7 +28,7 @@ def is_archival(sp: SourcePub) -> bool:
     return bool(sp.archival) or is_non_venue(normalize(sp.venue))
 
 
-def _title_tokens(title: str | None) -> frozenset[str]:
+def title_tokens(title: str | None) -> frozenset[str]:
     return frozenset(t for t in normalize(title).split() if len(t) > 1)
 
 
@@ -62,7 +62,7 @@ def cluster(pubs: Sequence[SourcePub]) -> list[list[int]]:
     by_doi: dict[str, int] = {}
     by_title: dict[str, list[int]] = defaultdict(list)
     token_index: dict[str, list[int]] = defaultdict(list)
-    tokens = [_title_tokens(p.title) for p in pubs]
+    tokens = [title_tokens(p.title) for p in pubs]
 
     for i, p in enumerate(pubs):
         if p.doi:

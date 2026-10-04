@@ -78,7 +78,7 @@ async def install_viewer() -> None:
 # ---- Stored PDFs ----------------------------------------------------------------------------
 
 
-def _slug(title: str | None) -> str:
+def slug(title: str | None) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "-", ascii_fold(title or "")).strip("-")[:60] or "paper"
 
 
@@ -114,7 +114,7 @@ def save(pub_id: int, data: bytes, origin: str | None, *, edited: bool = False) 
         if pub is None:
             raise PdfError("no such paper")
         row = s.get(PublicationPdf, pub_id)
-        rel = row.path if row else f"{pub.person_id}/{pub_id}-{_slug(pub.title)}.pdf"
+        rel = row.path if row else f"{pub.person_id}/{pub_id}-{slug(pub.title)}.pdf"
         path = pdf_dir() / rel
         atomic_write(path, data)
         if row is None:

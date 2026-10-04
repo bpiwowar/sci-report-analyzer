@@ -55,7 +55,7 @@ def banner(*, dense: bool = False) -> None:
     bar (e.g. the PDF viewer's), on its colour."""
     if not enabled:
         return
-    from .sync import _running
+    from .sync import any_running
 
     state = {"dismissed": 0, "confirm": False}
     if dense:
@@ -66,7 +66,7 @@ def banner(*, dense: bool = False) -> None:
     box.mark("live-reload")
 
     def apply() -> None:
-        busy = any(not t.done() for t in _running.values())
+        busy = any_running()
         if busy and not state["confirm"]:
             state["confirm"] = True
             button.text = _("Restart anyway")
