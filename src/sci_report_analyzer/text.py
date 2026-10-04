@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from functools import lru_cache
 
 _COMBINING = re.compile("[̀-ͯ]")
 
@@ -22,3 +23,12 @@ def ascii_fold(text: str) -> str:
 def ascii_key(text: str) -> str:
     """Lowercase ASCII letters and digits only ("Kronland-Martinet": "kronlandmartinet")."""
     return re.sub(r"[^a-z0-9]+", "", ascii_fold(text).lower())
+
+
+@lru_cache(maxsize=1024)
+def safe_compile(pattern: str, ignore_case: bool = False) -> re.Pattern[str] | None:
+    """A regex compiled (cached); none when invalid."""
+    try:
+        return re.compile(pattern, re.I if ignore_case else 0)
+    except re.error:
+        return None

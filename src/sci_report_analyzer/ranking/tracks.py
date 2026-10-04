@@ -25,7 +25,7 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from ..i18n import language
-from ..text import ascii_fold
+from ..text import ascii_fold, safe_compile
 
 FINDINGS_ID = "findings"
 # A publication's track override meaning "the main track" (no satellite track): see
@@ -46,10 +46,7 @@ class TrackRule(BaseModel):
 
     def compiled(self) -> re.Pattern[str] | None:
         """Its regex; none when invalid."""
-        try:
-            return re.compile(self.pattern, re.I if self.ignore_case else 0)
-        except re.error:
-            return None
+        return safe_compile(self.pattern, self.ignore_case)
 
 
 class NameRule(BaseModel):
@@ -64,10 +61,7 @@ class NameRule(BaseModel):
 
     def compiled(self) -> re.Pattern[str] | None:
         """Its regex; none when invalid."""
-        try:
-            return re.compile(self.pattern, re.I if self.ignore_case else 0)
-        except re.error:
-            return None
+        return safe_compile(self.pattern, self.ignore_case)
 
     def apply(self, text: str) -> str:
         rx = self.compiled() if self.pattern else None

@@ -18,6 +18,7 @@ from ..db.models import AppSetting, JcrRecord, VenueCache, utcnow
 from ..db.session import session_scope
 from ..sources.base import SourceError, user_agent
 from ..sources.openalex import params as openalex_params
+from ..text import safe_compile
 from . import datasets, detection, tracks
 from .badge import (
     FINDINGS_RE,
@@ -157,10 +158,7 @@ class VenuePattern(BaseModel):
         return f"(?i){self.pattern}" if self.ignore_case else self.pattern
 
     def compiled(self) -> re.Pattern | None:
-        try:
-            return re.compile(self.pattern, re.I if self.ignore_case else 0)
-        except re.error:
-            return None
+        return safe_compile(self.pattern, self.ignore_case)
 
     def applies(self, source: str | None, raw: str | None) -> bool:
         if not raw or (self.sources and source not in self.sources):
