@@ -97,6 +97,24 @@ def tag_numbered(tag_id: int, numbers: dict[int, int | None], period_id: int | N
             s.add(row)
 
 
+def set_tag_number(
+    pub_id: int, tag_id: int, number: int | None, period_id: int | None = None
+) -> None:
+    """The paper's number within a tag (its rank in the tag's list; None: none), the tag put
+    on it if needed (a per-period tag: within ``period_id``)."""
+    tag_numbered(tag_id, {pub_id: number}, period_id)
+
+
+def number_in_order(tag_id: int, pub_ids: list[int], period_id: int | None = None) -> None:
+    """Number papers having a tag 1, 2… in this order."""
+    tag_numbered(tag_id, {p: i for i, p in enumerate(pub_ids, 1)}, period_id)
+
+
+def clear_tag_numbers(tag_id: int, pub_ids: list[int], period_id: int | None = None) -> None:
+    """The papers' numbers within a tag removed (the tag kept)."""
+    tag_numbered(tag_id, dict.fromkeys(pub_ids), period_id)
+
+
 def _list_key(person_id: int, tag_id: int, period_id: int | None) -> str:
     return f"ui.reflist.{person_id}.{period_id or 0}.{tag_id}"
 

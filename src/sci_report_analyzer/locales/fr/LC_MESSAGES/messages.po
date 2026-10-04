@@ -191,6 +191,9 @@ msgstr "Une différence mineure : le canal de l'atelier est plus précis"
 msgid "A new venue: “{text}”"
 msgstr "Un nouveau canal de publication : « {text} »"
 
+msgid "A number, please"
+msgstr "Un nombre, s’il vous plaît"
+
 msgid ""
 "A paper takes the quartile of its year (else of the closest year before);"
 " years missing: Settings › Data & cache, “Scimago, past years”"
@@ -559,6 +562,10 @@ msgstr ""
 "Aussi les thèses hors de la période (encadrement la chevauchant ; jurys :"
 " soutenance dans la période)"
 
+#, python-brace-format
+msgid "Alt-click: set its number within “{tag}”"
+msgstr "Alt-clic : fixer son numéro au sein de « {tag} »"
+
 msgid "Among the papers"
 msgstr "Parmi les articles"
 
@@ -903,6 +910,9 @@ msgstr "Effacer les filtres (la période et ses années sont conservées)"
 msgid "Clear the notes"
 msgstr "Effacer les notes"
 
+msgid "Clear the numbers"
+msgstr "Effacer les numéros"
+
 msgid "Clear the years"
 msgstr "Effacer les années"
 
@@ -1212,6 +1222,9 @@ msgstr ""
 msgid "Don't ask again"
 msgstr "Ne plus demander"
 
+msgid "Down"
+msgstr "Descendre"
+
 msgid "Download"
 msgstr "Télécharger"
 
@@ -1266,6 +1279,19 @@ msgstr "Téléchargement des revues Scimago et de la liste des revues prédatric
 
 msgid "Drag a venue onto another one to merge it into that one."
 msgstr "Faites glisser un canal sur un autre pour l'y fusionner."
+
+msgid "Drag onto another paper (its top / bottom half: before / after it)"
+msgstr ""
+"Faites glisser sur un autre article (sa moitié haute / basse : avant / "
+"après lui)"
+
+#, python-brace-format
+msgid ""
+"Drag onto another paper to reorder them (numbered 1, 2… in the new order "
+"within “{tag}”)"
+msgstr ""
+"Faites glisser sur un autre article pour les réordonner (numérotés 1, 2… "
+"dans le nouvel ordre au sein de « {tag} »)"
 
 msgid "Drag to resize the side panel"
 msgstr "Faites glisser pour redimensionner le panneau latéral"
@@ -1363,6 +1389,9 @@ msgstr "Vide : l'année donnée par les sources"
 
 msgid "End"
 msgstr "Fin"
+
+msgid "Enter: save · Escape: cancel · empty: no number"
+msgstr "Entrée : enregistrer · Échap : annuler · vide : aucun numéro"
 
 msgid ""
 "Erase what was set by hand, on the venues and / or on the papers; "
@@ -1844,6 +1873,16 @@ msgstr "Son canal principal (c'est la session {track} de ce canal)"
 
 msgid "Its name, to use it as .name (optional)"
 msgstr "Son nom, pour l'utiliser comme .nom (facultatif)"
+
+msgid "Its number in the tag's list (Alt-click to change it)"
+msgstr "Son numéro dans la liste de l’étiquette (Alt-clic pour le changer)"
+
+msgid "Its number in the tag's list (click to change it)"
+msgstr "Son numéro dans la liste de l’étiquette (cliquez pour le changer)"
+
+#, python-brace-format
+msgid "Its number within “{tag}” (click to change it)"
+msgstr "Son numéro au sein de « {tag} » (cliquez pour le changer)"
 
 msgid "Its own settings"
 msgstr "Ses propres réglages"
@@ -2436,6 +2475,9 @@ msgstr "Aucun article ne correspond"
 msgid "No paper to discuss (set the folder's numbered tag)"
 msgstr "Aucun article à discuter (choisir l'étiquette numérotée du dossier)"
 
+msgid "No paper with this tag"
+msgstr "Aucun article avec cette étiquette"
+
 msgid "No paper."
 msgstr "Aucun article."
 
@@ -2649,8 +2691,14 @@ msgstr "Rien à fusionner"
 msgid "Number format"
 msgstr "Format du numéro"
 
+msgid "Number in this order"
+msgstr "Numéroter dans cet ordre"
+
 msgid "Number of a listed paper"
 msgstr "Numéro d'un article de la liste"
+
+msgid "Number them 1, 2… as listed"
+msgstr "Les numéroter 1, 2… dans l’ordre affiché"
 
 msgid "Numbered list"
 msgstr "Liste numérotée"
@@ -2738,6 +2786,17 @@ msgstr "Clé d'API OpenAlex (gratuite, https://openalex.org/settings/api)"
 
 msgid "Or upload it (a PDF file):"
 msgstr "Ou envoyez-le (un fichier PDF) :"
+
+msgid "Order the papers of this tag (their numbers)"
+msgstr "Ordonner les articles de cette étiquette (leurs numéros)"
+
+#, python-brace-format
+msgid "Order the papers tagged “{tag}”"
+msgstr "Ordonner les articles étiquetés « {tag} »"
+
+#, python-brace-format
+msgid "Order the papers tagged “{tag}” within {period}"
+msgstr "Ordonner les articles étiquetés « {tag} » dans {period}"
 
 msgid "Other"
 msgstr "Autre"
@@ -3149,6 +3208,9 @@ msgstr "Supprimer le PDF stocké, avec ses annotations ?"
 
 msgid "Remove the stored PDF?"
 msgstr "Supprimer le PDF stocké ?"
+
+msgid "Remove their numbers (the tag stays)"
+msgstr "Retirer leurs numéros (l’étiquette reste)"
 
 msgid "Remove them"
 msgstr "Les supprimer"
@@ -3995,14 +4057,27 @@ msgstr ""
 "rayonnement"
 
 msgid ""
-"Their numbers (.index, .number, [@key]): as put from a list, else by "
-"year; the other papers apart, from 1, as first cited. They are the papers"
-" to discuss (without: those of the period's years)."
+"Their numbers (#) order them: in the publications, and in the citations "
+"of folder notes (those without a number come after). Drag a paper or use "
+"its arrows (all are then numbered 1, 2… in the new order), or click a "
+"number to type it."
 msgstr ""
-"Leurs numéros (.index, .number, [@clé]) : ceux d'une liste, sinon par "
-"année ; les autres articles à part, à partir de 1, dans l'ordre des "
-"citations. Ce sont les articles à discuter (sans : ceux des années de la "
-"période)."
+"Leurs numéros (#) les ordonnent : dans les publications, et dans les "
+"citations des notes de dossier (ceux sans numéro viennent après). Faites "
+"glisser un article ou utilisez ses flèches (tous sont alors numérotés 1, "
+"2… dans le nouvel ordre), ou cliquez sur un numéro pour le saisir."
+
+msgid ""
+"Their numbers (.index, .number, [@key]): their numbers within the tag "
+"(put from a list, or set by hand: Alt-click a #number, or order the tag's"
+" papers), else by year; the other papers apart, from 1, as first cited. "
+"They are the papers to discuss (without: those of the period's years)."
+msgstr ""
+"Leurs numéros (.index, .number, [@clé]) : leurs numéros au sein de "
+"l’étiquette (ceux d’une liste, ou fixés à la main : Alt-cliquez sur un "
+"#numéro, ou ordonnez les articles de l’étiquette), sinon par année ; les "
+"autres articles à part, à partir de 1, dans l’ordre des citations. Ce "
+"sont les articles à discuter (sans : ceux des années de la période)."
 
 msgid "Their papers at this venue"
 msgstr "Ses articles dans ce canal"
@@ -4227,6 +4302,9 @@ msgstr "Délier (rejeter)"
 #, python-brace-format
 msgid "Unsaved: {screens}"
 msgstr "Non enregistré : {screens}"
+
+msgid "Up"
+msgstr "Monter"
 
 #, python-brace-format
 msgid "Update failed: {error}"

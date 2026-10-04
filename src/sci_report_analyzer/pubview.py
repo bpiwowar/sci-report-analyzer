@@ -1234,6 +1234,17 @@ def tagged(rows: list[PubStat], tag_ids: Iterable[int], period_id: int | None) -
     return [r for r in rows if r.tags_in(period_id) & wanted] if wanted else list(rows)
 
 
+def tag_order(rows: list[PubStat], tag_id: int, period_id: int | None) -> list[PubStat]:
+    """The papers having a tag (global, or within the period), in its order: by their
+    number, then those without one (latest first, then by title), as citations number them."""
+
+    def key(r: PubStat) -> tuple:
+        n = r.number_of(tag_id, period_id)
+        return (n is None, n or 0, -(r.year or 0), (r.title or "").lower())
+
+    return sorted((r for r in rows if tag_id in r.tags_in(period_id)), key=key)
+
+
 def hashtag(name: str) -> str:
     """A tag as an Obsidian #tag: letters, digits, _, - and / (spaces become -); never
     digits only."""

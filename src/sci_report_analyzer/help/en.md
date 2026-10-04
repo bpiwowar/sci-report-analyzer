@@ -192,6 +192,14 @@ starred, within the period) on them with their **numbers** in the list. Filterin
 shows the papers in the list's order (#3 on their tag), and the 🗒 listing numbers them and
 ends with the items not found.
 
+**Numbers within a tag** (a paper's rank in the tag's list): Alt-click a number (`#3` next
+to a tag on a paper's row; in its details, where `#` is shown when it has none, a plain click
+too) to type it (Enter or leaving it saves, Escape cancels, empty removes it). To order all the papers of a tag, filter on it
+and click the numbered-list button next to the tags filter: drag the papers or use their ↑ / ↓
+arrows (they are then all numbered 1, 2… in the new order), type a number, “Number in this
+order” or “Clear the numbers”. Papers without a number come after the numbered ones (latest
+first), in the list as in the citations.
+
 Notes are Markdown, with **LaTeX**: `$x^2$` inline, `$$\sum_i x_i$$` displayed.
 A line break is kept (as in Obsidian). They are edited with a Markdown editor (toolbar,
 ⌘B / ⌘I, a preview beside or instead).
@@ -213,7 +221,9 @@ until each is cited, orange if one cited is not of the period's years. The edito
 "Papers" mode shows, instead of the preview, the papers to discuss with their numbers (red
 until cited, orange: not of the period's years; a click cites it, the ⋮ menu with a
 template), the one at the cursor highlighted, a search (Enter cites the first match; the
-person's other papers too), and "Cite them" (those not cited yet). Copy substitutes the
+person's other papers too), and "Cite them" (those not cited yet); the papers of the
+numbered tag are reordered there too (dragged, their ↑ / ↓ arrows, or their number
+Alt-clicked and typed), the citations renumbered. Copy substitutes the
 citations, followed by the references, numbered as cited.
 
 **PDFs**: the PDF icon next to a title opens the paper's stored PDF in a new window (red;
