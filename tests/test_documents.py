@@ -311,6 +311,12 @@ async def test_folder_notes(user: User, monkeypatch, fake_viewer):
     monkeypatch.setattr(MarkdownEditor, "insert_block", lambda self, text: inserted.append(text))
     await user.open(f"/pdf/{ids['a']}?period={period}")
     await user.should_see(marker="folder-note")
+    # (the paper's own notes shown first, the folder's in the last tab)
+    tabs = user.find(kind=ui.tabs).elements.pop()
+    assert tabs.value == "notes"
+    assert [t._props["name"] for t in tabs.default_slot.children if isinstance(t, ui.tab)][
+        -1
+    ] == "folder-notes"
     user.find(marker="folder-note").elements.pop().value = "Shortlist: **two** papers"
     await note_status(user, "folder-note")
     assert folders.notes_of(period) == "Shortlist: **two** papers"
