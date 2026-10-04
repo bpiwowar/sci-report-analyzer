@@ -35,6 +35,7 @@ from functools import lru_cache
 from lark import Lark, Transformer
 from lark.exceptions import LarkError
 
+from .authors import surname
 from .db.models import AppSetting, Folder, FolderSettings, Period
 from .db.session import session_scope
 from .i18n import _
@@ -77,9 +78,8 @@ def _ascii(text: str) -> str:
 
 
 def _base_key(s: PubStat) -> str:
-    """BibTeX-like: the first author's last name, the year, the title's first word."""
-    names = (s.authors[0] if s.authors else "").replace(",", " ").split()
-    author = _ascii(names[-1]) if names else ""
+    """BibTeX-like: the first author's surname, the year, the title's first word."""
+    author = surname(s.authors[0]) if s.authors else ""
     words = [w for w in (_ascii(w) for w in (s.title or "").split()) if w and w not in _STOP]
     return f"{author or 'anon'}{s.year or 'nd'}{words[0] if words else ''}"
 

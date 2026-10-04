@@ -28,6 +28,19 @@ def _setup():
     return pid, period
 
 
+def test_keys_take_the_surname_whatever_the_name_order():
+    from types import SimpleNamespace
+
+    def key(author):
+        s = SimpleNamespace(id=1, authors=[author], year=2020, title="Neural ranking")
+        return reports.citation_keys([s])[1]
+
+    assert key("Jane Doe") == key("Doe, Jane") == key("DOE Jane") == "doe2020neural"
+    assert key("Aurélie Névot") == "nevot2020neural"
+    assert key("R.L. Kronland-Martinet") == "kronlandmartinet2020neural"
+    assert key("Zhang Wei (张伟)") == "wei2020neural"
+
+
 def test_keys_numbers_and_substitution():
     pid, period = _setup()
     stats = asyncio.run(pubview.load_stats(pid))

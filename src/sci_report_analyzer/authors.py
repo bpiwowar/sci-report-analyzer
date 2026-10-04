@@ -6,6 +6,8 @@ import re
 import unicodedata
 from collections.abc import Iterable
 
+from .text import ascii_fold
+
 _COMBINING = re.compile("[̀-ͯ]")
 
 
@@ -22,9 +24,9 @@ def natural_order(name: str) -> str:
             return f"{first} {last}"
     words = name.split()
 
-    def caps(w: str) -> bool:
+    def caps(w: str) -> bool:  # (not initials: "R.L. Gordon")
         letters = [c for c in w if c.isalpha()]
-        return len(letters) >= 2 and all(c.isupper() for c in letters)
+        return len(letters) >= 2 and all(c.isupper() for c in letters) and "." not in w
 
     upper = [w for w in words if caps(w)]
     if upper and len(upper) < len(words):
@@ -43,6 +45,13 @@ def name_key(name: str) -> tuple[str, str]:
     if not parts:
         return "", ""
     return parts[-1], parts[0][0]
+
+
+def surname(name: str) -> str:
+    """The surname, whatever the order of the name ("Jane Doe", "Doe, Jane", "DOE Jane"),
+    in lowercase ASCII, its parts joined ("Kronland-Martinet": "kronlandmartinet")."""
+    words = [re.sub(r"[^a-z0-9]", "", ascii_fold(w).lower()) for w in natural_order(name).split()]
+    return next((w for w in reversed(words) if w), "")
 
 
 def same_author(a: str, b: str) -> bool:
