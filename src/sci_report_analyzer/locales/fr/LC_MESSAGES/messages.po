@@ -137,15 +137,15 @@ msgstr "Une session prédéfinie, modifiée par rapport à sa valeur par défaut
 msgid "A category cannot go within itself"
 msgstr "Une catégorie ne peut pas aller dans elle-même"
 
+msgid "A colour is a hex code, e.g. #2196f3"
+msgstr "Une couleur est un code hexadécimal, p. ex. #2196f3"
+
 msgid ""
 "A folder (e.g. a committee) groups people; each person has their own "
 "period in it."
 msgstr ""
 "Un dossier (p. ex. un comité) regroupe des personnes ; chacune y a sa "
 "propre période."
-
-msgid "A colour is a hex code, e.g. #2196f3"
-msgstr "Une couleur est un code hexadécimal, p. ex. #2196f3"
 
 msgid "A folder cannot go within itself"
 msgstr "Un dossier ne peut pas aller en lui-même"
@@ -5394,6 +5394,18 @@ msgstr "source"
 #, python-brace-format
 msgid "source text: “{text}”"
 msgstr "texte de la source : « {text} »"
+
+msgid ""
+"sources disagree on a book chapter or a conference paper — set the kind of "
+"its venue (or of the paper)"
+msgstr ""
+"les sources hésitent entre un chapitre d'ouvrage et un article de conférence"
+" — fixez le type de son canal (ou de l'article)"
+
+msgid "sources disagree on a paper or a whole volume — split them or set the kind"
+msgstr ""
+"les sources hésitent entre un article et un volume entier — séparez-les ou"
+" fixez le type"
 
 msgid "sources give different tracks — pick one in the details"
 msgstr ""

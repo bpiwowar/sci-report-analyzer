@@ -55,7 +55,7 @@ OPENALEX_BACKOFF = timedelta(minutes=15)
 
 
 # Bumped when the matching logic changes, so that cached matches are recomputed.
-MATCH_VERSION = "m10"
+MATCH_VERSION = "m11"
 # Words saying a venue text is a conference, or a journal ("Journal of Neuroscience"), or
 # a society or an event instead ("Society for Neuroscience", its annual meeting); words any
 # conference name can have.
@@ -429,7 +429,15 @@ class RankingService:
                 else raw_s[colon + 1 :]
             )
         acronym = paren_acronym(host_raw) if corrected is None and type_hint != "journal" else None
-        key = _cache_key(norm_venue, type_hint, acronym)
+        match_venue = (self.clean(host_raw, source) or venue) if findings else venue
+        if corrected is None:
+            match_venue = for_rankings(match_venue) or match_venue
+        # A Findings text is matched through its host conference, which its key must say:
+        # "Findings of the ACL: EMNLP 2023" and "Findings of the ACL EMNLP" share their
+        # cleaned text.
+        key = _cache_key(
+            f"{norm_venue}>{normalize(match_venue)}" if findings else norm_venue, type_hint, acronym
+        )
 
         if corrected is None and is_non_venue(norm_venue):
             return badge_archival(key)
@@ -441,9 +449,6 @@ class RankingService:
         if hit is not None and (hit[0] is None or st.source_on(hit[0].source)):
             return with_corrected(hit[0])
 
-        match_venue = (self.clean(host_raw, source) or venue) if findings else venue
-        if corrected is None:
-            match_venue = for_rankings(match_venue) or match_venue
         # Matching takes a few ms: let the other tasks run between the venues of a batch.
         await asyncio.sleep(0)
 

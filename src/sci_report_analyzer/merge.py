@@ -15,10 +15,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .db.models import Person, Publication, SourcePub, utcnow
+from .ranking.kinds import doc_form
 from .ranking.normalize import is_non_venue, normalize
 from .ranking.service import service
 from .sources import PRIORITY
 from .sources.base import normalize_doi
+from .sources.doi import VOLUME_TYPES
 
 _MIN_TITLE_TOKENS = 3
 
@@ -112,10 +114,20 @@ def main_members(members: Sequence[SourcePub]) -> list[SourcePub]:
     return sorted(members, key=lambda m: (is_archival(m), _priority(m), m.id or 0))
 
 
+def _book_doi(m: SourcePub) -> bool:
+    """A DOI record of a whole book (or proceedings volume)."""
+    return m.link.source == "doi" and m.doc_type in VOLUME_TYPES
+
+
 def canonical(pub: Publication, members: Sequence[SourcePub]) -> None:
     ordered = main_members(members)
     published = [m for m in ordered if not is_archival(m)] or ordered
-    pub.title = next((m.title for m in ordered if m.title), pub.title)
+    # A paper's record giving its book's DOI: the book's title is not the paper's.
+    if any(doc_form(m.doc_type) == "paper" for m in ordered):
+        ordered_titles = [m for m in ordered if not _book_doi(m)]
+    else:
+        ordered_titles = ordered
+    pub.title = next((m.title for m in ordered_titles if m.title), pub.title)
     years = Counter(m.year for m in published if m.year)
     # The DOI record (the publisher's) gives the year, else the majority does.
     doi_year = next(
