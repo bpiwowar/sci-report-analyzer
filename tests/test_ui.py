@@ -381,6 +381,24 @@ async def test_problem_icon_and_filter(user: User) -> None:
     await user.should_see("the person's name is not found among the authors — add an alias")
 
 
+async def test_matching_thresholds(user: User) -> None:
+    """The other thresholds of the matching, edited in Settings → Matching (cleared: the
+    default)."""
+    from sci_report_analyzer.ranking.service import load_settings
+
+    await user.open("/settings?tab=matching")
+    await user.should_see("Other thresholds")
+    user.find(marker="threshold-reflist_suggest").elements.pop().value = 0.6
+    user.find(marker="threshold-merge_year_slack").elements.pop().value = 2
+    user.find(marker="threshold-openalex_score").elements.pop().value = None
+    user.find(marker="threshold-unreliable_venue_sources").elements.pop().value = []
+    user.find(marker="matching-save").click()
+    st = load_settings()
+    assert st.reflist_suggest == 0.6 and st.merge_year_slack == 2
+    assert isinstance(st.merge_year_slack, int)
+    assert st.openalex_score == 0.8 and st.unreliable_venue_sources == []
+
+
 async def test_matching_tab_choose_source(user: User) -> None:
     from sci_report_analyzer.db.models import Publication, VenueText
     from sci_report_analyzer.db.session import session_scope

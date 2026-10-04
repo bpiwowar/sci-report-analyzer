@@ -115,6 +115,13 @@ msgstr ""
 "Un volume Findings est classé comme sa conférence principale ; il est "
 "détecté après les autres sessions."
 
+msgid ""
+"A PhD student on a paper more than this many years after their "
+"defence: a former one"
+msgstr ""
+"Un doctorant sur un article plus de ce nombre d'années après sa "
+"soutenance : un ancien"
+
 msgid "A built-in rule, as by default"
 msgstr "Une règle prédéfinie, telle que par défaut"
 
@@ -222,6 +229,9 @@ msgstr ""
 "aident toujours à trouver son canal de publication. S’applique aux "
 "personnes ayant un profil validé sur cette source ; un dossier peut en "
 "utiliser une autre."
+
+msgid "A paper's records in the sources"
+msgstr "Les fiches d'un article dans les sources"
 
 msgid "A part of it (it is a joint conference including this venue)"
 msgstr "Une de ses parties (c'est une conférence jointe incluant ce canal)"
@@ -982,6 +992,9 @@ msgstr "Conférence"
 msgid "Conference (CORE)"
 msgstr "Conférence (CORE)"
 
+msgid "Conference instead of a journal"
+msgstr "Conférence plutôt qu'une revue"
+
 msgid "Conference or journal"
 msgstr "Conférence ou revue"
 
@@ -1330,9 +1343,6 @@ msgstr "Déposer ici : au premier niveau"
 msgid "Drop here: last, at the top level"
 msgstr "Déposer ici : en dernier, au premier niveau"
 
-msgid "E.g. a summary of its items"
-msgstr "P. ex. un résumé de ses éléments"
-
 msgid ""
 "Each named: it is used as `.name` in the folder's notes, instead of the "
 "general template of that name (Settings → Citation templates)."
@@ -1567,6 +1577,9 @@ msgstr "Dossiers qu'il contient :"
 
 msgid "Forget the chosen record: match automatically"
 msgstr "Oublier l'entrée choisie : correspondance automatique"
+
+msgid "Former student after (years)"
+msgstr "Ancien étudiant après (années)"
 
 msgid "Forward (also ⌥→ or ⌘])"
 msgstr "Avancer (aussi ⌥→ ou ⌘])"
@@ -2060,6 +2073,13 @@ msgstr "Libellé"
 msgid "Language"
 msgstr "Langue"
 
+msgid ""
+"Largest gap (in years) between the years of two records of the same "
+"paper"
+msgstr ""
+"Plus grand écart (en années) entre les années de deux fiches du même "
+"article"
+
 msgid "Later"
 msgstr "Plus tard"
 
@@ -2116,6 +2136,9 @@ msgstr "Liste"
 
 msgid "List + years"
 msgstr "Liste + années"
+
+msgid "Listed as similar"
+msgstr "Listés comme similaires"
 
 msgid "Look up on…"
 msgstr "Rechercher sur…"
@@ -2177,6 +2200,9 @@ msgstr "Liste Markdown"
 #, python-brace-format
 msgid "Marked as the {track} track"
 msgstr "Marqué comme session {track}"
+
+msgid "Match"
+msgstr "Appariement"
 
 msgid "Match cache"
 msgstr "Cache des appariements"
@@ -2303,6 +2329,16 @@ msgstr "Peut-être déjà un extrait ({n}) : fusionner avec lui ?"
 
 msgid "Minimum match confidence"
 msgstr "Confiance minimale de l’appariement"
+
+msgid ""
+"Minimum score of a conference record replacing an approximate journal "
+"match of a text naming a conference"
+msgstr ""
+"Score minimal d'une fiche de conférence remplaçant l'appariement "
+"approximatif à une revue d'un texte nommant une conférence"
+
+msgid "Minimum score of a match in the list of predatory venues"
+msgstr "Score minimal d'un appariement dans la liste des canaux prédateurs"
 
 msgid "Move"
 msgstr "Déplacer"
@@ -2817,6 +2853,9 @@ msgstr "OpenAlex (recours en ligne)"
 msgid "OpenAlex API key (free, https://openalex.org/settings/api)"
 msgstr "Clé d'API OpenAlex (gratuite, https://openalex.org/settings/api)"
 
+msgid "OpenAlex match"
+msgstr "Appariement OpenAlex"
+
 msgid "Or upload it (a PDF file):"
 msgstr "Ou envoyez-le (un fichier PDF) :"
 
@@ -2848,6 +2887,9 @@ msgstr "Autres articles"
 
 msgid "Other spellings used in author lists, e.g. “B. Doe”"
 msgstr "Autres graphies utilisées dans les listes d'auteurs, p. ex. « B. Doe »"
+
+msgid "Other thresholds"
+msgstr "Autres seuils"
 
 msgid "Other venues' rules match this text too"
 msgstr "Des règles d'autres canaux reconnaissent aussi ce texte"
@@ -2951,6 +2993,9 @@ msgstr ""
 "son DOI, sinon par son titre. Vérifiez les correspondances, puis posez "
 "une étiquette sur les articles, avec leurs numéros dans la liste."
 
+msgid "Pasted list of references"
+msgstr "Liste de références collée"
+
 msgid "People"
 msgstr "Personnes"
 
@@ -2993,6 +3038,9 @@ msgstr ""
 "journals, licence MIT) : {n} entrées, téléchargée le {when}, actualisée "
 "chaque semaine."
 
+msgid "Predatory venue"
+msgstr "Canal prédateur"
+
 msgid "Preprint"
 msgstr "Prépublication"
 
@@ -3026,6 +3074,9 @@ msgstr "Proposition {i} sur {n}"
 
 msgid "Propose merges…"
 msgstr "Proposer des fusions…"
+
+msgid "Proposed for a merge"
+msgstr "Proposés pour une fusion"
 
 msgid "Publication"
 msgstr "Publication"
@@ -3563,6 +3614,21 @@ msgstr "Les réglages ne se déplacent que vers un dossier où il est"
 msgid "Settings → API keys"
 msgstr "Paramètres → Clés d’API"
 
+msgid "Share of a paper's title words to find in an item for a match"
+msgstr ""
+"Part des mots du titre d'un article à trouver dans un élément pour "
+"l'apparier"
+
+msgid "Share of a paper's title words to find in an item to suggest the paper"
+msgstr ""
+"Part des mots du titre d'un article à trouver dans un élément pour le "
+"suggérer"
+
+msgid "Share of title words (Jaccard) two records need to be the same paper"
+msgstr ""
+"Part de mots du titre (Jaccard) en commun pour que deux fiches soient "
+"le même article"
+
 msgid "Shared task"
 msgstr "Campagne d'éval."
 
@@ -3571,6 +3637,9 @@ msgstr "Campagne d'évaluation (shared task)"
 
 msgid "Shared tasks"
 msgstr "Campagnes d'évaluation"
+
+msgid "Shared title words"
+msgstr "Mots du titre en commun"
 
 #, python-brace-format
 msgid "Shared with {folders}: changed for them too"
@@ -3629,6 +3698,16 @@ msgstr "Panneau latéral (notes, signets, articles)"
 
 msgid "Similar venues"
 msgstr "Canaux similaires"
+
+msgid ""
+"Similarity (shared words, same acronym) of two venues proposed for a "
+"merge"
+msgstr ""
+"Similarité (mots en commun, même acronyme) de deux canaux proposés "
+"pour une fusion"
+
+msgid "Similarity of the venues listed as similar to a venue"
+msgstr "Similarité des canaux listés comme similaires à un canal"
 
 msgid "Skip"
 msgstr "Passer"
@@ -3735,6 +3814,12 @@ msgstr "PDF stockés"
 msgid "Student alias added"
 msgstr "Alias de doctorant ajouté"
 
+msgid "Students"
+msgstr "Étudiants"
+
+msgid "Suggestion"
+msgstr "Suggestion"
+
 msgid "Summary"
 msgstr "Résumé"
 
@@ -3821,9 +3906,6 @@ msgstr "Tester un texte de canal"
 
 msgid "Text"
 msgstr "Texte"
-
-msgid "Text (Markdown)"
-msgstr "Texte (Markdown)"
 
 msgid "Text of the group"
 msgstr "Texte du groupe"
@@ -4010,6 +4092,17 @@ msgstr ""
 "Les règles d'autres canaux de publication reconnaissent aussi ce texte : "
 "{venues}. Cliquez pour les fusionner en un seul canal."
 
+msgid ""
+"The rules of “Matching the rankings” are used when looking a venue up "
+"in the rankings: a text naming a society or an event is not matched to "
+"a journal; generic words are left out when comparing a text with a "
+"record found by its acronym."
+msgstr ""
+"Les règles « Correspondance avec les classements » servent à chercher un "
+"canal dans les classements : un texte nommant une société ou un "
+"événement n'est pas apparié à une revue ; les mots génériques sont "
+"ignorés en comparant un texte avec une fiche trouvée par son acronyme."
+
 msgid "The same venue"
 msgstr "Le même canal"
 
@@ -4039,6 +4132,9 @@ msgstr ""
 "session à la main. Chaque session et règle indique si elle est par "
 "défaut, modifiée par rapport à sa valeur par défaut ou ajoutée."
 
+msgid "The score given to a venue found through OpenAlex"
+msgstr "Le score donné à un canal trouvé par OpenAlex"
+
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
 
@@ -4061,6 +4157,13 @@ msgstr ""
 "Les sources donnent des canaux de publication ou des sessions différents "
 ": sélectionnez-en un pour le valider pour cet article, ou plusieurs "
 "canaux pour les fusionner."
+
+msgid ""
+"The sources whose venue text is used only when no other source gives "
+"one (ORCID: a free text, often missing or wrong)"
+msgstr ""
+"Les sources dont le texte du canal n'est utilisé que si aucune autre "
+"source n'en donne (ORCID : un texte libre, souvent absent ou faux)"
 
 msgid ""
 "The sources' texts with this name belong to it; add variants or rules in "
@@ -4519,6 +4622,9 @@ msgstr "Canal de publication enregistré"
 msgid "Venue text"
 msgstr "Texte du canal"
 
+msgid "Venue text only as a fallback"
+msgstr "Texte du canal seulement à défaut"
+
 msgid "Venues"
 msgstr "Canaux"
 
@@ -4639,6 +4745,9 @@ msgstr "Trouvé ici à tort : l'oublier"
 
 msgid "Year"
 msgstr "Année"
+
+msgid "Year gap"
+msgstr "Écart d'années"
 
 msgid "Yes"
 msgstr "Oui"
