@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 15:11+0200\n"
+"POT-Creation-Date: 2026-10-04 16:24+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -137,6 +137,9 @@ msgstr ""
 "Un dossier (p. ex. un comité) regroupe des personnes ; chacune y a sa "
 "propre période."
 
+msgid "A folder cannot go within itself"
+msgstr "Un dossier ne peut pas aller en lui-même"
+
 msgid "A folder's template needs a name"
 msgstr "Un modèle de dossier doit avoir un nom"
 
@@ -235,6 +238,11 @@ msgstr "Une synchronisation est en cours et serait interrompue."
 msgid "A track added by hand"
 msgstr "Une session ajoutée à la main"
 
+msgid "A track removed is no paper's, variant's or venue rule's track any more."
+msgstr ""
+"Une session supprimée n'est plus celle d'aucun article, variante ou règle"
+" de canal."
+
 msgid "A venue already has this name"
 msgstr "Un canal porte déjà ce nom"
 
@@ -263,6 +271,16 @@ msgstr ""
 "d'après les acronymes de ses textes. Ses articles prennent le niveau "
 "commun à ses conférences ; s'ils diffèrent, celui que vous choisissez "
 "(sinon le plus bas). Un niveau fixé à la main ci-dessous prime."
+
+msgid ""
+"A venue marked as this track (Venues → “Mark as a track”) is renamed to "
+"its conference's name: the one these regexes give from its name, applied "
+"in turn (\\1, \\2… or \\g<name> in the replacement)."
+msgstr ""
+"Un canal marqué comme cette session (Canaux → « Marquer comme session ») "
+"est renommé du nom de sa conférence : celui que donnent ces regex à "
+"partir de son nom, appliquées tour à tour (\\1, \\2… ou \\g<name> dans le"
+" remplacement)."
 
 msgid ""
 "A venue text joining two conferences (its parts are then looked for among"
@@ -335,6 +353,9 @@ msgstr "Ajouter une conférence"
 
 msgid "Add a main conference"
 msgstr "Ajouter une conférence principale"
+
+msgid "Add a name rule"
+msgstr "Ajouter une règle de nom"
 
 msgid "Add a person"
 msgstr "Ajouter une personne"
@@ -651,6 +672,13 @@ msgstr "Signet ajouté : {name}"
 msgid "Bookmarks"
 msgstr "Signets"
 
+msgid ""
+"Both formats are the same: the papers with the tag and the others, each "
+"numbered from 1, cannot be told apart."
+msgstr ""
+"Les deux formats sont identiques : les articles avec l'étiquette et les "
+"autres, numérotés chacun à partir de 1, ne se distinguent pas."
+
 msgid "By kind of venue"
 msgstr "Par type de canal de publication"
 
@@ -680,6 +708,9 @@ msgstr "CORE {rank} jusqu'en {year}"
 
 msgid "Cancel"
 msgstr "Annuler"
+
+msgid "Cancel changes"
+msgstr "Annuler les modifications"
 
 msgid "Candidate profiles found — validate them in the Sources tab."
 msgstr "Profils candidats trouvés — validez-les dans l'onglet Sources."
@@ -717,6 +748,9 @@ msgstr "Changer d’emplacement…"
 
 msgid "Change the conferences"
 msgstr "Modifier les conférences"
+
+msgid "Changes discarded"
+msgstr "Modifications abandonnées"
 
 msgid "Chapter"
 msgstr "Chapitre"
@@ -793,6 +827,9 @@ msgstr "Effacer"
 msgid "Clear all"
 msgstr "Tout effacer"
 
+msgid "Clear all the notes of the folder on this person?"
+msgstr "Effacer toutes les notes du dossier sur cette personne ?"
+
 msgid "Clear manual decisions"
 msgstr "Effacer les décisions manuelles"
 
@@ -827,6 +864,9 @@ msgstr ""
 
 msgid "Clear out the automatic settings of all papers?"
 msgstr "Effacer les réglages automatiques de tous les articles ?"
+
+msgid "Clear the notes"
+msgstr "Effacer les notes"
 
 msgid ""
 "Click a name to say who it is: the person, one of their PhD students, or "
@@ -910,6 +950,9 @@ msgstr "Copier"
 
 msgid "Copy a name:"
 msgstr "Copier un nom :"
+
+msgid "Copy my text"
+msgstr "Copier mon texte"
 
 msgid "Copy the current data there"
 msgstr "Y copier les données actuelles"
@@ -1089,6 +1132,12 @@ msgstr "Règles de détection"
 msgid "Detection rules saved"
 msgstr "Règles de détection enregistrées"
 
+msgid "Discard"
+msgstr "Abandonner"
+
+msgid "Discard the unsaved changes?"
+msgstr "Abandonner les modifications non enregistrées ?"
+
 msgid "Discard: not this person (won't be suggested again)"
 msgstr "Écarter : ce n'est pas cette personne (ne sera plus proposé)"
 
@@ -1207,6 +1256,9 @@ msgstr "Modifier les catégories"
 msgid "Edit the folder"
 msgstr "Modifier le dossier"
 
+msgid "Edit the regex"
+msgstr "Modifier la regex"
+
 msgid "Edit, edit beside the preview, or the preview only"
 msgstr "Édition, édition à côté de l'aperçu, ou aperçu seul"
 
@@ -1320,12 +1372,13 @@ msgstr ""
 msgid ""
 "Excerpts of the people's documents (a passage selected in a PDF) are "
 "filed in them; in this order in the reports. Drag to order and nest them."
-" Years (optional): those a category is about."
+" Years (optional): those a category is about. Its colour tints its "
+"excerpts."
 msgstr ""
 "Les extraits des documents des personnes (un passage sélectionné dans un "
 "PDF) y sont classés, dans cet ordre dans les rapports. Faites-les glisser"
 " pour les ordonner et les imbriquer. Années (facultatif) : celles que "
-"concerne une catégorie."
+"concerne une catégorie. Sa couleur teinte ses extraits."
 
 msgid "Excerpts were filed there meanwhile"
 msgstr "Des extraits y ont été classés entre-temps"
@@ -1511,13 +1564,6 @@ msgid "Hide a misattributed / irrelevant record"
 msgstr "Masquer une notice mal attribuée / non pertinente"
 
 msgid ""
-"Hide or show the options panel of highlighting, text and drawing (colour,"
-" thickness…): the mode stays on"
-msgstr ""
-"Masquer ou afficher le panneau d’options du surlignage, du texte et du "
-"dessin (couleur, épaisseur…) : le mode reste actif"
-
-msgid ""
 "Holds the database (people, publications, venues, settings) and the "
 "stored PDFs."
 msgstr ""
@@ -1628,8 +1674,18 @@ msgstr "Condition incomplète"
 msgid "Influence"
 msgstr "Rayonnement"
 
+msgid "Insert the excerpts (kept up to date)"
+msgstr "Insérer les extraits (tenus à jour)"
+
 msgid "Insert the papers not cited yet, at the cursor (as a list of citations)"
 msgstr "Insérer les articles pas encore cités, au curseur (en liste de citations)"
+
+msgid ""
+"Insert the summary of the period’s publications (kept up to date, as set "
+"in the Summary)"
+msgstr ""
+"Insérer le résumé des publications de la période (tenu à jour, réglé "
+"comme dans le Résumé)"
 
 msgid "Installing the PDF viewer (PDF.js, once)…"
 msgstr "Installation de la visionneuse PDF (PDF.js, une seule fois)…"
@@ -1696,6 +1752,10 @@ msgstr "Italique (⌘/Ctrl-I)"
 
 msgid "Its demo track, one of its workshops…"
 msgstr "Sa session démo, un de ses ateliers…"
+
+#, python-brace-format
+msgid "Its identifier: {id} (it cannot be changed later)"
+msgstr "Son identifiant : {id} (il ne pourra plus être changé)"
 
 msgid "Its main conference (it is a workshop of this venue)"
 msgstr "Sa conférence principale (c'est un atelier de ce canal)"
@@ -1812,6 +1872,9 @@ msgstr ""
 "Garder les canaux séparés : ce texte devient une variante de ce canal, "
 "prioritaire sur les règles des autres canaux"
 
+msgid "Keep them"
+msgstr "Les garder"
+
 msgid "Kind"
 msgstr "Type"
 
@@ -1923,7 +1986,9 @@ msgstr "En faire le modèle par défaut"
 msgid ""
 "Make it the “rayonnement” category: the excerpts flagged “influence” in "
 "the other categories are listed in it too"
-msgstr "En faire la catégorie « rayonnement » : les extraits marqués « rayonnement » des autres catégories y sont aussi listés"
+msgstr ""
+"En faire la catégorie « rayonnement » : les extraits marqués « "
+"rayonnement » des autres catégories y sont aussi listés"
 
 msgid "Manage tags (names, colours)"
 msgstr "Gérer les étiquettes (noms, couleurs)"
@@ -2393,6 +2458,14 @@ msgstr "Hors des années de la période"
 msgid "Not related: never propose it again"
 msgstr "Sans rapport : ne plus jamais le proposer"
 
+msgid "Not saved"
+msgstr "Non enregistré"
+
+msgid "Not saved: the notes were changed elsewhere since this window loaded them"
+msgstr ""
+"Non enregistré : les notes ont été modifiées ailleurs depuis leur "
+"chargement dans cette fenêtre"
+
 #, python-brace-format
 msgid "Not saved: {error}"
 msgstr "Non enregistré : {error}"
@@ -2599,6 +2672,9 @@ msgstr ""
 #, python-brace-format
 msgid "Papers not looked for: {error}"
 msgstr "Articles non recherchés : {error}"
+
+msgid "Papers of one of these tracks"
+msgstr "Articles de l'une de ces sessions"
 
 msgid ""
 "Papers of this workshop take the rank of its main conference in their "
@@ -2908,6 +2984,9 @@ msgstr "Canaux liés ?"
 msgid "Relation recorded"
 msgstr "Relation enregistrée"
 
+msgid "Reload"
+msgstr "Recharger"
+
 msgid "Remove"
 msgstr "Supprimer"
 
@@ -2941,6 +3020,9 @@ msgstr "Supprimer le PDF stocké, avec ses annotations ?"
 
 msgid "Remove the stored PDF?"
 msgstr "Supprimer le PDF stocké ?"
+
+msgid "Remove them"
+msgstr "Les supprimer"
 
 #, python-brace-format
 msgid "Removed from {category}"
@@ -2999,6 +3081,9 @@ msgstr "Redémarrez l’application pour utiliser {path}"
 
 msgid "Restarting… the page will reload by itself"
 msgstr "Redémarrage… la page se rechargera d’elle-même"
+
+msgid "Restore them"
+msgstr "Les rétablir"
 
 msgid "Retry"
 msgstr "Réessayer"
@@ -3164,18 +3249,25 @@ msgstr "Recherche parmi les canaux de tous types"
 msgid ""
 "Select an area of a page (A, or Alt+drag): draw a rectangle on the page, "
 "the text inside it becomes the selection, to quote (Q), add as an excerpt"
-" (E) or find its paper (F). Escape to leave."
+" (E), find its paper (F), tag the papers of a list (L) or copy (⌘C / "
+"Ctrl+C). Shift+drag adds another area (their texts, in order). Escape to "
+"leave."
 msgstr ""
 "Sélectionner une zone d'une page (A, ou Alt+glisser) : tracez un "
 "rectangle sur la page, le texte qu'il contient devient la sélection : "
-"pour la citer (Q), l'ajouter comme extrait (E) ou trouver son article "
-"(F). Échap pour quitter."
+"pour la citer (Q), l'ajouter comme extrait (E), trouver son article (F), "
+"étiqueter les articles d'une liste (L) ou la copier (⌘C / Ctrl+C). "
+"Maj+glisser ajoute une autre zone (leurs textes, dans l'ordre). Échap "
+"pour quitter."
 
 msgid "Select people and a folder"
 msgstr "Sélectionnez des personnes et un dossier"
 
 msgid "Select people first"
 msgstr "Sélectionnez d'abord des personnes"
+
+msgid "Select the list (or an area over it) in the PDF first"
+msgstr "Sélectionnez d'abord la liste (ou une zone qui la couvre) dans le PDF"
 
 msgid "Select the reference (or its title) in the PDF first"
 msgstr "Sélectionnez d'abord la référence (ou son titre) dans le PDF"
@@ -3250,6 +3342,11 @@ msgstr "Afficher toutes les années"
 
 msgid "Show how the text was cleaned and matched"
 msgstr "Montrer comment le texte a été nettoyé et rapproché"
+
+msgid "Show the notes as saved (the text typed here is lost: copy it first)"
+msgstr ""
+"Afficher les notes enregistrées (le texte tapé ici est perdu : copiez-le "
+"d'abord)"
 
 msgid ""
 "Show the side panel (notes, excerpts, bookmarks…) in another window, e.g."
@@ -3354,6 +3451,9 @@ msgid_plural "Started {n} sync(s)"
 msgstr[0] "{n} synchronisation lancée"
 msgstr[1] "{n} synchronisations lancées"
 
+msgid "Starting notes"
+msgstr "Notes de départ"
+
 msgid "Status"
 msgstr "Statut"
 
@@ -3400,6 +3500,14 @@ msgid "Tag from a list: find the papers of a pasted list and tag them"
 msgstr ""
 "Étiqueter depuis une liste : retrouver les articles d'une liste collée et"
 " les étiqueter"
+
+msgid ""
+"Tag from a list: find the papers of the selected list (e.g. an area over "
+"numbered references) and tag them (L)"
+msgstr ""
+"Étiqueter depuis une liste : retrouver les articles de la liste "
+"sélectionnée (p. ex. une zone sur des références numérotées) et les "
+"étiqueter (L)"
 
 msgid "Tag to put"
 msgstr "Étiquette à poser"
@@ -3477,6 +3585,12 @@ msgstr "La fenêtre du PDF est fermée"
 
 msgid "The catch-all role is unknown"
 msgstr "Le rôle par défaut est inconnu"
+
+msgid "The colour of its excerpts (edit the categories to change it)"
+msgstr "La couleur de ses extraits (modifiez les catégories pour la changer)"
+
+msgid "The colour of its excerpts (their tint on the PDFs)"
+msgstr "La couleur de ses extraits (leur teinte dans les PDF)"
 
 msgid "The default"
 msgstr "Le modèle par défaut"
@@ -3582,6 +3696,16 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"The rule matches these variants of the venue, of another track than its "
+"own ({track}). Remove them (their texts then take the rule's track), or "
+"edit the regex so that it no longer matches them."
+msgstr ""
+"La règle reconnaît ces variantes du canal, d'une autre session que la "
+"sienne ({track}). Supprimez-les (leurs textes prennent alors la session "
+"de la règle), ou modifiez la regex pour qu'elle ne les reconnaisse plus."
+
+#, python-brace-format
+msgid ""
 "The rules of other venues match this text too: {venues}. Click to merge "
 "them into one venue."
 msgstr ""
@@ -3643,6 +3767,16 @@ msgstr ""
 "Les textes des sources portant ce nom lui appartiennent ; ajoutez des "
 "variantes ou des règles au canal pour reconnaître d'autres textes."
 
+#, python-brace-format
+msgid ""
+"The text a person's notes start with, while empty (e.g. headings and the "
+"blocks []{.publications}: the summary of their publications, "
+"[]{.excerpts}: their excerpts by category)"
+msgstr ""
+"Le texte par lequel commencent les notes d'une personne, tant qu'elles "
+"sont vides (p. ex. des titres et les blocs []{.publications} : le résumé "
+"de ses publications, []{.excerpts} : ses extraits par catégorie)"
+
 msgid "The text of the group (edit it with its pencil)"
 msgstr "Le texte du groupe (modifiez-le avec son crayon)"
 
@@ -3666,12 +3800,14 @@ msgid "The {source} source is disabled (Settings → Sources)"
 msgstr "La source {source} est désactivée (Paramètres → Sources)"
 
 msgid "The “rayonnement” category: it also lists the influence excerpts"
-msgstr "La catégorie « rayonnement » : elle liste aussi les extraits de rayonnement"
+msgstr ""
+"La catégorie « rayonnement » : elle liste aussi les extraits de "
+"rayonnement"
 
 msgid ""
 "Their numbers (.index, .number, [@key]): as put from a list, else by "
-"year; the other papers apart, from 1, as first cited. They are the "
-"papers to discuss (without: those of the period's years)."
+"year; the other papers apart, from 1, as first cited. They are the papers"
+" to discuss (without: those of the period's years)."
 msgstr ""
 "Leurs numéros (.index, .number, [@clé]) : ceux d'une liste, sinon par "
 "année ; les autres articles à part, à partir de 1, dans l'ordre des "
@@ -3734,12 +3870,12 @@ msgstr "Thèse (doctorat et autres)"
 
 msgid ""
 "They are on one item (in the order of their PDFs), with the second one's "
-"category, years, influence, colour and text (its pencil edits the text of"
-" the group)."
+"category, years, influence and text (its pencil edits the text of the "
+"group)."
 msgstr ""
 "Ils forment un seul élément (dans l'ordre de leurs PDF), avec la "
-"catégorie, les années, le rayonnement, la couleur et le texte du second "
-"(son crayon modifie le texte du groupe)."
+"catégorie, les années, le rayonnement et le texte du second (son crayon "
+"modifie le texte du groupe)."
 
 msgid "This cannot be undone."
 msgstr "Cette action est irréversible."
@@ -3831,6 +3967,11 @@ msgstr "Sessions enregistrées"
 msgid "Try a venue text"
 msgstr "Essayer un texte de canal de publication"
 
+msgid "Turn into a venue rule (to edit): its near variants match too"
+msgstr ""
+"En faire une règle du canal (à modifier) : ses variantes proches sont "
+"aussi reconnues"
+
 msgid "Two roles have the same name"
 msgstr "Deux rôles ont le même nom"
 
@@ -3889,6 +4030,10 @@ msgstr "Délier"
 
 msgid "Unlink (reject)"
 msgstr "Délier (rejeter)"
+
+#, python-brace-format
+msgid "Unsaved: {screens}"
+msgstr "Non enregistré : {screens}"
 
 #, python-brace-format
 msgid "Update failed: {error}"
@@ -3986,6 +4131,9 @@ msgstr "Variantes"
 
 msgid "Variants (cleaned texts, grouped by track)"
 msgstr "Variantes (textes nettoyés, groupés par session)"
+
+msgid "Variants of another track"
+msgstr "Variantes d'une autre session"
 
 msgid "Venue"
 msgstr "Canal"
@@ -4190,6 +4338,9 @@ msgstr "ajouter une note…"
 msgid "added"
 msgstr "ajoutée"
 
+msgid "added (from the file)"
+msgstr "ajoutée (du fichier)"
+
 msgid "all ranking lists"
 msgstr "tous les classements"
 
@@ -4198,9 +4349,6 @@ msgstr "toutes les sources"
 
 msgid "also matches"
 msgstr "le reconnaît aussi"
-
-msgid "amber (the default)"
-msgstr "ambre (par défaut)"
 
 msgid "any source"
 msgstr "toute source"
@@ -4216,9 +4364,6 @@ msgstr "automatique"
 
 msgid "belongs to it now"
 msgstr "lui appartient actuellement"
-
-msgid "blue"
-msgstr "bleu"
 
 msgid "bold"
 msgstr "gras"
@@ -4359,9 +4504,6 @@ msgstr "abandon de {url}"
 msgid "global"
 msgstr "globale"
 
-msgid "green"
-msgstr "vert"
-
 #, python-brace-format
 msgid "h-index {value}"
 msgstr "indice h {value}"
@@ -4381,6 +4523,15 @@ msgstr "ignorer la casse"
 #, python-brace-format
 msgid "imported: {value}"
 msgstr "importé : {value}"
+
+msgid "in both, the same"
+msgstr "dans les deux, identique"
+
+msgid "in both: the file's"
+msgstr "dans les deux : celle du fichier"
+
+msgid "in both: the local one"
+msgstr "dans les deux : celle d'ici"
 
 msgid "in no folder only"
 msgstr "seulement hors de tout dossier"
@@ -4443,6 +4594,9 @@ msgstr "son année"
 
 msgid "joint conference"
 msgstr "conférence conjointe"
+
+msgid "keep it"
+msgstr "la garder"
 
 #, python-brace-format
 msgid "key: “{key}”"
@@ -4577,6 +4731,9 @@ msgstr "pas encore cité"
 msgid "not found: {url}"
 msgstr "introuvable : {url}"
 
+msgid "not in the file (added here)"
+msgstr "absente du fichier (ajoutée ici)"
+
 msgid "not ranked"
 msgstr "non classé"
 
@@ -4630,9 +4787,6 @@ msgstr "ouvrir le canal de publication — classé comme : {record}"
 msgid "or beside the papers to discuss (cited or not)"
 msgstr "ou à côté des articles à discuter (cités ou non)"
 
-msgid "orange"
-msgstr "orange"
-
 msgid "other"
 msgstr "autre"
 
@@ -4676,9 +4830,6 @@ msgstr "motif"
 msgid "period {start}–{end}"
 msgstr "période {start}–{end}"
 
-msgid "pink"
-msgstr "rose"
-
 #, python-brace-format
 msgid "position {n}"
 msgstr "position {n}"
@@ -4688,9 +4839,6 @@ msgstr "prépublication"
 
 msgid "primary"
 msgstr "principal"
-
-msgid "purple"
-msgstr "violet"
 
 msgid "rank at the paper's publication time"
 msgstr "rang au moment de la publication de l’article"
@@ -4710,6 +4858,9 @@ msgstr "expression régulière (Python)"
 
 msgid "rejected"
 msgstr "rejeté"
+
+msgid "remove it"
+msgstr "la supprimer"
 
 msgid "replacement"
 msgstr "remplacement"
@@ -4841,6 +4992,9 @@ msgstr "à"
 #, python-brace-format
 msgid "track: {track}"
 msgstr "session : {track}"
+
+msgid "tracks"
+msgstr "sessions"
 
 #, python-brace-format
 msgid "unknown DBLP pid {pid}"
@@ -5096,6 +5250,12 @@ msgstr[1] ""
 "canal à part entière, classé comme sa conférence principale."
 
 #, python-brace-format
+msgid "{n} variant now matched by the rule was removed"
+msgid_plural "{n} variants now matched by the rule were removed"
+msgstr[0] "{n} variante désormais reconnue par la règle a été supprimée"
+msgstr[1] "{n} variantes désormais reconnues par la règle ont été supprimées"
+
+#, python-brace-format
 msgid "{n} venue text is matched by several venues."
 msgid_plural "{n} venue texts are matched by several venues."
 msgstr[0] "{n} texte de canal est reconnu par plusieurs canaux."
@@ -5342,206 +5502,3 @@ msgstr "✓ C'est {name}"
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
 
-msgid ""
-"Both formats are the same: the papers with the tag and the others, each "
-"numbered from 1, cannot be told apart."
-msgstr ""
-"Les deux formats sont identiques : les articles avec l'étiquette et les "
-"autres, numérotés chacun à partir de 1, ne se distinguent pas."
-
-msgid "Starting notes"
-msgstr "Notes de départ"
-
-msgid ""
-"The text a person's notes start with, while empty (e.g. headings and the "
-"blocks []{.publications}: the summary of their publications, "
-"[]{.excerpts}: their excerpts by category)"
-msgstr ""
-"Le texte par lequel commencent les notes d'une personne, tant qu'elles sont "
-"vides (p. ex. des titres et les blocs []{.publications} : le résumé de ses "
-"publications, []{.excerpts} : ses extraits par catégorie)"
-
-msgid ""
-"Insert the summary of the period’s publications (kept up to date, as set in "
-"the Summary)"
-msgstr ""
-"Insérer le résumé des publications de la période (tenu à jour, réglé comme "
-"dans le Résumé)"
-
-msgid "Insert the excerpts (kept up to date)"
-msgstr "Insérer les extraits (tenus à jour)"
-
-msgid "Not saved"
-msgstr "Non enregistré"
-
-msgid "Restore them"
-msgstr "Les rétablir"
-
-msgid "Clear the notes"
-msgstr "Effacer les notes"
-
-msgid "Copy my text"
-msgstr "Copier mon texte"
-
-msgid "Reload"
-msgstr "Recharger"
-
-msgid "Clear all the notes of the folder on this person?"
-msgstr "Effacer toutes les notes du dossier sur cette personne ?"
-
-msgid "Not saved: the notes were changed elsewhere since this window loaded them"
-msgstr "Non enregistré : les notes ont été modifiées ailleurs depuis leur chargement dans cette fenêtre"
-
-msgid "Show the notes as saved (the text typed here is lost: copy it first)"
-msgstr "Afficher les notes enregistrées (le texte tapé ici est perdu : copiez-le d'abord)"
-
-msgid ""
-"They are on one item (in the order of their PDFs), with the second one's "
-"category, years, influence and text (its pencil edits the text of the "
-"group)."
-msgstr ""
-"Ils forment un seul élément (dans l'ordre de leurs PDF), avec la "
-"catégorie, les années, le rayonnement et le texte du second (son crayon "
-"modifie le texte du groupe)."
-
-msgid ""
-"Excerpts of the people's documents (a passage selected in a PDF) are "
-"filed in them; in this order in the reports. Drag to order and nest them."
-" Years (optional): those a category is about. Its colour tints its "
-"excerpts."
-msgstr ""
-"Les extraits des documents des personnes (un passage sélectionné dans un "
-"PDF) y sont classés, dans cet ordre dans les rapports. Faites-les glisser"
-" pour les ordonner et les imbriquer. Années (facultatif) : celles que "
-"concerne une catégorie. Sa couleur teinte ses extraits."
-
-msgid "The colour of its excerpts (their tint on the PDFs)"
-msgstr "La couleur de ses extraits (leur teinte dans les PDF)"
-
-msgid "The colour of its excerpts (edit the categories to change it)"
-msgstr "La couleur de ses extraits (modifiez les catégories pour la changer)"
-
-
-msgid ""
-"Select an area of a page (A, or Alt+drag): draw a rectangle on the page, "
-"the text inside it becomes the selection, to quote (Q), add as an excerpt "
-"(E), find its paper (F), tag the papers of a list (L) or copy (⌘C / "
-"Ctrl+C). Shift+drag adds another area (their texts, in order). Escape to "
-"leave."
-msgstr ""
-"Sélectionner une zone d'une page (A, ou Alt+glisser) : tracez un "
-"rectangle sur la page, le texte qu'il contient devient la sélection : "
-"pour la citer (Q), l'ajouter comme extrait (E), trouver son article (F), "
-"étiqueter les articles d'une liste (L) ou la copier (⌘C / Ctrl+C). "
-"Maj+glisser ajoute une autre zone (leurs textes, dans l'ordre). Échap pour "
-"quitter."
-
-msgid ""
-"Tag from a list: find the papers of the selected list (e.g. an area over "
-"numbered references) and tag them (L)"
-msgstr ""
-"Étiqueter depuis une liste : retrouver les articles de la liste "
-"sélectionnée (p. ex. une zone sur des références numérotées) et les "
-"étiqueter (L)"
-
-msgid "Select the list (or an area over it) in the PDF first"
-msgstr "Sélectionnez d'abord la liste (ou une zone qui la couvre) dans le PDF"
-
-
-msgid "Cancel changes"
-msgstr "Annuler les modifications"
-
-#, python-brace-format
-msgid "Unsaved: {screens}"
-msgstr "Non enregistré : {screens}"
-
-msgid "Discard the unsaved changes?"
-msgstr "Abandonner les modifications non enregistrées ?"
-
-msgid "Changes discarded"
-msgstr "Modifications abandonnées"
-
-msgid "Keep them"
-msgstr "Les garder"
-
-msgid "Discard"
-msgstr "Abandonner"
-
-#, python-brace-format
-msgid "{n} variant now matched by the rule was removed"
-msgid_plural "{n} variants now matched by the rule were removed"
-msgstr[0] "{n} variante désormais reconnue par la règle a été supprimée"
-msgstr[1] "{n} variantes désormais reconnues par la règle ont été supprimées"
-
-msgid "Variants of another track"
-msgstr "Variantes d'une autre session"
-
-#, python-brace-format
-msgid ""
-"The rule matches these variants of the venue, of another track than its "
-"own ({track}). Remove them (their texts then take the rule's track), or "
-"edit the regex so that it no longer matches them."
-msgstr ""
-"La règle reconnaît ces variantes du canal, d'une autre session que la "
-"sienne ({track}). Supprimez-les (leurs textes prennent alors la session de "
-"la règle), ou modifiez la regex pour qu'elle ne les reconnaisse plus."
-
-msgid "Edit the regex"
-msgstr "Modifier la regex"
-
-msgid "Remove them"
-msgstr "Les supprimer"
-
-msgid "Turn into a venue rule (to edit): its near variants match too"
-msgstr ""
-"En faire une règle du canal (à modifier) : ses variantes proches sont "
-"aussi reconnues"
-
-msgid "A track removed is no paper's, variant's or venue rule's track any more."
-msgstr ""
-"Une session supprimée n'est plus celle d'aucun article, variante ou règle "
-"de canal."
-
-msgid ""
-"A venue marked as this track (Venues → “Mark as a track”) is renamed to "
-"its conference's name: the one these regexes give from its name, applied "
-"in turn (\\1, \\2… or \\g<name> in the replacement)."
-msgstr ""
-"Un canal marqué comme cette session (Canaux → « Marquer comme "
-"session ») est renommé du nom de sa conférence : celui que donnent ces "
-"regex à partir de son nom, appliquées tour à tour (\\1, \\2… ou \\g<name> "
-"dans le remplacement)."
-
-msgid "Add a name rule"
-msgstr "Ajouter une règle de nom"
-
-#, python-brace-format
-msgid "Its identifier: {id} (it cannot be changed later)"
-msgstr "Son identifiant : {id} (il ne pourra plus être changé)"
-
-msgid "Papers of one of these tracks"
-msgstr "Articles de l'une de ces sessions"
-
-msgid "added (from the file)"
-msgstr "ajoutée (du fichier)"
-
-msgid "in both, the same"
-msgstr "dans les deux, identique"
-
-msgid "in both: the file's"
-msgstr "dans les deux : celle du fichier"
-
-msgid "in both: the local one"
-msgstr "dans les deux : celle d'ici"
-
-msgid "keep it"
-msgstr "la garder"
-
-msgid "not in the file (added here)"
-msgstr "absente du fichier (ajoutée ici)"
-
-msgid "remove it"
-msgstr "la supprimer"
-
-msgid "tracks"
-msgstr "sessions"

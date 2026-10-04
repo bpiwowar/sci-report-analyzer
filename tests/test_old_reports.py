@@ -50,7 +50,7 @@ def test_migration_numbering_from_the_reports(tmp_path):
         c.execute("INSERT INTO period_tag (period_id, publication_id, tag_id) VALUES (20, 5, 1)")
     db_session.run_migrations(create_engine(f"sqlite:///{db}"))
     with sqlite3.connect(db) as c:
-        rows = dict(c.execute("SELECT id, citations FROM folder").fetchall())
+        rows = dict(c.execute("SELECT id, citations FROM folder_settings").fetchall())
         notes = [n for (n,) in c.execute("SELECT notes FROM folder")]
         pending = c.execute("SELECT value FROM app_setting WHERE key = 'old_reports'").fetchone()
     assert json.loads(rows[1]) == {"tag_id": 3, "format": "**#{index}**"}

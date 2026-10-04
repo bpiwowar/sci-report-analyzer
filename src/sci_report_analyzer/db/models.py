@@ -262,41 +262,71 @@ class AuthorCategory(Base):
 
 
 class Folder(Base):
-    """A named, dated group of people (e.g. a hiring committee).
+    """A named, dated group of people (e.g. a hiring committee), within another one or not.
 
     A person is in a folder when they have a period in it (a Period with this folder): the
-    period of interest of that person for that folder.
+    period of interest of that person for that folder. Its settings (FolderSettings) are
+    those it uses (FolderSettingsUse), else its parent's (see folders.settings_id).
     """
 
     __tablename__ = "folder"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
+    # The folder it is in (none: at the top level).
+    parent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("folder.id", ondelete="SET NULL"), index=True
+    )
     date: Mapped[date | None]
     hidden: Mapped[bool] = mapped_column(default=False)
     notes: Mapped[str | None]
     # The source a paper must be in to count ("none": no such source; None: the default
     # one, see source_settings).
     primary_source: Mapped[str | None] = mapped_column(String(32))
-    # How its notes cite papers: {"tag_id": the tag whose papers are numbered, "format": the
-    # number's, "templates": [{"name", "attrs"}] (over the general ones)}; see reports.py.
-    citations: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
 
     periods: Mapped[list[Period]] = relationship(
         back_populates="folder", cascade="all, delete-orphan", passive_deletes=True
     )
 
 
+class FolderSettings(Base):
+    """Settings of folders: its categories (Category) and how the notes cite papers. Used
+    by some folders (FolderSettingsUse), and the folders within them using their parent's."""
+
+    __tablename__ = "folder_settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # How the notes cite papers: {"tag_id": the tag whose papers are numbered, "format": the
+    # number's, "templates": [{"name", "attrs"}] (over the general ones), "skeleton": the
+    # starting notes}; see reports.py.
+    citations: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+
+
+class FolderSettingsUse(Base):
+    """The settings a folder uses (its own); a folder without any uses its parent's."""
+
+    __tablename__ = "folder_settings_use"
+
+    folder_id: Mapped[int] = mapped_column(
+        ForeignKey("folder.id", ondelete="CASCADE"), primary_key=True
+    )
+    settings_id: Mapped[int] = mapped_column(
+        ForeignKey("folder_settings.id", ondelete="CASCADE"), index=True
+    )
+
+
 class Category(Base):
-    """A category of a folder's grid (e.g. "Research", and under it "Projects"), in order:
-    excerpts of its people's documents are filed in it. Its years (optional) are those it
-    is about; one can gather the excerpts showing influence (``influence``). Its colour is
-    that of its excerpts (their tint on the PDFs)."""
+    """A category of the folders' grid (e.g. "Research", and under it "Projects"), in order:
+    one of their settings; excerpts of their people's documents are filed in it. Its years
+    (optional) are those it is about; one can gather the excerpts showing influence
+    (``influence``). Its colour is that of its excerpts (their tint on the PDFs)."""
 
     __tablename__ = "category"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    folder_id: Mapped[int] = mapped_column(ForeignKey("folder.id", ondelete="CASCADE"), index=True)
+    settings_id: Mapped[int] = mapped_column(
+        ForeignKey("folder_settings.id", ondelete="CASCADE"), index=True
+    )
     parent_id: Mapped[int | None] = mapped_column(
         ForeignKey("category.id", ondelete="CASCADE"), index=True
     )
@@ -304,7 +334,7 @@ class Category(Base):
     position: Mapped[int] = mapped_column(default=0)  # among its siblings
     start_year: Mapped[int | None]
     end_year: Mapped[int | None]
-    # The folder's "rayonnement" (at most one): the excerpts flagged "influence" in the
+    # The settings' "rayonnement" (at most one): the excerpts flagged "influence" in the
     # other categories are listed in it too.
     influence: Mapped[bool] = mapped_column(default=False, server_default="0")
     colour: Mapped[str | None] = mapped_column(String(16))  # (none: the default tint)
@@ -312,8 +342,8 @@ class Category(Base):
 
 class Excerpt(Base):
     """A passage of a PDF (a document's, or a paper's) of a person in a folder, filed in one
-    of the folder's categories; the years it is about (optional), and whether it shows the
-    person's influence ("rayonnement": invited talks, prizes, committees…)."""
+    of the categories of the folder's settings; the years it is about (optional), and whether
+    it shows the person's influence ("rayonnement": invited talks, prizes, committees…)."""
 
     __tablename__ = "excerpt"
 
