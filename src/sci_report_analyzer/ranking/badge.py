@@ -311,6 +311,7 @@ KIND_ORDER = (
     "natl_conference",
     "natl_journal",
     "natl_workshop",
+    "shared_task",
     "preprint",
     "book",
     "chapter",

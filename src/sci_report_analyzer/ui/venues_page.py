@@ -33,6 +33,7 @@ TABS = {
     "conferences": (N_("Conferences"), venues.CONFERENCE_KINDS),
     "workshops": (N_("Workshops"), WORKSHOP_KINDS),
     "journals": (N_("Journals"), venues.JOURNAL_KINDS),
+    "shared_tasks": (N_("Shared tasks"), ("shared_task",)),
     "other": (N_("Other & preprints"), ("preprint", "other")),
 }
 LEVELS = ["A*", "A", "B", "C", "Q1", "Q2", "Q3", "Q4"]

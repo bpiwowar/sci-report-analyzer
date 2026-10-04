@@ -1,7 +1,7 @@
 """First level of classification: the *kind* of publication (mostly, of its venue).
 
-international / national conference, workshop or journal · preprint · book · book chapter ·
-edited proceedings · software · dataset · thesis · other.
+international / national conference, workshop or journal · shared task · preprint · book ·
+book chapter · edited proceedings · software · dataset · thesis · other.
 The rank (CORE / quartile) is the second level; each kind can map to a default level
 (e.g. every national conference counts as a given level) unless overridden.
 """
@@ -22,6 +22,7 @@ KINDS: dict[str, str] = Labels(
         "natl_conference": N_("National conference"),
         "natl_workshop": N_("National workshop"),
         "natl_journal": N_("National journal"),
+        "shared_task": N_("Shared task / evaluation campaign"),
         "preprint": N_("Preprint"),
         "book": N_("Book"),
         "chapter": N_("Book chapter"),
@@ -40,6 +41,7 @@ KIND_SHORT = Labels(
         "natl_conference": N_("Natl. conf."),
         "natl_workshop": N_("Natl. workshop"),
         "natl_journal": N_("Natl. journal"),
+        "shared_task": N_("Shared task"),
         "preprint": N_("Preprint"),
         "book": N_("Book"),
         "chapter": N_("Chapter"),
@@ -59,6 +61,7 @@ KIND_COLOUR = {
     "natl_conference": "#bf8700",
     "natl_workshop": "#d4a72c",
     "natl_journal": "#9a6700",
+    "shared_task": "#ff8182",
     "preprint": "#afb8c1",
     "book": "#bf3989",
     "chapter": "#e26ba8",
@@ -70,10 +73,12 @@ KIND_COLOUR = {
 }
 
 WORKSHOP_KINDS = ("intl_workshop", "natl_workshop")
-# Not papers in a venue: never ranked by it (software on Zenodo is not a preprint). Edited
-# proceedings keep their venue's rank, in categories of their own (editing SIGIR's
-# proceedings is not a SIGIR paper, but counts more than editing a C conference's).
-UNRANKED_KINDS = ("software", "dataset")
+# Not papers in a venue: never ranked by it (software on Zenodo is not a preprint), nor
+# shared task papers (working notes, mostly not peer-reviewed: a CLEF lab's notes are not a
+# CLEF paper). Edited proceedings keep their venue's rank, in categories of their own
+# (editing SIGIR's proceedings is not a SIGIR paper, but counts more than editing a C
+# conference's).
+UNRANKED_KINDS = ("software", "dataset", "shared_task")
 # A publication's kind, never a venue's: a venue is not an edited volume (its proceedings,
 # edited by someone, are among its records), nor a thesis.
 PUBLICATION_ONLY_KINDS = ("proceedings", "thesis")
@@ -95,6 +100,32 @@ WORKSHOP_RE = re.compile(
 _HOST_RE = re.compile(
     r"(?-i:(?<=\w)\s*@\s*)(?P<a>[^,:;()]+)|(?:co-located|in conjunction) with (?:the )?"
     r"(?P<b>[^,:;()]+)",
+    re.I,
+)
+
+
+# Shared tasks and evaluation campaigns (SemEval, TREC, CLEF labs, NTCIR...): their working
+# notes. A venue mixing them with research papers (WMT, BioNLP's "Workshop and Shared
+# Task") is not one: its papers' titles tell.
+SHARED_TASK_VENUE_RE = re.compile(
+    r"\bworking notes\b|\bsemantic evaluations?\b|\bText REtrieval Conference\b"
+    r"|\bevaluation campaigns?\b|\bbenchmarking initiative\b"
+    r"|\bForum for Information Retrieval Evaluation\b"
+    r"|(?-i:\b(?:SemEval|TREC|NTCIR|MediaEval|ImageCLEF|LifeCLEF)\b)",
+    re.I,
+)
+_CAMPAIGNS = (
+    r"SemEval|TREC|NTCIR|MediaEval|WMT|IWSLT|CLEF|ImageCLEF|LifeCLEF|BioASQ|CheckThat!?"
+    r"|eRisk|Touché|FIRE|DEFT|GermEval|IberLEF|EvaLatin|MIREX"
+)
+# A participant's or an organiser's paper: "X at SemEval-2017 Task 12: ...", "Findings of
+# the WMT 2018 ... Shared Task", "Overview of the CLEF eHealth Evaluation Lab 2016",
+# "... Notebook for the ImageCLEF Lab at CLEF 2025".
+SHARED_TASK_TITLE_RE = re.compile(
+    r"\bshared[- ]tasks?\b|\bnotebook for the\b|\b(?:evaluation|benchmarking) (?:lab|campaign)s?\b"
+    rf"|(?-i:\b(?:{_CAMPAIGNS})(?:[- ]?(?:19|20)\d{{2}}\b|\s+Task\s*\d))"
+    rf"|(?:\bat|@)\s+(?:the\s+)?(?-i:(?:{_CAMPAIGNS})\b)"
+    r"|^\s*(?:an\s+)?overview\s+of\b.*\b(?:lab|track|task|challenge)\b",
     re.I,
 )
 
@@ -221,6 +252,7 @@ class KindEvidence:
     venue_type: str | None = None  # "conference" / "journal" hint from the source
     doc_type: str | None = None
     archival: bool = False
+    title: str | None = None  # the paper's (a shared task's paper says so)
 
 
 def _keyword_hit(text: str, words: list[str]) -> bool:
@@ -258,8 +290,16 @@ def detect_kind(
     if doc_types & _BOOK_DOC_TYPES and not (badge and (badge.coreRank or badge.quartile)):
         return "chapter" if doc_types & _CHAPTER_DOC_TYPES else "book"
 
-    # Workshops (unless a journal ranking lists the venue).
+    # Shared tasks (before workshops: SemEval is no ACL workshop), unless a journal.
     journal_ranked = badge is not None and badge.source in ("scimago", "jcr") and badge.quartile
+    if (
+        not journal_ranked
+        and not doc_types & _JOURNAL_DOC_TYPES
+        and (SHARED_TASK_VENUE_RE.search(venue) or SHARED_TASK_TITLE_RE.search(ev.title or ""))
+    ):
+        return "shared_task"
+
+    # Workshops (unless a journal ranking lists the venue).
     if WORKSHOP_RE.search(venue) and not journal_ranked:
         natl = _keyword_hit(venue, national_keywords) or (
             unknown_scope == "national" and not _keyword_hit(venue, international_keywords)

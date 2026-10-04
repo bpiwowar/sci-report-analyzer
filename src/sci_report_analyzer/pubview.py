@@ -231,8 +231,8 @@ def publication_kind(
         return pub.kind_override, "forced"
     if venue is not None and venue.kind_manual and venue.kind in VENUE_KINDS:
         return venue.kind, "venue"
-    kind, source = _detected_kind(badge, venue, views, raw)
-    if venue is not None and venue.hosts and kind not in WORKSHOP_KINDS:
+    kind, source = _detected_kind(badge, venue, views, raw, pub.title)
+    if venue is not None and venue.hosts and kind not in (*WORKSHOP_KINDS, "shared_task"):
         # A venue with a main conference is a workshop.
         kind = "natl_workshop" if kind.startswith("natl") else "intl_workshop"
     return kind, source
@@ -243,6 +243,7 @@ def _detected_kind(
     venue: Venue | None,
     views: list[MemberView],
     raw: dict[int, SourcePub],
+    title: str | None = None,
 ) -> tuple[str, str]:
     # Software and datasets, from any record (on Zenodo, an archive, they are not preprints).
     if kind := data_kind(" ".join({raw[m.id].doc_type or "" for m in views})):
@@ -263,7 +264,10 @@ def _detected_kind(
         t for t in {raw[m.id].doc_type for m in published if m.venue_reliable} if t
     )
     ev = KindEvidence(
-        venue=(venue.name if venue else None) or sp.venue, venue_type=vtype, doc_type=doc_types
+        venue=(venue.name if venue else None) or sp.venue,
+        venue_type=vtype,
+        doc_type=doc_types,
+        title=title,
     )
     return detect_kind(
         badge,
@@ -993,6 +997,7 @@ _FR_KINDS = {
     "natl_conference": "Conf. nat.",
     "natl_workshop": "Atelier nat.",
     "natl_journal": "Revue nat.",
+    "shared_task": "Campagne d'éval.",
     "preprint": "Prépublication",
     "book": "Livre",
     "chapter": "Chapitre",

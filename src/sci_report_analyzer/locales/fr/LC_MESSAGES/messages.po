@@ -4894,3 +4894,12 @@ msgstr "✓ C'est {name}"
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
 
+
+msgid "Shared task / evaluation campaign"
+msgstr "Campagne d'évaluation (shared task)"
+
+msgid "Shared task"
+msgstr "Campagne d'éval."
+
+msgid "Shared tasks"
+msgstr "Campagnes d'évaluation"
