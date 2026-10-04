@@ -1243,3 +1243,58 @@ def hashtag(name: str) -> str:
 def links_of(person_id: int) -> list[SourceLink]:
     with session_scope() as s:
         return list(s.scalars(select(SourceLink).where(SourceLink.person_id == person_id)))
+
+
+# A paper's source records by venue and track (its matching tab).
+GroupKey = tuple[int | None, str | None]
+
+
+@dataclass
+class VenueGroups:
+    """A paper's published records (its preprints too, when it has only them) by venue and
+    track, the paper's own first; ``used``: the records whose venue is used; ``several``:
+    more than one venue; ``conflicting``: the sources disagree (on the venue or the track);
+    ``no_venue``: a kind without one (a book…), so no group."""
+
+    groups: dict[GroupKey, list[MemberView]]
+    used: set[int]
+    preprints: int
+    several: bool
+    conflicting: bool
+    no_venue: bool
+
+
+def venue_groups(stat: PubStat) -> VenueGroups:
+    # Preprints (arXiv, HAL deposits...) don't rank the paper: only the published versions
+    # count (unless there are only preprints).
+    published = [m for m in stat.members if not m.archival] or stat.members
+    # A different track is a disagreement too; a record without one takes that of its
+    # venue's other records (a demo paper is a demo).
+    groups: dict[GroupKey, list[MemberView]] = {}
+    for m in published:
+        groups.setdefault((m.venue_id, track_of(m, published)), []).append(m)
+    first = [k for k in groups if k[0] == stat.venue_id and k[1] == stat.track] or [
+        k for k in groups if k[0] == stat.venue_id
+    ]
+    if first:  # the paper's venue first
+        groups = {first[0]: groups.pop(first[0]), **groups}
+    no_venue = stat.kind in NO_VENUE_KINDS and stat.venue_id is None
+    if no_venue:
+        groups = {}
+    # A workshop's main conference is no disagreement (the workshop is more precise).
+    dm = doi_member(stat.members)
+    conflicting = len(
+        {
+            (same_venue(ms[0]), k[1])
+            for k, ms in groups.items()
+            if k[0] is not None and not all(m.minor for m in ms)
+        }
+    ) > 1 and (dm is None or dm.minor)
+    return VenueGroups(
+        groups,
+        used={m.id for m in venue_members(stat.members)},
+        preprints=len(stat.members) - len(published),
+        several=len([g for g in groups if g[0] is not None]) > 1,
+        conflicting=conflicting,
+        no_venue=no_venue,
+    )
