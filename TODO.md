@@ -49,3 +49,11 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
 - One editor per folder, not per document: several documents are annotated, but the notes
   are a single text. A quote then names its source document explicitly (e.g. its title
   or a short reference with the page, linking back to the place in that PDF).
+
+## Folders (after the folder-wide notes above)
+
+- Mark some papers of a folder with tags (e.g. "starred"); several tags, each with its
+  name.
+- Remove the "report on cited papers" view: merged into the folder notes. Next to the
+  "quote" icon, another icon colour-coded by citation status, with the details on hover:
+  all cited / cited but not in the range / not cited.
