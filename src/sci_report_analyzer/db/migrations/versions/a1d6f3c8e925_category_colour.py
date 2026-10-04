@@ -36,9 +36,12 @@ def upgrade() -> None:
             sa.text("SELECT category_id, colour FROM excerpt WHERE colour IS NOT NULL")
         ):
             used.setdefault(cat, Counter())[colour] += 1
+    # (by folder; run again after f6b3d8a2c5e9: by settings)
+    columns = {c["name"] for c in inspector.get_columns("category")}
+    group = "folder_id" if "folder_id" in columns else "settings_id"
     counts: dict[int, int] = {}
     for cat, folder in bind.execute(
-        sa.text("SELECT id, folder_id FROM category WHERE colour IS NULL ORDER BY folder_id, id")
+        sa.text(f"SELECT id, {group} FROM category WHERE colour IS NULL ORDER BY {group}, id")
     ):
         k = counts.get(folder, 0)
         counts[folder] = k + 1
