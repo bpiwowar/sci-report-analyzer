@@ -10,6 +10,7 @@ from nicegui import ui
 from .. import annotations, folders, reports
 from ..i18n import N_, _
 from . import unsaved
+from .categories_editor import shared_note
 
 TEMPLATES_HELP = N_(
     "How a paper is cited: `[@key]` followed by the template. `{.notes}`, `{.tags}`, "
@@ -134,6 +135,7 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
     tags = {t.id: ("⏱ " if t.per_period else "") + t.name for t in annotations.all_tags()}
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-4xl"):
         ui.label(_("Citations in the notes of {folder}").format(folder=name)).classes("text-lg")
+        shared_note(folder_id)
         with ui.row().classes("w-full items-start gap-3"):
             tag = (
                 ui.select(

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 16:24+0200\n"
+"POT-Creation-Date: 2026-10-04 16:28+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -350,6 +350,9 @@ msgstr "Ajouter des PDF"
 
 msgid "Add a conference"
 msgstr "Ajouter une conférence"
+
+msgid "Add a folder within it"
+msgstr "Ajouter un dossier dans celui-ci"
 
 msgid "Add a main conference"
 msgstr "Ajouter une conférence principale"
@@ -1211,6 +1214,16 @@ msgstr "Téléchargement du PDF…"
 msgid "Downloading the Scimago journals and the predatory list…"
 msgstr "Téléchargement des revues Scimago et de la liste des revues prédatrices…"
 
+msgid ""
+"Drag a folder onto another one to put it within it (onto its top or "
+"bottom: next to it). A folder uses the settings of the folder it is in "
+"(its categories, the citations in its notes: all of them), or its own "
+"ones."
+msgstr ""
+"Glissez un dossier sur un autre pour le mettre dedans (sur son haut ou "
+"son bas : à côté). Un dossier utilise les réglages du dossier où il est "
+"(ses catégories, les citations dans ses notes : tous), ou les siens."
+
 msgid "Drag a venue onto another one to merge it into that one."
 msgstr "Faites glisser un canal sur un autre pour l'y fusionner."
 
@@ -1223,6 +1236,9 @@ msgid ""
 msgstr ""
 "Glisser : sur le haut / bas d'une catégorie (avant / après elle), ou sur "
 "son milieu (dedans)"
+
+msgid "Drop here: at the top level"
+msgstr "Déposer ici : au premier niveau"
 
 msgid "Drop here: last, at the top level"
 msgstr "Déposer ici : en dernier, au premier niveau"
@@ -1450,6 +1466,9 @@ msgstr "Marqué « rayonnement » dans {category} (copié ici aussi)"
 msgid "Folders"
 msgstr "Dossiers"
 
+msgid "Folders within it:"
+msgstr "Dossiers qu'il contient :"
+
 msgid "Forget the chosen record: match automatically"
 msgstr "Oublier l'entrée choisie : correspondance automatique"
 
@@ -1562,6 +1581,9 @@ msgstr "Masquer"
 
 msgid "Hide a misattributed / irrelevant record"
 msgstr "Masquer une notice mal attribuée / non pertinente"
+
+msgid "Hide the folders within it"
+msgstr "Masquer les dossiers qu'il contient"
 
 msgid ""
 "Holds the database (people, publications, venues, settings) and the "
@@ -1750,6 +1772,9 @@ msgstr ""
 msgid "Italic (⌘/Ctrl-I)"
 msgstr "Italique (⌘/Ctrl-I)"
 
+msgid "Its categories and the citations in its notes"
+msgstr "Ses catégories et les citations dans ses notes"
+
 msgid "Its demo track, one of its workshops…"
 msgstr "Sa session démo, un de ses ateliers…"
 
@@ -1766,6 +1791,12 @@ msgstr "Son canal principal (c'est la session {track} de ce canal)"
 
 msgid "Its name, to use it as .name (optional)"
 msgstr "Son nom, pour l'utiliser comme .nom (facultatif)"
+
+msgid "Its own settings: a copy of its parent's"
+msgstr "Ses propres réglages : une copie de ceux de son parent"
+
+msgid "Its parent's settings"
+msgstr "Les réglages de son parent"
 
 msgid ""
 "Its quotes, joined; edited, it is the text of the group (its excerpts: "
@@ -2299,6 +2330,9 @@ msgstr "Aucun extrait d'un document pour l’instant"
 msgid "No excerpt has these words"
 msgstr "Aucun extrait n'a ces mots"
 
+msgid "No folder yet"
+msgstr "Aucun dossier pour l'instant"
+
 msgid "No item in the text"
 msgstr "Aucun élément dans le texte"
 
@@ -2638,6 +2672,9 @@ msgstr ""
 
 msgid "Override"
 msgstr "Remplacer"
+
+msgid "Own settings"
+msgstr "Ses propres réglages"
 
 msgid "Own thesis"
 msgstr "Thèse personnelle"
@@ -3108,6 +3145,10 @@ msgstr "Règles"
 msgid "Same paper as… (merge into this one)"
 msgstr "Même article que… (le fusionner dans celui-ci)"
 
+#, python-brace-format
+msgid "Same settings as: {folders}"
+msgstr "Mêmes réglages que : {folders}"
+
 msgid "Save"
 msgstr "Enregistrer"
 
@@ -3322,6 +3363,10 @@ msgstr "Campagne d'évaluation (shared task)"
 msgid "Shared tasks"
 msgstr "Campagnes d'évaluation"
 
+#, python-brace-format
+msgid "Shared with {folders}: changed for them too"
+msgstr "Partagés avec {folders} : modifiés pour eux aussi"
+
 msgid "Short"
 msgstr "Court"
 
@@ -3342,6 +3387,9 @@ msgstr "Afficher toutes les années"
 
 msgid "Show how the text was cleaned and matched"
 msgstr "Montrer comment le texte a été nettoyé et rapproché"
+
+msgid "Show the folders within it"
+msgstr "Afficher les dossiers qu'il contient"
 
 msgid "Show the notes as saved (the text typed here is lost: copy it first)"
 msgstr ""
@@ -3783,6 +3831,11 @@ msgstr "Le texte du groupe (modifiez-le avec son crayon)"
 msgid "The track's identifier (in the exported settings)"
 msgstr "L'identifiant de la session (dans les paramètres exportés)"
 
+msgid "The tree of folders: nest, move and rename them; their settings"
+msgstr ""
+"L'arbre des dossiers : les imbriquer, les déplacer, les renommer ; leurs "
+"réglages"
+
 #, python-brace-format
 msgid "The validated profiles give the ORCID {orcid}."
 msgstr "Les profils validés donnent l'ORCID {orcid}."
@@ -4060,6 +4113,20 @@ msgstr "L’utiliser"
 
 msgid "Use the conferences found in its texts"
 msgstr "Utiliser les conférences trouvées dans ses textes"
+
+msgid "Use the parent's"
+msgstr "Utiliser ceux du parent"
+
+msgid ""
+"Use the settings of the folder it is in? Its own ones (categories, "
+"citations in the notes) are dropped, unless other folders use them; its "
+"people's excerpts go to the categories of the same names there (added if "
+"missing)."
+msgstr ""
+"Utiliser les réglages du dossier où il est ? Les siens (catégories, "
+"citations dans les notes) sont supprimés, sauf si d'autres dossiers les "
+"utilisent ; les extraits de ses personnes vont dans les catégories de "
+"mêmes noms (ajoutées si elles manquent)."
 
 msgid "Use the venues' short names (acronyms) when they have one"
 msgstr ""
@@ -5112,6 +5179,12 @@ msgid "{n} candidate(s) to review"
 msgid_plural "{n} candidate(s) to review"
 msgstr[0] "{n} candidat à examiner"
 msgstr[1] "{n} candidats à examiner"
+
+#, python-brace-format
+msgid "{n} category added there, for the excerpts filed in it"
+msgid_plural "{n} categories added there, for the excerpts filed in them"
+msgstr[0] "{n} catégorie ajoutée là, pour les extraits qui y sont classés"
+msgstr[1] "{n} catégories ajoutées là, pour les extraits qui y sont classés"
 
 #, python-brace-format
 msgid "{n} category copied"
