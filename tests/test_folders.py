@@ -156,3 +156,20 @@ def test_primary_source_default_and_folder_override():
     assert source_settings.primary_for(other) is None
     source_settings.set_disabled({"hal"})
     assert source_settings.primary_for(pid) is None
+
+
+def test_notes_saved_only_from_the_stored_ones():
+    """A person's notes within a folder: saved over the notes the editor loaded only."""
+    fid = folders.save_folder(None, "Committee", notes="The folder's own.")
+    period = folders.add_person(fid, make_person("Ann"))
+    assert folders.set_notes(period, "First.")  # (no base: saved)
+    assert folders.set_notes(period, "Second.", base="First.\n")  # (as loaded: spaces aside)
+    assert not folders.set_notes(period, "Stale.", base="First.")  # (changed since)
+    assert folders.notes_of(period) == "Second."
+    assert not folders.set_notes(period, "", base="")  # (loaded empty, written since)
+    assert folders.notes_of(period) == "Second."
+    # The folder's own notes: kept unless given.
+    folders.save_folder(fid, "Hiring committee")
+    assert folders.folders()[0].notes == "The folder's own."
+    folders.save_folder(fid, "Hiring committee", notes="")
+    assert folders.folders()[0].notes is None

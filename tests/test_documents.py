@@ -355,6 +355,79 @@ async def test_folder_notes(user: User, monkeypatch, tmp_path):
     await user.should_not_see(marker="folder-note")
 
 
+async def _status(user: User, mark: str, text: str) -> None:
+    """Wait until a note editor's status is ``text`` (e.g. once typing pauses)."""
+    for _i in range(40):
+        if user.find(marker=f"{mark}-status").elements.pop().text == text:
+            return
+        await asyncio.sleep(0.1)
+    raise AssertionError(f"{mark}: not {text!r}")
+
+
+async def test_folder_notes_stale_save_refused(user: User, monkeypatch, tmp_path):
+    """An editor whose notes changed since it loaded them (saved elsewhere) does not save over
+    them: it says so, and offers to copy its text or to reload."""
+    _, period, ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    pdfs.save(ids["a"], PDF, None)
+    copied = []
+    monkeypatch.setattr(ui.clipboard, "write", lambda text: copied.append(text))
+    folders.set_notes(period, "Mine.")
+    await user.open(f"/pdf/{ids['a']}?period={period}")
+    await user.should_see(marker="folder-note")
+    await user.should_not_see(marker="folder-note-conflict")
+    # Saved elsewhere meanwhile (e.g. a section appended), then typed here: refused.
+    appended = "Mine.\n\n## Starred papers\n\nAppended."
+    folders.set_notes(period, appended)
+    user.find(marker="folder-note").elements.pop().value = "Mine, edited."
+    await _status(user, "folder-note", "Not saved")
+    assert folders.notes_of(period) == appended
+    await user.should_see(marker="folder-note-conflict")
+    user.find(marker="folder-note-copy-unsaved").click()
+    assert copied == ["Mine, edited."]
+    # Reloaded: the notes as saved, and saving again from there.
+    user.find(marker="folder-note-reload").click()
+    editor = user.find(marker="folder-note").elements.pop()
+    assert editor.value == appended
+    await user.should_not_see(marker="folder-note-conflict")
+    editor.value = appended + " More."
+    await note_saved(user, "folder-note")
+    assert folders.notes_of(period) == appended + " More."
+    # Saving from the notes as they are: not refused.
+    assert folders.set_notes(period, "Same.", base=folders.notes_of(period))
+    assert not folders.set_notes(period, "Other.", base="Mine.")
+    assert folders.notes_of(period) == "Same."
+
+
+async def test_folder_notes_cleared_after_asking(user: User, monkeypatch, tmp_path):
+    """Emptying the notes saves nothing until confirmed (else restores them)."""
+    _, period, ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    pdfs.save(ids["a"], PDF, None)
+    folders.set_notes(period, "Precious notes.")
+    await user.open(f"/pdf/{ids['a']}?period={period}")
+    await user.should_see(marker="folder-note")
+    editor = user.find(marker="folder-note").elements.pop()
+    editor.value = ""
+    await _status(user, "folder-note", "Not saved")
+    await user.should_see(marker="folder-note-restore")
+    assert folders.notes_of(period) == "Precious notes."
+    user.find(marker="folder-note-restore").click()
+    assert editor.value == "Precious notes."
+    await user.should_not_see(marker="folder-note-restore")
+    assert folders.notes_of(period) == "Precious notes."
+    # Confirmed: cleared.
+    editor.value = "  "
+    await _status(user, "folder-note", "Not saved")
+    user.find(marker="folder-note-clear").click()
+    await _status(user, "folder-note", "Saved")
+    assert folders.notes_of(period) == ""
+    # Empty already: nothing to ask.
+    editor.value = "New start."
+    await note_saved(user, "folder-note")
+    assert folders.notes_of(period) == "New start."
+
+
 async def test_folder_notes_cite_and_copy(user: User, monkeypatch, tmp_path):
     """The folder's notes cite a paper and copy with the references, in the PDF viewer and on
     the documents page."""
@@ -996,10 +1069,14 @@ async def test_folder_notes_sync(user: User):
         def adopt(self, text):
             seen.append(text)
 
+        def rebase(self, text):
+            seen.append(f"rebased: {text}")
+
     clean, saver, same = Fake("old"), Fake("old"), Fake("new")
     folder_notes._editors()[folder] = {clean, saver, same}  # (as the registry's sets)
     folder_notes.saved(folder, "new", saver)
-    assert seen == ["new"]  # (the other one only: not the saver, not the one up to date)
+    # The other ones only (not the saver); the one up to date: as is, but saving from there.
+    assert sorted(seen) == ["new", "rebased: new"]
 
 
 def _page_event(user: User, name: str, args) -> None:

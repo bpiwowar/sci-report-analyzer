@@ -578,6 +578,30 @@ async def test_folders_on_people_page(user: User) -> None:
     assert folders.folders()[0].hidden
 
 
+async def test_folder_dialog_saves_its_notes_only_if_edited(user: User) -> None:
+    from sci_report_analyzer import folders
+
+    fid = folders.save_folder(None, "Hiring committee", notes="Old.")
+    await user.open(f"/?folder={fid}")
+    await user.should_see("Hiring committee")
+    folders.save_folder(fid, "Hiring committee", notes="Changed in another window.")
+    # The dialog shows the stale copy: saved without its notes edited, they are kept.
+    user.find(marker="folder-edit").click()
+    await user.should_see(marker="folder-own-notes")
+    user.find(marker="folder-name").type(" 2026")
+    user.find(marker="folder-save").click()
+    await user.should_see("Hiring committee 2026")
+    [f] = folders.folders()
+    assert (f.name, f.notes) == ("Hiring committee 2026", "Changed in another window.")
+    # Edited: saved.
+    user.find(marker="folder-edit").click()
+    await user.should_see(marker="folder-own-notes")
+    user.find(marker="folder-own-notes").elements.pop().value = "Mine."
+    user.find(marker="folder-save").click()
+    await user.should_see("Mine.")
+    assert folders.folders()[0].notes == "Mine."
+
+
 async def test_remove_from_folder_keeping_or_deleting_data(user: User) -> None:
     from sci_report_analyzer import annotations, folders
 
