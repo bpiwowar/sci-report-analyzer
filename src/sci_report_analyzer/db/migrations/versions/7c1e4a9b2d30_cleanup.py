@@ -7,7 +7,10 @@ gets another one are rewritten (their notes, their papers' notes, their notes wi
 folders, those of their documents, their excerpts). Both ways of making the keys are frozen
 here (the app's may change).
 
-Also dropped, as written but never read: the lists tags were put from (``ui.reflist.*``).
+Also dropped, as written but never read: the lists tags were put from (``ui.reflist.*``),
+the reports (their view merged into the notes: a text not found in its person's notes within
+the folder is appended to them first) and the ``old_reports`` request, when a sync started
+(``source_link.sync_started_at``), a thesis' discipline.
 
 Revision ID: 7c1e4a9b2d30
 Revises: f6b3d8a2c5e9
@@ -226,12 +229,58 @@ def _rewrite_keys(conn) -> None:
                     )
 
 
+def _keep_reports(conn) -> None:
+    """The text of a report not found in its person's notes within the folder (where the
+    old reports went, at first into the folder's own notes, since emptied): appended to
+    them, before the reports are dropped."""
+    rows = conn.execute(
+        sa.text(
+            "SELECT r.period_id, r.text, p.notes FROM report r "
+            "JOIN period p ON p.id = r.period_id WHERE trim(r.text) != ''"
+        )
+    )
+    for period_id, text, notes in list(rows):
+        if text.strip() in (notes or ""):
+            continue
+        notes = (notes or "").rstrip()
+        conn.execute(
+            sa.text("UPDATE period SET notes = :n WHERE id = :p"),
+            {
+                "n": (notes + "\n\n" if notes else "") + f"## Report\n\n{text.strip()}\n",
+                "p": period_id,
+            },
+        )
+
+
 def upgrade() -> None:
     conn = op.get_bind()
+    _keep_reports(conn)
     _rewrite_keys(conn)
-    # The lists tags were put from (annotations.tag_list): saved, never read.
+    # Written, never read: the lists tags were put from (annotations.tag_list), the reports
+    # (merged into the notes) and the request to merge them, when a sync started, a thesis'
+    # discipline.
     conn.execute(sa.text("DELETE FROM app_setting WHERE key LIKE 'ui.reflist.%'"))
+    conn.execute(sa.text("DELETE FROM app_setting WHERE key = 'old_reports'"))
+    op.drop_table("report")
+    with op.batch_alter_table("source_link") as batch:
+        batch.drop_column("sync_started_at")
+    with op.batch_alter_table("thesis") as batch:
+        batch.drop_column("discipline")
 
 
 def downgrade() -> None:
-    pass  # (the keys stay as they are)
+    # (the keys, the notes and the settings stay as they are)
+    with op.batch_alter_table("thesis") as batch:
+        batch.add_column(sa.Column("discipline", sa.String(), nullable=True))
+    with op.batch_alter_table("source_link") as batch:
+        batch.add_column(sa.Column("sync_started_at", sa.DateTime(), nullable=True))
+    op.create_table(
+        "report",
+        sa.Column("period_id", sa.Integer(), nullable=False),
+        sa.Column("text", sa.String(), nullable=False),
+        sa.Column("tag_ids", sa.JSON(), nullable=False),
+        sa.Column("number_format", sa.String(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.ForeignKeyConstraint(["period_id"], ["period.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("period_id"),
+    )

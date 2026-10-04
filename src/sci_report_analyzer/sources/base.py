@@ -70,7 +70,6 @@ class FetchedThesis:
     status: str | None = None
     defence_date: str | None = None
     start_date: str | None = None
-    discipline: str | None = None
     institution: str | None = None
     url: str | None = None
 

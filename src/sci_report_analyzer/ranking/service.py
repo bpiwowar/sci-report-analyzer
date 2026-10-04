@@ -381,7 +381,6 @@ class RankingService:
             type="conference" if s.get("type") == "conference" else "journal",
             hindex=stats.get("h_index"),
             twoYearMeanCitedness=stats.get("2yr_mean_citedness"),
-            worksCount=s.get("works_count"),
             score=0.8,
             exact=False,
             url=s.get("homepage_url") or s.get("id"),
@@ -537,7 +536,6 @@ class RankingService:
                         exact=ph.exact,
                     )
                 badge.predatory = True
-                badge.predatoryUrl = ph.record.get("url")
 
         if cacheable:
             self._cache_set(key, badge)

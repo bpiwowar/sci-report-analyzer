@@ -73,7 +73,6 @@ class SourceLink(Base):
     last_error: Mapped[str | None]
     # idle | running | ok | error
     sync_state: Mapped[str] = mapped_column(String(16), default="idle")
-    sync_started_at: Mapped[datetime | None]
     record_count: Mapped[int | None]
 
     person: Mapped[Person] = relationship(back_populates="links")
@@ -500,23 +499,6 @@ class PeriodDocument(Base):
     period: Mapped[Period] = relationship(back_populates="documents")
 
 
-class Report(Base):
-    """A report (Markdown) on a person within a period / folder, citing their papers
-    (``[@key]``, see reports.py): those with some tags. Its view is gone, merged into the
-    folder's notes (where it was appended): kept for its data."""
-
-    __tablename__ = "report"
-
-    period_id: Mapped[int] = mapped_column(
-        ForeignKey("period.id", ondelete="CASCADE"), primary_key=True
-    )
-    text: Mapped[str] = mapped_column(default="")
-    tag_ids: Mapped[list[Any]] = mapped_column(default=list)  # the papers to discuss
-    # How a paper's number is written ({n}: the number).
-    number_format: Mapped[str] = mapped_column(default="**#{n}**")
-    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
-
-
 class Thesis(Base):
     __tablename__ = "thesis"
     __table_args__ = (UniqueConstraint("link_id", "thesis_id", "role"),)
@@ -532,7 +514,6 @@ class Thesis(Base):
     status: Mapped[str | None]
     defence_date: Mapped[str | None]
     start_date: Mapped[str | None]
-    discipline: Mapped[str | None]
     institution: Mapped[str | None]
     url: Mapped[str | None]
 
