@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy import select
 
 from .annotations import save_ui_state, ui_state
+from .authors import name_key
 from .db.models import AppSetting, Period, PeriodDocument, utcnow
 from .db.session import session_scope
 from .i18n import _
@@ -458,10 +459,8 @@ _FIRST = re.compile(rf"({_AUTHOR})\s+(?:and|&)\s*$")
 
 
 def _surname(name: str) -> str:
-    """The surname of an author ("Jane Doe", "Doe, Jane"), normalized."""
-    name = name.split(",")[0] if "," in name else name
-    words = normalize(name).split()
-    return words[-1] if words else ""
+    """The surname of an author ("Jane Doe", "Doe, Jane", "DOE Jane"), normalized."""
+    return name_key(name)[0]
 
 
 def _author_years(

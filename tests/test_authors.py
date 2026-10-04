@@ -9,6 +9,7 @@ def test_natural_order():
     assert natural_order("Julien Marchetti") == "Julien Marchetti"
     assert natural_order("TANABE") == "TANABE"  # all capitals: nothing to reorder
     assert natural_order("J. Doe") == "J. Doe"
+    assert natural_order("R.L. Doe") == "R.L. Doe"  # (initials, not a surname)
 
 
 def test_surname_first_names_match_author_lists():
