@@ -13,8 +13,15 @@ from .. import annotations, venue_match, venues
 from ..db.models import Venue
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
-from ..ranking.badge import TRACK_LABEL, category_of, core_periods, sjr_periods, text_colour
-from ..ranking.kinds import KIND_SHORT, KINDS, VENUE_KINDS, WORKSHOP_KINDS
+from ..ranking.badge import (
+    TRACK_LABEL,
+    UNRANKED_COLOUR,
+    category_of,
+    core_periods,
+    sjr_periods,
+    text_colour,
+)
+from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
 from ..ranking.service import service
 from ..sources import ADAPTERS
 from .pub_details import VIA_LABEL, venue_rule_dialog
@@ -44,9 +51,17 @@ def _papers(n: int) -> str:
 
 
 def _chip_html(row: venues.VenueRow) -> str:
-    cat = category_of(row.badge, None, row.kind)
-    label = cat.label if row.badge or cat.base_key.startswith("k_") else _("not ranked")
+    """Its rank now: none for a kind never ranked (a shared task), "CORE A until 2008" for a
+    conference CORE no longer lists (its papers of then keep it)."""
+    badge = row.badge
+    if row.kind in UNRANKED_KINDS and not (badge and badge.manual):
+        badge = None
+    cat = category_of(badge, None, row.kind)
+    label = cat.label if badge or cat.base_key.startswith("k_") else _("not ranked")
     colour = cat.colour
+    if dropped := venues.dropped_from_core(badge):
+        label = _("CORE {rank} until {year}").format(rank=dropped[0], year=dropped[1])
+        colour = UNRANKED_COLOUR
     style = f"background:{colour};color:{text_colour(colour)}"
     return f'<span class="vr-chip" style="{style}">{escape(label)}</span>' + (
         f' <span title="{escape(_("manual decision"))}">✎</span>' if row.manual else ""

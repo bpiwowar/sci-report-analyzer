@@ -4995,3 +4995,6 @@ msgstr "Pas d'acronyme"
 
 msgid "This venue has no acronym: none is inferred"
 msgstr "Ce canal n'a pas d'acronyme : aucun n'est déduit"
+
+msgid "CORE {rank} until {year}"
+msgstr "CORE {rank} jusqu'en {year}"

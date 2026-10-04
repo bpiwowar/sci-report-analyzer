@@ -1076,3 +1076,31 @@ def test_mark_as_track_without_a_main_venue():
     (st,) = _stats(pid).values()
     assert st.venue_id == demo and st.track == "demo"
     assert st.category.track == "demo" and st.category.base_key == "as"
+
+
+def test_venue_chip_unranked_kind_or_dropped_from_core():
+    """A shared task shows no rank; a conference CORE no longer lists shows its last rank as
+    such ("CORE A until 2008"), not as its rank."""
+    from sci_report_analyzer.ranking.badge import Badge
+    from sci_report_analyzer.ui.venues_page import _chip_html
+
+    old = Badge(
+        source="core",
+        type="conference",
+        name="Gadget Retrieval Conference",
+        coreRank="A",
+        coreEdition="CORE2008",
+        coreHistory={"CORE2008": "A"},
+    )
+    assert venues.dropped_from_core(old) == ("A", 2008)
+    assert venues.dropped_from_core(old, 2009) is None  # (still in force then)
+    current = Badge(**{**old.to_dict(), "coreHistory": {"CORE2008": "A", "ICORE2026": "B"}})
+    assert venues.dropped_from_core(current) is None
+
+    def chip(kind, badge):
+        return _chip_html(
+            venues.VenueRow(1, "Gadget Retrieval Conference", kind, False, badge, False)
+        )
+
+    assert "CORE A until 2008" in chip("intl_conference", old)
+    assert "CORE A" not in chip("shared_task", old) and "Shared task" in chip("shared_task", old)
