@@ -259,6 +259,15 @@ def test_issn_identifies_the_venue():
     assert a.venue_id == target and a.members[0].via == "identifier"
 
 
+def test_issns_saved_once_whatever_their_spelling():
+    pid = make_person()
+    add_source(pid, "hal", "idhal:x", [pub("a", "Paper A", 2020, "Venue One")])
+    vid = stats(pid)["Paper A"].venue_id
+    venues.save_issns(vid, ["1234-567X", " 1234567x", "", "2049-3630"])
+    with session_scope() as s:
+        assert s.get(Venue, vid).identifiers == {"issn": ["1234-567X", "2049-3630"]}
+
+
 def test_validated_source_settles_different_venues():
     from sci_report_analyzer import annotations
 

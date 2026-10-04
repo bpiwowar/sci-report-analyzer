@@ -36,6 +36,7 @@ from .ranking.kinds import (
     host_text,
     is_edited_volume,
 )
+from .ranking.matcher import issn_key
 from .ranking.normalize import normalize, tokenize
 from .ranking.service import (
     VenuePattern,
@@ -803,7 +804,7 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
             if sp.archival or not sp.link.active:
                 continue
             m = texts.get((sp.link.source, sp.venue))
-            vid = by_issn.get(venue_match.norm_issn(sp.issn) or "") or (m and m.venue_id)
+            vid = by_issn.get(issn_key(sp.issn)) or (m and m.venue_id)
             if vid:
                 by_venue[vid].append(sp)
             if m:
@@ -1330,12 +1331,15 @@ def venue_patterns(venue_id: int) -> list[VenuePattern]:
 
 def save_issns(venue_id: int, issns: list[str]) -> None:
     """The ISSNs identifying a venue (records with one of them belong to it)."""
-    clean = list(dict.fromkeys(i.strip() for i in issns if venue_match.norm_issn(i)))
+    clean: dict[str, str] = {}  # (the same ISSN written twice: once)
+    for i in issns:
+        if key := issn_key(i):
+            clean.setdefault(key, i.strip())
     with session_scope() as s:
         v = s.get(Venue, venue_id)
         ids = {k: val for k, val in (v.identifiers or {}).items() if k != "issn"}
         if clean:
-            ids["issn"] = clean
+            ids["issn"] = list(clean.values())
         v.identifiers = ids or None
     _changed()
 
