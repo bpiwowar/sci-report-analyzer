@@ -24,20 +24,16 @@ uses.
 ### Versioning
 
 `format` must be `"sci-report-analyzer-settings"`, or the file is rejected. `version` (now
-`6`) is written but not checked on import. Every other field is optional: a missing one takes
-its default, an unknown one is ignored. Older files therefore import as long as their fields
-kept their meaning. A file of version 4 or before may have `flags` (`{"name", "colour",
-"track"}`; gone since version 5, see [Tracks](#track)): when its `matching` has no `tracks`,
-the colour of a flag with a track becomes that track's; the other flags are ignored. Since
-version 6 a track has `name_rules`: a built-in track without them (an older file) gets their
-defaults.
+`6`) must be 6 or later: older files (with `flags`, or tracks without `name_rules`) are
+refused. Every other field is optional: a missing one takes its default, an unknown one is
+ignored.
 
 ### Top level
 
 | Field | Type | Default | |
 |-------|------|---------|-|
 | `format` | `"sci-report-analyzer-settings"` | that | required in effect (the only accepted value) |
-| `version` | int | `6` | informative |
+| `version` | int | `6` | 6 or later |
 | `exported_at` | string \| null | null | ISO 8601, UTC, seconds (`2026-10-04T09:00:00+00:00`) |
 | `matching` | [Matching](#matching) | defaults | |
 | `venues` | list of [Venue](#venue) | `[]` | only venues with a manual decision or a manual variant are exported |

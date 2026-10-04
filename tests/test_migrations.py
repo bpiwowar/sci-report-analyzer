@@ -81,7 +81,8 @@ def test_cleanup_7c1e4a9b2d30(tmp_path):
         c.execute("UPDATE publication SET note = '[@jane2020neural]' WHERE id IN (2, 5)")
         c.execute(
             "INSERT INTO app_setting VALUES ('ui.reflist.1.0.1', '[]'), ('ui.x', '1'),"
-            " ('old_reports', '{}')"
+            " ('old_reports', '{}'), ('matching', ?)",
+            (json.dumps({"tracks": [{"id": "short"}, {"id": "mine", "name_rules": []}]}),),
         )
         c.execute(
             "INSERT INTO report VALUES (1, 'Read [@jane2020neural].', '[]', '', ''),"
@@ -97,7 +98,11 @@ def test_cleanup_7c1e4a9b2d30(tmp_path):
         notes = dict(c.execute("SELECT id, note FROM publication WHERE note IS NOT NULL"))
         # (person 2: their paper's key is doe2020other, no jane2020neural to rename)
         assert notes == {2: "[@doe2020neural]", 5: "[@jane2020neural]"}
-        assert c.execute("SELECT key FROM app_setting").fetchall() == [("ui.x",)]
+        settings = dict(c.execute("SELECT key, value FROM app_setting"))
+        assert settings.keys() == {"ui.x", "matching"}
+        short, mine = json.loads(settings["matching"])["tracks"]
+        assert [r["id"] for r in short["name_rules"]] == ["name_short_part", "name_short_words"]
+        assert mine == {"id": "mine", "name_rules": []}
         tables = {t for (t,) in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert "report" not in tables
         assert "sync_started_at" not in {r[1] for r in c.execute("PRAGMA table_info(source_link)")}

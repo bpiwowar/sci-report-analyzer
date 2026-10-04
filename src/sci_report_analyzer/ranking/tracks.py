@@ -20,9 +20,8 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
-from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from ..i18n import language
 from ..text import ascii_fold, safe_compile
@@ -83,15 +82,6 @@ class Track(BaseModel):
     colour: str = FALLBACK_COLOUR
     rules: list[TrackRule] = Field(default_factory=list)
     name_rules: list[NameRule] = Field(default_factory=list)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _default_name_rules(cls, data: Any) -> Any:
-        """A built-in track saved before the name rules gets their defaults."""
-        if not isinstance(data, dict) or "name_rules" in data:
-            return data
-        rules = DEFAULT_NAME_RULES_OF.get(data.get("id"), [])
-        return {**data, "name_rules": [r.model_copy() for r in rules]}
 
     def name(self, lang: str | None = None) -> str:
         """Its name in ``lang`` (that of the moment by default), else in English."""
@@ -186,6 +176,7 @@ DEFAULT_NAME_RULES = {r.id: r for rules in DEFAULT_NAME_RULES_OF.values() for r 
 DEFAULT_TRACKS: tuple[Track, ...] = (
     Track(
         id=FINDINGS_ID,
+        name_rules=DEFAULT_NAME_RULES_OF[FINDINGS_ID],
         names={"en": "Findings", "fr": "Findings"},
         colour=FALLBACK_COLOUR,
         rules=[
@@ -199,6 +190,7 @@ DEFAULT_TRACKS: tuple[Track, ...] = (
     ),
     Track(
         id="tutorial",
+        name_rules=DEFAULT_NAME_RULES_OF["tutorial"],
         names={"en": "Tutorial", "fr": "Tutoriel"},
         colour="#1a7f37",
         rules=[
@@ -208,6 +200,7 @@ DEFAULT_TRACKS: tuple[Track, ...] = (
     ),
     Track(
         id="demo",
+        name_rules=DEFAULT_NAME_RULES_OF["demo"],
         names={"en": "Demo", "fr": "Démo"},
         colour="#8a6fd0",
         rules=[
@@ -227,6 +220,7 @@ DEFAULT_TRACKS: tuple[Track, ...] = (
     ),
     Track(
         id="short",
+        name_rules=DEFAULT_NAME_RULES_OF["short"],
         names={"en": "Short", "fr": "Court"},
         colour="#d4a72c",
         rules=[
