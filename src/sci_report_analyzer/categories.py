@@ -5,6 +5,7 @@ its people's PDFs filed in them: listed by category, as Markdown for a report.""
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -794,43 +795,79 @@ def _markdown_item(e: ExcerptView) -> str:
     return " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
 
 
-def markdown(folder_id: int, period_id: int, *, level: int = 2) -> str:
+def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | None = None) -> str:
     """The excerpts by category (headings; a category's years in its heading), as Markdown
     (unquoted, their places between Obsidian comments: ``%% Application, p. 4; p. 12 %%``),
     with their years. The excerpts with the "influence" flag (left in their categories too)
     are also listed, one item per category (its path in bold, them nested below), in the
     folder's "rayonnement" category (after its own excerpts; see set_influence), else in a
-    "Rayonnement" section at the end. The categories with no excerpt (nor below) are left
-    out."""
+    "Rayonnement" section at the end. ``nested`` (None: the folder's choice, see
+    reports.nested_influence): them only there instead, under subsections named after their
+    categories (as nested as these, one level below), taken out of their categories. The
+    categories with no excerpt (nor below) are left out."""
+    if nested is None:
+        from . import reports
+
+        nested = reports.nested_influence(folder_id)
     nodes = tree(folder_id)
     by_cat: dict[int, list[ExcerptView]] = {}
     for e in excerpts(period_id, grouped=True):
         by_cat.setdefault(e.category_id, []).append(e)
     gather = next((n for n in nodes if n.influence), None)
-    influence: list[str] = []  # (by category, in tree order)
-    for n in nodes:
-        if n is not gather and (
-            flagged := [_markdown_item(e) for e in by_cat.get(n.id, []) if e.influence]
-        ):
-            influence += [f"- **{n.path}**", *(f"  - {x}" for x in flagged)]
+    # Those whose flagged excerpts are listed apart (nested: not those below the gathering one).
+    apart = [n for n in nodes if n is not gather]
+    if nested and gather is not None:
+        below: set[int] = set()
 
-    def count(n: Node) -> int:
-        own = len(by_cat.get(n.id, [])) + (len(influence) if n is gather else 0)
-        return own + sum(count(c) for c in n.children)
+        def mark(n: Node) -> None:
+            below.add(n.id)
+            for c in n.children:
+                mark(c)
+
+        mark(gather)
+        apart = [n for n in nodes if n.id not in below]
+    flagged = {n.id: [e for e in by_cat.get(n.id, []) if e.influence] for n in apart}
+    shown = {
+        k: [e for e in v if not (nested and e.influence and k in flagged)]
+        for k, v in by_cat.items()
+    }
+
+    def heading(n: Node, depth: int) -> str:
+        years = f" ({n.years})" if n.years else ""
+        return f"{'#' * min(depth, 6)} {n.name}{years}\n"
+
+    def counted(n: Node, own: Callable[[Node], int]) -> int:
+        return own(n) + sum(counted(c, own) for c in n.children)
+
+    def influence(base: int) -> list[str]:
+        """The flagged excerpts: items (by path), or subsections below the ``base`` level."""
+        out: list[str] = []
+        for n in apart:
+            items = [_markdown_item(e) for e in flagged.get(n.id, [])]
+            if not nested:
+                if items:
+                    out += [f"- **{n.path}**", *(f"  - {x}" for x in items)]
+            elif counted(n, lambda m: len(flagged.get(m.id, []))):
+                out.append(heading(n, base + 1 + n.depth))
+                out += [*(f"- {x}" for x in items), *([""] if items else [])]
+        return out
+
+    gathered = influence(level + gather.depth) if gather is not None else influence(level)
+
+    def own(n: Node) -> int:
+        return len(shown.get(n.id, [])) + (len(gathered) if n is gather else 0)
 
     out: list[str] = []
     for n in nodes:
-        if not count(n):
+        if not counted(n, own):
             continue
-        heading = "#" * min(level + n.depth, 6)
-        years = f" ({n.years})" if n.years else ""
-        out.append(f"{heading} {n.name}{years}\n")
-        for e in by_cat.get(n.id, []):  # (a group: its quotes, on one item)
+        out.append(heading(n, level + n.depth))
+        for e in shown.get(n.id, []):  # (a group: its quotes, on one item)
             out.append("- " + _markdown_item(e))
-        if n is gather:
-            out += influence
-        if by_cat.get(n.id) or (n is gather and influence):
+        if shown.get(n.id) and (n is not gather or nested or not gathered):
             out.append("")
-    if influence and gather is None:
-        out += [f"{'#' * min(level, 6)} Rayonnement\n", *influence]
+        if n is gather:
+            out += gathered + ([""] if gathered and not nested else [])
+    if gathered and gather is None:
+        out += [f"{'#' * min(level, 6)} Rayonnement\n", *gathered]
     return "\n".join(out).strip() + "\n" if out else ""

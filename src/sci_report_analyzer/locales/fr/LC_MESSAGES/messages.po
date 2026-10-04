@@ -1746,6 +1746,17 @@ msgstr "Importé : {counts}"
 msgid "In"
 msgstr "Dans"
 
+msgid ""
+"In []{.excerpts} (and the copied excerpts): the excerpts flagged "
+"“rayonnement” taken out of their categories, listed under subsections "
+"named after them; one block: []{.excerpts .nested-influence} or "
+"[]{.excerpts .flat-influence}"
+msgstr ""
+"Dans []{.excerpts} (et les extraits copiés) : les extraits marqués "
+"« rayonnement » retirés de leurs catégories, listés sous des sous-sections "
+"à leur nom ; pour un seul bloc : []{.excerpts .nested-influence} ou "
+"[]{.excerpts .flat-influence}"
+
 msgid "In folders"
 msgstr "Dans les dossiers"
 
@@ -3147,6 +3158,9 @@ msgstr "Sources de classement"
 
 msgid "Ranks over time"
 msgstr "Rangs au fil du temps"
+
+msgid "Rayonnement excerpts only in the Rayonnement section, by category"
+msgstr "Extraits de rayonnement seulement dans la section Rayonnement, par catégorie"
 
 msgid "Re-sync all"
 msgstr "Tout resynchroniser"

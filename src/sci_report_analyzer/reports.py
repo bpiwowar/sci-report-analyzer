@@ -15,7 +15,10 @@ syntax, substituted when shown or copied.
   also usable within another one (``{.starred: .notes}``);
 - ``[]{.publications}``, ``[]{.excerpts}`` (alone on their line): a block (see
   ``Context.blocks``), e.g. the summary of the period's publications, its excerpts by
-  category (their headings below that of the block).
+  category (their headings below that of the block); with its options as classes:
+  ``[]{.excerpts .nested-influence}`` the "rayonnement" excerpts only in the Rayonnement
+  section, under subsections of their categories (``.flat-influence``: also in their
+  categories, as by default; the default: the folder's, see ``nested_influence``).
 
 Within a folder, the papers with its numbered tag (see ``Numbering``) are numbered as listed
 (else by year), and the other papers cited apart, each from 1, as first cited: the former
@@ -63,8 +66,12 @@ _INTEXT = re.compile(r"(?<![\w@\[])@(?P<key>" + _KEY + r")")
 # Code (fenced blocks, spans) is left as is.
 _CODE = re.compile(r"(```.*?(?:```|$)|`[^`\n]*`)", re.S)
 _LIST_ITEM = re.compile(r"[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?")
-# A block, alone on its line: []{.publications}
-_BLOCK = re.compile(r"^[ \t]*\[\]\{\.(?P<name>[A-Za-z][\w-]*)\}[ \t]*$", re.M)
+# A block, alone on its line, with its options: []{.publications}, []{.excerpts .option}
+_BLOCK = re.compile(
+    r"^[ \t]*\[\]\{\.(?P<name>[A-Za-z][\w-]*)(?P<options>(?:[ \t]+\.[A-Za-z][\w-]*)*)[ \t]*\}"
+    r"[ \t]*$",
+    re.M,
+)
 _HEADING = re.compile(r"^(#{1,6})[ \t]", re.M)
 
 _STOP = {"a", "an", "the", "on", "of", "for", "in", "to", "and", "with", "from", "towards"}
@@ -176,9 +183,9 @@ class Context:
     templates: dict[str, str] = field(default_factory=dict)  # named ones: name -> {attrs}
     # The papers each to be cited (by default, the numbered ones; see citation_status).
     discuss: list[Paper] | None = None
-    # The blocks ([]{.name} on its line): name -> its Markdown, given the level of its
-    # headings (that below the heading the block is under).
-    blocks: dict[str, Callable[[int], str]] = field(default_factory=dict)
+    # The blocks ([]{.name .option…} on its line): name -> its Markdown, given the level of
+    # its headings (that below the heading the block is under) and its options (classes).
+    blocks: dict[str, Callable[[int, set[str]], str]] = field(default_factory=dict)
     numbered_tag: int | None = None  # (the tag whose numbers the papers have, if any)
 
     def __post_init__(self) -> None:
@@ -436,7 +443,8 @@ def render(text: str, ctx: Context) -> Rendered:
             if make is None:
                 return m.group(0)
             head = _HEADING.findall(before + src[: m.start()])
-            made.append(make(min(len(head[-1]) + 1, 6) if head else 2).rstrip("\n"))
+            options = {o.lstrip(".") for o in m.group("options").split()}
+            made.append(make(min(len(head[-1]) + 1, 6) if head else 2, options).rstrip("\n"))
             return f"\0{len(made) - 1}\0"
 
         return _BLOCK.sub(block, src) if ctx.blocks else src
@@ -532,6 +540,16 @@ def save_skeleton(folder_id: int, text: str) -> None:
     _save_citations(folder_id, skeleton=text.strip() and text.rstrip() + "\n")
 
 
+def nested_influence(folder_id: int | None) -> bool:
+    """Whether the folder's excerpts flagged "influence" are by default only in its
+    Rayonnement section, under subsections of their categories (see categories.markdown)."""
+    return bool(_citations(folder_id).get("nested_influence"))
+
+
+def save_nested_influence(folder_id: int, nested: bool) -> None:
+    _save_citations(folder_id, nested_influence=nested)
+
+
 def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
     """For the notes of the folder of a period (the person's in it): its numbering and its
     templates; the papers to discuss, those with its numbered tag (else those of the
@@ -550,13 +568,16 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
         return note_context(stats, keys)
     person_id, folder_id, years = found
 
-    def publications(_level: int) -> str:
+    def publications(_level: int, _options: set[str]) -> str:
         return "\n".join(saved_summary([s for s in stats if not s.hidden and in_years(s, years)]))
 
-    def excerpts(level: int) -> str:
+    def excerpts(level: int, options: set[str]) -> str:
         from . import categories
 
-        return categories.markdown(folder_id, period_id, level=level)
+        nested = True if "nested-influence" in options else None
+        if "flat-influence" in options:
+            nested = False
+        return categories.markdown(folder_id, period_id, level=level, nested=nested)
 
     n = numbering(folder_id)
     names = {t.id: t.name for t in annotations.all_tags()}
