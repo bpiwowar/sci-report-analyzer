@@ -8,11 +8,11 @@ from sci_report_analyzer.ranking.kinds import WORKSHOP_RE, KindEvidence, detect_
 from sci_report_analyzer.ranking.service import MatchSettings, load_settings, save_settings
 
 
-def _kind(venue, title=None):
+def _kind(venue):
     st = load_settings()
     return detect_kind(
         None,
-        KindEvidence(venue, title=title),
+        KindEvidence(venue),
         national_keywords=st.national_keywords,
         international_keywords=st.international_keywords,
     )
@@ -45,12 +45,31 @@ def test_defaults():
 
 
 def test_rule_references():
-    # {rule:campaigns} is the campaigns' pattern: a new campaign is a shared task's.
-    title = "Team Foo at Zorblat-2024 Task 3: Bar"
-    assert _kind("Proceedings of the Workshop on Foo", title) == "intl_workshop"
-    default = detection.DEFAULTS["campaigns"].pattern
-    _set("campaigns", default + "|Zorblat", ignore_case=False)
-    assert _kind("Proceedings of the Workshop on Foo", title) == "shared_task"
+    # {rule:track_tutorial} is the tutorial rule's pattern.
+    assert _kind("Zorblat Seminar") == "intl_journal"
+    _set("workshop", r"\bseminar\b|{rule:track_tutorial}")
+    assert _kind("Zorblat Seminar") == "intl_workshop"
+    assert _kind("Zorblat Tutorials") == "intl_workshop"
+    _set("track_tutorial", r"\bcourse\b")
+    assert _kind("Zorblat Course") == "intl_workshop"
+
+
+def test_language_rules():
+    # A rule of a language is part of another: a text matching it matches the latter.
+    assert {d.language for d in DEFAULT_DETECTION_RULES} == {None, "en", "fr"}
+    parts = {d.id: d.part_of for d in DEFAULT_DETECTION_RULES}
+    assert parts["workshop_fr"] == "workshop" and parts["workshop_at"] == "workshop"
+    assert all(parts[p] is None for p in parts.values() if p)
+    assert WORKSHOP_RE.search("Atelier sur les gadgets")
+    assert detect_track("Foo 2024 (Démonstrations)") == "demo"
+    assert _kind("Revue des gadgets") == "natl_journal"
+    # The leftmost match of the parts: the main conference's text.
+    assert host_text("Foo @ ECIR, co-located with SIGIR") == "ECIR"
+    # Changed, a part changes its rule's detection only.
+    _set("workshop_fr", r"\bséminaires?\b")
+    assert not WORKSHOP_RE.search("Atelier sur les gadgets")
+    assert WORKSHOP_RE.search("Séminaire sur les gadgets")
+    assert WORKSHOP_RE.search("Workshop on Gadgets")
 
 
 def test_changed_rules_change_the_detection():
@@ -67,7 +86,8 @@ def test_changed_rules_change_the_detection():
 
     _set("workshop_host", r"\bhosted by (.+)")
     assert host_text("Foo Workshop, hosted by ECIR") == "ECIR"
-    assert host_text("Foo @ SIGIR") is None
+    assert host_text("Foo, co-located with SIGIR") is None
+    assert host_text("Foo @ SIGIR") == "SIGIR"  # (its own rule)
 
 
 def test_invalid_rule_takes_its_default():

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 12:09+0200\n"
+"POT-Creation-Date: 2026-10-04 12:19+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -112,6 +112,12 @@ msgstr " ; les ex æquo sont départagés par la priorité des sources ({order})
 msgid "A DOI starts with 10. (e.g. 10.1145/3404835.3462812)"
 msgstr "Un DOI commence par 10. (p. ex. 10.1145/3404835.3462812)"
 
+msgid "A built-in rule, as by default"
+msgstr "Une règle prédéfinie, telle que par défaut"
+
+msgid "A built-in rule, changed from its default"
+msgstr "Une règle prédéfinie, modifiée par rapport à sa valeur par défaut"
+
 msgid "A category cannot go within itself"
 msgstr "Une catégorie ne peut pas aller dans elle-même"
 
@@ -179,15 +185,6 @@ msgstr ""
 "personnes ayant un profil validé sur cette source ; un dossier peut en "
 "utiliser une autre."
 
-msgid ""
-"A paper title saying it is a participant's or an organiser's paper of a "
-"shared task: the paper is a shared task paper, whatever its venue (unless"
-" a journal)."
-msgstr ""
-"Un titre d'article disant que c'est l'article d'un participant ou d'un "
-"organisateur d'une campagne d'évaluation : l'article est un article de "
-"campagne d'évaluation, quel que soit son canal (sauf une revue)."
-
 msgid "A part of it (it is a joint conference including this venue)"
 msgstr "Une de ses parties (c'est une conférence jointe incluant ce canal)"
 
@@ -199,6 +196,9 @@ msgstr "Un pourcentage se compare à p"
 
 msgid "A role has no name"
 msgstr "Un rôle n'a pas de nom"
+
+msgid "A rule added by hand"
+msgstr "Une règle ajoutée à la main"
 
 msgid "A sync is already running"
 msgstr "Une synchronisation est déjà en cours"
@@ -268,20 +268,22 @@ msgstr "Un texte de canal nommant une session d'articles courts."
 msgid "A venue text naming a tutorial track."
 msgstr "Un texte de canal nommant une session de tutoriels."
 
-msgid ""
-"A venue text naming a workshop (ranked as its main conference): “Workshop"
-" on…”, “X @ SIGIR”, “co-located with…”."
+msgid "A venue text naming a workshop (ranked as its main conference)."
 msgstr ""
 "Un texte de canal nommant un atelier (classé comme sa conférence "
-"principale) : « Workshop on… », « X @ SIGIR », « co-located with… »."
+"principale)."
 
 msgid ""
-"A venue text naming an evaluation campaign or its working notes: its "
-"papers are shared task papers (unranked), unless in a journal."
+"A venue text naming a workshop (ranked as its main conference): “Workshop"
+" on…”, “co-located with…”."
 msgstr ""
-"Un texte de canal nommant une campagne d'évaluation ou ses notes de "
-"travail : ses articles sont des articles de campagne d'évaluation (non "
-"classés), sauf dans une revue."
+"Un texte de canal nommant un atelier (classé comme sa conférence "
+"principale) : « Workshop on… », « co-located with… »."
+
+msgid "A venue text naming a workshop by its main conference: “X @ SIGIR”."
+msgstr ""
+"Un texte de canal nommant un atelier par sa conférence principale : « X @"
+" SIGIR »."
 
 msgid "A workshop of this venue"
 msgstr "Un atelier de ce canal"
@@ -492,6 +494,9 @@ msgstr "Parmi les articles"
 
 msgid "Annotations"
 msgstr "Annotations"
+
+msgid "Any language"
+msgstr "Toutes langues"
 
 msgid "Apply"
 msgstr "Appliquer"
@@ -761,10 +766,6 @@ msgstr "Règles de nettoyage"
 #, python-brace-format
 msgid "Cleaning rules saved — {n} venue text(s) re-matched"
 msgstr "Règles de nettoyage enregistrées — {n} texte(s) de canal ré-apparié(s)"
-
-#, python-brace-format
-msgid "Cleaning rules · {language}"
-msgstr "Règles de nettoyage · {language}"
 
 msgid "Clear"
 msgstr "Effacer"
@@ -1248,9 +1249,6 @@ msgstr ""
 "Estimé : {n} ans avant la soutenance (theses.fr ne donne le début que des"
 " thèses en cours)"
 
-msgid "Evaluation campaigns"
-msgstr "Campagnes d'évaluation"
-
 msgid "Event"
 msgstr "Événement"
 
@@ -1443,9 +1441,6 @@ msgid ""
 msgstr ""
 "Les appariements approximatifs sous ce score se rabattent sur OpenAlex "
 "(si activé) ou sont indiqués comme non classés."
-
-msgid "General"
-msgstr "Générales"
 
 msgid "Give an absolute path"
 msgstr "Indiquez un chemin absolu"
@@ -1816,9 +1811,6 @@ msgstr "Libellé"
 
 msgid "Language"
 msgstr "Langue"
-
-msgid "Language-specific"
-msgstr "Par langue"
 
 msgid "Later"
 msgstr "Plus tard"
@@ -2736,7 +2728,8 @@ msgid ""
 "is the key matching the venues' variants; it is also what the rankings "
 "are searched with. Which venue a text belongs to is then set on the "
 "venues (variants and venue rules, on the Venues page or from a paper's "
-"details)."
+"details). The rules removing words of a language (e.g. spelled ordinals) "
+"are applied first, to every venue text."
 msgstr ""
 "Expressions régulières Python appliquées, dans l’ordre, aux textes de "
 "canal de publication des sources (\\1, \\2… ou \\g<name> dans le "
@@ -2745,23 +2738,29 @@ msgstr ""
 "variantes des canaux de publication ; c’est aussi avec lui que les "
 "classements sont interrogés. Le canal de publication auquel appartient un"
 " texte est ensuite défini sur les canaux (variantes et règles de canal, "
-"sur la page Canaux ou depuis les détails d’un article)."
+"sur la page Canaux ou depuis les détails d’un article). Les règles "
+"retirant des mots d’une langue (p. ex. les ordinaux en toutes lettres) "
+"sont appliquées d’abord, à tous les textes de canal."
 
 #, python-brace-format
 msgid ""
-"Python regular expressions classifying the venues and papers when no "
-"decision was made by hand: shared tasks, workshops and their main "
-"conference, conference or journal, tracks, joint conferences. "
-"{rule:campaigns} in a pattern stands for the pattern of the rule with "
-"that id; (?-i:…) makes a part case-sensitive. Each rule shows its default"
-" when changed."
+"Python regular expressions classifying the venues when no decision was "
+"made by hand: workshops and their main conference, conference or journal,"
+" tracks, joint conferences. A rule matching words of a language is part "
+"of another (“atelier”, of the workshop rule): a venue text matching it "
+"matches the latter. {rule:<id>} in a pattern stands for the pattern of "
+"the rule with that id; (?-i:…) makes a part case-sensitive. Each rule "
+"shows whether it is a default one, and its default when changed."
 msgstr ""
-"Expressions régulières Python classant les canaux et les articles quand "
-"aucune décision n'a été prise à la main : campagnes d'évaluation, "
-"ateliers et leur conférence principale, conférence ou revue, sessions, "
-"conférences conjointes. {rule:campaigns} dans un motif représente le "
-"motif de la règle de cet identifiant ; (?-i:…) rend une partie sensible à"
-" la casse. Chaque règle modifiée affiche sa valeur par défaut."
+"Expressions régulières Python classant les canaux quand aucune décision "
+"n'a été prise à la main : ateliers et leur conférence principale, "
+"conférence ou revue, sessions, conférences conjointes. Une règle "
+"reconnaissant des mots d'une langue fait partie d'une autre (« atelier »,"
+" de la règle des ateliers) : un texte de canal qu'elle reconnaît est "
+"reconnu par cette dernière. {rule:<id>} dans un motif représente le motif"
+" de la règle de cet identifiant ; (?-i:…) rend une partie sensible à la "
+"casse. Chaque règle indique si c'est une règle par défaut, et sa valeur "
+"par défaut quand elle est modifiée."
 
 #, python-brace-format
 msgid "Quartile {quartile}"
@@ -2966,13 +2965,6 @@ msgstr "Règle {n} : {error}"
 msgid "Rules"
 msgstr "Règles"
 
-msgid ""
-"Rules removing words of a language (e.g. spelled ordinals): applied to "
-"every venue text, before the general rules."
-msgstr ""
-"Règles supprimant des mots d'une langue (p. ex. les ordinaux en lettres) "
-": appliquées à tous les textes de canal, avant les règles générales."
-
 msgid "Same paper as… (merge into this one)"
 msgstr "Même article que… (le fusionner dans celui-ci)"
 
@@ -3176,12 +3168,6 @@ msgstr "Campagne d'éval."
 
 msgid "Shared task / evaluation campaign"
 msgstr "Campagne d'évaluation (shared task)"
-
-msgid "Shared task paper"
-msgstr "Article de campagne d'évaluation"
-
-msgid "Shared task venue"
-msgstr "Canal de campagne d'évaluation"
 
 msgid "Shared tasks"
 msgstr "Campagnes d'évaluation"
@@ -3446,6 +3432,12 @@ msgstr ""
 "Les anciens noms restent des variantes, leurs textes sont donc toujours "
 "reconnus"
 
+msgid "The language of the rule's words"
+msgstr "La langue des mots de la règle"
+
+msgid "The language whose words the rule removes (any: a general rule)"
+msgstr "La langue dont la règle retire des mots (toutes : une règle générale)"
+
 msgid ""
 "The main conference a workshop text names: the text of the first group "
 "that matches (suggested as the workshop's host)."
@@ -3453,21 +3445,15 @@ msgstr ""
 "La conférence principale que nomme le texte d'un atelier : le texte du "
 "premier groupe qui correspond (suggéré comme hôte de l'atelier)."
 
+msgid "The main conference named after an “@”: “X @ SIGIR”."
+msgstr "La conférence principale nommée après un « @ » : « X @ SIGIR »."
+
 msgid "The main conference of this workshop"
 msgstr "La conférence principale de cet atelier"
 
 #, python-brace-format
 msgid "The main venue (this one is its {track} track)"
 msgstr "Le canal principal (celui-ci est sa session {track})"
-
-#, python-brace-format
-msgid ""
-"The names of the evaluation campaigns, used by the shared task paper rule"
-" as {rule:campaigns} (case-sensitive there)."
-msgstr ""
-"Les noms des campagnes d'évaluation, utilisés par la règle des articles "
-"de campagne d'évaluation sous la forme {rule:campaigns} (sensibles à la "
-"casse là)."
 
 msgid ""
 "The other sources' venues are then ignored for this paper, also after a "
@@ -3977,12 +3963,18 @@ msgstr ""
 msgid "Workshop"
 msgstr "Atelier"
 
+msgid "Workshop @ conference"
+msgstr "Atelier @ conférence"
+
 #, python-brace-format
 msgid "Workshop {category}"
 msgstr "Atelier {category}"
 
 msgid "Workshop's main conference"
 msgstr "Conférence principale d'un atelier"
+
+msgid "Workshop's main conference @"
+msgstr "Conférence principale d'un atelier @"
 
 #, python-brace-format
 msgid "Workshop: the rank of its main conference in {year}, “{host}”"
@@ -4032,6 +4024,9 @@ msgstr "acronyme"
 msgid "add a note…"
 msgstr "ajouter une note…"
 
+msgid "added"
+msgstr "ajoutée"
+
 msgid "all ranking lists"
 msgstr "tous les classements"
 
@@ -4043,9 +4038,6 @@ msgstr "le reconnaît aussi"
 
 msgid "amber (the default)"
 msgstr "ambre (par défaut)"
-
-msgid "and a paper title"
-msgstr "et un titre d'article"
 
 msgid "any source"
 msgstr "toute source"
@@ -4121,6 +4113,9 @@ msgstr "conflit : la règle d'un autre canal de publication correspond aussi"
 msgid "corrected"
 msgstr "corrigé"
 
+msgid "default"
+msgstr "par défaut"
+
 #, python-brace-format
 msgid "default level of “{kind}” (Settings → Venue kinds)"
 msgstr "niveau par défaut de « {kind} » (Paramètres → Types de canaux)"
@@ -4143,6 +4138,9 @@ msgstr "p. ex. ICLR"
 
 msgid "e.g. Intl. collaborators"
 msgstr "p. ex. Collaborateurs internationaux"
+
+msgid "edited"
+msgstr "modifiée"
 
 msgid "enabled"
 msgstr "activée"
@@ -4296,6 +4294,9 @@ msgstr "clé : « {key} »"
 #, python-brace-format
 msgid "kind: {kind}"
 msgstr "type : {kind}"
+
+msgid "language"
+msgstr "langue"
 
 #, python-brace-format
 msgid "last sync {when}"
@@ -4493,6 +4494,10 @@ msgstr "page {page}"
 
 msgid "papers co-authored with a (confirmed) PhD student from theses.fr"
 msgstr "articles co-écrits avec un doctorant (confirmé) issu de theses.fr"
+
+#, python-brace-format
+msgid "part of the rule “{name}”"
+msgstr "fait partie de la règle « {name} »"
 
 msgid "pattern"
 msgstr "motif"

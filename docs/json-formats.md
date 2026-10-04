@@ -53,7 +53,7 @@ kept their meaning.
 | `international_keywords` | list of string | built-in list | words making it international |
 | `unknown_scope` | `"international"` \| `"national"` | `"international"` | scope of a venue without a clue |
 | `kind_levels` | object: kind → level | `{}` | default level per [kind](#venue-kinds), e.g. `{"natl_conference": "C"}`; levels `A*`, `A`, `B`, `C`, `Q1`…`Q4` or any typed text |
-| `detection_rules` | list of [DetectionRule](#detectionrule) | the built-in rules | regexes classifying venues and papers, by `id`; a missing one takes its default |
+| `detection_rules` | list of [DetectionRule](#detectionrule) | the built-in rules | regexes classifying venues, by `id`; a missing one takes its default |
 | `core_edition` | `"publication"` \| `"latest"` | `"publication"` | CORE edition giving a paper its rank |
 
 #### NormRule
@@ -77,7 +77,7 @@ the spelled ordinals.
 
 #### DetectionRule
 
-A regex classifying venues and papers (`ranking.detection.DetectionRule`; Settings →
+A regex classifying venues (`ranking.detection.DetectionRule`; Settings →
 Detection rules). Python syntax (not `re.ASCII`); `(?-i:…)` makes a part case-sensitive;
 `{rule:<id>}` stands for another rule's pattern, in a group. An invalid pattern takes the
 rule's default.
@@ -88,20 +88,28 @@ rule's default.
 | `pattern` | string | required | |
 | `ignore_case` | bool | true | |
 
-The rules (defaults in `ranking.detection.DEFAULT_DETECTION_RULES`):
+The rules (defaults in `ranking.detection.DEFAULT_DETECTION_RULES`), all searched in the
+venue text. A rule is general or of a language (Settings → Detection rules, by language);
+one *part of* another is searched with it: a text matching either matches the latter (its
+leftmost match counts).
 
-| `id` | Searched in | Decides |
-|------|-------------|---------|
-| `shared_task_venue` | venue text | a shared task (unless a journal) |
-| `campaigns` | — | the campaigns' names, used as `{rule:campaigns}` by `shared_task_title` (case-sensitive by default) |
-| `shared_task_title` | paper title | a shared task paper (unless a journal) |
-| `workshop` | venue text | a workshop (ranked as its main conference) |
-| `workshop_host` | venue text | the workshop's main conference: the first group that matches |
-| `conference` | venue text | a conference, when neither the rankings nor the sources tell |
-| `journal` | venue text | a journal, likewise (after `conference`) |
-| `track_tutorial`, `track_demo`, `track_short` | venue text | a track, tried in this order |
-| `track_findings` | venue text | a Findings volume |
-| `joint` | venue text | a joint conference (its parts looked for) |
+| `id` | Language | Part of | Decides |
+|------|----------|---------|---------|
+| `workshop` | en | | a workshop (ranked as its main conference) |
+| `workshop_at` | — | `workshop` | likewise: “X @ SIGIR” |
+| `workshop_fr` | fr | `workshop` | likewise: “atelier” |
+| `workshop_host` | en | | the workshop's main conference (“co-located with …”): the first group that matches |
+| `workshop_host_at` | — | `workshop_host` | likewise, after an “@” |
+| `conference` | en | | a conference, when neither the rankings nor the sources tell |
+| `conference_fr` | fr | `conference` | likewise |
+| `journal` | en | | a journal, likewise (after `conference`) |
+| `journal_fr` | fr | `journal` | likewise |
+| `track_tutorial`, `track_demo`, `track_short` | en | | a track, tried in this order |
+| `track_tutorial_fr`, `track_demo_fr`, `track_short_fr` | fr | the English one | likewise |
+| `track_findings` | en | | a Findings volume |
+| `joint` | en | | a joint conference (its parts looked for) |
+
+A shared task (`shared_task`) is never detected: it is set by hand.
 
 ### Venue
 

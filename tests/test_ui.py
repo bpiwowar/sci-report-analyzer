@@ -129,8 +129,6 @@ async def test_period_filter(user: User) -> None:
         "sources",
         "matching",
         "rules",
-        "rules-en",
-        "rules-fr",
         "kinds",
         "detection",
         "flags",
@@ -781,41 +779,75 @@ async def test_detection_rules(user: User) -> None:
 
     await user.open("/settings?tab=detection")
     await user.should_see("Detection rules")
-    await user.should_see("Shared task paper")
+    await user.should_see("Short paper track")
+    # By language: a rule of a language says which it is part of.
+    await user.should_see("Any language")
+    await user.should_see("part of the rule “Workshop · English”")
     user.find("detect-try-venue").type("Seminar on Foo @ ECIR")
     await user.should_see("main conference: “ECIR”")
+    await user.should_not_see(marker="origin-edited")
     user.find("detect-pattern-workshop").elements.pop().value = r"\bseminars?\b"
     await user.should_see("default: " + DEFAULTS["workshop"].pattern + " [ignore case]")
+    await user.should_see(marker="origin-edited")
     user.find("detect-save").click()
     await user.should_see("Detection rules saved")
     assert workshop() == r"\bseminars?\b"
     user.find("detect-reset-workshop").click()
+    await user.should_not_see(marker="origin-edited")
     user.find("detect-save").click()
     assert workshop() == DEFAULTS["workshop"].pattern
 
 
+async def test_rule_origins(user: User) -> None:
+    """A cleaning rule shows whether it is a default one, changed (reset) or added."""
+    from sci_report_analyzer.ranking.service import load_settings, save_settings
+
+    st = load_settings()
+    changed = next(r for r in st.norm_rules if r.language is None)
+    default = changed.pattern
+    changed.pattern = "changed"
+    save_settings(st)
+    await user.open("/settings?tab=rules")
+    await user.should_see(marker="norm-reset-0")
+    await user.should_not_see(marker="norm-reset-1")
+    await user.should_not_see(marker="origin-added")
+    user.find("norm-add").click()
+    await user.should_see(marker="origin-added")
+    user.find("norm-reset-1").click()  # (the changed rule, now second)
+    await user.should_not_see(marker="norm-reset-1")
+    user.find("norm-save").click()
+    await user.should_see("Cleaning rules saved")
+    rule = next(r for r in load_settings().norm_rules if r.id == changed.id)
+    assert rule.pattern == default
+
+
 async def test_language_cleaning_rules(user: User) -> None:
-    """A language's rules are edited on their own; the general ones are left as they were."""
+    """The rules, by language: one is added to a language, another moved to one."""
     from sci_report_analyzer.ranking.service import load_settings
 
     general = [r.id for r in load_settings().norm_rules if r.language is None]
-    await user.open("/settings?tab=rules-en")
-    await user.should_see("Cleaning rules · English")
+    await user.open("/settings?tab=rules")
+    await user.should_see("Any language")
+    await user.should_see("English")
     user.find("norm-en-add").click()
     await user.should_see("Custom rule 1")
     (new,) = [e for e in user.find("norm-en-pattern-0").elements if not e.value]
     new.value = r"\bannual\b"
-    user.find("norm-en-save").click()
+    # The last general rule, now French (and edited).
+    user.find(f"norm-language-{len(general) - 1}").elements.pop().value = "fr"
+    await user.should_see(marker="norm-fr-reset-1")
+    user.find("norm-save").click()
     await user.should_see("Cleaning rules saved")
     rules = load_settings().norm_rules
-    assert [(r.id, r.language) for r in rules[:5]] == [
+    assert [(r.id, r.language) for r in rules[:6]] == [
         ("custom1en", "en"),
         ("proceedingsOf", "en"),
         ("leadingThe", "en"),
         ("ordinalsEn", "en"),
         ("ordinalsFr", "fr"),
+        (general[-1], "fr"),
     ]
-    assert [r.id for r in rules if r.language is None] == general
+    assert [r.id for r in rules if r.language is None] == general[:-1]
 
 
 async def test_name_variants_are_in_the_sources_tab(user: User) -> None:

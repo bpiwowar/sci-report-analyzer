@@ -1,9 +1,12 @@
-"""Detection rules: the regexes classifying venues and papers (shared tasks, workshops and
-their main conference, conferences vs journals, tracks, joint conferences).
+"""Detection rules: the regexes classifying venues (workshops and their main conference,
+conferences vs journals, tracks, joint conferences).
 
 Their defaults are here; the patterns in force are the settings' (``MatchSettings.
 detection_rules``, Settings → Detection rules), a rule missing from them or invalid taking
 its default. ``{rule:<id>}`` in a pattern stands for another rule's pattern (in a group).
+
+A rule is general or of a language (its words: "workshop", "atelier"); one of a language
+can be part of another (``part_of``): a text matches the latter if it matches either.
 """
 
 from __future__ import annotations
@@ -36,7 +39,17 @@ class DetectionDefault:
     description: str
     pattern: str
     ignore_case: bool = True
+    # The language whose words it matches (Settings → Detection rules, by language); none:
+    # a general rule.
+    language: str | None = None
+    # The rule it is part of (searched with it: ``Rule(part_of)``); none: its own.
+    part_of: str | None = None
     examples: tuple[str, ...] = ()
+
+    @property
+    def decides(self) -> str:
+        """The rule whose decision it makes (its own, or the one it is part of)."""
+        return self.part_of or self.id
 
     def rule(self) -> DetectionRule:
         return DetectionRule(id=self.id, pattern=self.pattern, ignore_case=self.ignore_case)
@@ -44,7 +57,6 @@ class DetectionDefault:
 
 DETECTION_GROUPS = Labels(
     {
-        "shared_task": N_("Shared tasks"),
         "workshop": N_("Workshops"),
         "form": N_("Conference or journal"),
         "track": N_("Tracks"),
@@ -53,57 +65,6 @@ DETECTION_GROUPS = Labels(
 )
 
 DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
-    # Shared tasks and evaluation campaigns (SemEval, TREC, CLEF labs, NTCIR...): their
-    # working notes. A venue mixing them with research papers (WMT, BioNLP's "Workshop and
-    # Shared Task") is not one: its papers' titles tell.
-    DetectionDefault(
-        id="shared_task_venue",
-        group="shared_task",
-        name=N_("Shared task venue"),
-        description=N_(
-            "A venue text naming an evaluation campaign or its working notes: its papers are "
-            "shared task papers (unranked), unless in a journal."
-        ),
-        pattern=r"\bworking notes\b|\bsemantic evaluations?\b|\bText REtrieval Conference\b"
-        r"|\bevaluation campaigns?\b|\bbenchmarking initiative\b"
-        r"|\bForum for Information Retrieval Evaluation\b"
-        r"|(?-i:\b(?:SemEval|TREC|NTCIR|MediaEval|ImageCLEF|LifeCLEF)\b)",
-        examples=("Working Notes of CLEF 2025", "Proceedings of SemEval-2017"),
-    ),
-    DetectionDefault(
-        id="campaigns",
-        group="shared_task",
-        name=N_("Evaluation campaigns"),
-        description=N_(
-            "The names of the evaluation campaigns, used by the shared task paper rule as "
-            "{rule:campaigns} (case-sensitive there)."
-        ),
-        pattern=r"SemEval|TREC|NTCIR|MediaEval|WMT|IWSLT|CLEF|ImageCLEF|LifeCLEF|BioASQ"
-        r"|CheckThat!?|eRisk|Touché|FIRE|DEFT|GermEval|IberLEF|EvaLatin|MIREX",
-        ignore_case=False,
-        examples=("SemEval",),
-    ),
-    # A participant's or an organiser's paper: "X at SemEval-2017 Task 12: ...", "Findings
-    # of the WMT 2018 ... Shared Task", "Overview of the CLEF eHealth Evaluation Lab 2016",
-    # "... Notebook for the ImageCLEF Lab at CLEF 2025".
-    DetectionDefault(
-        id="shared_task_title",
-        group="shared_task",
-        name=N_("Shared task paper"),
-        description=N_(
-            "A paper title saying it is a participant's or an organiser's paper of a shared "
-            "task: the paper is a shared task paper, whatever its venue (unless a journal)."
-        ),
-        pattern=r"\bshared[- ]tasks?\b|\bnotebook for the\b"
-        r"|\b(?:evaluation|benchmarking) (?:lab|campaign)s?\b"
-        r"|(?-i:\b{rule:campaigns}(?:[- ]?(?:19|20)\d{2}\b|\s+Task\s*\d))"
-        r"|(?:\bat|@)\s+(?:the\s+)?(?-i:{rule:campaigns}\b)"
-        r"|^\s*(?:an\s+)?overview\s+of\b.*\b(?:lab|track|task|challenge)\b",
-        examples=(
-            "Team Foo at SemEval-2017 Task 12: Clinical Events",
-            "Overview of the CLEF eHealth Evaluation Lab 2016",
-        ),
-    ),
     # "Workshop on ...", "Trustworthy AI @ ACM Multimedia", "... co-located with ...". Its
     # rank is that of its main conference.
     DetectionDefault(
@@ -112,11 +73,30 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         name=N_("Workshop"),
         description=N_(
             "A venue text naming a workshop (ranked as its main conference): “Workshop on…”, "
-            "“X @ SIGIR”, “co-located with…”."
+            "“co-located with…”."
         ),
-        pattern=r"\bworkshops?\b|\bateliers?\b|(?-i:(?<=\w)\s*@\s*(?=[A-Z]))|\bco-located\b"
-        r"|\bin conjunction with\b",
-        examples=("Trustworthy AI @ ACM Multimedia", "Proc. of X, co-located with ECIR"),
+        pattern=r"\bworkshops?\b|\bco-located\b|\bin conjunction with\b",
+        language="en",
+        examples=("Workshop on Foo", "Proc. of X, co-located with ECIR"),
+    ),
+    DetectionDefault(
+        id="workshop_at",
+        group="workshop",
+        name=N_("Workshop @ conference"),
+        description=N_("A venue text naming a workshop by its main conference: “X @ SIGIR”."),
+        pattern=r"(?-i:(?<=\w)\s*@\s*(?=[A-Z]))",
+        part_of="workshop",
+        examples=("Trustworthy AI @ ACM Multimedia",),
+    ),
+    DetectionDefault(
+        id="workshop_fr",
+        group="workshop",
+        name=N_("Workshop"),
+        description=N_("A venue text naming a workshop (ranked as its main conference)."),
+        pattern=r"\bateliers?\b",
+        language="fr",
+        part_of="workshop",
+        examples=("Atelier sur les gadgets",),
     ),
     DetectionDefault(
         id="workshop_host",
@@ -126,9 +106,18 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
             "The main conference a workshop text names: the text of the first group that "
             "matches (suggested as the workshop's host)."
         ),
-        pattern=r"(?-i:(?<=\w)\s*@\s*)(?P<a>[^,:;()]+)|(?:co-located|in conjunction) with "
-        r"(?:the )?(?P<b>[^,:;()]+)",
-        examples=("Trustworthy AI @ ACM Multimedia", "Proc. of X, co-located with ECIR"),
+        pattern=r"(?:co-located|in conjunction) with (?:the )?(?P<b>[^,:;()]+)",
+        language="en",
+        examples=("Proc. of X, co-located with ECIR",),
+    ),
+    DetectionDefault(
+        id="workshop_host_at",
+        group="workshop",
+        name=N_("Workshop's main conference @"),
+        description=N_("The main conference named after an “@”: “X @ SIGIR”."),
+        pattern=r"(?-i:(?<=\w)\s*@\s*)(?P<a>[^,:;()]+)",
+        part_of="workshop_host",
+        examples=("Trustworthy AI @ ACM Multimedia",),
     ),
     # Used only when neither a ranking nor the sources tell.
     DetectionDefault(
@@ -140,17 +129,42 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
             "whether it is a conference or a journal."
         ),
         pattern=r"\b(conf(erence)?|symposium|workshops?|proceedings|proc\.|meeting|congress|"
-        r"colloquium|conférence|colloque|journées|atelier|rencontres|forum|summit)\b",
+        r"colloquium|forum|summit)\b",
+        language="en",
         examples=("Symposium on Foo",),
+    ),
+    DetectionDefault(
+        id="conference_fr",
+        group="form",
+        name=N_("Conference"),
+        description=N_(
+            "A venue text naming a conference, when neither the rankings nor the sources say "
+            "whether it is a conference or a journal."
+        ),
+        pattern=r"\b(conférence|colloque|journées|ateliers?|rencontres|congrès)\b",
+        language="fr",
+        part_of="conference",
+        examples=("Actes du colloque Foo",),
     ),
     DetectionDefault(
         id="journal",
         group="form",
         name=N_("Journal"),
         description=N_("A venue text naming a journal (after the conference rule)."),
-        pattern=r"\b(journal|transactions|trans\.|revue|letters|review|magazine|annals|"
+        pattern=r"\b(journal|transactions|trans\.|letters|review|magazine|annals|"
         r"bulletin|quarterly|j\.)\b",
+        language="en",
         examples=("Annals of Foo",),
+    ),
+    DetectionDefault(
+        id="journal_fr",
+        group="form",
+        name=N_("Journal"),
+        description=N_("A venue text naming a journal (after the conference rule)."),
+        pattern=r"\brevues?\b",
+        language="fr",
+        part_of="journal",
+        examples=("Revue des gadgets",),
     ),
     # Tracks, in this order (Findings: see below).
     DetectionDefault(
@@ -159,7 +173,18 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         name=N_("Tutorial track"),
         description=N_("A venue text naming a tutorial track."),
         pattern=r"\btutorials?\b",
+        language="en",
         examples=("ECIR 2024 Tutorials",),
+    ),
+    DetectionDefault(
+        id="track_tutorial_fr",
+        group="track",
+        name=N_("Tutorial track"),
+        description=N_("A venue text naming a tutorial track."),
+        pattern=r"\btutoriels?\b",
+        language="fr",
+        part_of="track_tutorial",
+        examples=("Foo 2024, tutoriels",),
     ),
     DetectionDefault(
         id="track_demo",
@@ -167,7 +192,18 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         name=N_("Demo track"),
         description=N_("A venue text naming a demo track."),
         pattern=r"\b(?:demos?|demonstrations?)\b",
+        language="en",
         examples=("ACL 2023 (System Demonstrations)",),
+    ),
+    DetectionDefault(
+        id="track_demo_fr",
+        group="track",
+        name=N_("Demo track"),
+        description=N_("A venue text naming a demo track."),
+        pattern=r"\b(?:démos?|démonstrations?)\b",
+        language="fr",
+        part_of="track_demo",
+        examples=("Foo 2024 (Démonstrations)",),
     ),
     DetectionDefault(
         id="track_short",
@@ -175,7 +211,18 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         name=N_("Short paper track"),
         description=N_("A venue text naming a short paper track."),
         pattern=r"\bshort papers?\b",
+        language="en",
         examples=("ACL 2022 (Volume 2: Short Papers)",),
+    ),
+    DetectionDefault(
+        id="track_short_fr",
+        group="track",
+        name=N_("Short paper track"),
+        description=N_("A venue text naming a short paper track."),
+        pattern=r"\barticles? courts?\b",
+        language="fr",
+        part_of="track_short",
+        examples=("Foo 2024 (Articles courts)",),
     ),
     DetectionDefault(
         id="track_findings",
@@ -186,6 +233,7 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
             "main conference."
         ),
         pattern=r"\bfindings\b",
+        language="en",
         examples=("Findings of the Association for Computational Linguistics: ACL 2023",),
     ),
     # Two conferences joined by "and" ("… Conference on X and the International Joint
@@ -199,6 +247,7 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         ),
         pattern=r"\b(?:conference|symposium|meeting|workshop)\b.*\band\b(?:\s+the)?\b.*"
         r"\b(?:conference|symposium|meeting|workshop)\b",
+        language="en",
         examples=("Conference on Foo and the International Conference on Bar",),
     ),
 )
@@ -293,15 +342,22 @@ def regex(rule_id: str) -> re.Pattern[str]:
     return _compiled[rule_id]
 
 
+# Each rule's own and those part of it ({"workshop": ("workshop", "workshop_at", …)}).
+PARTS = {
+    d.id: tuple(p.id for p in DEFAULT_DETECTION_RULES if p.decides == d.id)
+    for d in DEFAULT_DETECTION_RULES
+    if d.part_of is None
+}
+
+
 class Rule:
-    """A rule's regex as set, looked up at each use: ``WORKSHOP_RE.search(text)``."""
+    """A rule's regexes as set (its own and its parts'), looked up at each use:
+    ``WORKSHOP_RE.search(text)``."""
 
     def __init__(self, rule_id: str) -> None:
         self.id = rule_id
 
     def search(self, text: str, *args) -> re.Match[str] | None:
-        return regex(self.id).search(text, *args)
-
-    @property
-    def pattern(self) -> str:
-        return regex(self.id).pattern
+        """The leftmost match of its regexes (the first one's, on a tie)."""
+        found = (regex(p).search(text, *args) for p in PARTS[self.id])
+        return min((m for m in found if m), key=lambda m: m.start(), default=None)

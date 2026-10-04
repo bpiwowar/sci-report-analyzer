@@ -189,7 +189,7 @@ class MatchSettings(BaseModel):
     )
     unknown_scope: str = "international"
     kind_levels: dict[str, str] = Field(default_factory=dict)
-    # The regexes classifying venues and papers (kinds, workshops, tracks, joint
+    # The regexes classifying venues (kinds, workshops, tracks, joint
     # conferences), each by id; one missing takes its default (``ranking.detection``).
     detection_rules: list[DetectionRule] = Field(default_factory=default_detection_rules)
     # CORE rank of a paper: the edition in force when it was published, or the latest.
