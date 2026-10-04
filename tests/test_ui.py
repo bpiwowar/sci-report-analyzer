@@ -4,7 +4,16 @@ import asyncio
 import json
 
 import pytest
-from helpers import add_source, make_person, note_saved, pub, thesis
+from helpers import (
+    add_source,
+    make_person,
+    note_saved,
+    own_settings,
+    pub,
+    set_correction,
+    set_level,
+    thesis,
+)
 from nicegui import ui
 from nicegui.testing import User
 
@@ -650,12 +659,12 @@ async def test_folders_tree_editor(user: User) -> None:
     # Its own settings (a copy of its parent's), then its parent's again (once confirmed).
     user.find(marker=f"folder-settings-{sub}").click()
     await user.should_see("Its own settings: a copy of its parent's")
-    assert folders.own_settings(sub) and [n.name for n in categories.tree(sub)] == ["Research"]
+    assert own_settings(sub) and [n.name for n in categories.tree(sub)] == ["Research"]
     await user.should_see(marker=f"folder-own-{sub}")
     user.find(marker=f"folder-settings-{sub}").click()
     user.find(marker="folder-settings-confirm").click()
     await user.should_see(marker=f"folder-shared-{sub}")
-    assert not folders.own_settings(sub)
+    assert not own_settings(sub)
     # Moved: with its "Move to" menu, dragged onto a folder, then onto the top level.
     user.find(marker=f"folder-move-{sub}").click()
     user.find(marker=f"folder-parent-{sub}").elements.pop().value = prize
@@ -695,7 +704,7 @@ async def test_folder_settings_moved_and_copied_from_the_tree(user: User) -> Non
     await user.should_see(marker=f"folder-own-{sub}")
     user.find(marker="folder-settings-apply").click()
     await user.should_not_see(marker=f"folder-own-{sub}")
-    assert not folders.own_settings(sub)
+    assert not own_settings(sub)
     assert [n.name for n in categories.tree(other)] == ["Research"]
     # Copied to another folder (chosen in the dialog).
     user.find(marker=f"folder-copy-settings-{other}").click()
@@ -849,7 +858,7 @@ async def test_mapping_rule_updates_the_details(user: User) -> None:
 
     pid = _seed()
     pub_id = _pub_id("Deep ranking for search")
-    venues.set_correction("Mapped Venue Name", None)  # creates the target venue
+    set_correction("Mapped Venue Name", None)  # creates the target venue
     with session_scope() as s:
         m = s.get(Publication, pub_id).members[0]
         mid, source = m.id, m.link.source
@@ -874,14 +883,13 @@ async def test_mapping_rule_updates_the_details(user: User) -> None:
 async def test_reset_automatic_settings(user: User) -> None:
     from sqlalchemy import func, select
 
-    from sci_report_analyzer import venues
     from sci_report_analyzer.db.models import Publication, Venue, VenueText
     from sci_report_analyzer.db.session import session_scope
 
     pid = _seed()
     await user.open(f"/person/{pid}")
     await user.should_see("Deep ranking for search")
-    venues.set_level("Some Workshop on Things", "conference", "B")
+    set_level("Some Workshop on Things", "conference", "B")
     await user.open("/settings?tab=data")
     user.find("reset-automatic").click()
     await user.should_see(marker="reset-automatic-confirm")
@@ -1209,9 +1217,8 @@ async def test_drop_a_venue_onto_another(user: User) -> None:
     pid = _seed()
     await user.open(f"/person/{pid}")
     await user.should_see("Deep ranking for search")  # links publications to venues
-    from sci_report_analyzer import venues
 
-    venues.set_level("Neural Computation Letters", "journal", "Q2")
+    set_level("Neural Computation Letters", "journal", "Q2")
     with session_scope() as s:
         target = s.query(Venue).filter_by(name="Neural Computation").one().id
         other = s.query(Venue).filter_by(name="Neural Computation Letters").one().id
@@ -1246,14 +1253,13 @@ async def test_merge_while_searching_keeps_the_search(user: User) -> None:
     """A merge from the list updates its rows in place: the search text and the tab stay."""
     from nicegui.events import GenericEventArguments
 
-    from sci_report_analyzer import venues
     from sci_report_analyzer.db.models import Venue
     from sci_report_analyzer.db.session import session_scope
 
     pid = _seed()
     await user.open(f"/person/{pid}")
     await user.should_see("Deep ranking for search")
-    venues.set_level("Neural Computation Letters", "journal", "Q2")
+    set_level("Neural Computation Letters", "journal", "Q2")
     with session_scope() as s:
         target = s.query(Venue).filter_by(name="Neural Computation").one().id
         other = s.query(Venue).filter_by(name="Neural Computation Letters").one().id
@@ -1284,14 +1290,13 @@ async def test_merge_while_searching_keeps_the_search(user: User) -> None:
 
 async def test_venue_list_search_looks_in_every_kind(user: User) -> None:
     """A venue filed under another kind is still found by the search of a tab."""
-    from sci_report_analyzer import venues
     from sci_report_analyzer.db.models import Venue
     from sci_report_analyzer.db.session import session_scope
 
     pid = _seed()
     await user.open(f"/person/{pid}")
     await user.should_see("Deep ranking for search")
-    venues.set_level("Neural Computation Letters", "journal", "Q2")
+    set_level("Neural Computation Letters", "journal", "Q2")
     with session_scope() as s:
         journal = s.query(Venue).filter_by(name="Neural Computation Letters").one().id
     await user.open("/venues?tab=conferences")
@@ -1475,14 +1480,13 @@ async def test_candidate_with_another_orcid_than_the_validated_profiles(user: Us
 
 
 async def test_venue_search_and_merge(user: User) -> None:
-    from sci_report_analyzer import venues
     from sci_report_analyzer.db.models import Venue
     from sci_report_analyzer.db.session import session_scope
 
     pid = _seed()
     await user.open(f"/person/{pid}")
     await user.should_see("Deep ranking for search")  # links publications to venues
-    venues.set_level("Neural Computation Letters", "journal", "Q2")
+    set_level("Neural Computation Letters", "journal", "Q2")
     with session_scope() as s:
         target = s.query(Venue).filter_by(name="Neural Computation").one().id
         other = s.query(Venue).filter_by(name="Neural Computation Letters").one().id

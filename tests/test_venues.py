@@ -1,6 +1,6 @@
 import asyncio
 
-from helpers import add_source, make_person, pub
+from helpers import add_source, make_person, pub, set_kind, set_level
 from sqlalchemy import select
 
 from sci_report_analyzer import pubview, sync, venues
@@ -77,7 +77,7 @@ def test_kind_default_level_unless_overridden():
     st = stats(pid)
     assert st["Paper A"].badge.coreRank == "C"
     assert st["Paper A"].badge.extra["kind_default"] == "natl_conference"
-    venues.set_level("Colloque de machin", "conference", "B")  # venue override wins
+    set_level("Colloque de machin", "conference", "B")  # venue override wins
     assert stats(pid)["Paper B"].badge.coreRank == "B"
 
 
@@ -91,7 +91,7 @@ def test_merge_venues_moves_variants_and_links():
     )
     st = stats(pid)
     a, b = st["Paper A"].venue_id, st["Paper B"].venue_id
-    venues.set_kind("Some Venue Alt", "natl_journal")
+    set_kind("Some Venue Alt", "natl_journal")
     venues.merge_venues(a, [b])
     with session_scope() as s:
         assert {k.key for k in s.get(Venue, a).keys} == {"some venue", "some venue alt"}
@@ -1103,7 +1103,7 @@ def test_demo_track_merged_into_its_main_venue():
     )
     _stats(pid)
     main, demo = _venue_of("Main paper"), _venue_of("Demo paper")
-    venues.set_level("Conference on Widget Processing (WIDG)", "conference", "A*")
+    set_level("Conference on Widget Processing (WIDG)", "conference", "A*")
     rows = _rows()
     assert venues.guess_relation(rows[demo], rows[main]) == "~track:demo"
     assert venues.relate_venues(demo, [main], "~track:demo") == main
@@ -1119,7 +1119,7 @@ def test_mark_as_track_without_a_main_venue():
     add_source(pid, "hal", "h", [pub("d", "Demo paper", 2023, WIDG_DEMO)])
     _stats(pid)
     demo = _venue_of("Demo paper")
-    venues.set_level(WIDG_DEMO, "conference", "A*")
+    set_level(WIDG_DEMO, "conference", "A*")
     venues.mark_as_track(demo, "demo", tracks.conference_name("demo", WIDG_DEMO))
     with session_scope() as s:
         assert s.get(Venue, demo).name == "Conference on Widget Processing (WIDG)"

@@ -1,3 +1,4 @@
+from helpers import set_correction, set_kind, set_level
 from sqlalchemy import select
 
 from sci_report_analyzer import settings_io, venues
@@ -17,16 +18,16 @@ def _venue_attrs():
 
 
 def test_roundtrip_replace():
-    venues.set_correction("Venue A", "Neural Computation")
-    venues.set_level("Venue B", "conference", "A")
-    venues.set_kind("Venue D", "natl_conference")
+    set_correction("Venue A", "Neural Computation")
+    set_level("Venue B", "conference", "A")
+    set_kind("Venue D", "natl_conference")
     st = load_settings()
     st.min_score = 0.7
     save_settings(st)
     exported = settings_io.export_settings().model_dump_json()
 
-    venues.set_correction("Venue A", None)
-    venues.set_correction("Venue C", "Something")
+    set_correction("Venue A", None)
+    set_correction("Venue C", "Something")
     data = settings_io.parse_file(exported)
     settings_io.import_settings(data, "replace")
     attrs = _venue_attrs()
@@ -38,8 +39,8 @@ def test_roundtrip_replace():
 
 
 def test_merge_with_conflicts():
-    venues.set_correction("Venue A", "Local text")
-    venues.set_correction("Venue Z", "Kept")
+    set_correction("Venue A", "Local text")
+    set_correction("Venue Z", "Kept")
     data = settings_io.SettingsFile(
         matching=load_settings(),
         venues=[
@@ -68,8 +69,8 @@ def test_merge_with_conflicts():
 
 
 def test_merged_variants_are_exported():
-    venues.set_correction("Venue A", "X")
-    venues.set_correction("Venue A bis", "Y")
+    set_correction("Venue A", "X")
+    set_correction("Venue A bis", "Y")
     with session_scope() as s:
         a = s.get(VenueKey, "venue a").venue_id
         b = s.get(VenueKey, "venue a bis").venue_id
@@ -98,7 +99,7 @@ def test_norm_rule_conflicts():
 
 
 def test_venue_rules_and_identifiers_roundtrip():
-    venues.set_correction("Venue A", "X")
+    set_correction("Venue A", "X")
     with session_scope() as s:
         vid = s.get(VenueKey, "venue a").venue_id
     venues.save_patterns(vid, [VenuePattern(pattern="^Venue A", track="demo")])
