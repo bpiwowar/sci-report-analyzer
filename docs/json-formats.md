@@ -144,10 +144,9 @@ imported; an unknown name is dropped.
 #### Venue kinds
 
 Keys of `ranking.kinds.KINDS`: `intl_conference`, `intl_workshop`, `intl_journal`,
-`natl_conference`, `natl_workshop`, `natl_journal`, `preprint`, `book`, `chapter`,
-`proceedings`, `software`, `dataset`, `thesis`, `other`. `proceedings` and `thesis` are
-publication kinds only: valid in `kind_levels`, not as a venue's `kind`. Coming:
-`shared_task` (Shared task / evaluation campaign).
+`natl_conference`, `natl_workshop`, `natl_journal`, `shared_task`, `preprint`, `book`,
+`chapter`, `proceedings`, `software`, `dataset`, `thesis`, `other`. `proceedings` and
+`thesis` are publication kinds only: valid in `kind_levels`, not as a venue's `kind`.
 
 ### Flag
 
