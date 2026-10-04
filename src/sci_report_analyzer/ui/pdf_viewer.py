@@ -983,51 +983,7 @@ def viewer_frame(
         ui.label(title).classes("ellipsis grow min-w-0 font-medium")
         ui.label("").classes("text-sm opacity-80").props("id=vr-pdf-status").mark("pdf-status")
         livereload.banner(dense=True)  # (--live-reload: a new version, to restart)
-        # (the actions on a selection, greyed out without one: their tooltips on a wrapper, a
-        # disabled button showing none)
-        with ui.element("span").tooltip(
-            _("Find the paper of the selected text, e.g. a reference (F)")
-        ):
-            ui.button(
-                icon="manage_search", on_click=_here(side, "vr-pdf-find", side.find_selection)
-            ).props("flat dense round color=white id=vr-pdf-find").mark("pdf-find")
-        ui.on("vr-pdf-find", side.find_selection)
-        ui.on("vr-pdf-quote", lambda: side.quote())
-        with ui.element("span").tooltip(_(TAG_LIST_TIP)):
-            ui.button(
-                icon="playlist_add_check",
-                on_click=_here(side, "vr-pdf-tag-list", side.tag_selection),
-            ).props("flat dense round color=white id=vr-pdf-tag-list").mark("pdf-tag-list")
-        ui.on("vr-pdf-tag-list", side.tag_selection)
-        # An area (a rectangle) of a page, selected: its text, as a text selection.
-        with ui.element("span").tooltip(
-            _(
-                "Select an area of a page (A, or Alt+drag): draw a rectangle on the page, the "
-                "text inside it becomes the selection, to quote (Q), add as an excerpt (E), find "
-                "its paper (F), tag the papers of a list (L) or copy (⌘C / Ctrl+C). Shift+drag "
-                "adds another area (their texts, in order). Escape to leave."
-            )
-        ):
-            ui.button(icon="highlight_alt").props("flat dense round color=white id=vr-pdf-area").on(
-                "click", js_handler="() => vrPdf.areaMode()"
-            ).mark("pdf-area")
-        if side.folder and side.source[0] == "doc":  # (excerpts: of documents, not papers)
-            with ui.element("span").tooltip(
-                _(
-                    "Add the selected text (or the highlight clicked) to a category of {folder} (E)"
-                ).format(folder=side.folder[1])
-            ):
-                ui.button(
-                    icon="playlist_add", on_click=_here(side, "vr-pdf-excerpt", side.add_excerpt)
-                ).props("flat dense round color=white id=vr-pdf-excerpt").mark("pdf-excerpt")
-            ui.on("vr-pdf-excerpt", side.add_excerpt)
-        ui.button(
-            icon="bookmark_add",
-            on_click=_here(side, "vr-pdf-bookmark", lambda: side.add_bookmark(*bookmarked)),
-        ).props("flat dense round color=white").tooltip(
-            _("Bookmark this place, named after the selected text if any (B)")
-        ).mark("pdf-bookmark")
-        ui.on("vr-pdf-bookmark", lambda: side.add_bookmark(*bookmarked))
+        _selection_actions(side, bookmarked, here=True)
         ui.button(_("Save"), icon="save").props("flat dense color=white").on(
             "click", js_handler="() => vrPdf.save(true)"
         ).tooltip(_("Save the annotations into the stored PDF (also every few seconds)"))
@@ -1090,6 +1046,63 @@ def viewer_frame(
     return box
 
 
+def _selection_actions(side: Side, bookmarked: tuple[str, int], *, here: bool) -> None:
+    """The header's actions on the PDF's selection, and the events of their shortcuts.
+    ``here``: in the PDF's window (with the area selection; done in the pane while the side
+    panel is in another window), else in that other window."""
+
+    def action(event: str, icon: str, tip: str, act: Callable[[], Any], mark: str) -> None:
+        # (greyed out without a selection: the tooltip on a wrapper, a disabled button
+        # showing none; the id for the PDF's script)
+        with ui.element("span").tooltip(tip):
+            ui.button(icon=icon, on_click=_here(side, event, act) if here else act).props(
+                f"flat dense round color=white id={event}"
+            ).mark(mark)
+        ui.on(event, act)
+
+    ui.on("vr-pdf-quote", lambda: side.quote())
+    action(
+        "vr-pdf-find",
+        "manage_search",
+        _("Find the paper of the selected text, e.g. a reference (F)"),
+        side.find_selection,
+        "pdf-find",
+    )
+    action(
+        "vr-pdf-tag-list", "playlist_add_check", _(TAG_LIST_TIP), side.tag_selection, "pdf-tag-list"
+    )
+    if here:
+        # An area (a rectangle) of a page, selected: its text, as a text selection.
+        with ui.element("span").tooltip(
+            _(
+                "Select an area of a page (A, or Alt+drag): draw a rectangle on the page, the "
+                "text inside it becomes the selection, to quote (Q), add as an excerpt (E), find "
+                "its paper (F), tag the papers of a list (L) or copy (⌘C / Ctrl+C). Shift+drag "
+                "adds another area (their texts, in order). Escape to leave."
+            )
+        ):
+            ui.button(icon="highlight_alt").props("flat dense round color=white id=vr-pdf-area").on(
+                "click", js_handler="() => vrPdf.areaMode()"
+            ).mark("pdf-area")
+    if side.folder and side.source[0] == "doc":  # (excerpts: of documents, not papers)
+        action(
+            "vr-pdf-excerpt",
+            "playlist_add",
+            _(
+                "Add the selected text (or the highlight clicked) to a category of {folder} (E)"
+            ).format(folder=side.folder[1]),
+            side.add_excerpt,
+            "pdf-excerpt",
+        )
+    action(
+        "vr-pdf-bookmark",
+        "bookmark_add",
+        _("Bookmark this place, named after the selected text if any (B)"),
+        lambda: side.add_bookmark(*bookmarked),
+        "pdf-bookmark",
+    )
+
+
 def _here(side: Side, event: str, act: Callable[[], Any]) -> Callable[[], Awaitable[None]]:
     """A header action on the selection (``event``: its shortcut's), done in the pane while
     the side panel is in another window."""
@@ -1121,31 +1134,7 @@ def _pane_frame(
         ui.label(title).classes("ellipsis grow min-w-0 font-medium")
         ui.label("").classes("text-sm opacity-80").props("id=vr-pane-status").mark("pane-status")
         livereload.banner(dense=True)
-        ui.button(icon="manage_search", on_click=side.find_selection).props(
-            "flat dense round color=white"
-        ).tooltip(_("Find the paper of the selected text, e.g. a reference (F)")).mark("pdf-find")
-        ui.on("vr-pdf-find", side.find_selection)
-        ui.on("vr-pdf-quote", lambda: side.quote())
-        ui.button(icon="playlist_add_check", on_click=side.tag_selection).props(
-            "flat dense round color=white"
-        ).tooltip(_(TAG_LIST_TIP)).mark("pdf-tag-list")
-        ui.on("vr-pdf-tag-list", side.tag_selection)
-        if side.folder and side.source[0] == "doc":
-            with ui.element("span").tooltip(
-                _(
-                    "Add the selected text (or the highlight clicked) to a category of {folder} (E)"
-                ).format(folder=side.folder[1])
-            ):  # (its id: the E shortcut is on)
-                ui.button(icon="playlist_add", on_click=side.add_excerpt).props(
-                    "flat dense round color=white id=vr-pdf-excerpt"
-                ).mark("pdf-excerpt")
-            ui.on("vr-pdf-excerpt", side.add_excerpt)
-        ui.button(icon="bookmark_add", on_click=lambda: side.add_bookmark(*bookmarked)).props(
-            "flat dense round color=white"
-        ).tooltip(_("Bookmark this place, named after the selected text if any (B)")).mark(
-            "pdf-bookmark"
-        )
-        ui.on("vr-pdf-bookmark", lambda: side.add_bookmark(*bookmarked))
+        _selection_actions(side, bookmarked, here=False)
         ui.button(icon="close_fullscreen").props("flat dense round color=white").on(
             "click", js_handler="() => vrPane.back()"
         ).tooltip(_("Back into the PDF window (closes this one)")).mark("pane-back")
