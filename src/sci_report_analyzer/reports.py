@@ -26,7 +26,6 @@ the period's years, every paper numbered as first cited).
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
@@ -41,6 +40,7 @@ from .db.models import Folder, FolderSettings, Period
 from .db.session import session_scope
 from .i18n import _
 from .pubview import PubStat, hashtag, saved_summary, tagged
+from .text import ascii_key
 
 NUMBER_FORMAT = "**#{index}**"
 REFERENCE_FORMAT = "[{index}]"  # (in the notes: by default)
@@ -73,15 +73,10 @@ _STOP = {"a", "an", "the", "on", "of", "for", "in", "to", "and", "with", "from",
 # ---- Keys and numbers -----------------------------------------------------------------------
 
 
-def _ascii(text: str) -> str:
-    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
-    return re.sub(r"[^a-z0-9]+", "", text.lower())
-
-
 def _base_key(s: PubStat) -> str:
     """BibTeX-like: the first author's surname, the year, the title's first word."""
     author = surname(s.authors[0]) if s.authors else ""
-    words = [w for w in (_ascii(w) for w in (s.title or "").split()) if w and w not in _STOP]
+    words = [w for w in (ascii_key(w) for w in (s.title or "").split()) if w and w not in _STOP]
     return f"{author or 'anon'}{s.year or 'nd'}{words[0] if words else ''}"
 
 

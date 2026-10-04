@@ -6,12 +6,12 @@ All regexes use ``re.ASCII`` so that ``\\b``/``\\d`` behave like JavaScript's.
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Iterable
 from functools import lru_cache
 
 from pydantic import BaseModel, Field
 
+from ..text import strip_diacritics  # (re-exported)
 from . import ordinals
 
 # Words (and period-abbreviations of them) that carry no discriminating signal
@@ -82,14 +82,8 @@ ARCHIVAL = frozenset(
     ]
 )
 
-_COMBINING = re.compile("[̀-ͯ]")
 _NON_ALNUM = re.compile(r"[^a-z\d]+", re.ASCII)
 _SPACES = re.compile(r"\s+")
-
-
-def strip_diacritics(s: str) -> str:
-    return _COMBINING.sub("", unicodedata.normalize("NFD", s))
-
 
 # What the ordinals rules leave ("Zth ACM Conference", "Zème conférence"): readable, but
 # not in the keys ("Fourteenth X" and "X" are the same venue).
