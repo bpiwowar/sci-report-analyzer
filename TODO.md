@@ -16,22 +16,6 @@ erased the rest.
 - The folder dialog's "Notes" field (the folder's own short text): save it only when
   edited (the dialog may show a stale copy).
 
-## Folder notes: rubrics (live blocks)
-
-Blocks on their own line in a person's folder notes, in the citations' Pandoc style,
-expanded live in the preview and in the copy (the notes keep only the line), so that a
-copy gives the full text:
-
-- `[]{.publications}`: the publications summary (`pubview.summary_lines`, with the
-  panel's saved "Summary" settings), restricted to the period's papers.
-- `[]{.excerpts}`: the excerpts by category (`categories.markdown`), headings one level
-  below the heading the block sits under.
-- Two toolbar buttons to insert them (the current excerpts button pastes a snapshot that
-  goes stale).
-- Optional: a folder skeleton (in the folder's settings), the starting text of each
-  person whose notes are empty, e.g. `## Publications` / `[]{.publications}` /
-  `## Activities` / `[]{.excerpts}` / `## Starred papers`.
-
 ## Settings: saving
 
 Saving the preferences is easy to forget (each screen has its own save button).

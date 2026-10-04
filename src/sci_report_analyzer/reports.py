@@ -11,7 +11,10 @@ syntax, substituted when shown or copied.
   ``.year``, ``.tags``, ``.notes``) replaced and the rest kept: ``EMNLP (2026)``,
   ``{#.index}``: ``#2``, ``{**#.index** (.short-venue .year): .notes}``;
 - ``[@key]{.starred}``: a named template (Settings → Citation templates, or the folder's),
-  also usable within another one (``{.starred: .notes}``).
+  also usable within another one (``{.starred: .notes}``);
+- ``[]{.publications}``, ``[]{.excerpts}`` (alone on their line): a block (see
+  ``Context.blocks``), e.g. the summary of the period's publications, its excerpts by
+  category (their headings below that of the block).
 
 Within a folder, the papers with its numbered tag (see ``Numbering``) are numbered as listed
 (else by year), and the other papers cited apart, each from 1, as first cited: the former
@@ -24,6 +27,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from functools import lru_cache
 
@@ -33,7 +37,7 @@ from lark.exceptions import LarkError
 from .db.models import AppSetting, Folder, Period
 from .db.session import session_scope
 from .i18n import _
-from .pubview import PubStat, hashtag, tagged
+from .pubview import PubStat, hashtag, saved_summary, tagged
 
 NUMBER_FORMAT = "**#{index}**"
 REFERENCE_FORMAT = "[{index}]"  # (in the notes: by default)
@@ -48,6 +52,9 @@ _INTEXT = re.compile(r"(?<![\w@\[])@(?P<key>" + _KEY + r")")
 # Code (fenced blocks, spans) is left as is.
 _CODE = re.compile(r"(```.*?(?:```|$)|`[^`\n]*`)", re.S)
 _LIST_ITEM = re.compile(r"[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?")
+# A block, alone on its line: []{.publications}
+_BLOCK = re.compile(r"^[ \t]*\[\]\{\.(?P<name>[A-Za-z][\w-]*)\}[ \t]*$", re.M)
+_HEADING = re.compile(r"^(#{1,6})[ \t]", re.M)
 
 _STOP = {"a", "an", "the", "on", "of", "for", "in", "to", "and", "with", "from", "towards"}
 
@@ -164,6 +171,9 @@ class Context:
     templates: dict[str, str] = field(default_factory=dict)  # named ones: name -> {attrs}
     # The papers each to be cited (by default, the numbered ones; see citation_status).
     discuss: list[Paper] | None = None
+    # The blocks ([]{.name} on its line): name -> its Markdown, given the level of its
+    # headings (that below the heading the block is under).
+    blocks: dict[str, Callable[[int], str]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.by_key = {p.key: p for p in self.papers}
@@ -409,8 +419,23 @@ def render(text: str, ctx: Context) -> Rendered:
         pieces.append(_INTEXT.sub(intext, src[last:]))
         return "".join(pieces)
 
+    # The blocks: their Markdown (not cited from) put back in place of a mark once cited.
+    made: list[str] = []
+
+    def blocks(src: str, before: str) -> str:
+        def block(m: re.Match) -> str:
+            make = ctx.blocks.get(m.group("name"))
+            if make is None:
+                return m.group(0)
+            head = _HEADING.findall(before + src[: m.start()])
+            made.append(make(min(len(head[-1]) + 1, 6) if head else 2).rstrip("\n"))
+            return f"\0{len(made) - 1}\0"
+
+        return _BLOCK.sub(block, src) if ctx.blocks else src
+
     chunks = _CODE.split(text)
-    out.text = "".join(c if i % 2 else prose(c) for i, c in enumerate(chunks))
+    pieces = [c if i % 2 else prose(blocks(c, "".join(chunks[:i]))) for i, c in enumerate(chunks)]
+    out.text = re.sub(r"\0(\d+)\0", lambda m: made[int(m.group(1))], "".join(pieces))
     out.unknown = list(unknown)
     out.errors = list(dict.fromkeys(out.errors))
     return out
@@ -486,6 +511,16 @@ def save_numbering(folder_id: int, n: Numbering) -> None:
     )
 
 
+def skeleton(folder_id: int | None) -> str:
+    """The starting text of a person's notes in the folder (while empty), e.g. its headings
+    and blocks."""
+    return _citations(folder_id).get("skeleton") or ""
+
+
+def save_skeleton(folder_id: int, text: str) -> None:
+    _save_citations(folder_id, skeleton=text.strip() and text.rstrip() + "\n")
+
+
 def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
     """For the notes of the folder of a period (the person's in it): its numbering and its
     templates; the papers to discuss, those with its numbered tag (else those of the
@@ -503,6 +538,15 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
     if found is None:
         return note_context(stats, keys)
     person_id, folder_id, years = found
+
+    def publications(_level: int) -> str:
+        return "\n".join(saved_summary([s for s in stats if not s.hidden and in_years(s, years)]))
+
+    def excerpts(level: int) -> str:
+        from . import categories
+
+        return categories.markdown(folder_id, period_id, level=level)
+
     n = numbering(folder_id)
     names = {t.id: t.name for t in annotations.all_tags()}
     tag = n.tag_id if n.tag_id in names else None
@@ -520,6 +564,7 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
         listed_format=n.listed_format if tag else None,
         templates=load_templates(folder_id).names,
         discuss=discuss,
+        blocks={"publications": publications, "excerpts": excerpts},
     )
 
 

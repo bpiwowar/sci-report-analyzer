@@ -1159,6 +1159,27 @@ def summary_lines(
     return lines
 
 
+def saved_summary(rows: list[PubStat]) -> list[str]:
+    """The summary of ``rows`` with the summary dialog's last settings (its kinds, details,
+    short names, language), as a Markdown list."""
+    saved = summary_settings()
+    off_kinds = set(saved.get("off_kinds", []))
+    details = {k: "off" for k in saved.get("off_categories", [])}
+    details.update(saved.get("details") or {})
+    kept = [
+        r for r in rows if ((r.kind if r.kind in KIND_ORDER else None) or "none") not in off_kinds
+    ]
+    return summary_lines(
+        kept,
+        short=saved.get("short", False),
+        by_kind=saved.get("by_kind", True),
+        years=saved.get("years", True),
+        details=details,
+        lang=saved.get("lang", "en"),
+        markdown=True,
+    )
+
+
 def tagged(rows: list[PubStat], tag_ids: Iterable[int], period_id: int | None) -> list[PubStat]:
     """The papers having one of the tags (global, or within the period); every paper
     without tags to look for."""
