@@ -277,17 +277,29 @@ a date and can be hidden. Each person has their **own period** in each of their 
 (set in their Periods tab), with its own stars, tags and notes; opening a person from a
 folder selects it. Removing a person from a folder (✕ on their card, or in their Periods
 tab) either keeps that period, with its data, as one of their own periods, or deletes it.
+The 📝 button of a person's card (also next to the folder's name on their page, and in their
+Documents tab) opens their **notes and excerpts in the folder** on a page of their own, as
+next to their PDFs: to write them, or see their excerpts by category, without opening any
+document (e.g. when they have none).
 
-Folders can be **within other folders**: the **Folders** button of the Reports page shows
-them as a tree (collapsible), to rename them, add one within another, and move them (drag
-a folder onto another one, or choose where it is in its "In" menu). A folder uses the
-**settings** of the folder it is in, or its own ones: all of them, its categories and the
-citations in its notes (the numbered tag, the number formats, its templates, the starting
-notes). Choosing its own settings starts from a copy of its parent's; going back to its
-parent's drops its own (unless other folders use them), its people's excerpts going to the
-categories of the same names there (added if missing), as when a folder using its parent's
-settings is moved. A folder moved to the top level keeps the settings it used; the
-categories and citations dialogs say when other folders use the same ones.
+Folders can be **within other folders**: the Reports page shows them as a **tree** on its
+left (above, on a narrow screen), collapsible; a click on a folder shows it (its people, the
+folders within it), "All people (cleanup)" every person. Drag a folder onto another one to
+put it within it (onto its top or bottom: next to it), or onto "Drop here" for the top level.
+Each folder's ⋮ menu renames it, adds a folder within it, moves it ("Move to…") and chooses
+its settings. A folder uses the **settings** of the folder it is in, or its own ones (an icon in
+the tree): all of them, its categories and the citations in its notes (the numbered tag, the
+number formats, its templates, the starting notes). Choosing its own settings starts from a
+copy of its parent's; going back to its parent's drops its own (unless other folders use
+them), its people's excerpts going to the categories of the same names there (added if
+missing), as when a folder using its parent's settings is moved. **Move its settings to…**
+gives the settings a folder uses to a folder it is in (e.g. its parent, for all the folders
+within it to share them): the folder (and those between them) then uses the target's, as do
+the folders that used the target's previous settings (dropped, unless others use them).
+**Copy its settings to…** gives any other folder its own copy of them. Both name the folders
+whose settings change before doing it, the excerpts following as above. A folder moved to
+the top level keeps the settings it used; the categories and citations dialogs say when
+other folders use the same ones.
 
 **Co-author categories** (e.g. "Intl. collaborators"): click a co-author's name in a
 publication's details to put them in a category (or to say they are the person or one of

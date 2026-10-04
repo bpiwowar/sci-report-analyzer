@@ -18,6 +18,7 @@ from .sources.base import close_client
 from .sync import reset_running_states
 from .ui import (
     documents_page,
+    folder_notes,
     help_page,
     pdf_viewer,
     person,
@@ -52,6 +53,7 @@ def setup() -> None:
     venues_page.register()
     pdf_viewer.register()
     documents_page.register()
+    folder_notes.register()
     app.on_startup(lambda: background_tasks.create(datasets.keep_datasets_fresh()))
     app.on_shutdown(_shutdown)
 

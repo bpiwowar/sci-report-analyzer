@@ -17,7 +17,8 @@ from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
 from ..sync import discover, is_syncing, start_sync
 from .categories_editor import categories_dialog
-from .folders_editor import folders_dialog
+from .folder_notes import NOTES_TIP, notes_url
+from .folders_editor import ALL, folders_tree
 from .person import purge_dialog, remove_from_folder_dialog
 from .theme import STATUS_COLOUR, fmt_dt, frame, source_tag
 
@@ -65,7 +66,6 @@ async def _create(name: str, affiliation: str, folder_id: int | None = None) -> 
 
 
 LAST_FOLDER = "ui.people.folder"  # the folder shown on the Reports page (sticky)
-ALL = 0  # "folder" value of the All people (cleanup) view
 
 
 def register() -> None:
@@ -77,15 +77,38 @@ def register() -> None:
         if folder not in known:
             folder = ALL
         annotations.save_ui_state(LAST_FOLDER, folder)
-        current = known.get(folder)
-        title = current.name if current else _("All people")
+        title = known[folder].name if folder in known else _("All people")
         with frame(title):
+
+            @ui.refreshable
+            def body() -> None:  # (again once the tree changed: names, places, settings)
+                _reports(folder, body.refresh)
+
+            body()
+            ui.timer(2.0, lambda: _refresh_if_running())
+
+
+def _reports(folder: int, changed) -> None:
+    """The tree of folders (on the left; above, on narrow screens), and the folder selected
+    (else All people)."""
+    known = {f.id: f for f in folders.folders()}
+    current = known.get(folder)
+    with ui.element("div").classes("w-full flex flex-col md:flex-row md:flex-nowrap gap-4"):
+        with (
+            ui.column()
+            .classes(
+                "w-full md:w-72 shrink-0 gap-1 self-start md:sticky md:top-16"
+                " md:max-h-[calc(100vh-5rem)] md:overflow-auto"
+            )
+            .mark("folders-pane")
+        ):
+            folders_tree(current.id if current else ALL, _goto, changed)
+        with ui.column().classes("w-full min-w-0 grow gap-3"):
             _header(current, known)
             if current is None:
                 _cleanup_view(known)
             else:
                 _folder_view(current)
-            ui.timer(2.0, lambda: _refresh_if_running())
 
 
 def _refresh_if_running() -> None:
@@ -107,16 +130,6 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
             ui.label(current.date.isoformat()).classes("text-grey")
         if current and current.hidden:
             ui.badge(_("hidden"), color="grey")
-        options = {  # (as a tree, the hidden ones last)
-            n.id: _("{name} (hidden)").format(name=n.path) if n.hidden else n.path
-            for n in sorted(folders.tree(), key=lambda n: n.hidden)
-        }
-        ui.select(
-            {**options, ALL: _("All people (cleanup)")},
-            value=current.id if current else ALL,
-            label=_("folder"),
-            on_change=lambda e: _goto(e.value),
-        ).props("dense outlined options-dense").classes("w-64").mark("folder-select")
         if current:
             refresh = ui.navigate.reload
             ui.button(icon="edit", on_click=lambda: folder_dialog(current)).props(
@@ -144,13 +157,6 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
                 _("Purge: remove all papers of the folder's people and re-sync")
             ).mark("purge-folder")
         ui.space()
-        ui.button(
-            _("Folders"),
-            icon="account_tree",
-            on_click=lambda: folders_dialog(ui.navigate.reload),
-        ).props("flat").tooltip(
-            _("The tree of folders: nest, move and rename them; their settings")
-        ).mark("folders-tree")
         ui.button(
             _("New folder"),
             icon="create_new_folder",
@@ -349,7 +355,7 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
     ui.label(
         _(
             "Every person, with the folders they are in: select people to delete them or to put "
-            "them in a folder. Pick a folder above to work with it."
+            "them in a folder. Pick a folder in the tree to work with it."
         )
     ).classes("text-sm text-grey")
     rows = folders.people_rows()
@@ -527,6 +533,11 @@ def _card(
                 if member.stars:
                     ui.label(f"★ {member.stars}").classes("text-amber-8 text-sm")
                 ui.space()
+                ui.button(
+                    icon="edit_note", on_click=lambda: ui.navigate.to(notes_url(member.period_id))
+                ).props("flat round dense size=sm").tooltip(_(NOTES_TIP)).mark(
+                    f"notes-{member.period_id}"
+                )
 
                 def remove() -> None:
                     remove_from_folder_dialog(folder_id, person.id, ui.navigate.reload)
