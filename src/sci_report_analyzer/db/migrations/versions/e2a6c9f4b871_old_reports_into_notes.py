@@ -1,7 +1,7 @@
 """reports: into the folders' notes (their view is gone)
 
-The reports' texts and their papers (with their notes) are appended to the notes of their
-folders by the app, once it runs (it renders the citations with the papers as loaded: see
+The reports' texts and their papers (with their notes) are appended to the notes of the
+people in their folders (b5e1f7c3a9d2; at first, of the folders) by the app, once it runs (it renders the citations with the papers as loaded: see
 old_reports.py); this revision only asks for it (the ``old_reports`` app setting), when
 there are folders. The report table is kept.
 

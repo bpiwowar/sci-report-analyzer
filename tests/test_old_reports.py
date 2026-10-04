@@ -108,25 +108,31 @@ async def test_old_reports_appended_once():
     # Not asked: nothing done.
     assert not old_reports.pending()
     assert await old_reports.migrate() == 0
-    assert folders.notes_of(fid) == "My own notes."
-    # Asked (by the migration): appended, after the notes kept as they were.
+    assert folders.notes_of(period) == ""
+    # Asked (by the migration): appended to each person's notes within the folder.
+    folders.set_notes(period, "My own notes.")
     _pending()
-    assert await old_reports.migrate() == 1
-    text = folders.notes_of(fid)
-    assert text.startswith("My own notes.\n\n## Starred papers\n\n### Jane Doe\n\nBoth strong: [@")
+    assert await old_reports.migrate() == 2
+    text = folders.notes_of(period)
+    assert text.startswith("My own notes.\n\n## Starred papers\n\nBoth strong: [@")
     assert f"- [@{keys[b]}]: **The neural retrieval** · *ECIR* · 2022" in text
     assert f"- [@{keys[a]}]: **Deep ranking for search** · *SIGIR* · 2021" in text
     assert "\n\n  Strong *results*.\n\n  Second paragraph.\n\n  In the folder: shortlist" in text
     assert "Deep ranking again" not in text  # (not one of the report's papers)
-    assert f"### John Roe\n\n- [@{zkey}]: **Sparse things** · *ACL* · 2020" in text
-    assert folders.notes_of(empty) == "Untouched."
+    assert "Sparse things" not in text  # (John Roe's: in his own notes)
+    assert folders.notes_of(period_other).startswith(
+        f"## Starred papers\n\n- [@{zkey}]: **Sparse things** · *ACL* · 2020"
+    )
+    # The folders' own notes: untouched.
+    by_id = {f.id: f.notes for f in folders.folders()}
+    assert by_id[fid] == "My own notes." and by_id[empty] == "Untouched."
     assert not old_reports.pending()
     # Never twice: asked again, the folders done are skipped.
     with session_scope() as s:
         row = s.get(AppSetting, old_reports.PENDING_KEY)
         row.value = {**row.value, "pending": True}
     assert await old_reports.migrate() == 0
-    assert folders.notes_of(fid) == text
+    assert folders.notes_of(period) == text
     # The citations render in the notes, numbered as the report did.
     ctx = reports.folder_context(stats, period)
     assert reports.render(f"[@{keys[b]}]", ctx).unknown == []
