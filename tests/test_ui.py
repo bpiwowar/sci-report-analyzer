@@ -819,6 +819,46 @@ async def test_drop_a_venue_onto_another(user: User) -> None:
     assert any(r["id"] == target for t in tables for r in t.rows)
 
 
+async def test_merge_while_searching_keeps_the_search(user: User) -> None:
+    """A merge from the list updates its rows in place: the search text and the tab stay."""
+    from nicegui.events import GenericEventArguments
+
+    from sci_report_analyzer import venues
+    from sci_report_analyzer.db.models import Venue
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = _seed()
+    await user.open(f"/person/{pid}")
+    await user.should_see("Deep ranking for search")
+    venues.set_level("Neural Computation Letters", "journal", "Q2")
+    with session_scope() as s:
+        target = s.query(Venue).filter_by(name="Neural Computation").one().id
+        other = s.query(Venue).filter_by(name="Neural Computation Letters").one().id
+    await user.open("/venues?tab=journals")
+    await user.should_see(marker="venue-list-filter-journals")
+    (filt,) = user.find("venue-list-filter-journals").elements
+    (table,) = [c for c in filt.parent_slot.children if isinstance(c, ui.table)]
+    user.find("venue-list-filter-journals").type("Neural Computation")
+    for listener in table._event_listeners.values():
+        if listener.type == "venue_drop":
+            args = GenericEventArguments(sender=table, client=table.client, args={})
+            args.args.update(src=other, dst=target)
+            with table.parent_slot:
+                listener.handler(args)
+    await user.should_see(marker="venue-merge-confirm")
+    user.find("venue-merge-confirm").click()
+    for _ in range(50):
+        if not any(r["id"] == other for r in table.rows):
+            break
+        await asyncio.sleep(0.02)
+    # The same table and filter box (not rebuilt), the search still there.
+    assert not table.is_deleted and not filt.is_deleted
+    assert filt.value == "Neural Computation"
+    assert not any(r["id"] == other for r in table.rows)
+    assert any(r["id"] == target for r in table.rows)
+    await user.should_see(marker="venue-list-all-kinds")
+
+
 async def test_venue_list_search_looks_in_every_kind(user: User) -> None:
     """A venue filed under another kind is still found by the search of a tab."""
     from sci_report_analyzer import venues
