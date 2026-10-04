@@ -136,6 +136,9 @@ def remove(pub_id: int) -> None:
             return
         (pdf_dir() / row.path).unlink(missing_ok=True)
         s.delete(row)
+    from .documents import forget_place  # (documents imports this module)
+
+    forget_place("pub", pub_id)
 
 
 def move(session, source_id: int, target_id: int) -> None:

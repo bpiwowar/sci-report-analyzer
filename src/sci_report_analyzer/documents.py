@@ -16,7 +16,8 @@ from typing import Any
 
 from sqlalchemy import select
 
-from .db.models import Period, PeriodDocument, utcnow
+from .annotations import save_ui_state, ui_state
+from .db.models import AppSetting, Period, PeriodDocument, utcnow
 from .db.session import session_scope
 from .i18n import _
 from .pdfs import PdfError, _slug, is_pdf, pdf_dir
@@ -145,6 +146,7 @@ def remove(doc_id: int) -> None:
             return
         (pdf_dir() / doc.path).unlink(missing_ok=True)
         s.delete(doc)
+    forget_place("doc", doc_id)
 
 
 def set_lines(doc_id: int, lines: list[dict[str, Any]]) -> None:
@@ -651,3 +653,42 @@ def set_bookmarks(kind: str, key: int, marks: list[dict[str, Any]]) -> None:
     with session_scope() as s:
         if row := _bookmarked(s, kind, key):
             row.bookmarks = list(marks)
+
+
+# ---- Where the reader was (to open the PDF there again) ----
+
+_ZOOM = re.compile(r"auto|page-width|page-fit|page-actual|\d{1,4}(\.\d{1,2})?")
+
+
+def _place_key(kind: str, key: int) -> str:
+    return f"ui.pdf.at.{kind}.{key}"
+
+
+def last_place(kind: str, key: int) -> dict[str, Any] | None:
+    """Where the PDF of a document (``kind`` "doc") or of a paper ("pub") was last read:
+    {"p": page, "zoom", "left", "top" (PDF units)}, or None."""
+    return ui_state(_place_key(kind, key))
+
+
+def save_last_place(kind: str, key: int, place: dict[str, Any]) -> None:
+    """Keep where the PDF is read (as sent by the viewer: anything else is ignored)."""
+    try:
+        p, left, top = int(place["p"]), int(place.get("left") or 0), int(place.get("top") or 0)
+        zoom = str(place.get("zoom") or "auto")
+    except (KeyError, TypeError, ValueError):
+        return
+    if p >= 1 and _ZOOM.fullmatch(zoom):
+        save_ui_state(_place_key(kind, key), {"p": p, "zoom": zoom, "left": left, "top": top})
+
+
+def forget_place(kind: str, key: int) -> None:
+    with session_scope() as s:
+        if row := s.get(AppSetting, _place_key(kind, key)):
+            s.delete(row)
+
+
+def place_hash(place: dict[str, Any] | None) -> str:
+    """The viewer's open parameters (its URL's hash) of a place, or ""."""
+    if not place:
+        return ""
+    return f"#page={place['p']}&zoom={place['zoom']},{place['left']},{place['top']}"
