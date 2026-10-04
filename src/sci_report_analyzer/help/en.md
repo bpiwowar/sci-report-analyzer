@@ -193,11 +193,10 @@ A line break is kept (as in Obsidian). They are edited with a Markdown editor (t
 **Report** (✒ in the panel, with a period / folder chosen; a new tab): a Markdown report on
 the person, citing their papers with Pandoc's syntax: `[@key]` the paper's number (`**#6**`,
 the format can be changed), `[@a; @b]` several, `@key` its title, venue, year and category,
-`[@key]{notes}` with its notes, `[@key]{tags}` with its tags (`{notes tags}` both), and
-templates, with fields as in Python: `[@key]{{short-venue} ({year})}` gives `EMNLP (2026)`
-(fields: `{number}`, `{index}` the bare number as in `{#{index}}`, `{title}`, `{venue}`,
-`{short-venue}` the acronym, `{year}`, `{tags}`, `{notes}`, as in
-`{**#{index}** ({short-venue} {year}): {notes}}`; a bracket without a
+`[@key]{.notes}` with its notes, `[@key]{.tags}` with its tags (`{.notes .tags}` both), and
+templates: `[@key]{.short-venue (.year)}` gives `EMNLP (2026)` (fields: `.number`, `.index`
+the bare number as in `{#.index}`, `.title`, `.venue`, `.short-venue` the acronym, `.year`,
+`.tags`, `.notes`, as in `{**#.index** (.short-venue .year): .notes}`; a bracket without a
 value is dropped). "Cite as" chooses how a paper is inserted when clicked in
 the side (or with Enter), among the templates set in Settings → Report templates. The
 papers to discuss are those with some tags (else those of the period's years), numbered by

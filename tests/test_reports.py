@@ -49,7 +49,7 @@ def test_keys_numbers_and_substitution():
     text = (
         f"See [@smith2022neural] and [see @smith2022neural; @{keys[a]}, p. 3].\n"
         "In-text: @smith2022neural. Mail: x@smith2022neural.org `[@smith2022neural]`\n"
-        f"- [@{keys[a]}]{{notes}}\n"
+        f"- [@{keys[a]}]{{.notes}}\n"
         f"Other: [@{keys[c]}] and [@nobody]."
     )
     r = reports.render(text, ctx)
@@ -64,15 +64,15 @@ def test_keys_numbers_and_substitution():
     assert r.cited["smith2022neural"] == 3
     assert reports.uncited(ctx, r.cited) == []
     # Templates (parsed: a group without a value is dropped, an unclosed one left as is).
-    assert reports.render("[@smith2022neural]{{short-venue} ({year})}", ctx).text == "ECIR (2022)"
-    out = reports.render(f"[@smith2022neural; @{keys[a]}]{{number year}}", ctx).text
+    assert reports.render("[@smith2022neural]{.short-venue (.year)}", ctx).text == "ECIR (2022)"
+    out = reports.render(f"[@smith2022neural; @{keys[a]}]{{.number .year}}", ctx).text
     assert out == "**#1** 2022, **#2** 2021"
-    assert reports.render("[@smith2022neural]{#{index}}", ctx).text == "#1"
-    tpl = "{**#{index}** ({short-venue} {year}): {notes}}"
+    assert reports.render("[@smith2022neural]{#.index}", ctx).text == "#1"
+    tpl = "{**#.index** (.short-venue .year): .notes}"
     out = reports.render(f"- [@{keys[a]}]{tpl}", ctx).text
     assert out == "- **#2** (SIGIR 2021): Strong *results*.\n\n  Second paragraph."
     assert reports.render(f"[@smith2022neural]{tpl}", ctx).text == "**#1** (ECIR 2022)"
-    assert reports.render("[@smith2022neural]{{title} ()}", ctx).text == "The neural retrieval"
+    assert reports.render("[@smith2022neural]{.title ()}", ctx).text == "The neural retrieval"
     assert reports.render("[@smith2022neural]{(.year}", ctx).text == "[@smith2022neural]{(.year}"
     # Tags (not the report's), a number format, the list of papers.
     other = annotations.save_tag("strong")
@@ -81,7 +81,7 @@ def test_keys_numbers_and_substitution():
     papers = reports.papers_to_discuss(stats, keys, [tag], period)
     names = {tag: "discuss", other: "strong"}
     ctx = reports.Context(papers, stats, keys, names, {tag}, period, number_format="[{n}]")
-    out = reports.render(f"[@{keys[a]}]{{tags}}", ctx).text
+    out = reports.render(f"[@{keys[a]}]{{.tags}}", ctx).text
     assert out.startswith("[2] **Deep ranking for search**") and out.endswith("#strong")
     assert "#discuss" not in out
     assert reports.uncited(ctx, reports.render("", ctx).cited) == papers
@@ -100,13 +100,13 @@ def test_keys_numbers_and_substitution():
 
 def test_report_templates():
     t = reports.load_templates()
-    assert t.cite("k") == "[@k]{**#{index}** ({short-venue} {year})}"
+    assert t.cite("k") == "[@k]{**#.index** (.short-venue .year)}"
     assert t.cite("k", "") == "[@k]"
-    assert reports.check_template("{{year} (}") and reports.check_template("{year")
-    t.items.append(reports.Template("Year", "{year}"))
-    t.default = "{year}"
+    assert reports.check_template("{.year (}") and reports.check_template(".year")
+    t.items.append(reports.Template("Year", "{.year}"))
+    t.default = "{.year}"
     reports.save_templates(t)
-    assert reports.load_templates().cite("k") == "[@k]{year}"
+    assert reports.load_templates().cite("k") == "[@k]{.year}"
     t.items.append(reports.Template("Bad", "{(.year}"))
     with pytest.raises(ValueError):
         reports.save_templates(t)
@@ -117,11 +117,11 @@ async def test_report_templates_settings(user: User):
     await user.should_see(marker="report-template-0")
     user.find(marker="report-template-add").click()
     await user.should_see(marker="report-template-attrs-7")
-    user.find(marker="report-template-attrs-7").elements.pop().value = "{title}"
+    user.find(marker="report-template-attrs-7").elements.pop().value = "{.title}"
     user.find(marker="report-template-default-7").click()
     user.find(marker="report-templates-save").click()
     t = reports.load_templates()
-    assert t.items[-1].attrs == "{title}" and t.default == "{title}"
+    assert t.items[-1].attrs == "{.title}" and t.default == "{.title}"
 
 
 def test_notes_keep_line_breaks():
@@ -155,32 +155,32 @@ def test_named_templates_within_others_and_cycles():
     pid, _ = _setup()
     stats = asyncio.run(pubview.load_stats(pid))
     keys = reports.citation_keys(stats)
-    templates = {"starred": "{{index} ({short-venue} {year})}", "long": "{{starred}: {title}}"}
+    templates = {"starred": "{.index (.short-venue .year)}", "long": "{.starred: .title}"}
     ctx = reports.Context([], stats, keys, {}, templates=templates)
-    assert reports.render("[@smith2022neural]{starred}", ctx).text == "1 (ECIR 2022)"
-    out = reports.render("[@smith2022neural]{long}", ctx).text
+    assert reports.render("[@smith2022neural]{.starred}", ctx).text == "1 (ECIR 2022)"
+    out = reports.render("[@smith2022neural]{.long}", ctx).text
     assert out == "1 (ECIR 2022): The neural retrieval"
     # A cycle: the citation left as is, with the error (not a crash).
-    templates.update(a="{b}", b="{x {a}}")
-    r = reports.render("[@smith2022neural]{a} ok", ctx)
-    assert r.text.startswith("[@smith2022neural]{a} (⚠ ") and r.text.endswith(" ok")
-    assert r.errors == ["Template cycle: {a} → {b} → {a}"]
+    templates.update(a="{.b}", b="{x .a}")
+    r = reports.render("[@smith2022neural]{.a} ok", ctx)
+    assert r.text.startswith("[@smith2022neural]{.a} (⚠ ") and r.text.endswith(" ok")
+    assert r.errors == ["Template cycle: .a → .b → .a"]
     assert reports.template_cycle(templates) == ("a", "b", "a")
     # Refused when saved: a cycle, a name twice, a reserved name.
     t = reports.load_templates()
-    t.items.append(reports.Template("A", "{b}", "a"))
-    t.items.append(reports.Template("B", "{a}", "b"))
+    t.items.append(reports.Template("A", "{.b}", "a"))
+    t.items.append(reports.Template("B", "{.a}", "b"))
     with pytest.raises(ValueError, match="cycle"):
         reports.save_templates(t)
-    t.items[-1] = reports.Template("B", "{year}", "a")
+    t.items[-1] = reports.Template("B", "{.year}", "a")
     with pytest.raises(ValueError, match="Two templates"):
         reports.save_templates(t)
-    t.items[-1] = reports.Template("B", "{year}", "year")
+    t.items[-1] = reports.Template("B", "{.year}", "year")
     with pytest.raises(ValueError, match="field"):
         reports.save_templates(t)
-    t.items[-1] = reports.Template("B", "{year}", ".b")
+    t.items[-1] = reports.Template("B", "{.year}", ".b")
     reports.save_templates(t)
-    assert reports.load_templates().names == {"a": "{b}", "b": "{year}"}
+    assert reports.load_templates().names == {"a": "{.b}", "b": "{.year}"}
 
 
 def test_folder_numbering_templates_and_status():
@@ -217,23 +217,23 @@ def test_folder_numbering_templates_and_status():
     assert [p.key for p in st.off] == [keys[a]] and st.colour == "warning"
     # The folder's templates over the general ones (by name), within one another.
     t = reports.load_templates()
-    t.items.append(reports.Template("Starred", "{short-venue}", "starred"))
+    t.items.append(reports.Template("Starred", "{.short-venue}", "starred"))
     reports.save_templates(t)
     reports.save_folder_templates(
         fid,
         [
-            reports.Template("", "{{index} ({short-venue} {year})}", "starred"),
-            reports.Template("", "{{starred}: {title}}", "long"),
+            reports.Template("", "{.index (.short-venue .year)}", "starred"),
+            reports.Template("", "{.starred: .title}", "long"),
         ],
     )
     ctx = reports.folder_context(stats, period)
-    out = reports.render(f"[@{keys[b]}]{{long}}", ctx).text
+    out = reports.render(f"[@{keys[b]}]{{.long}}", ctx).text
     assert out == "2 (ECIR 2022): The neural retrieval"
-    assert reports.load_templates().names["starred"] == "{short-venue}"
+    assert reports.load_templates().names["starred"] == "{.short-venue}"
     with pytest.raises(ValueError, match="cycle"):
-        reports.save_folder_templates(fid, [reports.Template("", "{starred}", "starred")])
+        reports.save_folder_templates(fid, [reports.Template("", "{.starred}", "starred")])
     with pytest.raises(ValueError, match="name"):
-        reports.save_folder_templates(fid, [reports.Template("", "{year}", "")])
+        reports.save_folder_templates(fid, [reports.Template("", "{.year}", "")])
 
 
 async def test_folder_notes_citation_status(user: User, monkeypatch, tmp_path):
@@ -271,25 +271,31 @@ async def test_folder_notes_citation_status(user: User, monkeypatch, tmp_path):
     assert reports.numbering(fid) == reports.Numbering(star, "[{index}]")
 
 
-def test_old_template_syntax_converted():
-    """The migration to Python-style templates: the citations of a text, and templates."""
+def test_python_style_templates_converted_back():
+    """The migration back to classes (from the Python-style fields, for a while)."""
     import importlib.util
     from pathlib import Path
 
     import sci_report_analyzer.db as db
 
-    path = next(Path(db.__file__).parent.glob("migrations/versions/c3a8e6f1d4b9_*.py"))
+    path = next(Path(db.__file__).parent.glob("migrations/versions/d4b2f8a6c1e3_*.py"))
     spec = importlib.util.spec_from_file_location("m", path)
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     text = (
-        "See [@a]{.notes .tags}, [@b]{**#.index** (out – .short-venue .year)} and "
-        "[@c; @d]{.starred}; [not a citation]{.red}, @e, [@f]."
+        "See [@a]{notes tags}, [@b]{**#{index}** (out – {short-venue} {year})}, "
+        "[@c; @d]{starred}, [@e]{{starred}: {notes}}; kept: [@f]{.notes}, "
+        "[@g]{**#.index** (.short-venue .year)}, [not a citation]{x}, @h, [@i]."
     )
     assert m.convert_text(text) == (
-        "See [@a]{notes tags}, [@b]{**#{index}** (out – {short-venue} {year})} and "
-        "[@c; @d]{starred}; [not a citation]{.red}, @e, [@f]."
+        "See [@a]{.notes .tags}, [@b]{**#.index** (out – .short-venue .year)}, "
+        "[@c; @d]{.starred}, [@e]{.starred: .notes}; kept: [@f]{.notes}, "
+        "[@g]{**#.index** (.short-venue .year)}, [not a citation]{x}, @h, [@i]."
     )
-    assert m.convert_template("{.starred: .notes}") == "{{starred}: {notes}}"
+    assert m.convert_template("{**#{index}** ({short-venue} {year})}") == (
+        "{**#.index** (.short-venue .year)}"
+    )
+    assert m.convert_template("{ **#.index** (.short-venue .year)}") == (
+        "{ **#.index** (.short-venue .year)}"
+    )
     assert m.convert_template("") == ""
-    assert m.convert_template("{{year}}") == "{{year}}"  # (already converted)

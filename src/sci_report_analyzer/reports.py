@@ -3,16 +3,15 @@ syntax, substituted when shown or copied.
 
 - ``[@key]`` (or ``[@a; @b]``, ``[see @a, p. 3]``): the paper's number (``**#6**``,
   see ``number_format``);
-- ``@key``, or ``[@key]{full}``: its number, title, venue, year and category;
-- ``[@key]{notes}``: that, then its notes; ``[@key]{tags}``: with its tags (#tags), and
-  ``[@key]{notes tags}`` both;
-- ``[@key]{{short-venue} ({year})}``: a template (as Python's ``str.format``), its fields
-  (``{number}``, ``{index}``: the bare number, ``{title}``, ``{venue}``, ``{short-venue}``:
-  the acronym, else the venue, ``{year}``, ``{tags}``, ``{notes}``) replaced and the rest
-  kept: ``EMNLP (2026)``, ``{#{index}}``: ``#2``,
-  ``{**#{index}** ({short-venue} {year}): {notes}}``; ``{{`` and ``}}``: a brace;
-- ``[@key]{starred}``: a named template (Settings → Citation templates, or the folder's),
-  also usable within another one (``{{starred}: {notes}}``).
+- ``@key``, or ``[@key]{.full}``: its number, title, venue, year and category;
+- ``[@key]{.notes}``: that, then its notes; ``[@key]{.tags}``: with its tags (#tags), and
+  ``[@key]{.notes .tags}`` both;
+- ``[@key]{.short-venue (.year)}``: a template, its fields (``.number``, ``.index``: the
+  bare number, ``.title``, ``.venue``, ``.short-venue``: the acronym, else the venue,
+  ``.year``, ``.tags``, ``.notes``) replaced and the rest kept: ``EMNLP (2026)``,
+  ``{#.index}``: ``#2``, ``{**#.index** (.short-venue .year): .notes}``;
+- ``[@key]{.starred}``: a named template (Settings → Citation templates, or the folder's),
+  also usable within another one (``{.starred: .notes}``).
 
 Within a folder, the papers with its numbered tag (see ``Numbering``) are numbered first
 (as listed, else by year): the papers to discuss, each to be cited at least once (without a
@@ -39,12 +38,9 @@ NUMBER_FORMAT = "**#{index}**"
 REFERENCE_FORMAT = "[{index}]"  # (in the notes: by default)
 
 _KEY = r"\w+(?:[:.#$%&+?<>~/-]\w+)*"
-# A bracketed citation, then how it is cited (in braces, as Pandoc's bracketed span):
-# [see @a, p. 3; @b]{notes}, [@a]{{short-venue} ({year})}
+# A bracketed citation, then its classes (Pandoc's bracketed span): [see @a, p. 3; @b]{.notes}
 _BRACKET = re.compile(
-    r"\[(?P<body>[^\[\]]*?(?<![\w@])-?@"
-    + _KEY
-    + r"[^\[\]]*)\](?:\{(?P<attrs>(?:[^{}\n]|\{[^{}\n]*\})*)\})?"
+    r"\[(?P<body>[^\[\]]*?(?<![\w@])-?@" + _KEY + r"[^\[\]]*)\](?:\{(?P<attrs>[^{}\n]*)\})?"
 )
 _ITEM = re.compile(r"(?P<pre>.*?)(?<![\w@])-?@(?P<key>" + _KEY + r")(?P<post>.*)", re.S)
 _INTEXT = re.compile(r"(?<![\w@\[])@(?P<key>" + _KEY + r")")
@@ -148,8 +144,7 @@ class TemplateCycle(ValueError):
 
     def __init__(self, path: tuple[str, ...]) -> None:
         self.path = path
-        names = " → ".join(f"{{{n}}}" for n in path)
-        super().__init__(_("Template cycle: {path}").format(path=names))
+        super().__init__(_("Template cycle: {path}").format(path=" → ".join(f".{n}" for n in path)))
 
 
 @dataclass
@@ -210,8 +205,8 @@ class Context:
         return "\n".join(lines[:1] + [pad + ln if ln.strip() else "" for ln in lines[1:]])
 
     def is_template(self, attrs: Attrs) -> bool:
-        """Fields (or named templates) to fill, rather than an entry (``{notes}``…)."""
-        return attrs.template or bool(attrs.classes & (FIELDS | set(self.templates)))
+        """Fields (or named templates) to fill, rather than classes (``{.notes}``…)."""
+        return bool(attrs.classes & (FIELDS | set(self.templates)))
 
     def cite(self, p: Paper, attrs: Attrs, indent: int = 0, using: tuple[str, ...] = ()) -> str:
         """The paper cited with ``attrs`` (``using``: the named templates being expanded)."""
@@ -223,7 +218,7 @@ class Context:
         return self.number(p)
 
     def fields(self, p: Paper, attrs: Attrs, indent: int = 0, using: tuple[str, ...] = ()) -> str:
-        """A template's fields replaced (``{short-venue} ({year})`` → ``EMNLP (2026)``), and
+        """A template's fields replaced (``{.short-venue (.year)}`` → ``EMNLP (2026)``), and
         its named templates expanded (a cycle: ``TemplateCycle``)."""
         s = p.stat
         values = {
@@ -266,7 +261,7 @@ class Rendered:
     errors: list[str] = field(default_factory=list)  # (e.g. a template cycle)
 
 
-# ---- How a paper is cited: names ({notes tags}) or a template ({{short-venue} ({year})}) ---
+# ---- Attributes: classes ({.notes .tags}) or a template ({.short-venue (.year)}) ---------
 
 FIELDS = {"number", "index", "title", "venue", "short-venue", "year"}
 # (not a template's name: they have their meaning)
@@ -275,14 +270,12 @@ RESERVED = FIELDS | {"full", "notes", "tags"}
 _ATTRS = Lark(
     r"""
     start: item*
-    ?item: FIELD -> cls | "(" item* ")" -> group | TEXT -> text | BRACE -> brace
-    FIELD: /\{[A-Za-z][\w-]*\}/
-    BRACE: "{{" | "}}"
-    TEXT: /[^{}()]+/
+    ?item: CLASS -> cls | "(" item* ")" -> group | TEXT -> text
+    CLASS: /\.[A-Za-z][\w-]*/
+    TEXT: /([^.()]|\.(?![A-Za-z]))+/
     """,
     parser="lalr",
 )
-_NAMES = re.compile(r"\s*[A-Za-z][\w-]*(?:\s+[A-Za-z][\w-]*)*\s*")
 
 
 class _Attrs(Transformer):
@@ -292,10 +285,7 @@ class _Attrs(Transformer):
         return items
 
     def cls(self, items):
-        return ("cls", str(items[0])[1:-1])
-
-    def brace(self, items):
-        return ("text", str(items[0])[0])
+        return ("cls", str(items[0])[1:])
 
     def text(self, items):
         return ("text", str(items[0]))
@@ -307,7 +297,6 @@ class _Attrs(Transformer):
 @dataclass
 class Attrs:
     items: list[tuple]
-    template: bool = False  # (else names: built-in ones, fields, named templates)
 
     @property
     def classes(self) -> set[str]:
@@ -349,20 +338,15 @@ class Attrs:
 
 @lru_cache(maxsize=256)
 def parse_attrs(attrs: str) -> Attrs | None:
-    """How a citation is cited, within its braces: names (``notes tags``, ``starred``), or a
-    template (``{short-venue} ({year})``); ``None``: not well formed (e.g. a ``(`` not
-    closed, a lone brace)."""
-    if not attrs.strip() or _NAMES.fullmatch(attrs):  # (their values: separated by a space)
-        names = attrs.split()
-        return Attrs([x for n in names for x in (("text", " "), ("cls", n))][1:])
+    """The attributes of a citation (``None``: not well formed, e.g. a ``(`` not closed)."""
     try:
-        return Attrs(_Attrs().transform(_ATTRS.parse(attrs)), template=True)
+        return Attrs(_Attrs().transform(_ATTRS.parse(attrs)))
     except LarkError:
         return None
 
 
 def _inner(attrs: str) -> str:
-    """A template without its braces (``{{year}}`` → ``{year}``)."""
+    """A template without its braces (``{.year}`` → ``.year``)."""
     attrs = attrs.strip()
     return attrs[1:-1] if attrs.startswith("{") and attrs.endswith("}") else attrs
 
@@ -560,8 +544,8 @@ _NAME = re.compile(r"[A-Za-z][\w-]*")
 @dataclass
 class Template:
     label: str
-    attrs: str  # after [@key], e.g. "{notes}" ("": the number)
-    name: str = ""  # (if any: usable as [@key]{name}, and within others as {name})
+    attrs: str  # after [@key], e.g. "{.notes}" ("": the number)
+    name: str = ""  # (if any: usable as .name, e.g. [@key]{.name}, and within others)
 
 
 @dataclass
@@ -581,15 +565,15 @@ class Templates:
 def default_templates() -> Templates:
     return Templates(
         [
-            Template("Number, venue (year)", "{**#{index}** ({short-venue} {year})}"),
-            Template("… and notes", "{**#{index}** ({short-venue} {year}): {notes}}"),
+            Template("Number, venue (year)", "{**#.index** (.short-venue .year)}"),
+            Template("… and notes", "{**#.index** (.short-venue .year): .notes}"),
             Template("Number", ""),
-            Template("Title, venue…", "{full}"),
-            Template("Title, venue… and notes", "{notes}"),
-            Template("… and tags", "{tags}"),
-            Template("… notes and tags", "{notes tags}"),
+            Template("Title, venue…", "{.full}"),
+            Template("Title, venue… and notes", "{.notes}"),
+            Template("… and tags", "{.tags}"),
+            Template("… notes and tags", "{.notes .tags}"),
         ],
-        "{**#{index}** ({short-venue} {year})}",
+        "{**#.index** (.short-venue .year)}",
     )
 
 
@@ -598,9 +582,8 @@ def check_template(attrs: str) -> str | None:
     attrs = attrs.strip()
     if not attrs:
         return None
-    m = _BRACKET.fullmatch(f"[@k]{attrs}")
-    if m is None or m.group("attrs") is None or parse_attrs(m.group("attrs")) is None:
-        return _("Expected {…} with balanced parentheses and braces, e.g. {{short-venue} ({year})}")
+    if not (attrs.startswith("{") and attrs.endswith("}")) or parse_attrs(attrs[1:-1]) is None:
+        return _("Expected {…} with balanced parentheses, e.g. {.short-venue (.year)}")
     return None
 
 
@@ -612,7 +595,7 @@ def check_name(name: str) -> str | None:
     if not _NAME.fullmatch(name):
         return _("A letter, then letters, digits, - or _ (e.g. starred)")
     if name in RESERVED:
-        return _("Already a field or a built-in name: {name}").format(name=name)
+        return _("Already a field or a class: .{name}").format(name=name)
     return None
 
 
@@ -642,7 +625,7 @@ def check_templates(items: list[Template], over: dict[str, str] | None = None) -
         if err := check_template(t.attrs) or check_name(t.name):
             return f"{t.label or t.name or t.attrs}: {err}"
         if t.name and t.name in seen:
-            return _("Two templates named {name}").format(name=t.name)
+            return _("Two templates named .{name}").format(name=t.name)
         seen.add(t.name)
     named = {**(over or {}), **{t.name: t.attrs for t in items if t.name}}
     if cycle := template_cycle(named):
@@ -684,7 +667,7 @@ def load_templates(folder_id: int | None = None) -> Templates:
                 t.default = own.attrs
             same.attrs = own.attrs
         else:
-            t.items.append(Template(own.label or own.name, own.attrs, own.name))
+            t.items.append(Template(own.label or f".{own.name}", own.attrs, own.name))
     return t
 
 
