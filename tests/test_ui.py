@@ -819,6 +819,31 @@ async def test_drop_a_venue_onto_another(user: User) -> None:
     assert any(r["id"] == target for t in tables for r in t.rows)
 
 
+async def test_venue_list_search_looks_in_every_kind(user: User) -> None:
+    """A venue filed under another kind is still found by the search of a tab."""
+    from sci_report_analyzer import venues
+    from sci_report_analyzer.db.models import Venue
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = _seed()
+    await user.open(f"/person/{pid}")
+    await user.should_see("Deep ranking for search")
+    venues.set_level("Neural Computation Letters", "journal", "Q2")
+    with session_scope() as s:
+        journal = s.query(Venue).filter_by(name="Neural Computation Letters").one().id
+    await user.open("/venues?tab=conferences")
+    await user.should_see(marker="venue-list-filter-conferences")
+    (filt,) = user.find("venue-list-filter-conferences").elements
+    (table,) = [c for c in filt.parent_slot.children if isinstance(c, ui.table)]
+    assert not any(r["id"] == journal for r in table.rows)
+    await user.should_not_see(marker="venue-list-all-kinds")
+    user.find("venue-list-filter-conferences").type("Neural Computation Letters")
+    assert any(r["id"] == journal for r in table.rows)  # the journal, shown with its kind
+    await user.should_see(marker="venue-list-all-kinds")
+    user.find("venue-list-filter-conferences").clear()
+    assert not any(r["id"] == journal for r in table.rows)
+
+
 async def test_add_a_venue(user: User) -> None:
     from sci_report_analyzer.db.models import Venue
     from sci_report_analyzer.db.session import session_scope

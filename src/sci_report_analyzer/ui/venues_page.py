@@ -562,7 +562,7 @@ def _tabs(rows: list[venues.VenueRow], view: _View, focus: int | None = None) ->
     with ui.tab_panels(tabs, value=tab).classes("w-full"):
         for name, (_label, kinds) in TABS.items():
             with ui.tab_panel(name):
-                _table([r for r in rows if r.kind in kinds], rows, view)
+                _table([r for r in rows if r.kind in kinds], rows, view, name)
         if undecided:
             with ui.tab_panel("joint"):
                 _joint_list(undecided, rows, view)
@@ -729,7 +729,9 @@ def _joint_editor(row: venues.VenueRow, finish, go) -> None:
                 ).tooltip(_("Use the conferences found in its texts")).mark("venue-parts-auto")
 
 
-def _table(rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], view: _View) -> None:
+def _table(
+    rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], view: _View, name: str = ""
+) -> None:
     columns = [
         {"name": "short", "label": _("Short"), "field": "short", "align": "left", "sortable": True},
         {"name": "name", "label": _("Venue"), "field": "name", "align": "left", "sortable": True},
@@ -739,23 +741,30 @@ def _table(rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], view: _
         {"name": "people", "label": _("People"), "field": "people", "sortable": True},
         {"name": "variants", "label": _("Variants"), "field": "variants", "sortable": True},
     ]
-    data = [
-        {
-            "id": r.id,
-            "short": (r.short_name or "") + (" ✎" if r.short_manual else ""),
-            "name": r.name,
-            "url": r.url,
-            "kind": KIND_SHORT[r.kind] + ("" if not r.kind_manual else " ✎"),
-            "rank": _chip_html(r),
-            "pubs": r.publications,
-            "people": len(r.people),
-            "variants": len(r.variants),
-        }
-        for r in sorted(rows, key=lambda r: (-r.publications, r.name.lower()))
-    ]
-    by_id = {r.id: r for r in rows}
+
+    def data(rows: list[venues.VenueRow]) -> list[dict]:
+        return [
+            {
+                "id": r.id,
+                "short": (r.short_name or "") + (" ✎" if r.short_manual else ""),
+                "name": r.name,
+                "url": r.url,
+                "kind": KIND_SHORT[r.kind] + ("" if not r.kind_manual else " ✎"),
+                "rank": _chip_html(r),
+                "pubs": r.publications,
+                "people": len(r.people),
+                "variants": len(r.variants),
+            }
+            for r in sorted(rows, key=lambda r: (-r.publications, r.name.lower()))
+        ]
+
+    # A search looks in every kind (a venue may be misclassified): the kind column tells.
+    own, everything = data(rows), data(all_rows)
+    by_id = {r.id: r for r in all_rows}
     table = (
-        ui.table(columns=columns, rows=data, row_key="id", pagination=50)
+        ui.table(
+            columns=columns, rows=everything if view.filter else own, row_key="id", pagination=50
+        )
         .classes("w-full")
         .props("dense flat")
     )
@@ -767,12 +776,26 @@ def _table(rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], view: _
         .props("dense outlined clearable")
         .classes("w-64")
     )
+    filt.mark(f"venue-list-filter-{name}" if name else "venue-list-filter")
     filt.bind_value(table, "filter")
-    filt.on_value_change(lambda e: setattr(view, "filter", e.value or ""))
+    all_kinds = ui.label(_("Searching venues of every kind")).classes("text-xs text-grey")
+    all_kinds.mark("venue-list-all-kinds")
+    all_kinds.bind_visibility_from(table, "filter", backward=bool)
+
+    searching = [bool(view.filter)]
+
+    def filtered(e) -> None:
+        view.filter = e.value or ""
+        if searching[0] != bool(view.filter):
+            searching[0] = bool(view.filter)
+            table.rows = everything if view.filter else own
+
+    filt.on_value_change(filtered)
     filt.move(target_index=0)
+    all_kinds.move(target_index=1)
     ui.label(_("Drag a venue onto another one to merge it into that one.")).classes(
         "text-xs text-grey"
-    ).move(target_index=1)
+    ).move(target_index=2)
 
     def open_row(e) -> None:
         with view.dialogs:
