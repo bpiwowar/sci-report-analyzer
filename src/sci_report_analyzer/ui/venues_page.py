@@ -121,7 +121,8 @@ def register() -> None:
                 ui.spinner(size="lg")
             # Outside the list, which is rebuilt after a change.
             dialogs = ui.element("div")
-            # The tab and the filter are kept when the list is rebuilt (after a merge...).
+            # After a change (a merge...), the list is updated in place: the tab, the search
+            # and the scroll stay; when rebuilt, the tab and the search are kept.
             view = _View(tab=tab, dialogs=dialogs)
 
             def show_conflicts() -> None:
@@ -135,6 +136,8 @@ def register() -> None:
                     return
                 show_conflicts()
                 view.rows = rows
+                if view.update(rows):
+                    return
                 container.clear()
                 with container:
                     _tabs(rows, view)
@@ -536,6 +539,8 @@ class _View:
     dialogs: ui.element
     filter: str = ""
     reload: Callable[[], object] = lambda: None
+    # Shows new rows in the list in place; False: the list must be rebuilt.
+    update: Callable[[list[venues.VenueRow]], bool] = lambda _rows: False
     rows: list[venues.VenueRow] = field(default_factory=list)
 
 
@@ -549,23 +554,53 @@ def _tabs(rows: list[venues.VenueRow], view: _View, focus: int | None = None) ->
     undecided = [r for r in rows if _undecided_joint(r)]
     if tab == "joint" and not undecided:
         view.tab = tab = "conferences"
+
+    def labels(rows: list[venues.VenueRow], undecided: list[venues.VenueRow]) -> dict[str, str]:
+        out = {
+            name: f"{_(label)} ({sum(r.kind in kinds for r in rows)})"
+            for name, (label, kinds) in TABS.items()
+        }
+        out["joint"] = _("Multiple conferences ({n})").format(n=len(undecided))
+        return out
+
+    texts = labels(rows, undecided)
+    tab_els: dict[str, ui.tab] = {}
     with ui.tabs(value=tab, on_change=lambda e: setattr(view, "tab", e.value)).classes(
         "w-full"
     ) as tabs:
-        for name, (label, kinds) in TABS.items():
-            n = sum(r.kind in kinds for r in rows)
-            ui.tab(name, f"{_(label)} ({n})")
+        for name in TABS:
+            tab_els[name] = ui.tab(name, texts[name])
         if undecided:
-            ui.tab("joint", _("Multiple conferences ({n})").format(n=len(undecided))).classes(
-                "text-orange-9"
-            ).mark("venue-tab-joint")
+            tab_els["joint"] = (
+                ui.tab("joint", texts["joint"]).classes("text-orange-9").mark("venue-tab-joint")
+            )
+    updates: list[Callable[[list[venues.VenueRow]], None]] = []
     with ui.tab_panels(tabs, value=tab).classes("w-full"):
         for name, (_label, kinds) in TABS.items():
             with ui.tab_panel(name):
-                _table([r for r in rows if r.kind in kinds], rows, view, name)
+                updates.append(_table([r for r in rows if r.kind in kinds], rows, view, name))
         if undecided:
-            with ui.tab_panel("joint"):
+            with ui.tab_panel("joint"), ui.column().classes("w-full") as joint:
                 _joint_list(undecided, rows, view)
+
+    def update(new_rows: list[venues.VenueRow]) -> bool:
+        """The same tables with new rows (the search and the scroll stay); rebuilt when the
+        tab of the joint venues comes or goes."""
+        now = [r for r in new_rows if _undecided_joint(r)]
+        if bool(now) != bool(undecided) or tabs.is_deleted:
+            return False
+        for name, text in labels(new_rows, now).items():
+            if name in tab_els:
+                tab_els[name].set_label(text)
+        for fn in updates:
+            fn(new_rows)
+        if now:
+            joint.clear()
+            with joint:
+                _joint_list(now, new_rows, view)
+        return True
+
+    view.update = update
     if focus is not None and (r := next((r for r in rows if r.id == focus), None)):
         with view.dialogs:
             venue_dialog(r, rows, view.reload)
@@ -731,7 +766,8 @@ def _joint_editor(row: venues.VenueRow, finish, go) -> None:
 
 def _table(
     rows: list[venues.VenueRow], all_rows: list[venues.VenueRow], view: _View, name: str = ""
-) -> None:
+) -> Callable[[list[venues.VenueRow]], None]:
+    """The venues of a tab; returns what shows new rows in place (``all_rows`` changed)."""
     columns = [
         {"name": "short", "label": _("Short"), "field": "short", "align": "left", "sortable": True},
         {"name": "name", "label": _("Venue"), "field": "name", "align": "left", "sortable": True},
@@ -761,6 +797,7 @@ def _table(
     # A search looks in every kind (a venue may be misclassified): the kind column tells.
     own, everything = data(rows), data(all_rows)
     by_id = {r.id: r for r in all_rows}
+    kinds = TABS[name][1] if name in TABS else {r.kind for r in rows}
     table = (
         ui.table(
             columns=columns, rows=everything if view.filter else own, row_key="id", pagination=50
@@ -798,8 +835,9 @@ def _table(
     ).move(target_index=2)
 
     def open_row(e) -> None:
-        with view.dialogs:
-            venue_dialog(by_id[e.args["id"]], all_rows, view.reload)
+        if (row := by_id.get(e.args["id"])) is not None:
+            with view.dialogs:
+                venue_dialog(row, view.rows, view.reload)
 
     table.on("open_venue", open_row)
     table.on("show_pubs", lambda e: papers_dialog(by_id[e.args["id"]]))
@@ -812,6 +850,17 @@ def _table(
                 _confirm_merge(dst, [src], lambda _vid: view.reload(), swappable=True)
 
     table.on("venue_drop", dropped)
+
+    def update(new_rows: list[venues.VenueRow]) -> None:
+        """New rows (a merged venue gone, the kept one changed), the search kept."""
+        nonlocal own, everything
+        own, everything = data([r for r in new_rows if r.kind in kinds]), data(new_rows)
+        by_id.clear()
+        by_id.update((r.id, r) for r in new_rows)
+        table.rows = everything if searching[0] else own
+        table.update()
+
+    return update
 
 
 _ROW_SLOT = """
