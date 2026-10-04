@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 
 NO_CONFIRM = "ui.pdf.no_confirm"  # AppSetting: download without asking first
 HIDE_PARAMS = "ui.pdf.hide_params"  # AppSetting: the editing tools without their options
+SIDE_WIDTH = "ui.pdf.side_width"  # AppSetting: the width (px) of the side column
+SIDE_DEFAULT, SIDE_MIN = 384, 240
 _no_confirm: bool | None = None  # (cached NO_CONFIRM)
 
 _TYPES = {
@@ -38,6 +40,33 @@ _TYPES = {
     ".pfb": "application/octet-stream",
     ".icc": "application/octet-stream",
 }
+
+# Dragging the splitter between the PDF and the side column resizes the latter (the iframe
+# is covered meanwhile, else it swallows the mouse events); its width is sent on release.
+_SPLITTER = """
+<script>
+document.addEventListener('mousedown', (ev) => {
+  const bar = ev.target.closest && ev.target.closest('#vr-pdf-splitter');
+  if (!bar) return;
+  ev.preventDefault();
+  const side = document.getElementById('vr-pdf-side'), row = side.parentElement;
+  const cover = document.createElement('div');
+  cover.style.cssText = 'position:fixed;inset:0;z-index:9999;cursor:col-resize';
+  document.body.appendChild(cover);
+  const width = (x) => Math.round(Math.max(%(min)d,
+    Math.min(row.getBoundingClientRect().right - x, row.clientWidth * 0.7)));
+  const move = (e) => { side.style.width = width(e.clientX) + 'px'; };
+  const up = (e) => {
+    document.removeEventListener('mousemove', move);
+    document.removeEventListener('mouseup', up);
+    cover.remove();
+    emitEvent('vr-pdf-side-width', width(e.clientX));
+  };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+});
+</script>
+"""
 
 # Saves the edits back (Ctrl+S, the viewer's save button, and every few seconds), and turns
 # on the highlight button of a text selection; where the reader is (bookmarks), and what is
@@ -657,6 +686,7 @@ def viewer_frame(
         "failed": _("Not saved: {error}"),
     }
     ui.add_css(MARKDOWN_CSS)
+    ui.add_head_html(_SPLITTER % {"min": SIDE_MIN})
     hide = bool(annotations.ui_state(HIDE_PARAMS, False))
     ui.add_head_html(
         _SCRIPT
@@ -737,11 +767,22 @@ def viewer_frame(
         ui.element("iframe").props(f'id=vr-pdf-frame src="{src}"').classes("grow").style(
             "height:calc(100vh - 40px); border:0"
         ).mark("pdf-frame")
+        ui.element("div").props("id=vr-pdf-splitter").classes(
+            "shrink-0 bg-grey-4 hover:bg-primary"
+        ).style("width:5px; cursor:col-resize; height:calc(100vh - 40px)").tooltip(
+            _("Drag to resize the side panel")
+        ).mark("pdf-splitter")
+        width = max(SIDE_MIN, int(annotations.ui_state(SIDE_WIDTH, SIDE_DEFAULT) or SIDE_DEFAULT))
         box = (
             ui.column()
-            .classes("w-96 shrink-0 p-3 gap-2 overflow-auto border-l")
-            .style("height:calc(100vh - 40px)")
+            .classes("shrink-0 p-3 gap-2 overflow-auto")
+            .style(f"width:{width}px;height:calc(100vh - 40px)")
+            .props("id=vr-pdf-side")
             .mark("pdf-side")
+        )
+        ui.on(
+            "vr-pdf-side-width",
+            lambda e: annotations.save_ui_state(SIDE_WIDTH, max(SIDE_MIN, int(e.args))),
         )
     return box
 

@@ -133,9 +133,9 @@ class Side:
     def _fit(self) -> None:
         """Wider for the details of a paper."""
         if self.details.visible or self.tab_bar.value in self.wide:
-            self.box.style("width:40rem")
+            self.box.style("min-width:40rem")
         else:
-            self.box.style(remove="width:40rem")
+            self.box.style(remove="min-width:40rem")
 
     async def add_bookmark(self, kind: str, key: int) -> None:
         loc = await ui.run_javascript("vrPdf.location()")

@@ -244,3 +244,22 @@ async def test_viewer_changes_reach_the_panel(user: User):
             break
     else:
         raise AssertionError("not shown as annotated")
+
+
+async def test_viewer_side_width(user: User, monkeypatch, tmp_path):
+    _, _, ids = _person()
+    a = ids["Deep ranking for search"]
+    viewer = tmp_path / "pdfjs"
+    (viewer / "web").mkdir(parents=True)
+    (viewer / "web" / "viewer.html").write_text("<html></html>")
+    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
+    pdfs.save(a, PDF, None)
+
+    await user.open(f"/pdf/{a}")
+    await user.should_see(marker="pdf-splitter")
+    [side] = user.find(marker="pdf-side").elements
+    assert side.style["width"] == f"{pdf_viewer.SIDE_DEFAULT}px"
+    annotations.save_ui_state(pdf_viewer.SIDE_WIDTH, 512)  # (set by dragging the splitter)
+    await user.open(f"/pdf/{a}")
+    [side] = user.find(marker="pdf-side").elements
+    assert side.style["width"] == "512px"
