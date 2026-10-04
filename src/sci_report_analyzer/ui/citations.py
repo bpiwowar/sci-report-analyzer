@@ -231,6 +231,23 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
         ).classes("text-sm text-grey")
         with ui.column().classes("gap-1"):
             refresh = template_rows(own, mark="folder-template", labels=False)
+        skeleton = (
+            ui.textarea(
+                _("Starting notes"),
+                value=reports.skeleton(folder_id),
+                placeholder="## Publications\n[]{.publications}\n\n## Activities\n[]{.excerpts}",
+            )
+            .props("dense outlined autogrow")
+            .classes("w-full font-mono text-sm mt-2")
+            .tooltip(
+                _(
+                    "The text a person's notes start with, while empty (e.g. headings and the "
+                    "blocks []{.publications}: the summary of their publications, "
+                    "[]{.excerpts}: their excerpts by category)"
+                )
+            )
+            .mark("folder-skeleton")
+        )
 
         def add() -> None:
             own.append(reports.Template("", "{.index (.short-venue .year)}", ""))
@@ -246,6 +263,7 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
                 folder_id,
                 reports.Numbering(tag.value or None, fmt.value or "", listed.value or ""),
             )
+            reports.save_skeleton(folder_id, skeleton.value or "")
             dlg.close()
             ui.notify(_("Saved"), type="positive")
             if on_saved:

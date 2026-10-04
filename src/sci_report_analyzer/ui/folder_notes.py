@@ -9,7 +9,7 @@ from weakref import WeakSet
 
 from nicegui import app, ui
 
-from .. import folders
+from .. import folders, reports
 from ..i18n import _
 from .mdedit import MarkdownEditor
 from .tags import note_editor
@@ -46,8 +46,12 @@ def folder_notes_editor(
     side: Callable[[], None] | None = None,
 ) -> MarkdownEditor:
     """The editor of a person's notes within a folder, saved as typed (as the other notes);
-    ``side``: the pane of the papers to cite (in place of the preview)."""
+    ``side``: the pane of the papers to cite (in place of the preview). Empty notes start
+    with the folder's skeleton (saved once edited)."""
     holder: list[MarkdownEditor] = []
+    text = folders.notes_of(period_id)
+    if not text.strip() and (found := folders.folder_of_period(period_id)):
+        text = reports.skeleton(found[0]) or text
 
     def save(text: str) -> None:
         folders.set_notes(period_id, text)
@@ -55,7 +59,7 @@ def folder_notes_editor(
 
     editor = note_editor(
         _("Notes of the folder"),
-        folders.notes_of(period_id),
+        text,
         save,
         mark="folder-note",
         mode="split",

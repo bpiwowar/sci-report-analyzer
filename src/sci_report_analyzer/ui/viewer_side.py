@@ -327,13 +327,28 @@ class Side:
 
     def folder_tools(self) -> None:
         """The toolbar of the folder's notes: quote, cite a paper, copy with the references
-        (numbered as the folder says)."""
+        (numbered as the folder says), insert a block (the publications, the excerpts)."""
         self.quote_tool(lambda: self.folder_editor, first=True)
         self.cite_tools(
             lambda: self.folder_editor,
             "folder-note",
             lambda: reports.folder_context(self.stats, self.period_id),
         )
+        for name, icon, tip in (
+            (
+                "publications",
+                "summarize",
+                _(
+                    "Insert the summary of the period’s publications (kept up to date, as set "
+                    "in the Summary)"
+                ),
+            ),
+            ("excerpts", "format_list_bulleted", _("Insert the excerpts (kept up to date)")),
+        ):
+            ui.button(
+                icon=icon,
+                on_click=lambda name=name: self.folder_editor.insert_block(f"[]{{.{name}}}"),
+            ).props("flat dense round size=sm").tooltip(tip).mark(f"folder-note-{name}")
 
     def note_context(self) -> reports.Context:
         """The papers a note cites, by their keys (for the preview and the copy)."""
