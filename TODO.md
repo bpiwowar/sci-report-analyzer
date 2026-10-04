@@ -92,7 +92,8 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
 
 ## Notes: citations everywhere
 
-The global notes (a paper's own note, not within a folder; the document's note) should
-have the citation icons and capabilities of the folder notes: `[@key]` citations rendered
-in the preview (with the citation template), Shift-click on a paper to cite it there, and
-the citation-status icon.
+The folder notes (the global notes, for all the folder's documents and papers) should have
+the citation icons and capabilities of the document's note (`documents_page.py`,
+`_note_tools`): "Cite a paper" (a picker of the folder's papers, `[@key]` inserted at the
+cursor) and "Copy the note, its citations numbered and the papers cited listed", in the PDF
+viewer and on the documents page.
