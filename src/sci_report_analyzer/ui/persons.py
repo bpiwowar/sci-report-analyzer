@@ -15,7 +15,7 @@ from ..db.models import Person, Publication
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
-from ..sync import discover, is_syncing, start_sync
+from ..sync import any_running, discover, is_syncing, start_sync
 from .categories_editor import categories_dialog
 from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
@@ -113,7 +113,7 @@ def _reports(folder: int, changed) -> None:
 
 
 def _refresh_if_running() -> None:
-    if _any_running():
+    if any_running():
         _folder_cards.refresh()
 
 
@@ -440,10 +440,6 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
 
     add_btn.on_click(add)
     del_btn.on_click(delete)
-
-
-def _any_running() -> bool:
-    return any(is_syncing(p.id) for p, _st in _people())
 
 
 def _card(

@@ -572,3 +572,8 @@ def add_link(person_id: int, source: str, external_id: str, *, validated: bool =
                 link.evidence = {**(link.evidence or {}), "orcid": external_id}
         s.flush()
         return link.id
+
+
+def any_running() -> bool:
+    """Whether a sync is running (of any person)."""
+    return any(not task.done() for task in _running.values())
