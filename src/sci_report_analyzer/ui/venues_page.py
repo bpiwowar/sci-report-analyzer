@@ -831,7 +831,15 @@ def _table(
     """The venues of a tab; returns what shows new rows in place (``all_rows`` changed)."""
     columns = [
         {"name": "short", "label": _("Short"), "field": "short", "align": "left", "sortable": True},
-        {"name": "name", "label": _("Venue"), "field": "name", "align": "left", "sortable": True},
+        # Long names wrap (cells do not by default).
+        {
+            "name": "name",
+            "label": _("Venue"),
+            "field": "name",
+            "align": "left",
+            "sortable": True,
+            "style": "white-space: normal; min-width: 12rem",
+        },
         {"name": "kind", "label": _("Kind"), "field": "kind", "sortable": True},
         {"name": "rank", "label": _("Rank"), "field": "rank"},
         {"name": "pubs", "label": _("Papers"), "field": "pubs", "sortable": True},
