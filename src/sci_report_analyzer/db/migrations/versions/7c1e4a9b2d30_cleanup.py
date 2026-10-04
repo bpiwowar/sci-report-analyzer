@@ -10,7 +10,8 @@ here (the app's may change).
 Also dropped, as written but never read: the lists tags were put from (``ui.reflist.*``),
 the reports (their view merged into the notes: a text not found in its person's notes within
 the folder is appended to them first) and the ``old_reports`` request, when a sync started
-(``source_link.sync_started_at``), a thesis' discipline.
+(``source_link.sync_started_at``), a thesis' discipline. The tracks saved before they had
+name rules get the built-in ones (once given when loaded).
 
 Revision ID: 7c1e4a9b2d30
 Revises: f6b3d8a2c5e9
@@ -229,6 +230,111 @@ def _rewrite_keys(conn) -> None:
                     )
 
 
+# ---- the tracks' name rules ------------------------------------------------------------------
+
+# The built-in tracks' name rules (ranking.tracks.DEFAULT_NAME_RULES_OF), as of this revision.
+_NAME_RULES = {
+    "findings": [
+        {
+            "id": "name_findings_of",
+            "pattern": "^findings\\s+of(?:\\s+the)?\\s+",
+            "replacement": "",
+            "ignore_case": True,
+            "examples": ["Findings of the Association for Computational Linguistics: ACL 2023"],
+        },
+        {
+            "id": "name_findings_part",
+            "pattern": "\\s*[(\\[][^)\\]]*\\bfindings\\b[^)\\]]*[)\\]]",
+            "replacement": "",
+            "ignore_case": True,
+            "examples": ["WIDG (Findings)"],
+        },
+    ],
+    "tutorial": [
+        {
+            "id": "name_tutorial_of",
+            "pattern": "^tutori[ae]ls?\\s+(?:of|at)(?:\\s+the)?\\s+",
+            "replacement": "",
+            "ignore_case": True,
+            "examples": ["Tutorials of WIDG"],
+        },
+        {
+            "id": "name_tutorial_part",
+            "pattern": "\\s*[(\\[][^)\\]]*\\btutori[ae]ls?\\b[^)\\]]*[)\\]]",
+            "replacement": "",
+            "ignore_case": True,
+            "examples": ["WIDG (Tutorials)"],
+        },
+        {
+            "id": "name_tutorial_words",
+            "pattern": "[\\s:,;–—-]*\\btutori[ae]ls?(?:\\s+(?:track|session|papers?))?\\b",
+            "replacement": "",
+            "ignore_case": True,
+            "examples": ["ECIR 2024 Tutorials", "Foo 2024, tutoriels"],
+        },
+    ],
+    "demo": [
+        {
+            "id": "name_demo_acronym",
+            "pattern": "^([A-Z][A-Za-z0-9&+-]{1,11})\\s*[(\\[][^)\\]]*\\b(?i:(?:system\\s+)?d[eé]mo(?:nstration)?s?)\\b[^)\\]]*[)\\]]\\s*(.+?)(?:\\s*\\(\\1\\))?$",
+            "replacement": "\\2 (\\1)",
+            "ignore_case": False,
+            "examples": ["WIDG (Demonstration) Conference on Widget Processing (WIDG)"],
+        },
+        {
+            "id": "name_demo_part",
+            "pattern": "\\s*[(\\[][^)\\]]*\\b(?:system\\s+)?d[eé]mo(?:nstration)?s?\\b[^)\\]]*[)\\]]",
+            "replacement": "",
+            "ignore_case": True,
+            "examples": ["ACL 2023 (System Demonstrations)"],
+        },
+        {
+            "id": "name_demo_words",
+            "pattern": "[\\s:,;–—-]*\\b(?:system\\s+)?d[eé]mo(?:nstration)?s?(?:\\s+(?:track|session|papers?))?\\b",
+            "replacement": "",
+            "ignore_case": True,
+            "examples": [
+                "Proceedings of the Conference on Widgets: System Demonstrations",
+                "WIDG Demo Track",
+            ],
+        },
+    ],
+    "short": [
+        {
+            "id": "name_short_part",
+            "pattern": "\\s*[(\\[][^)\\]]*\\b(?:short\\s+papers?|articles?\\s+courts?)\\b[^)\\]]*[)\\]]",
+            "replacement": "",
+            "ignore_case": True,
+            "examples": ["ACL 2022 (Volume 2: Short Papers)"],
+        },
+        {
+            "id": "name_short_words",
+            "pattern": "[\\s:,;–—-]*\\b(?:short\\s+papers?|articles?\\s+courts?)(?:\\s+(?:track|session|papers?))?\\b",
+            "replacement": "",
+            "ignore_case": True,
+            "examples": ["WIDG 2024 Short Papers"],
+        },
+    ],
+}
+
+
+def _track_name_rules(conn) -> None:
+    """Tracks saved before they had name rules (a built-in one got its defaults when loaded,
+    no longer): given them."""
+    row = conn.execute(sa.text("SELECT value FROM app_setting WHERE key = 'matching'"))
+    matching = _json(row.scalar())
+    if not isinstance(matching, dict) or not isinstance(matching.get("tracks"), list):
+        return
+    old = [t for t in matching["tracks"] if isinstance(t, dict) and "name_rules" not in t]
+    for t in old:
+        t["name_rules"] = _NAME_RULES.get(t.get("id"), [])
+    if old:
+        conn.execute(
+            sa.text("UPDATE app_setting SET value = :v WHERE key = 'matching'"),
+            {"v": json.dumps(matching)},
+        )
+
+
 def _keep_reports(conn) -> None:
     """The text of a report not found in its person's notes within the folder (where the
     old reports went, at first into the folder's own notes, since emptied): appended to
@@ -256,6 +362,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     _keep_reports(conn)
     _rewrite_keys(conn)
+    _track_name_rules(conn)
     # Written, never read: the lists tags were put from (annotations.tag_list), the reports
     # (merged into the notes) and the request to merge them, when a sync started, a thesis'
     # discipline.

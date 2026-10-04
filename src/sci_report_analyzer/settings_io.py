@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import object_session, selectinload
 
@@ -34,6 +34,7 @@ from .ranking.service import (
 
 FORMAT = "sci-report-analyzer-settings"
 VERSION = 6
+MIN_VERSION = 6  # (older files had flags, tracks without name rules)
 
 
 class VariantIO(BaseModel):
@@ -90,25 +91,6 @@ class SettingsFile(BaseModel):
     venues: list[VenueIO] = Field(default_factory=list)
     jcr: list[dict[str, Any]] | None = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def _flags(cls, data: Any) -> Any:
-        """A file of before version 5 has flags ({name, colour, track}) and no tracks: the
-        colour of a flag with a track is that track's (the other flags are ignored)."""
-        if not isinstance(data, dict) or not data.get("flags"):
-            return data
-        data = dict(data)
-        flags = data.pop("flags")
-        matching = dict(data.get("matching") or {})
-        if "tracks" not in matching:
-            colours = {f["track"]: f["colour"] for f in flags if f.get("track") and f.get("colour")}
-            defs = tracks.default_tracks()
-            for t in defs:
-                t.colour = colours.get(t.id, t.colour)
-            matching["tracks"] = [t.model_dump() for t in defs]
-            data["matching"] = matching
-        return data
-
 
 def export_settings(*, include_jcr: bool = False) -> SettingsFile:
     with session_scope() as s:
@@ -149,7 +131,15 @@ def export_settings(*, include_jcr: bool = False) -> SettingsFile:
 
 
 def parse_file(text: str) -> SettingsFile:
-    return SettingsFile.model_validate_json(text)
+    data = SettingsFile.model_validate_json(text)
+    if data.version < MIN_VERSION:
+        raise ValueError(
+            _(
+                "it was exported by an older version of the app (format {version}): only "
+                "files of format {min} or later can be imported"
+            ).format(version=data.version, min=MIN_VERSION)
+        )
+    return data
 
 
 @dataclass
