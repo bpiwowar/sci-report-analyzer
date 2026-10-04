@@ -32,7 +32,7 @@ et des rapports, pour préparer une évaluation.
 Votre **adresse e-mail** (Paramètres → Clés d'API) est requise avant toute récupération : elle est envoyée
 aux sources (OpenAlex, Crossref et Unpaywall la demandent) afin qu'elles puissent vous contacter.
 
-Une **source principale** (Paramètres → Sources ; un dossier peut en utiliser une autre, ou aucune) décide
+Une **source principale** (Paramètres → Sources de publications ; un dossier peut en utiliser une autre, ou aucune) décide
 quels articles comptent : un article qu'elle ne liste pas pour la personne est exclu du panneau, des rapports
 et de la synthèse, par exemple HAL, où les chercheurs du CNRS doivent déposer leurs articles. L'interrupteur
 *seulement ceux absents de HAL* les liste, pour les y ajouter. Les autres sources aident toujours à trouver
@@ -53,7 +53,7 @@ de livres : leur texte de canal est leur propre titre, leur collection ou leur 
 s'ils y sont liés à la main).
 Chaque source donne un texte de canal, qui est apparié à un canal :
 
-1. Le texte est nettoyé par les **règles de normalisation** (Paramètres : expressions régulières,
+1. Le texte est nettoyé par les **règles de nettoyage** (Paramètres → Règles de nettoyage : expressions régulières,
    éventuellement pour certaines sources seulement, qui suppriment les années, les ordinaux, les plages de pages…).
 2. Il appartient au canal qui l'a comme **variante** (même texte nettoyé) ; une variante ajoutée
    à la main l'emporte sur tout le reste. Sinon, une **règle de canal** (une expression régulière sur le texte de la source,
@@ -71,7 +71,7 @@ et conservée définitivement. C'est la source principale de l'article : ses ti
 les autres sources ne complètent que ce qui lui manque. Un chapitre de livre sans événement (par exemple un volume
 d'une collection comme LNCS) ne désigne aucun canal réel : ce sont les autres sources qui le donnent.
 
-**Sources utilisées.** Paramètres → Appariement choisit les sources de publications utilisées par l'application ; une source désactivée
+**Sources utilisées.** Paramètres → Sources de publications choisit les sources utilisées par l'application ; une source désactivée
 n'est ni interrogée ni synchronisée, et ses notices sont écartées (conservées pour plus tard).
 
 Les canaux sont classés selon deux niveaux :
