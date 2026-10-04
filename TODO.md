@@ -70,17 +70,6 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
 
 - Mark some papers of a folder with tags (e.g. "starred"); several tags, each with its
   name.
-- Remove the "report on cited papers" view: merged into the folder notes. Next to the
-  "quote" icon, another icon colour-coded by citation status, with the details on hover:
-  all cited / cited but not in the range / not cited.
 - Migration to the folder-wide notes: append to each folder's notes a final "Starred
   papers" section holding everything the old per-paper notes / report had (each starred
   paper with its citation and notes), so nothing is lost when that view goes.
-- `.index` (and `.number`) in the citation templates: set by the folder's settings, with
-  the tag whose papers are numbered (`.index` = the paper's number among the "starred"
-  ones, in my case) and the number's format (e.g. `**#{index}**`), instead of a global
-  setting.
-- Citation templates defined in general and per folder (a folder's definition overrides
-  the general one), and usable inside other templates: e.g. `.starred` =
-  `.index (.short-venue .year)`, where `.index` is itself expanded (the paper's index
-  among the folder's starred papers, as set above).

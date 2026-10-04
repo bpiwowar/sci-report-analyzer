@@ -1,5 +1,5 @@
-"""Reports on a person within a period / folder: Markdown citing the person's papers with
-Pandoc's syntax, substituted when copied.
+"""Citing a person's papers in Markdown (the notes of a folder, of a document…) with Pandoc's
+syntax, substituted when shown or copied.
 
 - ``[@key]`` (or ``[@a; @b]``, ``[see @a, p. 3]``): the paper's number (``**#6**``,
   see ``number_format``);
@@ -9,15 +9,17 @@ Pandoc's syntax, substituted when copied.
 - ``[@key]{.short-venue (.year)}``: a template, its fields (``.number``, ``.index``: the
   bare number, ``.title``, ``.venue``, ``.short-venue``: the acronym, else the venue,
   ``.year``, ``.tags``, ``.notes``) replaced and the rest kept: ``EMNLP (2026)``,
-  ``{#.index}``: ``#2``, ``{**#.index** (.short-venue .year): .notes}``.
+  ``{#.index}``: ``#2``, ``{**#.index** (.short-venue .year): .notes}``;
+- ``[@key]{.starred}``: a named template (Settings → Citation templates, or the folder's),
+  also usable within another one (``{.starred: .notes}``).
 
-The report discusses the papers with some tags (or, without, those of the period's years):
-each should be cited at least once.
+Within a folder, the papers with its numbered tag (see ``Numbering``) are numbered first
+(as listed, else by year): the papers to discuss, each to be cited at least once (without a
+numbered tag, those of the period's years).
 """
 
 from __future__ import annotations
 
-import hashlib
 import re
 import unicodedata
 from collections import Counter
@@ -26,21 +28,14 @@ from functools import lru_cache
 
 from lark import Lark, Transformer
 from lark.exceptions import LarkError
-from sqlalchemy import select
 
-from .db.models import (
-    AppSetting,
-    PeriodNote,
-    PeriodTag,
-    Publication,
-    PublicationTag,
-    Report,
-)
+from .db.models import AppSetting, Folder, Period
 from .db.session import session_scope
 from .i18n import _
 from .pubview import PubStat, hashtag, tagged
 
-NUMBER_FORMAT = "**#{n}**"
+NUMBER_FORMAT = "**#{index}**"
+REFERENCE_FORMAT = "[{index}]"  # (in the notes: by default)
 
 _KEY = r"\w+(?:[:.#$%&+?<>~/-]\w+)*"
 # A bracketed citation, then its classes (Pandoc's bracketed span): [see @a, p. 3; @b]{.notes}
@@ -93,7 +88,7 @@ class Paper:
     stat: PubStat
     key: str
     number: int
-    in_report: bool = True  # (else cited, but without the report's tags)
+    in_report: bool = True  # (else cited, but not among the papers to discuss)
     off_period: bool = False  # (with the tags, but its year outside the period's)
 
 
@@ -102,7 +97,7 @@ def in_years(s: PubStat, years: tuple[int | None, int | None]) -> bool:
     return (start is None or (s.year or 0) >= start) and (end is None or (s.year or 9999) <= end)
 
 
-def report_papers(
+def papers_to_discuss(
     stats: list[PubStat],
     keys: dict[int, str],
     tag_ids: list[int],
@@ -144,35 +139,50 @@ def report_papers(
 # ---- Substitution ---------------------------------------------------------------------------
 
 
+class TemplateCycle(ValueError):
+    """A template using itself (through others): ``path``, the names from the first one."""
+
+    def __init__(self, path: tuple[str, ...]) -> None:
+        self.path = path
+        super().__init__(_("Template cycle: {path}").format(path=" → ".join(f".{n}" for n in path)))
+
+
 @dataclass
 class Context:
     """What citations are resolved against."""
 
-    papers: list[Paper]  # the report's
+    papers: list[Paper]  # the numbered ones (e.g. a folder's papers to discuss)
     stats: list[PubStat]  # every paper of the person
     keys: dict[int, str]
     tags: dict[int, str]  # tag names (id -> name)
-    hide_tags: set[int] = field(default_factory=set)  # (the report's: not repeated)
+    hide_tags: set[int] = field(default_factory=set)  # (the numbered tag: not repeated)
     period_id: int | None = None
     number_format: str = NUMBER_FORMAT
+    templates: dict[str, str] = field(default_factory=dict)  # named ones: name -> {attrs}
+    # The papers each to be cited (by default, the numbered ones; see citation_status).
+    discuss: list[Paper] | None = None
 
     def __post_init__(self) -> None:
         self.by_key = {p.key: p for p in self.papers}
         self._stat_by_key = {self.keys[s.id]: s for s in self.stats if s.id in self.keys}
         self._next = max((p.number for p in self.papers), default=0) + 1
+        if self.discuss is None:
+            self.discuss = list(self.papers)
 
     def paper(self, key: str) -> Paper | None:
-        """The paper of a key; one outside the report gets the next number."""
+        """The paper of a key; one outside the numbered ones gets the next number."""
         if (p := self.by_key.get(key)) is None and (s := self._stat_by_key.get(key)):
             p = self.by_key[key] = Paper(s, key, self._next, in_report=False)
             self._next += 1
         return p
 
     def number(self, p: Paper) -> str:
-        return (self.number_format or NUMBER_FORMAT).replace("{n}", str(p.number))
+        """Its number, formatted (``{index}``, or ``{n}``: the number)."""
+        fmt = self.number_format or NUMBER_FORMAT
+        return fmt.replace("{index}", str(p.number)).replace("{n}", str(p.number))
 
     def hashtags(self, p: Paper) -> str:
-        """Its tags (but the report's)."""
+        """Its tags (but the hidden ones)."""
         names = sorted(
             (
                 self.tags[t]
@@ -194,21 +204,39 @@ class Context:
         lines = "\n\n".join(t.strip() for t in texts).splitlines()
         return "\n".join(lines[:1] + [pad + ln if ln.strip() else "" for ln in lines[1:]])
 
-    def fields(self, p: Paper, attrs: Attrs, indent: int = 0) -> str:
-        """A template's fields replaced (``{.short-venue (.year)}`` → ``EMNLP (2026)``)."""
+    def is_template(self, attrs: Attrs) -> bool:
+        """Fields (or named templates) to fill, rather than classes (``{.notes}``…)."""
+        return bool(attrs.classes & (FIELDS | set(self.templates)))
+
+    def cite(self, p: Paper, attrs: Attrs, indent: int = 0, using: tuple[str, ...] = ()) -> str:
+        """The paper cited with ``attrs`` (``using``: the named templates being expanded)."""
+        cls = attrs.classes
+        if self.is_template(attrs):
+            return self.fields(p, attrs, indent, using)
+        if cls & {"full", "notes", "tags"}:
+            return self.entry(p, notes="notes" in cls, tags="tags" in cls, indent=indent)
+        return self.number(p)
+
+    def fields(self, p: Paper, attrs: Attrs, indent: int = 0, using: tuple[str, ...] = ()) -> str:
+        """A template's fields replaced (``{.short-venue (.year)}`` → ``EMNLP (2026)``), and
+        its named templates expanded (a cycle: ``TemplateCycle``)."""
         s = p.stat
-        return attrs.fill(
-            {
-                "number": self.number(p),
-                "index": str(p.number),
-                "title": s.title or "",
-                "venue": s.venue or "",
-                "short-venue": s.venue_short or s.venue or "",
-                "year": str(s.year or ""),
-                "tags": self.hashtags(p),
-                "notes": self.notes(p, indent),
-            }
-        )
+        values = {
+            "number": self.number(p),
+            "index": str(p.number),
+            "title": s.title or "",
+            "venue": s.venue or "",
+            "short-venue": s.venue_short or s.venue or "",
+            "year": str(s.year or ""),
+            "tags": self.hashtags(p),
+            "notes": self.notes(p, indent),
+        }
+        for name in sorted((attrs.classes & set(self.templates)) - set(values)):
+            if name in using:
+                raise TemplateCycle((*using[using.index(name) :], name))
+            sub = parse_attrs(_inner(self.templates[name]))
+            values[name] = "" if sub is None else self.cite(p, sub, indent, (*using, name))
+        return attrs.fill(values)
 
     def entry(self, p: Paper, *, notes: bool = False, tags: bool = False, indent: int = 0) -> str:
         s = p.stat
@@ -230,11 +258,14 @@ class Rendered:
     text: str
     cited: Counter = field(default_factory=Counter)  # key -> times
     unknown: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)  # (e.g. a template cycle)
 
 
 # ---- Attributes: classes ({.notes .tags}) or a template ({.short-venue (.year)}) ---------
 
 FIELDS = {"number", "index", "title", "venue", "short-venue", "year"}
+# (not a template's name: they have their meaning)
+RESERVED = FIELDS | {"full", "notes", "tags"}
 
 _ATTRS = Lark(
     r"""
@@ -278,10 +309,6 @@ class Attrs:
 
         return set(walk(self.items))
 
-    @property
-    def template(self) -> bool:
-        return bool(self.classes & FIELDS)
-
     def fill(self, values: dict[str, str]) -> str:
         """The fields replaced, the other classes dropped, and a group left without any
         value (``(.year)`` without a year) too, as the separator before a last field
@@ -318,8 +345,15 @@ def parse_attrs(attrs: str) -> Attrs | None:
         return None
 
 
+def _inner(attrs: str) -> str:
+    """A template without its braces (``{.year}`` → ``.year``)."""
+    attrs = attrs.strip()
+    return attrs[1:-1] if attrs.startswith("{") and attrs.endswith("}") else attrs
+
+
 def render(text: str, ctx: Context) -> Rendered:
-    """The report with its citations substituted (unknown keys left as they are)."""
+    """The text with its citations substituted (unknown keys left as they are; a citation
+    with a template cycle too, followed by the error)."""
     out = Rendered("")
     unknown: dict[str, None] = {}
 
@@ -339,8 +373,6 @@ def render(text: str, ctx: Context) -> Rendered:
         attrs = parse_attrs(m.group("attrs") or "")
         if attrs is None:
             return m.group(0)
-        cls = attrs.classes
-        full = bool(cls & {"full", "notes", "tags"})
         parts = []
         for item in m.group("body").split(";"):
             im = _ITEM.fullmatch(item)
@@ -350,15 +382,11 @@ def render(text: str, ctx: Context) -> Rendered:
             p = resolve(im.group("key"))
             if p is None:
                 return m.group(0)
-            cited = (
-                ctx.fields(p, attrs, indent_at(src, m.start()))
-                if attrs.template
-                else ctx.entry(
-                    p, notes="notes" in cls, tags="tags" in cls, indent=indent_at(src, m.start())
-                )
-                if full
-                else ctx.number(p)
-            )
+            try:
+                cited = ctx.cite(p, attrs, indent_at(src, m.start()))
+            except TemplateCycle as e:
+                out.errors.append(str(e))
+                return f"{m.group(0)} (⚠ {e})"
             parts.append(f"{im.group('pre')}{cited}{im.group('post')}".strip())
         return ", ".join(x for x in parts if x)
 
@@ -378,16 +406,14 @@ def render(text: str, ctx: Context) -> Rendered:
     chunks = _CODE.split(text)
     out.text = "".join(c if i % 2 else prose(c) for i, c in enumerate(chunks))
     out.unknown = list(unknown)
+    out.errors = list(dict.fromkeys(out.errors))
     return out
 
 
 def bibliography(ctx: Context, *, notes: bool = False, tags: bool = False) -> str:
-    """The list of the papers (the report's, and the others cited), by number."""
+    """The list of the papers (the numbered ones, and the others cited), by number."""
     papers = sorted(ctx.by_key.values(), key=lambda p: p.number)
     return "\n".join("- " + ctx.entry(p, notes=notes, tags=tags, indent=2) for p in papers)
-
-
-REFERENCE_FORMAT = "[{n}]"
 
 
 def note_context(stats: list[PubStat], keys: dict[int, str]) -> Context:
@@ -407,63 +433,119 @@ def uncited(ctx: Context, cited: Counter) -> list[Paper]:
     return [p for p in ctx.papers if not cited.get(p.key)]
 
 
-# ---- Storage --------------------------------------------------------------------------------
+# ---- A folder's citations: its numbering, and the status of its papers ---------------------
 
 
 @dataclass
-class Saved:
-    text: str = ""
-    tag_ids: list[int] = field(default_factory=list)
-    number_format: str = NUMBER_FORMAT
+class Numbering:
+    """How a folder's notes number papers: those with ``tag_id`` (within the person's
+    period), as listed (else by year), then the others as first cited; ``format``: how a
+    number is written (``{index}``: the number). No tag: every paper as first cited."""
+
+    tag_id: int | None = None
+    format: str = REFERENCE_FORMAT
 
 
-def get(period_id: int) -> Saved:
+def _citations(folder_id: int | None) -> dict:
+    if not folder_id:
+        return {}
     with session_scope() as s:
-        r = s.get(Report, period_id)
-        if r is None:
-            return Saved()
-        return Saved(r.text, list(r.tag_ids or []), r.number_format or NUMBER_FORMAT)
+        f = s.get(Folder, folder_id)
+        return dict(f.citations or {}) if f is not None else {}
 
 
-def save(period_id: int, **values) -> None:
-    """Save some of the report's fields (text, tag_ids, number_format)."""
+def _save_citations(folder_id: int, **values) -> None:
     with session_scope() as s:
-        r = s.get(Report, period_id)
-        if r is None:
-            r = Report(period_id=period_id)
-            s.add(r)
-        for k, v in values.items():
-            setattr(r, k, v)
+        if (f := s.get(Folder, folder_id)) is not None:
+            f.citations = {**(f.citations or {}), **values}
 
 
-def signature(person_id: int) -> str:
-    """Changes when the person's papers are edited (titles, notes, tags, tracks...): the
-    report is then updated."""
-    pubs = select(Publication.id).where(Publication.person_id == person_id)
-    h = hashlib.sha1()
+def numbering(folder_id: int | None) -> Numbering:
+    c = _citations(folder_id)
+    return Numbering(c.get("tag_id"), c.get("format") or REFERENCE_FORMAT)
+
+
+def save_numbering(folder_id: int, n: Numbering) -> None:
+    _save_citations(folder_id, tag_id=n.tag_id, format=n.format.strip() or REFERENCE_FORMAT)
+
+
+def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
+    """For the notes of the folder of a period (the person's in it): its numbering and its
+    templates; the papers to discuss, those with its numbered tag (else those of the
+    period's years)."""
+    from . import annotations, source_settings
+
+    keys = citation_keys(stats)
     with session_scope() as s:
-        for q in (
-            select(Publication.__table__)
-            .where(Publication.person_id == person_id)
-            .order_by(Publication.id),
-            select(PublicationTag.__table__).where(PublicationTag.publication_id.in_(pubs)),
-            select(PeriodTag.__table__).where(PeriodTag.publication_id.in_(pubs)),
-            select(PeriodNote.__table__).where(PeriodNote.publication_id.in_(pubs)),
-        ):
-            for row in sorted(map(repr, s.execute(q).all())):
-                h.update(row.encode())
-    return h.hexdigest()
+        period = s.get(Period, period_id) if period_id else None
+        found = (
+            (period.person_id, period.folder_id, (period.start_year, period.end_year))
+            if period is not None
+            else None
+        )
+    if found is None:
+        return note_context(stats, keys)
+    person_id, folder_id, years = found
+    n = numbering(folder_id)
+    names = {t.id: t.name for t in annotations.all_tags()}
+    tag = n.tag_id if n.tag_id in names else None
+    primary = source_settings.primary_for(person_id, period_id)
+    papers = papers_to_discuss(stats, keys, [tag], period_id, years) if tag else []
+    discuss = papers if tag else papers_to_discuss(stats, keys, [], period_id, years, primary)
+    return Context(
+        papers,
+        stats,
+        keys,
+        names,
+        hide_tags={tag} if tag else set(),
+        period_id=period_id,
+        number_format=n.format,
+        templates=load_templates(folder_id).names,
+        discuss=discuss,
+    )
 
 
-# ---- Citation templates (Settings → Report templates) ---------------------------------------
+@dataclass
+class Status:
+    """The papers to discuss, cited or not."""
+
+    discuss: list[Paper]  # (of the period's years)
+    missing: list[Paper]  # of those, not cited
+    off: list[Paper]  # cited, to discuss but not of the period's years
+    outside: list[Paper]  # cited, not to discuss
+
+    @property
+    def colour(self) -> str:
+        if self.missing:
+            return "negative"
+        if self.off or self.outside:
+            return "warning"
+        return "positive" if self.discuss else "grey"
+
+
+def citation_status(ctx: Context, cited: Counter) -> Status:
+    """Which papers to discuss the text cites (``cited``: as rendered)."""
+    keys = {p.key for p in ctx.discuss}
+    inside = [p for p in ctx.discuss if not p.off_period]
+    return Status(
+        inside,
+        [p for p in inside if not cited.get(p.key)],
+        [p for p in ctx.discuss if p.off_period and cited.get(p.key)],
+        [p for k in cited if k not in keys and (p := ctx.by_key.get(k)) is not None],
+    )
+
+
+# ---- Citation templates (Settings → Citation templates; a folder's own) --------------------
 
 TEMPLATES_KEY = "report_templates"  # an AppSetting
+_NAME = re.compile(r"[A-Za-z][\w-]*")
 
 
 @dataclass
 class Template:
     label: str
     attrs: str  # after [@key], e.g. "{.notes}" ("": the number)
+    name: str = ""  # (if any: usable as .name, e.g. [@key]{.name}, and within others)
 
 
 @dataclass
@@ -473,6 +555,11 @@ class Templates:
 
     def cite(self, key: str, attrs: str | None = None) -> str:
         return f"[@{key}]{self.default if attrs is None else attrs}"
+
+    @property
+    def names(self) -> dict[str, str]:
+        """The named ones: name -> attrs."""
+        return {t.name: t.attrs for t in self.items if t.name}
 
 
 def default_templates() -> Templates:
@@ -500,24 +587,110 @@ def check_template(attrs: str) -> str | None:
     return None
 
 
-def load_templates() -> Templates:
+def check_name(name: str) -> str | None:
+    """Why a template's name cannot be used (else None; "": no name)."""
+    name = name.strip().removeprefix(".")
+    if not name:
+        return None
+    if not _NAME.fullmatch(name):
+        return _("A letter, then letters, digits, - or _ (e.g. starred)")
+    if name in RESERVED:
+        return _("Already a field or a class: .{name}").format(name=name)
+    return None
+
+
+def template_cycle(templates: dict[str, str]) -> tuple[str, ...] | None:
+    """A cycle among named templates (name -> attrs), if any: its names, from the first."""
+
+    def uses(name: str) -> set[str]:
+        a = parse_attrs(_inner(templates[name]))
+        return (a.classes & set(templates)) if a else set()
+
+    def walk(name: str, path: tuple[str, ...]) -> tuple[str, ...] | None:
+        if name in path:
+            return (*path[path.index(name) :], name)
+        for other in sorted(uses(name)):
+            if found := walk(other, (*path, name)):
+                return found
+        return None
+
+    return next((c for n in sorted(templates) if (c := walk(n, ()))), None)
+
+
+def check_templates(items: list[Template], over: dict[str, str] | None = None) -> str | None:
+    """Why templates cannot be saved (else None): a bad one, a name twice, a cycle (with
+    ``over``: the named ones they are used with, e.g. the general ones for a folder's)."""
+    seen: set[str] = set()
+    for t in items:
+        if err := check_template(t.attrs) or check_name(t.name):
+            return f"{t.label or t.name or t.attrs}: {err}"
+        if t.name and t.name in seen:
+            return _("Two templates named .{name}").format(name=t.name)
+        seen.add(t.name)
+    named = {**(over or {}), **{t.name: t.attrs for t in items if t.name}}
+    if cycle := template_cycle(named):
+        return str(TemplateCycle(cycle))
+    return None
+
+
+def _general() -> Templates:
     with session_scope() as s:
         row = s.get(AppSetting, TEMPLATES_KEY)
         saved = dict(row.value or {}) if row else {}
     if not saved.get("items"):
         return default_templates()
-    items = [Template(t.get("label", ""), t.get("attrs", "")) for t in saved["items"]]
+    items = [
+        Template(t.get("label", ""), t.get("attrs", ""), t.get("name") or "")
+        for t in saved["items"]
+    ]
     default = saved.get("default", "")
     if all(t.attrs != default for t in items):
         default = items[0].attrs
     return Templates(items, default)
 
 
+def folder_templates(folder_id: int | None) -> list[Template]:
+    """A folder's own templates (named: each overrides the general one of its name)."""
+    return [
+        Template(t.get("label") or "", t.get("attrs", ""), t.get("name") or "")
+        for t in _citations(folder_id).get("templates") or []
+    ]
+
+
+def load_templates(folder_id: int | None = None) -> Templates:
+    """The general templates; with a folder, its own over them (by name)."""
+    t = _general()
+    for own in folder_templates(folder_id):
+        same = next((x for x in t.items if x.name and x.name == own.name), None)
+        if same is not None:
+            if t.default == same.attrs:
+                t.default = own.attrs
+            same.attrs = own.attrs
+        else:
+            t.items.append(Template(own.label or f".{own.name}", own.attrs, own.name))
+    return t
+
+
 def save_templates(t: Templates) -> None:
     for x in t.items:
-        if err := check_template(x.attrs):
-            raise ValueError(f"{x.label or x.attrs}: {err}")
+        x.name = x.name.strip().removeprefix(".")
+    if err := check_templates(t.items):
+        raise ValueError(err)
     if all(x.attrs != t.default for x in t.items):
         t.default = t.items[0].attrs if t.items else ""
     with session_scope() as s:
         s.merge(AppSetting(key=TEMPLATES_KEY, value=asdict(t)))
+
+
+def save_folder_templates(folder_id: int, items: list[Template]) -> None:
+    """A folder's own templates (each named); refused (``ValueError``) if one is wrong, or
+    with a cycle among them and the general ones."""
+    for x in items:
+        x.name = x.name.strip().removeprefix(".")
+        if not x.name:
+            raise ValueError(_("A folder's template needs a name"))
+    if err := check_templates(items, _general().names):
+        raise ValueError(err)
+    _save_citations(
+        folder_id, templates=[{"name": x.name, "attrs": x.attrs, "label": x.label} for x in items]
+    )

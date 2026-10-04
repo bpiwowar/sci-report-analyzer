@@ -18,7 +18,6 @@ from .. import (
     i18n,
     keys,
     pdfs,
-    reports,
     settings_io,
     source_settings,
     venue_match,
@@ -63,7 +62,7 @@ NAV = (
         N_("Reports"),
         (
             ("contribution", N_("Contribution roles"), 0),
-            ("reports", N_("Report templates"), 0),
+            ("reports", N_("Citation templates"), 0),
         ),
     ),
     (N_("Data"), (("data", N_("Data & cache"), 0), ("io", N_("Import / export"), 0))),
@@ -284,85 +283,14 @@ def contribution_tab() -> None:
         ui.button(_("Save"), icon="save", on_click=save).mark("contribution-save")
 
 
-# ---- report templates ----------------------------------------------------------------------
+# ---- citation templates --------------------------------------------------------------------
 
 
 def report_templates_tab() -> None:
-    """How a paper is cited when inserted in a report (the report editor's "Cite as")."""
-    cfg = reports.load_templates()
-    ui.markdown(
-        _(
-            "How a paper is cited when inserted in a report: `[@key]` followed by the template. "
-            "`{.notes}`, `{.tags}`, `{.full}` (title, venue…) as in the report's help; otherwise "
-            "the fields `.number` (the number, formatted), `.index` (the bare number), `.title`, "
-            "`.venue`, `.short-venue` (its acronym), `.year`, `.tags`, `.notes` are replaced and "
-            "the rest kept, a parenthesis without a value dropped: `{**#.index** (.short-venue "
-            ".year)}` gives **#2** (EMNLP 2026), `{**#.index** (.short-venue .year): .notes}` "
-            "follows it with the notes. Empty: the number."
-        )
-    ).classes("text-sm text-grey")
+    """How a paper is cited in the notes (a folder's own templates are over these)."""
+    from .citations import templates_section
 
-    @ui.refreshable
-    def rows() -> None:
-        for i, t in enumerate(cfg.items):
-            with ui.row().classes("items-center gap-2 no-wrap").mark(f"report-template-{i}"):
-                default = cfg.default == t.attrs
-                ui.button(
-                    icon="star" if default else "star_border", on_click=lambda t=t: set_default(t)
-                ).props("flat round dense color=amber-8").tooltip(
-                    _("The default") if default else _("Make it the default")
-                ).mark(f"report-template-default-{i}")
-                ui.input(
-                    _("Label"), value=t.label, on_change=lambda e, t=t: setattr(t, "label", e.value)
-                ).props("dense outlined").classes("w-56")
-                ui.input(
-                    _("Template"),
-                    value=t.attrs,
-                    on_change=lambda e, t=t: set_attrs(t, e.value or ""),
-                    validation=reports.check_template,
-                ).props("dense outlined").classes("w-96").mark(f"report-template-attrs-{i}")
-                b = ui.button(icon="delete", on_click=lambda i=i: remove(i))
-                b.props("flat round dense color=negative")
-
-    def set_default(t: reports.Template) -> None:
-        cfg.default = t.attrs
-        rows.refresh()
-
-    def set_attrs(t: reports.Template, attrs: str) -> None:
-        if cfg.default == t.attrs:
-            cfg.default = attrs
-        t.attrs = attrs
-
-    def remove(i: int) -> None:
-        del cfg.items[i]
-        rows.refresh()
-
-    def add() -> None:
-        cfg.items.append(reports.Template(_("New template"), "{.short-venue .year}"))
-        rows.refresh()
-
-    def reset() -> None:
-        d = reports.default_templates()
-        cfg.items, cfg.default = d.items, d.default
-        rows.refresh()
-
-    def save() -> None:
-        try:
-            reports.save_templates(cfg)
-        except ValueError as e:
-            ui.notify(str(e), type="negative")
-            return
-        rows.refresh()
-        ui.notify(_("Saved (reload a report to see it)"), type="positive")
-
-    with ui.column().classes("gap-1"):
-        rows()
-    with ui.row().classes("mt-2"):
-        ui.button(_("Add a template"), icon="add", on_click=add).props("flat").mark(
-            "report-template-add"
-        )
-        ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat")
-        ui.button(_("Save"), icon="save", on_click=save).mark("report-templates-save")
+    templates_section()
 
 
 # ---- matching ------------------------------------------------------------------------------

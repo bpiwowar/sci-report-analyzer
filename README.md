@@ -2,7 +2,7 @@
 
 A local web app (NiceGUI + SQLite) to follow and evaluate researchers: it tracks their
 publications across sources, ranks their venues, and keeps per-person folders with tags,
-notes, stored PDFs and reports. Venues are ranked with Scimago, CORE (every edition since
+notes and stored PDFs. Venues are ranked with Scimago, CORE (every edition since
 2008) and a predatory list.
 
 ## Features
@@ -20,9 +20,12 @@ notes, stored PDFs and reports. Venues are ranked with Scimago, CORE (every edit
   **tag from a pasted list** (e.g. a report's numbered list: matched by HAL id / DOI / title,
   missing papers searched on HAL and added, the list's numbers kept for reporting).
   Notes accept LaTeX (`$…$`, `$$…$$`), edited with a Markdown editor (toolbar, preview).
-- **Reports** within a period / folder: Markdown citing the papers (Pandoc's `[@key]`,
-  `@key`, `[@key]{.notes}`, `[@key]{.tags}`), checking each paper to discuss (by tags) is
-  cited, substituted (numbers like **#6**, titles, notes, tags) when copied.
+- **Notes of a folder** (one Markdown text for all its documents and papers, next to any
+  of their PDFs) citing the papers (Pandoc's `[@key]`, `@key`, `[@key]{.notes}`,
+  `[@key]{.tags}`, templates such as `[@key]{.short-venue (.year)}`, named and composable,
+  general or per folder), substituted (numbers like **#6**, titles, notes, tags); the papers
+  with the folder's numbered tag are numbered first, and an icon tells whether each paper to
+  discuss is cited.
 - **PDFs**: downloaded from the papers' open-access links (sources, else Unpaywall), one by
   one or for all the papers shown, or uploaded; stored in the data directory and read in
   the browser with PDF.js (highlight, text, drawing, images), the annotations saved back,
@@ -34,7 +37,7 @@ notes, stored PDFs and reports. Venues are ranked with Scimago, CORE (every edit
   marked, and show the paper's details next to the document; references can be linked by
   hand from a selection; author-year citations (“(Lyu et al., 2023b)”) are linked too.
 - **Categories** per folder (an ordered tree, drag and drop, optional years): passages
-  selected in the PDFs are filed in them, listed per person, and inserted in reports as
+  selected in the PDFs are filed in them, listed per person, and inserted in notes as
   Markdown.
 - **Venues** (Conferences / Journals pages): variants after cleaning, two-level
   classification (kind → rank), default levels per kind, manual decisions per paper or per

@@ -1,4 +1,4 @@
-"""Reports: citation keys, numbers, substitution, and the report page."""
+"""Citations: keys, numbers, substitution, templates, a folder's numbering and status."""
 
 import asyncio
 
@@ -7,7 +7,6 @@ from helpers import add_source, make_person, pub
 from nicegui.testing import User
 
 from sci_report_analyzer import annotations, folders, pubview, reports
-from sci_report_analyzer.ui.mdedit import MarkdownEditor
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
 
@@ -44,7 +43,7 @@ def test_keys_numbers_and_substitution():
     annotations.toggle_tag(b, tag)
     annotations.set_note(a, "Strong *results*.\n\nSecond paragraph.")
     stats = asyncio.run(pubview.load_stats(pid))
-    papers = reports.report_papers(stats, keys, [tag], period)
+    papers = reports.papers_to_discuss(stats, keys, [tag], period)
     assert [(p.key, p.number) for p in papers] == [("smith2022neural", 1), (keys[a], 2)]
     ctx = reports.Context(papers, stats, keys, {tag: "discuss"}, {tag}, period)
     text = (
@@ -79,7 +78,7 @@ def test_keys_numbers_and_substitution():
     other = annotations.save_tag("strong")
     annotations.toggle_tag(a, other)
     stats = asyncio.run(pubview.load_stats(pid))
-    papers = reports.report_papers(stats, keys, [tag], period)
+    papers = reports.papers_to_discuss(stats, keys, [tag], period)
     names = {tag: "discuss", other: "strong"}
     ctx = reports.Context(papers, stats, keys, names, {tag}, period, number_format="[{n}]")
     out = reports.render(f"[@{keys[a]}]{{.tags}}", ctx).text
@@ -88,57 +87,15 @@ def test_keys_numbers_and_substitution():
     assert reports.uncited(ctx, reports.render("", ctx).cited) == papers
     assert reports.bibliography(ctx).splitlines()[0].startswith("- [1] **The neural")
     # Without tags: the papers of the period's years.
-    assert len(reports.report_papers(stats, keys, [], period, (2022, None))) == 1
+    assert len(reports.papers_to_discuss(stats, keys, [], period, (2022, None))) == 1
     # Numbers of a tag put from a list.
     annotations.tag_numbered(tag, {a: 3, b: 7})
     stats = asyncio.run(pubview.load_stats(pid))
-    papers = reports.report_papers(stats, keys, [tag], period)
+    papers = reports.papers_to_discuss(stats, keys, [tag], period)
     assert [p.number for p in papers] == [3, 7]
     # With tags: the papers of other years are off-period.
-    papers = reports.report_papers(stats, keys, [tag], period, (2022, None))
+    papers = reports.papers_to_discuss(stats, keys, [tag], period, (2022, None))
     assert [(p.key, p.off_period) for p in papers] == [(keys[a], True), ("smith2022neural", False)]
-
-
-async def test_report_page(user: User, monkeypatch):
-    pid, period = _setup()
-    stats = await pubview.load_stats(pid)
-    by = {s.title: s for s in stats}
-    keys = reports.citation_keys(stats)
-    tag = annotations.save_tag("discuss")
-    a = by["Deep ranking for search"].id
-    annotations.toggle_tag(a, tag)
-    reports.save(period, tag_ids=[tag])
-    await user.open(f"/person/{pid}?period={period}")
-    await user.should_see(marker="report")
-    await user.open(f"/report/{period}")
-    await user.should_see(marker="report-text")
-    await user.should_see("1 papers · 1 not discussed")
-    await user.should_see(marker=f"report-cite-{keys[a]}")
-    editor = user.find(marker="report-text").elements.pop()
-    editor.value = f"Good: [@{keys[a]}]."
-    await user.should_see("1 papers · 0 not discussed")
-    await user.should_see("Good: **#1**.")  # the preview
-    # The quick search, among the person's other papers too.
-    user.find(marker="report-search").type("neural")
-    await user.should_see(marker=f"report-cite-{keys[by['The neural retrieval'].id]}")
-    for _ in range(50):  # (saved every 2 s)
-        if reports.get(period).text:
-            break
-        await asyncio.sleep(0.1)
-    assert reports.get(period).text == f"Good: [@{keys[a]}]."
-    assert reports.get(period).tag_ids == [tag]
-    # The citation inserted on a click: as chosen (the default template, saved).
-    assert reports.load_templates().default == "{**#.index** (.short-venue .year)}"
-    options = user.find(marker="report-cite-form").elements.pop().options
-    assert options["{**#.index** (.short-venue .year)}"] == "Number, venue (year)\t#1 (SIGIR 2021)"
-    user.find(marker="report-cite-form").elements.pop().value = "{.notes}"
-    assert reports.load_templates().default == "{.notes}"
-    user.find(marker="report-search").clear()
-    await user.should_see(marker=f"report-cite-{keys[a]}")
-    inserted = []  # (inserted by the browser: the call is checked)
-    monkeypatch.setattr(MarkdownEditor, "insert", lambda self, text: inserted.append(text))
-    user.find(marker=f"report-cite-{keys[a]}").click()
-    assert inserted == [f"[@{keys[a]}]{{.notes}}"]
 
 
 def test_report_templates():
@@ -167,25 +124,6 @@ async def test_report_templates_settings(user: User):
     assert t.items[-1].attrs == "{.title}" and t.default == "{.title}"
 
 
-async def test_report_page_shows_notes_and_follows_edits(user: User):
-    pid, period = _setup()
-    stats = await pubview.load_stats(pid)
-    keys = reports.citation_keys(stats)
-    a = next(s.id for s in stats if s.title == "Deep ranking for search")
-    annotations.set_note(a, "A strong *paper*")
-    await user.open(f"/report/{period}")
-    await user.should_see(marker=f"report-note-{keys[a]}")
-    user.find(marker="report-text").elements.pop().value = f"[@{keys[a]}]{{.notes}}"
-    await user.should_see("A strong")
-    # Edited elsewhere (e.g. in the PDF's window): the sidebar and the preview follow.
-    annotations.set_note(a, "Its note, edited", period)
-    for _ in range(50):
-        if "Its note, edited" in user.find(marker=f"report-note-{keys[a]}").elements.pop().content:
-            break
-        await asyncio.sleep(0.1)
-    await user.should_see("Its note, edited")
-
-
 def test_notes_keep_line_breaks():
     import markdown2
 
@@ -193,28 +131,6 @@ def test_notes_keep_line_breaks():
 
     html = markdown2.markdown("one\ntwo\n\n```\nx\ny\n```", extras=NOTE_EXTRAS)
     assert "one<br />\ntwo" in html and "x\ny" in html  # (as in Obsidian; not in code)
-
-
-async def test_report_page_off_period(user: User):
-    from sci_report_analyzer.db.models import Period
-    from sci_report_analyzer.db.session import session_scope
-
-    pid, period = _setup()
-    stats = await pubview.load_stats(pid)
-    keys = reports.citation_keys(stats)
-    tag = annotations.save_tag("discuss")
-    for st in stats:
-        annotations.toggle_tag(st.id, tag)
-    reports.save(period, tag_ids=[tag])
-    with session_scope() as s:
-        s.get(Period, period).start_year = 2022
-    await user.open(f"/report/{period}")
-    await user.should_see("1 papers · 1 not discussed")
-    await user.should_see("+ 2 off-period · 2 not discussed")
-    await user.should_see(marker="report-off-period")
-    old = next(st for st in stats if st.year == 2021)
-    user.find(marker="report-text").elements.pop().value = f"[@{keys[old.id]}]"
-    await user.should_see("+ 2 off-period · 1 not discussed")
 
 
 def test_note_with_references():
@@ -233,3 +149,123 @@ def test_note_with_references():
     assert reports.with_references("No citation.", reports.note_context(stats, keys)) == (
         "No citation.\n"
     )
+
+
+def test_named_templates_within_others_and_cycles():
+    pid, _ = _setup()
+    stats = asyncio.run(pubview.load_stats(pid))
+    keys = reports.citation_keys(stats)
+    templates = {"starred": "{.index (.short-venue .year)}", "long": "{.starred: .title}"}
+    ctx = reports.Context([], stats, keys, {}, templates=templates)
+    assert reports.render("[@smith2022neural]{.starred}", ctx).text == "1 (ECIR 2022)"
+    out = reports.render("[@smith2022neural]{.long}", ctx).text
+    assert out == "1 (ECIR 2022): The neural retrieval"
+    # A cycle: the citation left as is, with the error (not a crash).
+    templates.update(a="{.b}", b="{x .a}")
+    r = reports.render("[@smith2022neural]{.a} ok", ctx)
+    assert r.text.startswith("[@smith2022neural]{.a} (⚠ ") and r.text.endswith(" ok")
+    assert r.errors == ["Template cycle: .a → .b → .a"]
+    assert reports.template_cycle(templates) == ("a", "b", "a")
+    # Refused when saved: a cycle, a name twice, a reserved name.
+    t = reports.load_templates()
+    t.items.append(reports.Template("A", "{.b}", "a"))
+    t.items.append(reports.Template("B", "{.a}", "b"))
+    with pytest.raises(ValueError, match="cycle"):
+        reports.save_templates(t)
+    t.items[-1] = reports.Template("B", "{.year}", "a")
+    with pytest.raises(ValueError, match="Two templates"):
+        reports.save_templates(t)
+    t.items[-1] = reports.Template("B", "{.year}", "year")
+    with pytest.raises(ValueError, match="field"):
+        reports.save_templates(t)
+    t.items[-1] = reports.Template("B", "{.year}", ".b")
+    reports.save_templates(t)
+    assert reports.load_templates().names == {"a": "{.b}", "b": "{.year}"}
+
+
+def test_folder_numbering_templates_and_status():
+    pid, period = _setup()
+    fid = folders.folder_of_period(period)[0]
+    stats = asyncio.run(pubview.load_stats(pid))
+    keys = reports.citation_keys(stats)
+    by = {s.title: s.id for s in stats}
+    a, b, c = (
+        by[t] for t in ("Deep ranking for search", "The neural retrieval", "Deep ranking again")
+    )
+    # By default: numbered as first cited, "[1]"; the papers to discuss: the period's.
+    ctx = reports.folder_context(stats, period)
+    r = reports.render(f"[@{keys[b]}] [@{keys[a]}]", ctx)
+    assert r.text == "[1] [2]"
+    st = reports.citation_status(ctx, r.cited)
+    assert len(st.discuss) == 3 and len(st.missing) == 1 and st.colour == "negative"
+    # A numbered tag (within the period) and a format: its papers first, as listed.
+    star = annotations.starred_tag_id()
+    annotations.tag_numbered(star, {a: 1, b: 2}, period)
+    reports.save_numbering(fid, reports.Numbering(star, "**#{index}**"))
+    stats = asyncio.run(pubview.load_stats(pid))
+    ctx = reports.folder_context(stats, period)
+    r = reports.render(f"[@{keys[b]}] [@{keys[c]}]", ctx)
+    assert r.text == "**#2** **#3**"
+    st = reports.citation_status(ctx, r.cited)
+    assert [p.key for p in st.missing] == [keys[a]] and [p.key for p in st.outside] == [keys[c]]
+    r = reports.render(f"[@{keys[a]}; @{keys[b]}]", ctx)
+    assert reports.citation_status(ctx, r.cited).colour == "positive"
+    # The period's years: a paper with the tag of another year, cited, is out of the range.
+    folders.set_period(period, 2022, None)
+    ctx = reports.folder_context(stats, period)
+    st = reports.citation_status(ctx, reports.render(f"[@{keys[a]}; @{keys[b]}]", ctx).cited)
+    assert [p.key for p in st.off] == [keys[a]] and st.colour == "warning"
+    # The folder's templates over the general ones (by name), within one another.
+    t = reports.load_templates()
+    t.items.append(reports.Template("Starred", "{.short-venue}", "starred"))
+    reports.save_templates(t)
+    reports.save_folder_templates(
+        fid,
+        [
+            reports.Template("", "{.index (.short-venue .year)}", "starred"),
+            reports.Template("", "{.starred: .title}", "long"),
+        ],
+    )
+    ctx = reports.folder_context(stats, period)
+    out = reports.render(f"[@{keys[b]}]{{.long}}", ctx).text
+    assert out == "2 (ECIR 2022): The neural retrieval"
+    assert reports.load_templates().names["starred"] == "{.short-venue}"
+    with pytest.raises(ValueError, match="cycle"):
+        reports.save_folder_templates(fid, [reports.Template("", "{.starred}", "starred")])
+    with pytest.raises(ValueError, match="name"):
+        reports.save_folder_templates(fid, [reports.Template("", "{.year}", "")])
+
+
+async def test_folder_notes_citation_status(user: User, monkeypatch, tmp_path):
+    from sci_report_analyzer import pdfs
+
+    pid, period = _setup()
+    viewer = tmp_path / "pdfjs"
+    (viewer / "web").mkdir(parents=True)
+    (viewer / "web" / "viewer.html").write_text("<html></html>")
+    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
+    stats = await pubview.load_stats(pid)
+    keys = reports.citation_keys(stats)
+    a = next(s.id for s in stats if s.title == "Deep ranking for search")
+    star = annotations.starred_tag_id()
+    annotations.toggle_tag(a, star, period)
+    fid = folders.folder_of_period(period)[0]
+    reports.save_numbering(fid, reports.Numbering(star, "#{index}"))
+    pdfs.save(a, b"%PDF-1.4\n%%EOF\n", None)
+    await user.open(f"/pdf/{a}?period={period}")
+    await user.should_see(marker="citation-status")
+    await user.should_see("0 of the 1 papers to discuss cited")
+    [box] = user.find(marker="citation-status").elements
+    [icon] = [e for e in box.descendants() if e.tag == "q-icon"]
+    assert icon.props["color"] == "negative"
+    user.find(marker="folder-note").elements.pop().value = f"Good: [@{keys[a]}]."
+    await user.should_see("1 of the 1 papers to discuss cited")
+    assert icon.props["color"] == "positive"
+    await user.should_see("Good: #1.")  # (the preview)
+    # A click: the folder's numbering and templates.
+    user.find(marker="citation-status").click()
+    await user.should_see(marker="folder-number-tag")
+    user.find(marker="folder-number-format").clear().type("[{index}]")
+    user.find(marker="folder-citations-save").click()
+    await user.should_see("Good: [1].")
+    assert reports.numbering(fid) == reports.Numbering(star, "[{index}]")

@@ -736,9 +736,6 @@ async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
     assert categories.excerpts(period, grouped=True)[0].group_text == (
         "Our model beats sparse ones (twice)"
     )
-    # In the report: inserted as Markdown.
-    await user.open(f"/report/{period}")
-    await user.should_see(marker="report-excerpts")
 
 
 async def test_categories_editor(user: User, monkeypatch, tmp_path):

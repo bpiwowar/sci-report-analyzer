@@ -276,6 +276,9 @@ class Folder(Base):
     # The source a paper must be in to count ("none": no such source; None: the default
     # one, see source_settings).
     primary_source: Mapped[str | None] = mapped_column(String(32))
+    # How its notes cite papers: {"tag_id": the tag whose papers are numbered, "format": the
+    # number's, "templates": [{"name", "attrs"}] (over the general ones)}; see reports.py.
+    citations: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
 
     periods: Mapped[list[Period]] = relationship(
         back_populates="folder", cascade="all, delete-orphan", passive_deletes=True
@@ -454,7 +457,8 @@ class PeriodDocument(Base):
 
 class Report(Base):
     """A report (Markdown) on a person within a period / folder, citing their papers
-    (``[@key]``, see reports.py): those with some tags."""
+    (``[@key]``, see reports.py): those with some tags. Its view is gone, merged into the
+    folder's notes (where it was appended, see old_reports.py): kept for its data."""
 
     __tablename__ = "report"
 

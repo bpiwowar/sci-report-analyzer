@@ -581,6 +581,16 @@ def folder_dialog(f: folders.FolderView | None) -> None:
             .mark("folder-primary")
         )
         hidden = ui.checkbox(_("Hidden"), value=f.hidden if f else False)
+        if f is not None:
+            from .citations import folder_citations_dialog
+
+            ui.button(
+                _("Citations in the notes"),
+                icon="format_list_numbered",
+                on_click=lambda: folder_citations_dialog(f.id),
+            ).props("flat no-caps").tooltip(
+                _("The numbered papers (a tag), the number's format, the folder's templates")
+            ).mark("folder-citations")
 
         def save() -> None:
             if not name.value.strip():
