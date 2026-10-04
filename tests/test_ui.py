@@ -418,6 +418,18 @@ async def test_matching_tab_choose_source(user: User) -> None:
         assert s.get(Publication, pub_id).venue_source == "hal"
 
 
+async def test_problem_icon_opens_the_tab_to_settle_it(user: User) -> None:
+    pid = make_person()
+    add_source(pid, "hal", "h", [pub("a", "Paper A", 2020, "Venue One", doi="10.1/x")])
+    add_source(pid, "dblp", "d", [pub("b", "Paper A", 2020, "Venue Two", doi="10.1/x")])
+    pid_a = _pub_id("Paper A")
+    await user.open(f"/person/{pid}")
+    await user.should_see(marker=f"problems-{pid_a}")
+    user.find(f"problems-{pid_a}").click()
+    await user.should_see("The sources give different venues or tracks", retries=5)
+    assert "matching" in {e.value for e in user.find(ui.tabs).elements}
+
+
 async def test_search_for_another_venue(user: User) -> None:
     from sci_report_analyzer.db.models import Publication, Venue
     from sci_report_analyzer.db.session import session_scope
