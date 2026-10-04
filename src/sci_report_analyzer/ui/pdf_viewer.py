@@ -14,7 +14,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import Client, app, background_tasks, ui
 
-from .. import annotations, pdfs
+from .. import annotations, documents, pdfs
 from ..db.models import Publication
 from ..db.session import session_scope
 from ..i18n import _, ngettext
@@ -102,6 +102,22 @@ window.vrPdf = {
       return {p: sel.p, y: Math.max(...ys) + 20, text: sel.text};
     }
     return {p: loc ? loc.pageNumber : a.page, y: loc ? loc.top : null, text: ''};
+  },
+  // Where the reader is (page, zoom, scroll), kept once they stop moving: the PDF opens there
+  // again (see documents.last_place). (PDF.js keeps it too, in the browser, but by the file's
+  // fingerprint: lost when the file is saved.)
+  at: null, atTimer: null,
+  moved(loc) {
+    if (!loc || !this.app()?.isInitialViewSet) return;  // (not the first page, while loading)
+    this.at = {p: loc.pageNumber, zoom: String(loc.scale), left: Math.round(loc.left),
+               top: Math.round(loc.top)};
+    clearTimeout(this.atTimer);
+    this.atTimer = setTimeout(() => this.keepAt(), 1000);
+  },
+  keepAt() {
+    clearTimeout(this.atTimer);
+    if (this.at) emitEvent('vr-pdf-at', this.at);
+    this.at = null;
   },
   // Through the link service, as a link: a step back and forward (the viewer's history).
   go(p, y) {
@@ -462,11 +478,13 @@ document.addEventListener('webviewerloaded', (e) => {
       if (ev.mode > 0) vrPdf.areaMode(false);  // (an editing mode: not both)
     });
     a.eventBus.on('annotationeditorstateschanged', () => vrPdf.actions());
+    a.eventBus.on('updateviewarea', (ev) => vrPdf.moved(ev.location));
     vrPdf.actions();
   });
 });
 setInterval(() => vrPdf.save(false), 4000);
 window.addEventListener('beforeunload', (e) => {
+  vrPdf.keepAt();
   if (vrPdf.dirty()) {
     vrPdf.save(true);
     e.preventDefault();
@@ -607,7 +625,8 @@ def viewer_frame(
     page: int | None = None,
 ) -> ui.column:
     """The page of a stored PDF: a header (back to ``home``, saving, bookmarks, finding the
-    paper of a selection), PDF.js, and the side column (returned)."""
+    paper of a selection), PDF.js (opened at ``page``, else where it was last read), and the
+    side column (returned)."""
     texts = {
         "saving": _("Saving…"),
         "saved": _("Saved at {time}"),
@@ -671,8 +690,9 @@ def viewer_frame(
             "flat dense round color=white"
         ).tooltip(_("Side panel (notes, bookmarks, papers)")).mark("pdf-toggle-notes")
     src = f"/pdfjs/web/viewer.html?file={file_url}%3Fv%3D{version}"
-    if page:
-        src += f"#page={page}"
+    # (at a page asked for, else where it was last read)
+    src += f"#page={page}" if page else documents.place_hash(documents.last_place(*bookmarked))
+    ui.on("vr-pdf-at", lambda e: documents.save_last_place(*bookmarked, e.args or {}))
     with ui.row().classes("w-full no-wrap gap-0"):
         ui.element("iframe").props(f'id=vr-pdf-frame src="{src}"').classes("grow").style(
             "height:calc(100vh - 40px); border:0"

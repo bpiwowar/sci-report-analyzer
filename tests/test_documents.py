@@ -265,6 +265,38 @@ async def test_paper_pdf_bookmarks(user: User, monkeypatch, tmp_path):
     await user.should_see("Page 4")
 
 
+async def test_last_place(user: User, monkeypatch, tmp_path):
+    _, period, ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    pdfs.save(ids["a"], PDF, None)
+    assert documents.last_place("pub", ids["a"]) is None
+    documents.save_last_place("pub", ids["a"], {"p": "3", "zoom": "page-width", "top": 512.4})
+    documents.save_last_place("pub", ids["a"], {"p": 2, "zoom": "1);alert(1"})  # (ignored)
+    documents.save_last_place("pub", ids["a"], {"zoom": "auto"})  # (ignored: no page)
+    assert documents.last_place("pub", ids["a"]) == {
+        "p": 3,
+        "zoom": "page-width",
+        "left": 0,
+        "top": 512,
+    }
+    # Opened again there, unless at a page asked for.
+    await user.open(f"/pdf/{ids['a']}")
+    await user.should_see(marker="pdf-frame")
+    src = user.find(marker="pdf-frame").elements.pop().props["src"]
+    assert src.endswith("#page=3&zoom=page-width,0,512")
+    await user.open(f"/pdf/{ids['a']}?page=7")
+    await user.should_see(marker="pdf-frame")
+    assert user.find(marker="pdf-frame").elements.pop().props["src"].endswith("#page=7")
+    # Forgotten with the PDF (or the document).
+    pdfs.remove(ids["a"])
+    assert documents.last_place("pub", ids["a"]) is None
+    doc = documents.add(period, "Application.pdf", PDF)
+    documents.save_last_place("doc", doc, {"p": 2, "zoom": "125.5", "left": -3, "top": 700})
+    assert documents.place_hash(documents.last_place("doc", doc)) == "#page=2&zoom=125.5,-3,700"
+    documents.remove(doc)
+    assert documents.last_place("doc", doc) is None
+
+
 async def test_author_year_citations():
     pid = make_person("Lena Martí Vidal")
     add_source(
