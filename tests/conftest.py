@@ -128,3 +128,14 @@ def fresh_db(tmp_path, monkeypatch):
     monkeypatch.setattr(tags, "NOTE_IDLE", 0.2)
     monkeypatch.setattr(tags, "NOTE_TICK", 0.05)
     yield
+
+
+@pytest.fixture
+def fake_viewer(monkeypatch, tmp_path) -> None:
+    """A stand-in for PDF.js (not downloaded in the tests): an empty viewer page."""
+    from sci_report_analyzer import pdfs
+
+    viewer = tmp_path / "pdfjs"
+    (viewer / "web").mkdir(parents=True)
+    (viewer / "web" / "viewer.html").write_text("<html></html>")
+    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)

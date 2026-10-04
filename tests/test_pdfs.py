@@ -114,13 +114,9 @@ def test_merge_and_cleanup():
     assert not pb.exists() and pdfs.stored(pid) == {a: False}
 
 
-async def test_viewer_page(user: User, monkeypatch, tmp_path):
+async def test_viewer_page(user: User, fake_viewer):
     pid, _, ids = _person()
     a = ids["Deep ranking for search"]
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
 
     await user.open(f"/pdf/{a}")
     await user.should_see("No PDF stored for this paper.")
@@ -157,16 +153,12 @@ async def test_viewer_page(user: User, monkeypatch, tmp_path):
     await user.should_not_see(marker="side-tab-categories")
 
 
-async def test_viewer_restart_notice(user: User, monkeypatch, tmp_path):
+async def test_viewer_restart_notice(user: User, monkeypatch, fake_viewer):
     """With --live-reload: a new version of the code, offered in the viewer's header too."""
     from sci_report_analyzer import livereload
 
     _, _, ids = _person()
     a = ids["Deep ranking for search"]
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
     pdfs.save(a, PDF, None)
     monkeypatch.setattr(livereload, "enabled", True)
     monkeypatch.setattr(livereload, "changed", {"ui/pdf_viewer.py"})
@@ -180,13 +172,9 @@ async def test_viewer_restart_notice(user: User, monkeypatch, tmp_path):
     await user.should_see("New version available (1 file changed)")
 
 
-async def test_viewer_details(user: User, monkeypatch, tmp_path):
+async def test_viewer_details(user: User, fake_viewer):
     _, _, ids = _person()
     a = ids["Deep ranking for search"]
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
     pdfs.save(a, PDF, None)
 
     await user.open(f"/pdf/{a}")
@@ -264,13 +252,9 @@ async def test_viewer_changes_reach_the_panel(user: User):
         raise AssertionError("not shown as annotated")
 
 
-async def test_viewer_side_width(user: User, monkeypatch, tmp_path):
+async def test_viewer_side_width(user: User, fake_viewer):
     _, _, ids = _person()
     a = ids["Deep ranking for search"]
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
     pdfs.save(a, PDF, None)
 
     await user.open(f"/pdf/{a}")
