@@ -1,10 +1,7 @@
 """The matcher against reference fixtures (records and expected matches)."""
 
-import gzip
-import json
-from pathlib import Path
-
 import pytest
+from helpers import load_fixture
 
 from sci_report_analyzer.ranking.matcher import Matcher
 from sci_report_analyzer.ranking.normalize import (
@@ -18,15 +15,7 @@ from sci_report_analyzer.ranking.normalize import (
     without_ordinal_marks,
 )
 
-FIXTURES = Path(__file__).parent / "fixtures"
-
-
-def _load(name):
-    with gzip.open(FIXTURES / name, "rt") as f:
-        return json.load(f)
-
-
-GOLDEN = _load("golden_cases.json.gz")
+GOLDEN = load_fixture("golden_cases.json.gz")
 # Cleaned differently on purpose: the reference leaves "èmes" of a plural French ordinal.
 DIVERGES = {
     "6èmes Journées internationales d'Analyse statistique des Données Textuelles (JADT 2002)"
@@ -35,7 +24,7 @@ DIVERGES = {
 
 @pytest.fixture(scope="module")
 def matcher():
-    return Matcher().load(_load("golden_records.json.gz"))
+    return Matcher().load(load_fixture("golden_records.json.gz"))
 
 
 def _pick(r):

@@ -4,7 +4,7 @@ import asyncio
 import json
 
 import pytest
-from helpers import add_source, make_person, note_status, pub, thesis
+from helpers import add_source, load_fixture, make_person, note_status, pub, thesis
 from nicegui import ui
 from nicegui.testing import User
 
@@ -1369,14 +1369,12 @@ async def test_add_a_joint_venue_without_a_name(user: User) -> None:
 
 
 async def test_doi_record_on_hover(user: User) -> None:
-    from pathlib import Path
-
     from sci_report_analyzer.db.models import DoiRecord, utcnow
     from sci_report_analyzer.db.session import session_scope
     from sci_report_analyzer.sources import doi
 
     d = "10.1145/3404835.3462812"
-    msg = json.loads((Path(__file__).parent / "fixtures" / "doi_crossref_sigir.json").read_text())
+    msg = load_fixture("doi_crossref_sigir.json")
     with session_scope() as s:
         s.add(
             DoiRecord(
