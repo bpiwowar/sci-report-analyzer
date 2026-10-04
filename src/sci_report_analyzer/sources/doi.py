@@ -118,6 +118,9 @@ def _authors(people: list[dict[str, Any]] | None) -> list[str]:
 _CONFERENCE_TYPES = {"proceedings-article", "paper-conference"}
 _JOURNAL_TYPES = {"journal-article", "article-journal"}
 _CHAPTER_TYPES = {"book-chapter", "chapter"}
+# A whole volume (a paper's record can carry its book's DOI, an ISBN-DOI): its container is
+# a series ("Lecture Notes in Computer Science", "Proceedings e report"), not a venue.
+VOLUME_TYPES = {"book", "edited-book", "monograph", "reference-book", "book-set", "proceedings"}
 _PREPRINT_PUBLISHERS = re.compile(r"\b(arxiv|biorxiv|medrxiv|ssrn|zenodo|preprints?)\b", re.I)
 
 
@@ -214,8 +217,9 @@ def parse(msg: dict[str, Any], registry: str) -> dict[str, Any]:
     # A chapter of a conference's book (LNCS...): the conference, not the book's title
     # ("Perception, Representations, Image, Sound, Music" is CMMR 2019's).
     chapter_of_event = kind in _CHAPTER_TYPES and bool(event_name)
+    in_book = kind in _CHAPTER_TYPES or kind in VOLUME_TYPES
     venue = venue_text(
-        (event_name if chapter_of_event else None)
+        (event_name if in_book and event_name else None)
         or container
         or event_name
         or msg.get("event-title")
@@ -243,9 +247,10 @@ def parse(msg: dict[str, Any], registry: str) -> dict[str, Any]:
         "title": _clean(first(msg.get("title"))),
         "year": _year(msg),
         "venue": venue or (publisher if archival else None),
-        # A chapter of a book in a series, without an event, names no venue (a volume title
-        # such as "Caring is Sharing"): the other sources' venue is used.
-        "venue_reliable": not (kind in _CHAPTER_TYPES and not event),
+        # A chapter of a book in a series, or a book, without an event, names no venue (a
+        # volume title such as "Caring is Sharing", a series): the other sources' venue is
+        # used.
+        "venue_reliable": not (in_book and not event),
         "container": container,
         "series": containers[0] if len(containers) > 1 else None,
         "venue_type": "conference"

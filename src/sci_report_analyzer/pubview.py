@@ -49,8 +49,10 @@ from .ranking.kinds import (
     VENUE_KINDS,
     WORKSHOP_KINDS,
     KindEvidence,
+    chapter_or_conference,
     data_kind,
     detect_kind,
+    doc_form,
 )
 from .ranking.normalize import is_non_venue, normalize
 from .ranking.service import is_ranked, service
@@ -129,6 +131,12 @@ class PubStat:
     disagree: bool
     # The sources give different tracks (e.g. demo and short), not settled by hand.
     track_conflict: bool = False
+    # Some records are of a paper, others of a whole volume (a book, proceedings): a paper
+    # merged with its book (through the book's DOI), not settled by setting the kind.
+    form_conflict: bool = False
+    # A chapter for some records, a conference paper for others (a conference whose
+    # proceedings are a book), not settled by setting the paper's or its venue's kind.
+    chapter_conflict: bool = False
     # The track set by hand (a track's id, or tracks.MAIN: the main track; None: automatic),
     # and the one found automatically (which the former replaces).
     track_override: str | None = None
@@ -207,6 +215,17 @@ class PubStat:
             out.append(_("sources give different venues — pick one in the details"))
         if self.track_conflict:
             out.append(_("sources give different tracks — pick one in the details"))
+        if self.form_conflict:
+            out.append(
+                _("sources disagree on a paper or a whole volume — split them or set the kind")
+            )
+        if self.chapter_conflict:
+            out.append(
+                _(
+                    "sources disagree on a book chapter or a conference paper — set the kind"
+                    " of its venue (or of the paper)"
+                )
+            )
         if self.missing:
             out.append(_("no longer in any source"))
         return out
@@ -269,11 +288,12 @@ def _detected_kind(
     vtype = sp.venue_type or next(
         (raw[m.id].venue_type for m in published if raw[m.id].venue_type), None
     )
-    # A DOI chapter without an event (a proceedings volume in a series) says nothing of
-    # the kind: its "book-chapter" is left out.
+    # A DOI chapter or book without an event (a proceedings volume in a series, the book
+    # of a paper given its book's DOI) says nothing of the kind: its "book-chapter" or
+    # "book" is left out, unless no other record gives a type.
     doc_types = " ".join(
         t for t in {raw[m.id].doc_type for m in published if m.venue_reliable} if t
-    )
+    ) or " ".join(t for t in {raw[m.id].doc_type for m in published} if t)
     ev = KindEvidence(
         venue=(venue.name if venue else None) or sp.venue,
         venue_type=vtype,
@@ -483,6 +503,18 @@ async def resolve_member(m: SourcePub, mv: MemberView, venues: dict[int, Venue])
     v = venues.get(mv.venue_id) if mv.venue_id else None
     if _has_decision(v):
         return await venue_badge(v, venues=venues)
+    if v is not None and (m.venue or m.issn):
+        # The venue's name when it is in the rankings, else its exact rank through any of
+        # its texts: an approximate match of the name can be another venue's ("Conference
+        # of the International Speech Communication Association" is not the journal
+        # "Speech Communication", its "(INTERSPEECH)" texts say CORE Interspeech).
+        b = await service.resolve(v.name, m.issn, m.venue_type)
+        if b is not None and b.exact:
+            return b
+        samples = [(m.venue, m.issn, m.venue_type), *((k.example, None, None) for k in v.keys)]
+        b = await venue_badge(v, [s for s in samples if s[0]], venues=venues)
+        if b is not None and b.exact and is_ranked(b):
+            return b
     by_hand = v is not None and mv.via in ("variant", "pattern", "identifier")
     if by_hand:
         b = await service.resolve(v.name, m.issn, m.venue_type)
@@ -802,7 +834,7 @@ async def load_stats(person_id: int) -> list[PubStat]:
                 )
             )
         )
-        venues = {v.id: v for v in s.scalars(select(Venue))}
+        venues = {v.id: v for v in s.scalars(select(Venue).options(selectinload(Venue.keys)))}
         names = {vid: v.name for vid, v in venues.items()}
         person = s.get(Person, person_id)
         people = PeopleIndex.for_person(s, person)
@@ -865,6 +897,20 @@ async def load_stats(person_id: int) -> list[PubStat]:
                 and not pub.rank_override
                 and not no_venue
             )
+            # (Not the unreliable sources': a type declared by hand on ORCID.)
+            doc_types = [
+                raw[v.id].doc_type
+                for v in views
+                if not v.archival and v.source not in service.settings.unreliable_venue_sources
+            ]
+            forms = {doc_form(t) for t in doc_types}
+            form_conflict = {"paper", "volume"} <= forms and not pub.kind_override
+            # Only when detected (not set on the paper nor on its venue).
+            chapter_conflict = (
+                kind_source == "detected"
+                and kind in ("chapter", "book")
+                and chapter_or_conference(doc_types)
+            )
             dm = doi_member(views)
             pdf_links = list(dict.fromkeys(v.pdf_url for v in views if v.pdf_url))
             url = next((v.url for v in views if not v.archival and v.url), None) or next(
@@ -904,6 +950,8 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     # With a DOI record, its venue is the paper's: no disagreement.
                     disagree=len(venue_ids) > 1 and (dm is None or dm.minor) and not no_venue,
                     track_conflict=track_conflict,
+                    form_conflict=form_conflict,
+                    chapter_conflict=chapter_conflict,
                     track_override=override,
                     auto_track=auto_track,
                     tags={tg.id for tg in pub.tags},

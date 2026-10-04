@@ -239,3 +239,35 @@ def test_crossref_is_asked_by_batches(monkeypatch):
     assert sorted(singles) == [(d, False) for d in other]
     assert counts == {"fetched": 1, "not_found": 3, "errors": 0}
     assert doi.cached([SIGIR])[SIGIR].origin == "crossref"
+
+
+def test_a_papers_record_with_its_books_doi(monkeypatch):
+    """HAL gives a paper its proceedings' DOI (an ISBN-DOI): the registry's record is the
+    book, in a series. The series is no venue, the book neither the paper's title nor its
+    kind; the records disagree on a paper or a volume (a conflict to settle)."""
+    book = "10.99999/978-0-00-000000-0"
+    msg = {
+        "type": "book",
+        "DOI": book,
+        "title": ["Models of Widget Emissions"],
+        "container-title": ["Proceedings in Widgetry"],
+        "issued": {"date-parts": [[2019]]},
+    }
+    d = doi.parse(msg, "crossref")
+    assert d["venue"] == "Proceedings in Widgetry" and not d["venue_reliable"]
+    with_event = doi.parse({**msg, "event": {"name": "Workshop on Widget Emissions"}}, "crossref")
+    assert with_event["venue"] == "Workshop on Widget Emissions" and with_event["venue_reliable"]
+
+    async def fetch(x, **kw):
+        return "ok", "crossref", doi.parse(msg, "crossref"), msg
+
+    monkeypatch.setattr(doi, "fetch_record", fetch)
+    pid = make_person("Ada Quillfeather")
+    venue = "11th International Workshop on Models of Widget Emissions"
+    paper = pub("h", "Sounds of Widgets", 2019, venue, doi=book, doc_type="COMM")
+    add_source(pid, "hal", "h/1", [paper])
+    asyncio.run(sync.sync_dois(pid))
+    (s,) = asyncio.run(pubview.load_stats(pid))
+    assert "doi" in s.sources and s.title == "Sounds of Widgets"
+    assert s.kind == "intl_workshop" and s.venue_raw == venue
+    assert s.form_conflict and any("whole volume" in p for p in s.problems)

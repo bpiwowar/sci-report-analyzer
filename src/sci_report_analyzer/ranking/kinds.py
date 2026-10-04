@@ -9,6 +9,7 @@ The rank (CORE / quartile) is the second level; each kind can map to a default l
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from ..i18n import N_, Labels
@@ -145,8 +146,15 @@ _CONFERENCE_RE = Rule("conference")
 _JOURNAL_RE = Rule("journal")
 # Document types (DBLP / HAL / OpenAlex / ORCID) that are neither papers in a conference
 # nor in a journal.
-# Edited volumes: proceedings, edited books (DBLP, HAL, Crossref).
-_PROCEEDINGS_DOC_TYPES = {"Editorship", "DOUV", "proceedings", "edited-book"}
+# Edited volumes: proceedings, edited books (DBLP, HAL, Crossref, ORCID).
+_PROCEEDINGS_DOC_TYPES = {
+    "Editorship",
+    "DOUV",
+    "PROCEEDINGS",
+    "proceedings",
+    "conference-proceedings",
+    "edited-book",
+}
 # Books and book chapters (edited volumes excluded).
 _CHAPTER_DOC_TYPES = {"Incollection", "COUV", "book-chapter", "BookSection", "book-section"}
 _BOOK_DOC_TYPES = _CHAPTER_DOC_TYPES | {
@@ -189,6 +197,37 @@ _JOURNAL_DOC_TYPES = {"Article", "ART", "journal-article", "article", "JournalAr
 def is_edited_volume(doc_type: str | None) -> bool:
     """An edited volume's record (proceedings, edited book), not a paper's."""
     return bool(set((doc_type or "").replace(",", " ").split()) & _PROCEEDINGS_DOC_TYPES)
+
+
+# Other records of a paper (DOI registries).
+_PAPER_DOC_TYPES = {"proceedings-article", "paper-conference", "article-journal", "chapter"}
+# Records of a whole volume: an edited one, or a book.
+_VOLUME_DOC_TYPES = _PROCEEDINGS_DOC_TYPES | {
+    "OUV",
+    "Book",
+    "book",
+    "monograph",
+    "reference-book",
+    "book-set",
+}
+
+
+def doc_form(doc_type: str | None) -> str | None:
+    """ "paper" (an article, a chapter) or "volume" (a book, proceedings) when the document
+    types say so."""
+    types = set((doc_type or "").replace(",", " ").split())
+    if types & (_CONFERENCE_DOC_TYPES | _JOURNAL_DOC_TYPES | _CHAPTER_DOC_TYPES | _PAPER_DOC_TYPES):
+        return "paper"
+    return "volume" if types & _VOLUME_DOC_TYPES else None
+
+
+def chapter_or_conference(doc_types: Iterable[str | None]) -> bool:
+    """Whether some records say a book chapter and others a conference paper (e.g. a paper
+    of a conference whose proceedings are a book: HAL's "COUV" and DBLP's "Inproceedings")."""
+    types = {t for d in doc_types for t in (d or "").replace(",", " ").split()}
+    return bool(types & _CHAPTER_DOC_TYPES) and bool(
+        types & (_CONFERENCE_DOC_TYPES | {"proceedings-article", "paper-conference"})
+    )
 
 
 def data_kind(doc_type: str | None) -> str | None:

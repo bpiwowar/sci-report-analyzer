@@ -1233,6 +1233,40 @@ def test_text_linked_by_hand_is_not_ranked_by_an_approximate_match(monkeypatch):
     assert a.problem_tab == "publication"
 
 
+def test_text_linked_by_hand_takes_the_venues_rank_not_its_names_approximate_match():
+    """A text linked by hand to a venue whose bare name approximately matches a journal
+    ("Speech Communication"): the venue's exact rank through its other texts (CORE
+    Interspeech, by the acronym of its DBLP text)."""
+    pid = make_person()
+    dblp = "Conference of the International Speech Communication Association (INTERSPEECH)"
+    add_source(pid, "dblp", "d", [pub("b", "Paper A", 2025, dblp)])
+    add_source(pid, "hal", "h", [pub("a", "Paper A", 2025, "Speech Days 2025")])
+    (a,) = stats(pid).values()
+    venue = next(m.venue_id for m in a.members if m.source == "dblp")
+    venues.add_variant(venue, "Speech Days 2025")
+    (a,) = stats(pid).values()
+    assert {m.venue_id for m in a.members} == {venue}
+    for b in [a.badge, *(m.badge for m in a.members)]:
+        assert b is not None and b.source == "core" and b.name.startswith("Interspeech")
+
+
+def test_chapter_or_conference_paper_settled_on_the_venue():
+    """A conference whose proceedings are a book: HAL says a chapter, DBLP a conference
+    paper. A chapter, with a conflict, until the venue's kind is set (for all its
+    papers)."""
+    pid = make_person()
+    venue = "Symposium on Widget Acoustics (SWA)"
+    add_source(pid, "dblp", "d", [pub("d", "Paper A", 2019, venue, doc_type="Inproceedings")])
+    add_source(pid, "hal", "h", [pub("h", "Paper A", 2019, "Widget Sounds", doc_type="COUV")])
+    (a,) = stats(pid).values()
+    assert a.kind == "chapter" and a.chapter_conflict
+    assert any("book chapter or a conference paper" in p for p in a.problems)
+    set_kind(venue, "intl_conference")
+    (a,) = stats(pid).values()
+    assert a.kind == "intl_conference" and not a.chapter_conflict
+    assert not any("book chapter" in p for p in a.problems)
+
+
 def test_problem_tab_of_different_venues():
     pid = make_person()
     add_source(pid, "hal", "h", [pub("a", "Paper A", 2020, "Venue One", doi="10.1/x")])
