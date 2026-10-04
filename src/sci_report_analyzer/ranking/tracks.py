@@ -121,9 +121,10 @@ DEFAULT_NAME_RULES_OF: dict[str, list[NameRule]] = {
     FINDINGS_ID: [
         _name_rule(
             "name_findings_of",
-            r"^findings\s+of(?:\s+the)?\s+",
+            r"^\s*findings\s+(?:of(?:\s+the)?\s+)?",
             "",
             "Findings of the Association for Computational Linguistics: ACL 2023",
+            "Findings EMNLP 2021",
         ),
         _name_rule(
             "name_findings_part", _IN_PARENS.format(words="findings"), "", "WIDG (Findings)"
