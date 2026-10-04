@@ -350,6 +350,9 @@ msgstr ""
 msgid "API keys"
 msgstr "Clés d’API"
 
+msgid "Activities"
+msgstr "Activités"
+
 msgid "Add"
 msgstr "Ajouter"
 
