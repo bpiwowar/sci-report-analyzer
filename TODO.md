@@ -49,6 +49,8 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
 - One editor per folder, not per document: several documents are annotated, but the notes
   are a single text. A quote then names its source document explicitly (e.g. its title
   or a short reference with the page, linking back to the place in that PDF).
+- Split view of the notes (Markdown editor | preview): keep the two scrolled in sync
+  (the preview follows the editor's position, and back), if possible.
 
 ## Folders (after the folder-wide notes above)
 
