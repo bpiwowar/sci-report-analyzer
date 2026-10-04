@@ -15,7 +15,6 @@ from .db.models import (
     PeriodTag,
     Person,
     Publication,
-    PublicationFlag,
     PublicationTag,
     SourceLink,
     SourcePub,
@@ -314,13 +313,6 @@ def purge_counts(person_ids: Iterable[int]) -> dict[str, int]:
             for p in s.scalars(select(Publication).where(Publication.person_id.in_(ids)))
             if p.has_overrides or p.hidden or p.merge_locked
         }
-        annotated |= set(
-            s.scalars(
-                select(PublicationFlag.publication_id).where(
-                    PublicationFlag.publication_id.in_(pubs)
-                )
-            )
-        )
         for m in (PublicationTag, PeriodTag, PeriodNote):
             annotated |= set(s.scalars(select(m.publication_id).where(m.publication_id.in_(pubs))))
         return {
@@ -337,7 +329,7 @@ def purge_counts(person_ids: Iterable[int]) -> dict[str, int]:
 
 
 def purge(person_ids: Iterable[int]) -> dict[str, int]:
-    """Remove every paper of these people (with their flags, tags, notes and per-paper decisions)
+    """Remove every paper of these people (with their tags, notes and per-paper decisions)
     and every source record, so that a re-sync (``start_sync``) starts from scratch. Sources,
     periods, aliases and venue decisions are kept."""
     ids = list(person_ids)

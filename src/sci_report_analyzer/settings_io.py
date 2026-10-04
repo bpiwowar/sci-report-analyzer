@@ -1,10 +1,9 @@
 """Export / import of matching settings (shareable JSON).
 
 A settings file holds the matching settings (sources, thresholds, normalization rules,
-venue-kind settings, detection rules), the venues with manual decisions (kind, level,
-ranking record, search text, variants, venue rules, identifiers), flag definitions and
-optionally imported JCR rows. People, publications and their annotations are never part
-of an import.
+venue-kind settings, detection rules, tracks), the venues with manual decisions (kind,
+level, ranking record, search text, variants, venue rules, identifiers) and optionally
+imported JCR rows. People, publications and their annotations are never part of an import.
 
 The format (fields, versioning, import modes): ``docs/json-formats.md``. Bump ``VERSION`` and
 update it when a field changes.
@@ -16,14 +15,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, select
 from sqlalchemy.orm import object_session, selectinload
 
 from . import venue_match
-from .db.models import Flag, JcrRecord, PublicationFlag, Venue, VenueKey
+from .db.models import JcrRecord, Venue, VenueKey
 from .db.session import session_scope
 from .i18n import _
+from .ranking import tracks
 from .ranking.service import (
     MatchSettings,
     VenuePattern,
@@ -33,7 +33,7 @@ from .ranking.service import (
 )
 
 FORMAT = "sci-report-analyzer-settings"
-VERSION = 4
+VERSION = 5
 
 
 class VariantIO(BaseModel):
@@ -82,20 +82,32 @@ class VenueIO(BaseModel):
         return [k for k in (v.key for v in self.variants) if k] or [service.key(self.name)]
 
 
-class FlagIO(BaseModel):
-    name: str
-    colour: str = "#57606a"
-    track: str | None = None
-
-
 class SettingsFile(BaseModel):
     format: Literal["sci-report-analyzer-settings"] = FORMAT
     version: int = VERSION
     exported_at: str | None = None
     matching: MatchSettings = Field(default_factory=MatchSettings)
     venues: list[VenueIO] = Field(default_factory=list)
-    flags: list[FlagIO] = Field(default_factory=list)
     jcr: list[dict[str, Any]] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _flags(cls, data: Any) -> Any:
+        """A file of before version 5 has flags ({name, colour, track}) and no tracks: the
+        colour of a flag with a track is that track's (the other flags are ignored)."""
+        if not isinstance(data, dict) or not data.get("flags"):
+            return data
+        data = dict(data)
+        flags = data.pop("flags")
+        matching = dict(data.get("matching") or {})
+        if "tracks" not in matching:
+            colours = {f["track"]: f["colour"] for f in flags if f.get("track") and f.get("colour")}
+            defs = tracks.default_tracks()
+            for t in defs:
+                t.colour = colours.get(t.id, t.colour)
+            matching["tracks"] = [t.model_dump() for t in defs]
+            data["matching"] = matching
+        return data
 
 
 def export_settings(*, include_jcr: bool = False) -> SettingsFile:
@@ -132,9 +144,6 @@ def export_settings(*, include_jcr: bool = False) -> SettingsFile:
             exported_at=datetime.now(UTC).isoformat(timespec="seconds"),
             matching=load_settings(),
             venues=venues,
-            flags=[
-                FlagIO(name=f.name, colour=f.colour, track=f.track) for f in s.scalars(select(Flag))
-            ],
             jcr=[r.data for r in s.scalars(select(JcrRecord))] if include_jcr else None,
         )
 
@@ -145,7 +154,7 @@ def parse_file(text: str) -> SettingsFile:
 
 @dataclass
 class Conflict:
-    kind: str  # matching | venue | variant | flag
+    kind: str  # matching | venue | variant
     key: str
     local: Any
     imported: Any
@@ -169,6 +178,13 @@ def _detection_text(r) -> str:
     return r.pattern + (" " + _("[ignore case]") if r.ignore_case else "")
 
 
+def _track_text(t: tracks.Track) -> str:
+    """A track's names, colour and rules."""
+    names = " / ".join(n for n in t.names.values() if n)
+    rules = " | ".join(_detection_text(r) for r in t.rules if r.pattern)
+    return f"{names} {t.colour}: {rules}"
+
+
 _SCALARS = (
     "min_score",
     "national_keywords",
@@ -185,6 +201,7 @@ def _matching_fields(m: MatchSettings) -> dict[str, Any]:
     # Normalization rules are compared one by one, keyed by their id.
     out.update({f"rules.{r.id}": _rule_text(r) for r in m.norm_rules})
     out.update({f"detection.{r.id}": _detection_text(r) for r in m.detection_rules})
+    out.update({f"tracks.{t.id}": _track_text(t) for t in m.tracks})
     return out
 
 
@@ -208,7 +225,21 @@ def _apply_matching(local: MatchSettings, data: MatchSettings, take: set[str]) -
     for r in imp["detection_rules"]:
         if r["id"] in detection and f"detection.{r['id']}" in take:
             d["detection_rules"][detection[r["id"]]] = r
+    known = {t["id"]: i for i, t in enumerate(d["tracks"])}
+    for t in imp["tracks"]:
+        if t["id"] not in known:
+            d["tracks"].append(t)
+        elif f"tracks.{t['id']}" in take:
+            d["tracks"][known[t["id"]]] = t
     return MatchSettings.model_validate(d)
+
+
+def _replacing(local: MatchSettings, data: MatchSettings) -> MatchSettings:
+    """The imported settings, with the local tracks added by hand that the file lacks
+    (papers, variants or venue rules may be of them)."""
+    ids = {t.id for t in data.tracks}
+    kept = [t for t in local.tracks if t.id not in ids and t.id not in tracks.DEFAULTS]
+    return data.model_copy(update={"tracks": [*data.tracks, *kept]})
 
 
 # ---- venues --------------------------------------------------------------------------------
@@ -337,17 +368,6 @@ def find_conflicts(data: SettingsFile) -> list[Conflict]:
     with session_scope() as s:
         for vio in data.venues:
             out.extend(_venue_conflicts(s, vio))
-        for f in data.flags:
-            cur = s.scalar(select(Flag).where(Flag.name == f.name))
-            if cur and (cur.colour, cur.track) != (f.colour, f.track):
-                out.append(
-                    Conflict(
-                        "flag",
-                        f.name,
-                        f"{cur.colour} {cur.track or ''}".strip(),
-                        f"{f.colour} {f.track or ''}".strip(),
-                    )
-                )
     return out
 
 
@@ -428,7 +448,7 @@ def import_settings(
     ``Conflict.id`` is in ``take_imported`` are overwritten, the others stay local.
     """
     take = take_imported or set()
-    counts = {"venues": 0, "flags": 0, "jcr": 0}
+    counts = {"venues": 0, "jcr": 0}
     replace = mode == "replace"
     with session_scope() as s:
         if replace:
@@ -456,21 +476,6 @@ def import_settings(
                 venue.hosts = hosts or None
             if "joint" in fields:
                 _import_joint(s, venue, vio.joint)
-        names = {f.name for f in data.flags}
-        for f in data.flags:
-            cur = s.scalar(select(Flag).where(Flag.name == f.name))
-            if cur is None:
-                s.add(Flag(name=f.name, colour=f.colour, track=f.track))
-                counts["flags"] += 1
-            elif replace or f"flag:{f.name}" in take:
-                cur.colour, cur.track = f.colour, f.track
-                counts["flags"] += 1
-        if replace and data.flags:
-            # Drop flag definitions absent from the file, unless papers still carry them.
-            used = set(s.scalars(select(PublicationFlag.flag_id)))
-            for f in s.scalars(select(Flag)):
-                if f.name not in names and f.id not in used:
-                    s.delete(f)
         if data.jcr:
             known = set() if replace else {r.data.get("name") for r in s.scalars(select(JcrRecord))}
             for row in data.jcr:
@@ -479,7 +484,7 @@ def import_settings(
                     counts["jcr"] += 1
 
     if replace:
-        save_settings(data.matching)
+        save_settings(_replacing(load_settings(), data.matching))
     else:
         save_settings(
             _apply_matching(

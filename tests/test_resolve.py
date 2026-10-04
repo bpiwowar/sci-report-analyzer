@@ -62,14 +62,21 @@ def test_forced_publication_match():
     assert asyncio.run(pubview.load_stats(pid))[0].badge is None
 
 
-def test_flag_track_makes_satellite_category():
+def test_track_set_by_hand_makes_satellite_category():
     pid = make_person()
-    add_source(pid, "dblp", "x/1", [pub("a", "Some paper", 2020, "Unknown venue xyz")])
+    add_source(pid, "dblp", "x/1", [pub("a", "Some paper", 2020, "Foo 2020 (Demonstrations)")])
     stats = asyncio.run(pubview.load_stats(pid))
-    short = next(f for f in annotations.all_flags() if f.name == "short")
-    annotations.toggle_flag(stats[0].id, short.id)
+    assert stats[0].track == "demo" == stats[0].auto_track
+    annotations.set_track_override(stats[0].id, "short")
     stats = asyncio.run(pubview.load_stats(pid))
     assert stats[0].track == "short" and stats[0].category.key.startswith("short:k_")
+    assert stats[0].auto_track == "demo"  # (what "automatic" would give)
+    # The main track: no satellite track, whatever the sources say.
+    annotations.set_track_override(stats[0].id, "main")
+    stats = asyncio.run(pubview.load_stats(pid))
+    assert stats[0].track is None and stats[0].category.track is None
+    annotations.set_track_override(stats[0].id, None)
+    assert asyncio.run(pubview.load_stats(pid))[0].track == "demo"
 
 
 def test_year_bins():

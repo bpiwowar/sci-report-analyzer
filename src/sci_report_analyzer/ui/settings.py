@@ -1,9 +1,10 @@
-"""Settings: matching, flags, tags, data, API keys, import/export."""
+"""Settings: matching, tracks, tags, data, API keys, import/export."""
 
 from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 from nicegui import ui
@@ -25,8 +26,8 @@ from .. import (
 from ..db.models import JcrRecord
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
-from ..ranking import datasets, detection
-from ..ranking.badge import FINDINGS_RE, SOURCE_LABELS, TOGGLABLE_SOURCES, TRACK_LABEL, detect_track
+from ..ranking import datasets, detection, tracks
+from ..ranking.badge import SOURCE_LABELS, TOGGLABLE_SOURCES
 from ..ranking.kinds import KINDS, WORKSHOP_RE, KindEvidence, detect_kind, host_text
 from ..ranking.normalize import (
     DEFAULT_NORM_RULES,
@@ -38,7 +39,7 @@ from ..ranking.normalize import (
 from ..ranking.service import load_settings, save_settings, service
 from ..sources import ADAPTERS
 from . import scimago_years
-from .theme import badge_details, fmt_dt, frame, level_hint, level_options, rank_chip
+from .theme import badge_details, fmt_dt, frame, level_hint, level_options, rank_chip, track_chip
 
 # The settings, in groups: (group, [(tab, label, depth)]); a tab of None is a heading
 # (e.g. "Language-specific" above the languages' cleaning rules).
@@ -54,9 +55,10 @@ NAV = (
             ("rules", N_("Cleaning rules"), 0),
             ("kinds", N_("Venue kinds"), 0),
             ("detection", N_("Detection rules"), 0),
+            ("tracks", N_("Tracks"), 0),
         ),
     ),
-    (N_("Annotations"), (("flags", N_("Flags, tags & categories"), 0),)),
+    (N_("Annotations"), (("tags", N_("Tags & categories"), 0),)),
     (
         N_("Reports"),
         (
@@ -73,7 +75,8 @@ PANELS = {
     "rules": lambda: rules_tab(),
     "kinds": lambda: kinds_tab(),
     "detection": lambda: detection_tab(),
-    "flags": lambda: flags_tab(),
+    "tracks": lambda: tracks_tab(),
+    "tags": lambda: tags_tab(),
     "contribution": lambda: contribution_tab(),
     "reports": lambda: report_templates_tab(),
     "data": lambda: data_tab(),
@@ -94,6 +97,7 @@ NAV_CSS = """
 def register() -> None:
     @ui.page("/settings")
     def settings_page(tab: str = "sources") -> None:
+        tab = "tags" if tab == "flags" else tab  # (the former "Flags, tags & categories")
         if tab not in PANELS:
             tab = "sources"
         with frame(_("Settings")):
@@ -440,13 +444,19 @@ ORIGINS = {
     "edited": (N_("edited"), N_("A built-in rule, changed from its default")),
     "added": (N_("added"), N_("A rule added by hand")),
 }
+# (A track's card.)
+TRACK_ORIGINS = {
+    "default": (N_("default"), N_("A built-in track, as by default")),
+    "edited": (N_("edited"), N_("A built-in track, changed from its default")),
+    "added": (N_("added"), N_("A track added by hand")),
+}
 _NORM_DEFAULTS = {r.id: r for r in DEFAULT_NORM_RULES}
 
 
-def _show_origin(card: ui.element, origin: str) -> None:
+def _show_origin(card: ui.element, origin: str, origins: dict = ORIGINS) -> None:
     """A rule's card and marker as a default rule's, a changed one's or an added one's."""
     card.classes(remove=" ".join(f"vr-rule-{o}" for o in ORIGINS), add=f"vr-rule-{origin}")
-    label, tip = ORIGINS[origin]
+    label, tip = origins[origin]
     ui.badge(_(label), color="grey-8").props("outline").tooltip(_(tip)).mark(f"origin-{origin}")
 
 
@@ -735,64 +745,11 @@ def lookup_tab() -> None:
     ui.input(_("Venue to look up"), on_change=run).props("debounce=500 clearable").classes("w-full")
 
 
-# ---- flags ---------------------------------------------------------------------------------
+# ---- tags ----------------------------------------------------------------------------------
 
 
-def flags_tab() -> None:
-    tracks = {"": _("— (no track)"), **TRACK_LABEL}
-
-    @ui.refreshable
-    def listing() -> None:
-        for f in annotations.all_flags():
-            with ui.row().classes("items-center gap-2"):
-                name = ui.input(_("Name"), value=f.name).props("dense")
-                colour = (
-                    ui.color_input(_("Colour"), value=f.colour, preview=True)
-                    .props("dense")
-                    .classes("w-36")
-                )
-                track = (
-                    ui.select(tracks, value=f.track or "", label=_("Track"))
-                    .props("dense")
-                    .classes("w-40")
-                )
-                ui.button(
-                    icon="save",
-                    on_click=lambda fid=f.id, n=name, c=colour, t=track: (
-                        annotations.save_flag(n.value, c.value, t.value, fid),
-                        ui.notify(_("Saved")),
-                    ),
-                ).props("flat round dense")
-                ui.button(
-                    icon="delete",
-                    on_click=lambda fid=f.id: (annotations.delete_flag(fid), listing.refresh()),
-                ).props("flat round dense color=negative")
-
-    ui.label(
-        _(
-            "Flags stick to publications. A flag with a track makes the paper a satellite "
-            "category (e.g. “Short CORE A*”) in the distribution."
-        )
-    ).classes("text-grey")
-    listing()
-    with ui.row().classes("items-center gap-2 mt-2"):
-        name = ui.input(_("New flag")).props("dense")
-        colour = (
-            ui.color_input(_("Colour"), value="#57606a", preview=True)
-            .props("dense")
-            .classes("w-36")
-        )
-        track = ui.select(tracks, value="", label=_("Track")).props("dense").classes("w-40")
-        ui.button(
-            _("Add"),
-            on_click=lambda: (
-                (annotations.save_flag(name.value, colour.value, track.value), listing.refresh())
-                if name.value
-                else None
-            ),
-        )
-
-    ui.label(_("Tags")).classes("text-lg mt-6")
+def tags_tab() -> None:
+    ui.label(_("Tags")).classes("text-lg")
     from .tags import tags_section
 
     tags_section()
@@ -863,7 +820,7 @@ def _reset_automatic_section() -> None:
             "their variants, which venue each source text belongs to, the papers' automatic "
             "venues and kinds, and the cached ranking matches. Everything set by hand is kept "
             "(venue levels, records, kinds, names, variants and rules; papers' venues, validated "
-            "sources, ranks, corrections, flags, tags and notes). Then everything is matched "
+            "sources, ranks, tracks, corrections, tags and notes). Then everything is matched "
             "again."
         )
     ).classes("text-sm text-grey")
@@ -906,7 +863,7 @@ def _reset_automatic_section() -> None:
     ui.label(
         _(
             "Erase what was set by hand, on the venues and / or on the papers; everything is then "
-            "matched automatically again. Flags, tags, notes, hidden papers and manual merges are "
+            "matched automatically again. Tags, notes, hidden papers and manual merges are "
             "kept. "
             "Export the settings first to keep a copy of the venue decisions."
         )
@@ -1373,8 +1330,8 @@ def _try_detection(st, venue: str) -> str:
         unknown_scope=st.unknown_scope,
     )
     out = [_("kind: {kind}").format(kind=KINDS.get(kind, kind))]
-    if track := detect_track(venue) or ("findings" if FINDINGS_RE.search(venue) else None):
-        out.append(_("track: {track}").format(track=TRACK_LABEL.get(track, track)))
+    if track := tracks.detect(venue):
+        out.append(_("track: {track}").format(track=tracks.name(track)))
     if WORKSHOP_RE.search(venue) and (host := host_text(venue)):
         out.append(_("main conference: “{host}”").format(host=host))
     if detection.Rule("joint").search(venue):
@@ -1388,8 +1345,9 @@ def detection_tab() -> None:
     ui.label(
         _(
             "Python regular expressions classifying the venues when no decision was made by "
-            "hand: workshops and their main conference, conference or journal, tracks, joint "
-            "conferences. A rule matching words of a language is part of another (“atelier”, "
+            "hand: workshops and their main conference, conference or journal, joint "
+            "conferences (those of the tracks: Settings → Tracks). A rule matching words of a "
+            "language is part of another (“atelier”, "
             "of the workshop rule): a venue text matching it matches the latter. {rule:<id>} "
             "in a pattern stands for the pattern of the rule with that id; (?-i:…) makes a "
             "part case-sensitive. Each rule shows whether it is a default one, and its default "
@@ -1521,6 +1479,280 @@ def detection_tab() -> None:
     ui.button(_("Save the rules"), icon="save", on_click=save).classes("mt-2").mark("detect-save")
 
 
+# ---- tracks --------------------------------------------------------------------------------
+
+# Colours offered to a new track (in turn).
+NEW_TRACK_COLOURS = ("#bf3989", "#1b7c83", "#bc4c00", "#4d2d8f", "#57606a")
+
+
+def tracks_tab() -> None:
+    ui.label(_("Tracks")).classes("text-lg")
+    ui.label(
+        _(
+            "The satellite tracks of the conferences (Findings, tutorials, demos, short "
+            "papers…): a paper of a track is counted apart (e.g. “Short CORE A*”, striped in "
+            "the track's colour). A venue text is of a track when one of its rules (Python "
+            "regular expressions, each general or of a language) matches it; the tracks are "
+            "tried in their order, Findings last. A variant, a venue rule or a paper (in its "
+            "details) can also be set to a track by hand. Each track and rule shows whether "
+            "it is a default one, changed from its default or added."
+        )
+    ).classes("text-grey text-sm")
+    defs = [t.model_copy(deep=True) for t in load_settings().tracks]
+    saved_ids = {t.id for t in defs}
+    languages = {"": _("Any language"), **i18n.LANGUAGES}
+
+    def at(t: tracks.Track) -> int:
+        return next(i for i, x in enumerate(defs) if x is t)
+
+    # Live preview with the tracks as edited (saved or not).
+    venue = (
+        ui.input(_("Try a venue text"), placeholder="ACL 2023 (System Demonstrations)")
+        .props("dense outlined clearable debounce=300")
+        .classes("w-full")
+        .mark("track-try")
+    )
+    result = ui.row().classes("items-center gap-2").mark("track-result")
+
+    def preview(_e=None) -> None:
+        result.clear()
+        if not venue.value:
+            return
+        with tracks.using(defs), result:
+            if found := tracks.detect(venue.value):
+                track_chip(found)
+            else:
+                ui.label(_("no track: the main conference")).classes("text-sm text-grey")
+
+    venue.on_value_change(preview)
+
+    def reset_rule(r: tracks.TrackRule) -> None:
+        d = tracks.DEFAULT_RULES[r.id]
+        r.pattern, r.ignore_case, r.language = d.pattern, d.ignore_case, d.language
+        listing.refresh()
+        preview()
+
+    def rule_row(t: tracks.Track, r: tracks.TrackRule, track_changed: Callable[[], None]) -> None:
+        """A rule of ``t``; ``track_changed`` refreshes the track's marker."""
+        row = ui.column().classes("w-full gap-0 border rounded p-1").mark(f"track-rule-{r.id}")
+
+        @ui.refreshable
+        def status() -> None:
+            o = tracks.rule_origin(r)
+            _show_origin(row, o)
+            if o == "edited":
+                ui.button(icon="restart_alt", on_click=lambda: reset_rule(r)).props(
+                    "flat round dense size=sm"
+                ).tooltip(_("Reset to the default")).mark(f"track-rule-reset-{r.id}")
+
+        @ui.refreshable
+        def shown() -> None:
+            rx = r.compiled()
+            if r.pattern and rx is None:
+                ui.label(_("invalid regex")).classes("text-negative text-xs")
+                return
+            for ex in r.examples:
+                found = rx.search(ex) if rx else None
+                ui.label(f"{'✓' if found else '✗'} “{ex}”").classes(
+                    "text-xs font-mono " + ("text-grey" if found else "text-negative")
+                )
+            if (d := tracks.DEFAULT_RULES.get(r.id)) and tracks.rule_origin(r) == "edited":
+                case = " " + _("[ignore case]") if d.ignore_case else ""
+                ui.label(_("default: {pattern}").format(pattern=d.pattern + case)).classes(
+                    "text-xs text-grey font-mono break-all"
+                )
+
+        def changed(_e=None) -> None:
+            status.refresh()
+            shown.refresh()
+            track_changed()
+            preview()
+
+        def set_language(e) -> None:
+            r.language = e.value or None
+            changed()
+
+        with row:
+            with ui.row().classes("items-center gap-2 w-full no-wrap"):
+                if r.id in tracks.DEFAULT_RULES:
+                    ui.badge(_language_name(r.language), color="grey-8").props("outline").classes(
+                        "shrink-0"
+                    ).tooltip(_("The language of the rule's words"))
+                else:
+                    ui.select(
+                        languages,
+                        label=_("language"),
+                        value=r.language or "",
+                        on_change=set_language,
+                    ).props("dense outlined").classes("w-36").tooltip(
+                        _("The language of the rule's words (any: a general rule)")
+                    ).mark(f"track-rule-language-{r.id}")
+                with ui.row().classes("items-center gap-1 no-wrap shrink-0"):
+                    status()
+                ui.input(_("pattern"), value=r.pattern, on_change=changed).bind_value(
+                    r, "pattern"
+                ).props("dense outlined debounce=300").classes("grow font-mono").mark(
+                    f"track-pattern-{r.id}"
+                )
+                ui.checkbox(_("ignore case"), value=r.ignore_case, on_change=changed).bind_value(
+                    r, "ignore_case"
+                )
+                if r.id not in tracks.DEFAULT_RULES:
+                    ui.button(
+                        icon="delete", on_click=lambda: (t.rules.remove(r), listing.refresh())
+                    ).props("flat round dense color=negative").tooltip(_("Delete the rule"))
+            with ui.column().classes("gap-0 pl-2"):
+                shown()
+
+    def add_rule(t: tracks.Track) -> None:
+        ids = {r.id for x in defs for r in x.rules}
+        n = 1
+        while f"{t.id}_{n}" in ids:
+            n += 1
+        t.rules.append(tracks.TrackRule(id=f"{t.id}_{n}", pattern=""))
+        listing.refresh()
+
+    def reset_track(t: tracks.Track) -> None:
+        defs[at(t)] = tracks.DEFAULTS[t.id].model_copy(deep=True)
+        listing.refresh()
+        preview()
+
+    def move(t: tracks.Track, d: int) -> None:
+        i, j = at(t), at(t) + d
+        if 0 <= j < len(defs):
+            defs[i], defs[j] = defs[j], defs[i]
+            listing.refresh()
+
+    def remove(t: tracks.Track) -> None:
+        defs.pop(at(t))
+        listing.refresh()
+        preview()
+
+    def card(t: tracks.Track) -> None:
+        box = ui.column().classes("w-full gap-1 border rounded p-2").mark(f"track-{t.id}")
+
+        @ui.refreshable
+        def status() -> None:
+            o = tracks.origin(t)
+            _show_origin(box, o, TRACK_ORIGINS)
+            if o == "edited":
+                ui.button(icon="restart_alt", on_click=lambda: reset_track(t)).props(
+                    "flat round dense size=sm"
+                ).tooltip(_("Reset the track to its default")).mark(f"track-reset-{t.id}")
+
+        def changed(_e=None) -> None:
+            status.refresh()
+            chip.refresh()
+            preview()
+
+        @ui.refreshable
+        def chip() -> None:
+            with tracks.using(defs):
+                track_chip(t.id)
+
+        with box:
+            with ui.row().classes("items-center gap-2 w-full no-wrap"):
+                with ui.row().classes("items-center gap-1 w-40 shrink-0"):
+                    chip()
+                    ui.label(t.id).classes("text-xs text-grey font-mono").tooltip(
+                        _("The track's identifier (in the exported settings)")
+                    )
+                for lang, lang_name in i18n.LANGUAGES.items():
+                    t.names.setdefault(lang, "")
+                    ui.input(
+                        _("name ({language})").format(language=lang_name),
+                        value=t.names[lang],
+                        on_change=changed,
+                    ).bind_value(t.names, lang).props("dense outlined").classes("w-40").mark(
+                        f"track-name-{t.id}-{lang}"
+                    )
+                ui.color_input(
+                    _("Colour"), value=t.colour, preview=True, on_change=changed
+                ).bind_value(t, "colour").props("dense").classes("w-36").mark(
+                    f"track-colour-{t.id}"
+                )
+                with ui.row().classes("items-center gap-1 no-wrap shrink-0"):
+                    status()
+                ui.space()
+                with ui.column().classes("gap-0"):
+                    ui.button(icon="arrow_upward", on_click=lambda: move(t, -1)).props(
+                        "flat round dense size=xs"
+                    ).mark(f"track-up-{t.id}")
+                    ui.button(icon="arrow_downward", on_click=lambda: move(t, 1)).props(
+                        "flat round dense size=xs"
+                    ).mark(f"track-down-{t.id}")
+                if t.id not in tracks.DEFAULTS:
+                    ui.button(icon="delete", on_click=lambda: remove(t)).props(
+                        "flat round dense color=negative"
+                    ).tooltip(_("Delete the track")).mark(f"track-delete-{t.id}")
+            if t.id == tracks.FINDINGS_ID:
+                ui.label(
+                    _(
+                        "A Findings volume is ranked as its main conference; it is detected "
+                        "after the other tracks."
+                    )
+                ).classes("text-xs text-grey")
+            # Its rules, by language (any language first).
+            order = list(LANGUAGE_GROUPS)
+            for r in sorted(t.rules, key=lambda r: order.index(r.language)):
+                rule_row(t, r, status.refresh)
+            ui.button(_("Add a rule"), icon="add", on_click=lambda: add_rule(t)).props(
+                "flat dense"
+            ).mark(f"track-add-rule-{t.id}")
+
+    @ui.refreshable
+    def listing() -> None:
+        for t in defs:
+            card(t)
+
+    listing()
+
+    def add_track() -> None:
+        if not (label := (new_name.value or "").strip()):
+            return
+        tid = tracks.new_id(label, (t.id for t in defs))
+        n = sum(t.id not in tracks.DEFAULTS for t in defs)
+        names = {lang: "" for lang in i18n.LANGUAGES} | {"en": label}
+        colour = NEW_TRACK_COLOURS[n % len(NEW_TRACK_COLOURS)]
+        defs.append(tracks.Track(id=tid, names=names, colour=colour))
+        new_name.value = ""
+        listing.refresh()
+
+    with ui.row().classes("items-center gap-2 mt-2"):
+        new_name = (
+            ui.input(_("New track (its English name)"))
+            .props("dense outlined")
+            .mark("track-new-name")
+        )
+        ui.button(_("Add a track"), icon="add", on_click=add_track).props("flat").mark("track-add")
+
+    def reset() -> None:
+        defs[:] = tracks.default_tracks() + [t for t in defs if t.id not in tracks.DEFAULTS]
+        listing.refresh()
+        preview()
+
+    def save() -> None:
+        bad = [t.name() for t in defs for r in t.rules if r.pattern and r.compiled() is None]
+        if bad:
+            ui.notify(_("Invalid rule: {names}").format(names=", ".join(bad)), type="negative")
+            return
+        new = load_settings()
+        new.tracks = [t.model_copy(deep=True) for t in defs]
+        save_settings(new)
+        # The tracks deleted: no paper, variant or venue rule is of them any more.
+        gone = saved_ids - {t.id for t in defs}
+        annotations.forget_tracks(gone)
+        saved_ids.clear()
+        saved_ids.update(t.id for t in defs)
+        ui.notify(_("Tracks saved"), type="positive")
+
+    with ui.row().classes("gap-2 mt-2"):
+        ui.button(_("Reset the built-in tracks"), icon="restart_alt", on_click=reset).props(
+            "flat"
+        ).mark("tracks-reset")
+        ui.button(_("Save the tracks"), icon="save", on_click=save).mark("tracks-save")
+
+
 # ---- import / export -----------------------------------------------------------------------
 
 
@@ -1528,8 +1760,8 @@ def io_tab() -> None:
     ui.label(_("Export")).classes("text-lg")
     ui.label(
         _(
-            "Matching settings, cleaning rules, corrections, manual levels and flag "
-            "definitions. People and publications are never exported."
+            "Matching settings (cleaning and detection rules, tracks…) and the venues' manual "
+            "decisions. People and publications are never exported."
         )
     ).classes("text-sm text-grey")
     include_jcr = ui.checkbox(_("Include imported JCR rows (check you may share them)"))
@@ -1575,8 +1807,8 @@ def import_dialog(data: settings_io.SettingsFile) -> None:
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
         ui.label(_("Import settings")).classes("text-lg")
         ui.label(
-            _("{corrections} corrections · {levels} manual levels · {flags} flags").format(
-                corrections=len(data.corrections), levels=len(data.levels), flags=len(data.flags)
+            _("{venues} venues · {tracks} tracks").format(
+                venues=len(data.venues), tracks=len(data.matching.tracks)
             )
             + (" · " + _("{n} JCR rows").format(n=len(data.jcr)) if data.jcr else "")
             + (

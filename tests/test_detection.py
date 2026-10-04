@@ -29,6 +29,15 @@ def _set(rule_id: str, pattern: str, ignore_case: bool = True) -> None:
     save_settings(st)
 
 
+def _set_track_rule(rule_id: str, pattern: str) -> None:
+    st = load_settings()
+    for t in st.tracks:
+        for r in t.rules:
+            if r.id == rule_id:
+                r.pattern = pattern
+    save_settings(st)
+
+
 def test_defaults():
     # Every rule is in the settings, with its default; its examples match it.
     assert [r.id for r in MatchSettings().detection_rules] == [
@@ -45,12 +54,12 @@ def test_defaults():
 
 
 def test_rule_references():
-    # {rule:track_tutorial} is the tutorial rule's pattern.
+    # {rule:joint} is the joint conference rule's pattern.
     assert _kind("Zorblat Seminar") == "intl_journal"
-    _set("workshop", r"\bseminar\b|{rule:track_tutorial}")
+    _set("workshop", r"\bseminar\b|{rule:joint}")
     assert _kind("Zorblat Seminar") == "intl_workshop"
-    assert _kind("Zorblat Tutorials") == "intl_workshop"
-    _set("track_tutorial", r"\bcourse\b")
+    assert _kind("Zorblat Conference on X and Conference on Y") == "intl_workshop"
+    _set("joint", r"\bcourse\b")
     assert _kind("Zorblat Course") == "intl_workshop"
 
 
@@ -80,7 +89,7 @@ def test_changed_rules_change_the_detection():
     assert not WORKSHOP_RE.search("Workshop on Foo")
 
     assert detect_track("ACL 2023 (System Demonstrations)") == "demo"
-    _set("track_demo", r"\bshowcase\b")
+    _set_track_rule("track_demo", r"\bshowcase\b")
     assert detect_track("ACL 2023 (System Demonstrations)") is None
     assert detect_track("ACL 2023 Showcase") == "demo"
 

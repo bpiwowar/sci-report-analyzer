@@ -137,12 +137,14 @@ exported settings.
 <!-- levels -->
 
 Satellite tracks (Findings, demos, short papers…) and workshops are shown as separate
-striped categories, e.g. "Findings CORE A" or "Workshop A*". **Flags** with a track (short,
-demo…) put a paper in such a category; other flags are just labels you can filter on.
+striped categories, e.g. "Findings CORE A" or "Workshop A*" (a track's stripes in its
+colour). The tracks, their names, colours and detection rules are set in Settings → Tracks
+(add one, e.g. an industry track, and its papers are counted apart too); a paper's track
+can be set by hand in its details (automatic, the main track, or a track).
 When the sources disagree only because some give a track (demo, short…) and others none,
 the track wins (demo, Findings, workshop…), whatever the venue each one gives. Different
 tracks (e.g. demo and short) are a problem to settle: validate a source in the details, or
-flag the paper. Likewise a workshop
+set the paper's track. Likewise a workshop
 wins over its main conference (e.g. a DOI record giving EMNLP for a BlackboxNLP paper).
 Edited proceedings (chairing) keep their venue's rank in categories of their own, e.g.
 "Proc. (ed.) CORE A*"; an edited volume without a venue is matched by its title.
@@ -154,7 +156,8 @@ to the selection. An unranked paper shows its kind (e.g. "Natl. conf.", "Book") 
 
 Click a publication to open its details:
 
-- **Publication**: links, flags, authors (confirm name matches), sources (split / merge).
+- **Publication**: links, authors (confirm name matches), sources (split / merge),
+  corrections (type, track, year…).
 - **Venue matching**: the matching process, step by step — venue texts from each source and
   the venue each belongs to (and how), the venue, its kind, and the rank. Each step says
   whether it is automatic or manual; ✎ **override** opens its editor, ↶ goes back to automatic. When
@@ -171,7 +174,7 @@ click it to open the page.
 **Tags & notes** (a paper's details, "Tags & notes" tab): type a name to create a tag. A
 **global** tag sticks to the paper; a tag **within a period** (⏱) is set separately in each
 period / folder. "starred" (the ★ button) is such a tag. Rename and recolour tags with the
-🏷 button or in Settings → Flags, tags & categories. Each paper has a **note** (Markdown),
+🏷 button or in Settings → Tags & categories. Each paper has a **note** (Markdown),
 plus a note within the selected period. The "tags" filter shows the papers having one of
 the chosen tags; to write about them, use the report editor (below).
 
@@ -276,7 +279,7 @@ publication's details to put them in a category (or to say they are the person o
 their PhD students); its "Look up on…" links search for them on Google Scholar, Semantic
 Scholar, DBLP, ORCID, HAL and the web (with the paper's title), in a new window. Categories
 are highlighted in author lists and give a "with …" filter
-next to "with PhD student"; manage them in Settings → Flags, tags & categories.
+next to "with PhD student"; manage them in Settings → Tags & categories.
 
 Author lists highlight the person (**bold**, using their aliases) and their PhD students
 (from theses.fr, with aliases you can add in the Theses tab).

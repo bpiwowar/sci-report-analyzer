@@ -137,12 +137,14 @@ paramètres exportés.
 <!-- levels -->
 
 Les sessions satellites (Findings, démos, articles courts…) et les ateliers sont affichés comme des catégories
-hachurées distinctes, par exemple « Findings CORE A » ou « Atelier A* ». Les **signalements** associés à une session (court,
-démo…) placent un article dans une telle catégorie ; les autres signalements sont de simples libellés sur lesquels filtrer.
+hachurées distinctes, par exemple « Findings CORE A » ou « Atelier A* » (les rayures d'une session sont de sa
+couleur). Les sessions, leurs noms, couleurs et règles de détection se règlent dans Paramètres → Sessions
+(ajoutez-en une, p. ex. une session industrielle, et ses articles sont aussi comptés à part) ; la session d'un
+article peut être fixée à la main dans ses détails (automatique, la session principale, ou une session).
 Lorsque les sources ne divergent que parce que certaines donnent une session (démo, court…) et d'autres la session normale,
 la session l'emporte (démo, Findings, atelier…), quel que soit le canal donné par chacune. Des
 sessions différentes (par exemple démo et court) sont un problème à régler : validez une source dans les détails, ou
-signalez l'article. De même, un atelier
+fixez la session de l'article. De même, un atelier
 l'emporte sur sa conférence principale (par exemple une notice DOI donnant EMNLP pour un article de BlackboxNLP).
 Les actes édités (présidence) conservent le rang de leur canal dans des catégories propres, par exemple
 « Actes (éd.) CORE A* » ; un volume édité sans canal est apparié par son titre.
@@ -154,7 +156,8 @@ Cliquez sur une barre ou une entrée de légende pour filtrer de façon croisée
 
 Cliquez sur une publication pour ouvrir ses détails :
 
-- **Publication** : liens, signalements, auteurs (confirmer les correspondances de noms), sources (séparer / fusionner).
+- **Publication** : liens, auteurs (confirmer les correspondances de noms), sources (séparer / fusionner),
+  corrections (type, session, année…).
 - **Appariement du canal** : le processus d'appariement, étape par étape — les textes de canal de chaque source et
   le canal auquel chacun appartient (et comment), le canal, son type et le rang. Chaque étape indique
   si elle est automatique ou manuelle ; ✎ **Remplacer** ouvre son éditeur, ↶ revient à l'automatique. Lorsque
@@ -171,7 +174,7 @@ Les **périodes** sont des intervalles d'années nommés (par exemple une pério
 **Étiquettes et notes** (détails d'un article, onglet « Étiquettes et notes ») : saisissez un nom pour créer une étiquette. Une étiquette
 **globale** reste attachée à l'article ; une étiquette **propre à une période** (⏱) est posée séparément dans chaque
 période / dossier. « étoilé » (le bouton ★) est une telle étiquette. Renommez et recolorez les étiquettes avec le
-bouton 🏷 ou dans Paramètres → Signalements, étiquettes et catégories. Chaque article a une **note** (Markdown),
+bouton 🏷 ou dans Paramètres → Étiquettes et catégories. Chaque article a une **note** (Markdown),
 plus une note propre à la période sélectionnée. Le filtre « étiquettes » affiche les articles ayant l'une
 des étiquettes choisies ; pour écrire à leur sujet, utilisez l'éditeur de rapport (ci-dessous).
 
@@ -275,7 +278,7 @@ détails d'une publication pour le placer dans une catégorie (ou pour indiquer 
 ses doctorants) ; ses liens « Rechercher sur… » le recherchent sur Google Scholar, Semantic
 Scholar, DBLP, ORCID, HAL et le web (avec le titre de l'article), dans une nouvelle fenêtre. Les catégories
 sont mises en évidence dans les listes d'auteurs et fournissent un filtre « avec … »
-à côté de « avec un doctorant » ; gérez-les dans Paramètres → Signalements, étiquettes et catégories.
+à côté de « avec un doctorant » ; gérez-les dans Paramètres → Étiquettes et catégories.
 
 Les listes d'auteurs mettent en évidence la personne (en **gras**, en utilisant ses alias) et ses doctorants
 (d'après theses.fr, avec des alias que vous pouvez ajouter dans l'onglet Thèses).

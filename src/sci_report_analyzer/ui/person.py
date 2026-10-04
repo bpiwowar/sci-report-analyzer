@@ -206,7 +206,7 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
 
     with ui.dialog() as confirm, ui.card():
         ui.label(
-            _("Delete {name} and all their data (flags, stars, periods)?").format(name=person.name)
+            _("Delete {name} and all their data (tags, stars, periods)?").format(name=person.name)
         )
         with ui.row().classes("justify-end w-full"):
             ui.button(_("Cancel"), on_click=confirm.close).props("flat")
@@ -244,8 +244,9 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
             )
             ui.label(
                 _(
-                    "• everything set on these papers: {n} paper(s) have flags, "
-                    "stars, a venue / rank / kind set by hand, corrections, a note, are hidden "
+                    "• everything set on these papers: {n} paper(s) have tags, "
+                    "stars, a venue / rank / kind / track set by hand, corrections, a note, are "
+                    "hidden "
                     "or were merged / split by hand"
                 ).format(n=n["annotated"])
             ).classes("text-negative" if n["annotated"] else "")

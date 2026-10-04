@@ -12,7 +12,8 @@ from nicegui import ui
 
 from .. import i18n
 from ..i18n import _
-from ..ranking.badge import LEVEL_HELP, Badge, category_of, text_colour
+from ..ranking import tracks
+from ..ranking.badge import LEVEL_HELP, Badge, Category, category_of, text_colour
 
 SOURCE_SHORT = {
     "dblp": "DBLP",
@@ -187,6 +188,31 @@ def span(html: str) -> ui.html:
     return ui.html(html, sanitize=False, tag="span")
 
 
+def stripes(cat: Category) -> str:
+    """The style of a striped category's stripes (a track's in its colour), else ""."""
+    if not cat.striped:
+        return ""
+    gradient = f"repeating-linear-gradient(45deg,{cat.stripe} 0 3px,transparent 3px 7px)"
+    return f";background-image:{gradient}"
+
+
+def track_chip_html(track: str | None) -> str:
+    """A track's chip, in its colour (none: the main track, discreet)."""
+    if track:
+        colour = tracks.colour(track)
+        style = f"background:{colour};color:{chip_text(colour)}"
+        label = tracks.name(track)
+    else:
+        style = "background:transparent;color:#8c959f;border:1px dashed #c8d1da"
+        label = _("main track")
+    return f'<span class="vr-chip" style="{style}">{escape(label)}</span>'
+
+
+def track_chip(track: str | None, mark: str | None = None) -> ui.html:
+    el = span(track_chip_html(track))
+    return el.mark(mark) if mark else el
+
+
 def rank_chip(badge: Badge | None, track: str | None = None, kind: str | None = None) -> ui.html:
     """Rank chip; an unranked venue shows its kind (e.g. "Natl. conf.") when known."""
     cat = category_of(badge, track, kind)
@@ -201,8 +227,8 @@ def rank_chip(badge: Badge | None, track: str | None = None, kind: str | None = 
     cls = "vr-chip vr-track" if cat.striped else "vr-chip"
     colour = cat.colour
     el = span(
-        f'<span class="{cls}" style="background:{colour};color:{text_colour(colour)}">'
-        f"{escape(label)}</span>"
+        f'<span class="{cls}" style="background:{colour};color:{text_colour(colour)}'
+        f'{stripes(cat)}">{escape(label)}</span>'
     )
     if badge:
         with el:

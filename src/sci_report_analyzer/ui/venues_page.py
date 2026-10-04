@@ -9,13 +9,12 @@ from html import escape
 from nicegui import background_tasks, ui
 from sqlalchemy.orm import selectinload
 
-from .. import annotations, venue_match, venues
+from .. import venue_match, venues
 from ..db.models import Venue
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
+from ..ranking import tracks
 from ..ranking.badge import (
-    TRACK_LABEL,
-    TRACK_ORDER,
     UNRANKED_COLOUR,
     category_of,
     core_periods,
@@ -70,10 +69,10 @@ def _chip_html(row: venues.VenueRow) -> str:
 
 
 def _track_style(track: str | None, colours: dict[str, str]) -> str:
-    """A track chip in its flag's colour; the main session (no track) discreet."""
+    """A track chip in its colour (Settings → Tracks); the main session (no track) discreet."""
     if not track:
         return "background:transparent;color:#8c959f;border:1px dashed #c8d1da"
-    colour = colours.get(track, annotations.TRACK_FALLBACK_COLOUR)
+    colour = colours.get(track, tracks.FALLBACK_COLOUR)
     return f"background:{colour};color:{text_colour(colour)}"
 
 
@@ -87,11 +86,11 @@ def _track_picker(
 ) -> ui.button:
     """A track as a coloured chip with its full label, a menu to change it (``main``: the
     main session, no track, offered)."""
-    colours = annotations.track_colours() if colours is None else colours
+    colours = tracks.colours() if colours is None else colours
     chip = ui.button().props("dense no-caps unelevated rounded size=sm").mark(mark)
 
     def paint(t: str | None) -> None:
-        chip.text = TRACK_LABEL.get(t, t) if t else _("no track")
+        chip.text = tracks.name(t) if t else _("no track")
         chip.style(replace=_track_style(t, colours) + ";padding:0 8px;min-height:20px")
         chip.value = t
 
@@ -100,8 +99,8 @@ def _track_picker(
         on_pick(t)
 
     with chip, ui.menu():
-        for k in (*([None] if main else []), *TRACK_LABEL):
-            label = TRACK_LABEL.get(k, k) if k else _("no track")
+        for k in (*([None] if main else []), *tracks.track_ids()):
+            label = tracks.name(k) if k else _("no track")
             with ui.menu_item(on_click=lambda k=k: pick(k)).mark(f"{mark}-{k or 'none'}"):
                 style = _track_style(k, colours)
                 span(f'<span class="vr-chip" style="{style}">{escape(label)}</span>')
@@ -1435,7 +1434,7 @@ def venue_dialog(
                 ui.label(_("Variants (cleaned texts, grouped by track)")).classes(
                     "font-medium mt-2"
                 )
-                colours = annotations.track_colours()
+                colours = tracks.colours()
                 workshop_keys = dict(venues.workshop_variants(row.id))
                 if workshop_keys:
                     with (
@@ -1547,7 +1546,7 @@ def venue_dialog(
                     groups: dict[str | None, list] = {}
                     for v in row.variants:
                         groups.setdefault(v[4], []).append(v)
-                    order = {t: i for i, t in enumerate(TRACK_ORDER)}
+                    order = {t: i for i, t in enumerate(tracks.track_ids())}
                     for track in sorted(
                         groups, key=lambda t: (t is not None, order.get(t, len(order)), t or "")
                     ):
@@ -1557,7 +1556,7 @@ def venue_dialog(
                             .mark(f"venue-variant-group-{track or 'none'}")
                         ):
                             if track:
-                                label = escape(TRACK_LABEL.get(track, track))
+                                label = escape(tracks.name(track))
                                 style = _track_style(track, colours)
                                 span(f'<span class="vr-chip" style="{style}">{label}</span>')
                             else:
@@ -1628,7 +1627,7 @@ def venue_dialog(
                                     else _("all sources")
                                 ).classes("text-xs text-grey")
                                 if r.track:
-                                    ui.label(f"→ {TRACK_LABEL.get(r.track, r.track)}").classes(
+                                    ui.label(f"→ {tracks.name(r.track)}").classes(
                                         "text-xs text-primary"
                                     )
                                 if r.note:
@@ -1716,7 +1715,7 @@ def venue_dialog(
 def _relation_label(relation: str) -> str:
     """What a suggested venue is, for the open one."""
     kind, _sep, track = relation.partition(":")
-    track = TRACK_LABEL.get(track, track)
+    track = tracks.name(track)
     return {
         "same": _("The same venue"),
         "track": _("This venue's {track} track").format(track=track),
@@ -1741,7 +1740,7 @@ def _this_label(relation: str, colours: dict[str, str]) -> str:
         "~workshop": _("One of its workshops"),
         "workshop": _("Its main conference (it is a workshop of this venue)"),
     }[kind]
-    label = escape(TRACK_LABEL.get(track, track))
+    label = escape(tracks.name(track))
     chip = f'<span class="vr-chip" style="{_track_style(track, colours)}">{label}</span>'
     return escape(text).format(track=chip)
 
@@ -1752,7 +1751,7 @@ def _secondary_label(relation: str) -> str:
     return {
         "same": _("The same venue (merged into the primary one)"),
         "track": _("Its {track} track (merged into it, its texts marked as such)").format(
-            track=TRACK_LABEL.get(track, track)
+            track=tracks.name(track)
         ),
         "joint": _("A joint conference including it"),
         "workshop": _("One of its workshops"),
@@ -1772,7 +1771,7 @@ def _relation_sentence(row: venues.VenueRow, group: list[venues.VenueRow], relat
         )
     else:
         text = _("“{sat}” becomes a workshop of “{main}”: its papers take its rank.")
-    text = text.format(sat=sat.name, main=main.name, track=TRACK_LABEL.get(track, track))
+    text = text.format(sat=sat.name, main=main.name, track=tracks.name(track))
     if len(group) > 1:
         first = _("First, {names} are merged into “{name}”.").format(
             names=", ".join(f"“{r.name}”" for r in group[1:]), name=group[0].name
@@ -1984,7 +1983,7 @@ def _relate_dialog(row: venues.VenueRow, other: venues.VenueRow, merged) -> None
         ui.label(_("What is this venue for “{name}”?").format(name=other.name)).classes(
             "text-lg font-medium"
         )
-        colours = annotations.track_colours()
+        colours = tracks.colours()
         rel = (
             ui.select(
                 {k: _this_label(k, colours) for k in venues.relation_choices(guess, both=True)},
@@ -2032,7 +2031,7 @@ def _track_box(row: venues.VenueRow, merged) -> None:
         btn.mark("venue-as-track")
 
     def confirm() -> None:
-        label = TRACK_LABEL.get(track.value, track.value)
+        label = tracks.name(track.value)
         with ui.dialog() as dlg, ui.card().classes("min-w-96"):
             ui.label(_("This venue is a {track} track").format(track=label)).classes(
                 "text-lg font-medium"

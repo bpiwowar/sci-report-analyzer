@@ -18,7 +18,6 @@ from .db.session import session_scope
 from .i18n import _
 from .ranking.badge import (
     FINDINGS_RE,
-    TRACK_ORDER,
     Badge,
     category_of,
     category_order,
@@ -43,6 +42,7 @@ from .ranking.service import (
     paren_acronym,
     service,
 )
+from .ranking.tracks import track_ids
 from .source_settings import active_links
 
 CONFERENCE_KINDS = ("intl_conference", "natl_conference")
@@ -1094,9 +1094,9 @@ def relation_choices(guess: str, *, both: bool = False) -> list[str]:
     """The relations to offer: the guess, the same venue, and each relation both ways (the
     tracks only in the guessed direction, unless ``both``)."""
     rev = "~" if guess.startswith("~") else ""
-    tracks = [f"{rev}track:{t}" for t in TRACK_ORDER]
+    tracks = [f"{rev}track:{t}" for t in track_ids()]
     if both:
-        tracks += [f"{'' if rev else '~'}track:{t}" for t in TRACK_ORDER]
+        tracks += [f"{'' if rev else '~'}track:{t}" for t in track_ids()]
     out = ["same", *tracks, "joint", "~joint", "workshop", "~workshop"]
     return [guess, *(r for r in out if r != guess)]
 

@@ -33,7 +33,6 @@ from .db.models import (
     PeriodNote,
     PeriodTag,
     Publication,
-    PublicationFlag,
     PublicationTag,
     Report,
 )
@@ -438,7 +437,7 @@ def save(period_id: int, **values) -> None:
 
 
 def signature(person_id: int) -> str:
-    """Changes when the person's papers are edited (titles, notes, tags, flags...): the
+    """Changes when the person's papers are edited (titles, notes, tags, tracks...): the
     report is then updated."""
     pubs = select(Publication.id).where(Publication.person_id == person_id)
     h = hashlib.sha1()
@@ -450,7 +449,6 @@ def signature(person_id: int) -> str:
             select(PublicationTag.__table__).where(PublicationTag.publication_id.in_(pubs)),
             select(PeriodTag.__table__).where(PeriodTag.publication_id.in_(pubs)),
             select(PeriodNote.__table__).where(PeriodNote.publication_id.in_(pubs)),
-            select(PublicationFlag.__table__).where(PublicationFlag.publication_id.in_(pubs)),
         ):
             for row in sorted(map(repr, s.execute(q).all())):
                 h.update(row.encode())

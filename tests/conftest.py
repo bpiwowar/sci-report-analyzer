@@ -103,7 +103,4 @@ def fresh_db(tmp_path, monkeypatch):
 
     monkeypatch.setattr(pdfs, "ROOT", tmp_path / "pdfs")
     monkeypatch.setattr(pdfs, "unpaywall", no_unpaywall)
-    from sci_report_analyzer.annotations import seed_flags
-
-    seed_flags()
     yield

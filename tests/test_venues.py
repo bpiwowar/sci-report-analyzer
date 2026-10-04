@@ -905,8 +905,7 @@ def test_a_track_wins_whatever_the_venue_and_different_tracks_conflict():
     (a,) = stats(pid).values()
     assert a.track == "short" and not a.track_conflict
     annotations.set_venue_source(a.id, None)
-    short = next(f for f in annotations.all_flags() if f.name == "short")
-    annotations.toggle_flag(a.id, short.id)  # or by a flag
+    annotations.set_track_override(a.id, "short")  # or the paper's track by hand
     (a,) = stats(pid).values()
     assert a.track == "short" and not a.track_conflict
 
