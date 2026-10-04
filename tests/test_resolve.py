@@ -29,6 +29,15 @@ def test_paren_acronym_falls_back_to_core_alias():
     assert resolve(ic, None, "conference") is None
 
 
+def test_a_conference_text_is_not_a_journal_reduced_to_the_same_words():
+    # Without its generic words, the text reduces to the journal "Speech Communication";
+    # its acronym names the CORE conference, whose name carries it.
+    text = "Conference of the International Speech Communication Association (INTERSPEECH)"
+    b = resolve(text, None, "conference")
+    assert b is not None and b.source == "core" and b.name.startswith("Interspeech")
+    assert resolve("Speech Communication", None, "journal").name == "Speech Communication"
+
+
 def test_venue_search_text_and_level():
     pid = make_person()
     add_source(
