@@ -739,8 +739,10 @@ class VenueRow:
     records: int = 0
     publications: int = 0
     people: set[int] = field(default_factory=set)
-    # (key, raw text, records, manual, track)
-    variants: list[tuple[str, str | None, int, bool, str | None]] = field(default_factory=list)
+    # (key, raw text, records, manual, track, source)
+    variants: list[tuple[str, str | None, int, bool, str | None, str | None]] = field(
+        default_factory=list
+    )
     raw_examples: Counter = field(default_factory=Counter)
     short_name: str | None = None  # set by hand, or found automatically
     url: str | None = None  # its website
@@ -864,7 +866,9 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
             v.id, set()
         )
         for vk in v.keys:
-            row.variants.append((vk.key, vk.example, key_count.get(vk.key, 0), vk.manual, vk.track))
+            row.variants.append(
+                (vk.key, vk.example, key_count.get(vk.key, 0), vk.manual, vk.track, vk.source)
+            )
         row.raw_examples.update(m.venue for m in members)  # as in the sources
         row.source_texts.update((m.link.source, m.venue) for m in members)
         row.short_manual = v.short_manual

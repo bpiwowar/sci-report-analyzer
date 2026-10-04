@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 11:25+0200\n"
+"POT-Creation-Date: 2026-10-04 12:09+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -642,6 +642,10 @@ msgstr ""
 msgid "CORE C: ranked conference meeting minimum standards."
 msgstr "CORE C : conférence classée satisfaisant les exigences minimales."
 
+#, python-brace-format
+msgid "CORE {rank} until {year}"
+msgstr "CORE {rank} jusqu'en {year}"
+
 msgid "Cancel"
 msgstr "Annuler"
 
@@ -747,6 +751,9 @@ msgstr "Nettoyé en"
 #, python-brace-format
 msgid "Cleaned as: “{text}”"
 msgstr "Nettoyé en : « {text} »"
+
+msgid "Cleaned text (after the normalization rules)"
+msgstr "Texte nettoyé (après les règles de normalisation)"
 
 msgid "Cleaning rules"
 msgstr "Règles de nettoyage"
@@ -1881,6 +1888,9 @@ msgstr "Conférence principale"
 
 msgid "Main conferences saved"
 msgstr "Conférences principales enregistrées"
+
+msgid "Main venue"
+msgstr "Canal principal"
 
 msgid "Make it a joint venue"
 msgstr "En faire un canal conjoint"
@@ -3826,8 +3836,8 @@ msgstr "Validé : le canal de publication de {source}"
 msgid "Variants"
 msgstr "Variantes"
 
-msgid "Variants (raw texts, matched by their cleaned text)"
-msgstr "Variantes (textes bruts, reconnus par leur texte nettoyé)"
+msgid "Variants (cleaned texts, grouped by track)"
+msgstr "Variantes (textes nettoyés, groupés par session)"
 
 msgid "Venue"
 msgstr "Canal"
@@ -4888,6 +4898,12 @@ msgstr ""
 "fournis : importez votre propre export ci-dessous."
 
 #, python-brace-format
+msgid "{n} raw text"
+msgid_plural "{n} raw texts"
+msgstr[0] "{n} texte brut"
+msgstr[1] "{n} textes bruts"
+
+#, python-brace-format
 msgid "{n} record"
 msgid_plural "{n} records"
 msgstr[0] "{n} notice"
@@ -5099,6 +5115,10 @@ msgid "“{text}” now belongs to “{name}” (a variant set by hand)"
 msgstr "« {text} » appartient désormais à « {name} » (variante fixée à la main)"
 
 #, python-brace-format
+msgid "“{text}”: in no source text"
+msgstr "« {text} » : dans aucun texte des sources"
+
+#, python-brace-format
 msgid "“{venue}” takes the level of “{name}”"
 msgstr "« {venue} » prend le niveau de « {name} »"
 
@@ -5157,21 +5177,3 @@ msgstr "✓ C'est {name}"
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
 
-
-msgid "Empty: inferred (ranking record acronym, venue texts): “{short}”"
-msgstr "Vide : déduit (acronyme de l'entrée de classement, textes du canal) : « {short} »"
-
-msgid "Empty: inferred (ranking record acronym, venue texts)"
-msgstr "Vide : déduit (acronyme de l'entrée de classement, textes du canal)"
-
-msgid "Validate the inferred acronym (set it by hand)"
-msgstr "Valider l'acronyme déduit (le fixer à la main)"
-
-msgid "No acronym"
-msgstr "Pas d'acronyme"
-
-msgid "This venue has no acronym: none is inferred"
-msgstr "Ce canal n'a pas d'acronyme : aucun n'est déduit"
-
-msgid "CORE {rank} until {year}"
-msgstr "CORE {rank} jusqu'en {year}"

@@ -293,7 +293,7 @@ async def test_venue_dialog_and_manual_level(user: User) -> None:
         assert vid is not None
         assert s.get(Venue, vid).name
     await user.open(f"/venues?focus={vid}")
-    await user.should_see("Variants (raw texts, matched by their cleaned text)")
+    await user.should_see("Variants (cleaned texts, grouped by track)")
     user.find("venue-save").click()  # reloads the page after closing the dialog
     await user.should_see("Test a venue string")
 
@@ -1250,6 +1250,42 @@ async def test_variant_track_as_a_coloured_chip(user: User) -> None:
     assert chip.text == "Tutorial" and "#1a7f37" in chip.style["background"]
     with session_scope() as s:
         assert s.get(VenueKey, key).track == "tutorial"
+
+
+async def test_venue_variants_grouped_by_track_with_their_raw_texts(user: User) -> None:
+    from sci_report_analyzer import venues
+    from sci_report_analyzer.db.models import Publication
+    from sci_report_analyzer.db.session import session_scope
+    from sci_report_analyzer.ranking.service import service
+
+    pid = make_person("Jane Doe")
+    papers = [
+        pub("a", "Paper A", 2023, WIDG, authors=["Jane Doe"]),
+        pub("b", "Paper B", 2023, f"{WIDG}.", authors=["Jane Doe"]),  # the same key
+        pub("c", "Paper C", 2023, WIDG_DEMO, authors=["Jane Doe"]),
+    ]
+    add_source(pid, "hal", "jd", papers)
+    await user.open(f"/person/{pid}")
+    await user.should_see("Paper A")
+    with session_scope() as s:
+        vid = s.get(Publication, _pub_id("Paper A")).venue_id
+    key, demo = service.key(WIDG, "hal"), service.key(WIDG_DEMO, "hal")
+    venues.add_variant(vid, WIDG_DEMO, "hal")
+    venues.set_variant_track(demo, "demo")
+    await user.open(f"/venues?focus={vid}")
+    user.find("venue-tab-matching").click()
+    await user.should_see(marker="venue-variant-group-demo")
+    # The main venue first, then each track (its chip in the flag's colour).
+    (main,) = user.find("venue-variant-group-none").elements
+    (group,) = user.find("venue-variant-group-demo").elements
+    assert main.id < group.id < user.find(f"venue-variant-{demo}").elements.pop().id
+    # Each variant as its cleaned text, its raw texts in an expansion (with their records).
+    await user.should_see(service.clean(WIDG, "hal"))
+    (raw,) = user.find(f"venue-variant-raw-{key}").elements
+    assert raw.props["label"] == "2 raw texts"
+    await user.should_see(f"{WIDG} (1)")
+    await user.should_see(f"{WIDG}. (1)")
+    await user.should_see(f"{WIDG_DEMO} (1)")
 
 
 async def test_venue_suggestion_as_a_track(user: User) -> None:
