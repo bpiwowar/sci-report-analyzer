@@ -117,10 +117,12 @@ def note_editor(
     render: Callable[[str], str] | None = None,
     toolbar: Callable[[], None] | None = None,
     fill: bool = False,
+    side: Callable[[], None] | None = None,
+    side_tip: str = "",
 ) -> MarkdownEditor:
     """A Markdown note, always open, saved as it is typed (once typing pauses, when the
     editor is left, and when the page is closed); ``mode``, ``stacked``, ``render``,
-    ``toolbar``: those of the editor."""
+    ``toolbar``, ``side``, ``side_tip``: those of the editor."""
     state = {"saved": (value or "").strip(), "typed": None, "at": 0.0}
 
     def flush() -> None:
@@ -159,6 +161,8 @@ def note_editor(
             render=render,
             toolbar=toolbar,
             fill=fill,
+            side=side,
+            side_tip=side_tip,
         )
 
     def adopt(text: str) -> None:  # (saved by another window)

@@ -190,22 +190,24 @@ Notes are Markdown, with **LaTeX**: `$x^2$` inline, `$$\sum_i x_i$$` displayed.
 A line break is kept (as in Obsidian). They are edited with a Markdown editor (toolbar,
 ⌘B / ⌘I, a preview beside or instead).
 
-**Report** (✒ in the panel, with a period / folder chosen; a new tab): a Markdown report on
-the person, citing their papers with Pandoc's syntax: `[@key]` the paper's number (`**#6**`,
-the format can be changed), `[@a; @b]` several, `@key` its title, venue, year and category,
-`[@key]{.notes}` with its notes, `[@key]{.tags}` with its tags (`{.notes .tags}` both), and
-templates: `[@key]{.short-venue (.year)}` gives `EMNLP (2026)` (fields: `.number`, `.index`
-the bare number as in `{#.index}`, `.title`, `.venue`, `.short-venue` the acronym, `.year`,
-`.tags`, `.notes`, as in `{**#.index** (.short-venue .year): .notes}`; a bracket without a
-value is dropped). "Cite as" chooses how a paper is inserted when clicked in
-the side (or with Enter), among the templates set in Settings → Report templates. The
-papers to discuss are those with some tags (else those of the period's years), numbered by
-the list a tag was put from (else by year); the side lists them, red until cited, with a quick
-search (⌘K / Ctrl-K, Enter cites the first match; the person's other papers too). Tagged
-papers outside the period's years are listed apart, at the bottom (orange until cited), and
-counted apart. "Cite them" inserts those of the period not discussed yet. Copy (or download)
-substitutes the citations, optionally followed by the list of the papers. The report is saved
-as it is typed.
+**Citations in the folder notes** (the folder tab next to a PDF): the person's notes within
+the folder cite their papers with Pandoc's syntax: `[@key]` the paper's number, `[@a; @b]`
+several, `@key` its title, venue, year and category, `[@key]{.notes}` with its notes,
+`[@key]{.tags}` with its tags (`{.notes .tags}` both), and templates:
+`[@key]{.short-venue (.year)}` gives `EMNLP (2026)` (fields: `.number` the number as the
+folder writes it, `.index` the bare number as in `{**#.index**}`, `.title`, `.venue`,
+`.short-venue` the acronym, `.year`, `.tags`, `.notes`; a bracket without a value is dropped).
+Named templates (Settings → Citation templates, or the folder's own) are used as `.name`.
+The folder's settings (the ✓ icon of its notes, or its dialog) set the tag whose papers are
+numbered (as listed, else by year; the others as first cited) and how numbers are written:
+one format for the listed papers (`**#{index}**`), one for the others (`[{index}]`). The
+papers to discuss are the listed ones (else those of the period's years); the ✓ icon is red
+until each is cited, orange if one cited is not of the period's years. The editor's
+"Papers" mode shows, instead of the preview, the papers to discuss with their numbers (red
+until cited, orange: not of the period's years; a click cites it, the ⋮ menu with a
+template), the one at the cursor highlighted, a search (Enter cites the first match; the
+person's other papers too), and "Cite them" (those not cited yet). Copy substitutes the
+citations, followed by the references, numbered as cited.
 
 **PDFs**: the PDF icon next to a title opens the paper's stored PDF in a new window (red;
 ✎ once annotated). A grey icon means an open-access link (or a DOI) is known: click it to

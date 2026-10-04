@@ -268,6 +268,7 @@ class Side:
             return
         from .citations import CitationStatus, folder_citations_dialog
         from .folder_notes import folder_notes_editor
+        from .papers_pane import PapersPane
 
         folder_id, name = self.folder
         tip = _("Notes of the folder {folder} on this person (all their documents and papers)")
@@ -283,18 +284,43 @@ class Side:
             status[0].update(ctx, out)
             return out.text
 
-        def refresh() -> None:  # (the preview, and the status: also without a preview)
+        pane: list[PapersPane] = []
+
+        def papers() -> None:
+            period_id = self.period_id
+            pane.append(
+                PapersPane(
+                    lambda: self.folder_editor,
+                    lambda: reports.folder_context(self.stats, period_id),
+                    lambda: reports.load_templates(folder_id),
+                    period_id,
+                    mark="folder-papers",
+                )
+            )
+
+        def shown() -> bool:
+            return bool(pane) and self.folder_editor.mode.value == "side"
+
+        def refresh() -> None:  # (the preview, the status, the papers: also when hidden)
             render(self.folder_editor.value)
             self.folder_editor.refresh_preview()
+            if shown():
+                pane[0].refresh(force=True)
+
+        def typed() -> None:
+            if self.folder_editor.mode.value not in ("split", "preview"):
+                render(self.folder_editor.value)  # (the status)
+            if shown():
+                pane[0].refresh()
 
         with self.section("folder-notes", "folder_open", tip.format(folder=name), fill=True):
-            self.folder_editor = folder_notes_editor(self.period_id, render, toolbar=tools)
-            self.folder_editor.editor.on_value_change(
-                lambda: (
-                    render(self.folder_editor.value)
-                    if self.folder_editor.mode.value == "edit"
-                    else None
-                )
+            self.folder_editor = folder_notes_editor(
+                self.period_id, render, toolbar=tools, side=papers
+            )
+            self.folder_editor.editor.on_value_change(typed)
+            pane[0].track(self.folder_editor)
+            self.folder_editor.on_mode.append(
+                lambda mode: pane[0].refresh(force=True) if mode == "side" else None
             )
         self.folder_refresh = refresh
         self.on_render.append(refresh)  # (the papers edited: their tags, notes…)

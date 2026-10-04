@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 14:29+0200\n"
+"POT-Creation-Date: 2026-10-04 15:07+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -758,11 +758,14 @@ msgstr "Citer un article"
 msgid "Cite a paper ([@key], numbered when copied)"
 msgstr "Citer un article ([@clé], numéroté à la copie)"
 
+msgid "Cite them"
+msgstr "Les citer"
+
 msgid "Cited, but not of the period's years:"
 msgstr "Cités, mais hors des années de la période :"
 
-msgid "Cited, but not to discuss:"
-msgstr "Cités, mais pas à discuter :"
+msgid "Cited, but not to discuss"
+msgstr "Cités, mais pas à discuter"
 
 msgid "Clean up"
 msgstr "Nettoyer"
@@ -1123,6 +1126,9 @@ msgstr "Télécharger et ouvrir"
 msgid "Download it"
 msgstr "Le télécharger"
 
+msgid "Download the PDF (open access) and view it (a new window)"
+msgstr "Télécharger le PDF (libre accès) et le voir (nouvelle fenêtre)"
+
 msgid "Download the PDF (open access) to view and annotate it"
 msgstr "Télécharger le PDF (accès ouvert) pour le voir et l’annoter"
 
@@ -1359,6 +1365,9 @@ msgstr "Récupération des articles du candidat…"
 msgid "Find a category of {folder} (Enter: the first one)"
 msgstr "Trouver une catégorie de {folder} (Entrée : la première)"
 
+msgid "Find a paper, Enter: cite it"
+msgstr "Chercher un article, Entrée : le citer"
+
 msgid "Find an excerpt (its words, its PDF)"
 msgstr "Trouver un extrait (ses mots, son PDF)"
 
@@ -1512,8 +1521,10 @@ msgstr ""
 "publication, paramètres) et les PDF stockés."
 
 #, python-brace-format
-msgid "How a number is written ({index}: the number; default: {default})"
-msgstr "Comment un numéro s'écrit ({index} : le numéro ; par défaut : {default})"
+msgid ""
+"How a number is written ({index}: the number; default: {default}): "
+"[@key], and .number in the templates"
+msgstr "Comment un numéro s'écrit ({index} : le numéro ; par défaut : {default}) : [@key], et .number dans les modèles"
 
 #, python-brace-format
 msgid ""
@@ -1534,6 +1545,13 @@ msgstr ""
 "`{**#.index** (.short-venue .year)}` donne **#2** (EMNLP 2026). Vide : le"
 " numéro. Un modèle qui a un nom s'utilise comme `.nom`, seul "
 "(`[@clé]{.starred}`) ou dans un autre (`{.starred: .notes}`)."
+
+#, python-brace-format
+msgid ""
+"How the number of a paper with the tag is written ({index}: the number; "
+"default: {default}): [@key], and .number in the templates; the others: "
+"the number format"
+msgstr "Comment s'écrit le numéro d'un article avec l'étiquette ({index} : le numéro ; par défaut : {default}) : [@key], et .number dans les modèles ; les autres : le format du numéro"
 
 #, python-brace-format
 msgid "IF {value}"
@@ -1600,6 +1618,9 @@ msgstr "Condition incomplète"
 
 msgid "Influence"
 msgstr "Rayonnement"
+
+msgid "Insert the papers not cited yet, at the cursor (as a list of citations)"
+msgstr "Insérer les articles pas encore cités, au curseur (en liste de citations)"
 
 msgid "Installing the PDF viewer (PDF.js, once)…"
 msgstr "Installation de la visionneuse PDF (PDF.js, une seule fois)…"
@@ -2352,6 +2373,9 @@ msgstr "Absent de {edition} (retiré de CORE)"
 msgid "Not loaded: download it"
 msgstr "Non chargée : la télécharger"
 
+msgid "Not of the period's years"
+msgstr "Hors des années de la période"
+
 msgid "Not related: never propose it again"
 msgstr "Sans rapport : ne plus jamais le proposer"
 
@@ -2414,6 +2438,9 @@ msgstr "Rien à fusionner"
 
 msgid "Number format"
 msgstr "Format du numéro"
+
+msgid "Number of a listed paper"
+msgstr "Numéro d'un article de la liste"
 
 msgid "Numbered list"
 msgstr "Liste numérotée"
@@ -2507,6 +2534,9 @@ msgstr "Autres et prépublications"
 
 msgid "Other (report…)"
 msgstr "Autre (rapport…)"
+
+msgid "Other papers"
+msgstr "Autres articles"
 
 msgid "Other spellings used in author lists, e.g. “B. Doe”"
 msgstr "Autres graphies utilisées dans les listes d'auteurs, p. ex. « B. Doe »"
@@ -3437,8 +3467,8 @@ msgstr "Le rôle par défaut est inconnu"
 msgid "The default"
 msgstr "Le modèle par défaut"
 
-msgid "The default format"
-msgstr "Le format par défaut"
+msgid "The default formats"
+msgstr "Les formats par défaut"
 
 msgid "The excerpts, as selected"
 msgstr "Les extraits, tels que sélectionnés"
@@ -3832,6 +3862,10 @@ msgstr "Inconnu des registres (demandé le {date})"
 msgid "Unknown year"
 msgstr "Année inconnue"
 
+#, python-brace-format
+msgid "Unknown: {keys}"
+msgstr "Inconnus : {keys}"
+
 msgid "Unlink"
 msgstr "Délier"
 
@@ -4022,6 +4056,9 @@ msgstr "Voir et annoter le PDF"
 msgid "View the PDF (annotated)"
 msgstr "Voir le PDF (annoté)"
 
+msgid "View the PDF, with its notes (a new window)"
+msgstr "Voir le PDF, avec ses notes (nouvelle fenêtre)"
+
 msgid "Web"
 msgstr "Web"
 
@@ -4104,6 +4141,12 @@ msgstr "[sans tenir compte de la casse]"
 msgid "[only {sources}]"
 msgstr "[seulement {sources}]"
 
+#, python-brace-format
+msgid ""
+"`.number`: the number written as set above (e.g. `{(.number .short-venue "
+".year)}`), `.index`: the bare number (e.g. `{**#.index**}`)."
+msgstr "`.number` : le numéro écrit comme réglé ci-dessus (ex. `{(.number .short-venue .year)}`), `.index` : le numéro seul (ex. `{**#.index**}`)."
+
 msgid "a citation"
 msgstr "une citation"
 
@@ -4180,12 +4223,19 @@ msgid "cited by its place only"
 msgstr "cité par son emplacement seulement"
 
 #, python-brace-format
+msgid "cited {n}×"
+msgstr "cité {n}×"
+
+#, python-brace-format
 msgid "cleaned as: “{text}”"
 msgstr "nettoyé en : « {text} »"
 
 #, python-brace-format
 msgid "cleaned: “{cleaned}” · key: “{key}”"
 msgstr "nettoyé : « {cleaned} » · clé : « {key} »"
+
+msgid "click: cite it"
+msgstr "clic : le citer"
 
 msgid "click: open the record · right-click: more links"
 msgstr "clic : ouvrir la notice · clic droit : plus de liens"
@@ -4500,6 +4550,9 @@ msgstr "aucune"
 msgid "not a PDF file"
 msgstr "ce n'est pas un fichier PDF"
 
+msgid "not cited yet"
+msgstr "pas encore cité"
+
 #, python-brace-format
 msgid "not found: {url}"
 msgstr "introuvable : {url}"
@@ -4514,11 +4567,18 @@ msgstr "pas l'ORCID de la personne ({orcid})"
 msgid "not them"
 msgstr "pas la personne"
 
+msgid "not to discuss"
+msgstr "pas à discuter"
+
 msgid "not used"
 msgstr "non utilisé"
 
 msgid "note (optional)"
 msgstr "note (facultative)"
+
+#, python-brace-format
+msgid "off-period ({year})"
+msgstr "hors période ({year})"
 
 msgid "on the paper (every period)"
 msgstr "sur l'article (toutes les périodes)"
@@ -4546,6 +4606,9 @@ msgstr "ouvrir le canal de publication"
 #, python-brace-format
 msgid "open the venue — ranked as: {record}"
 msgstr "ouvrir le canal de publication — classé comme : {record}"
+
+msgid "or beside the papers to discuss (cited or not)"
+msgstr "ou à côté des articles à discuter (cités ou non)"
 
 msgid "orange"
 msgstr "orange"

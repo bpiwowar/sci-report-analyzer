@@ -43,8 +43,10 @@ def folder_notes_editor(
     period_id: int,
     render: Callable[[str], str] | None = None,
     toolbar: Callable[[], None] | None = None,
+    side: Callable[[], None] | None = None,
 ) -> MarkdownEditor:
-    """The editor of a person's notes within a folder, saved as typed (as the other notes)."""
+    """The editor of a person's notes within a folder, saved as typed (as the other notes);
+    ``side``: the pane of the papers to cite (in place of the preview)."""
     holder: list[MarkdownEditor] = []
 
     def save(text: str) -> None:
@@ -62,6 +64,8 @@ def folder_notes_editor(
         render=render,
         toolbar=toolbar,
         fill=True,
+        side=side,
+        side_tip=_("or beside the papers to discuss (cited or not)"),
     )
     holder.append(editor)
     _editors().setdefault(period_id, WeakSet()).add(editor)
