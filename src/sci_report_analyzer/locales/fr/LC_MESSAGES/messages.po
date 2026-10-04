@@ -743,9 +743,6 @@ msgstr ""
 "Profils candidats trouvés — validez-les dans l'onglet Sources. Certaines "
 "sources ont échoué : {sources}"
 
-msgid "Candidates"
-msgstr "Candidats"
-
 msgid "Candidates to review"
 msgstr "Candidats à examiner"
 
@@ -826,10 +823,6 @@ msgstr "Nettoyer"
 
 msgid "Cleaned as"
 msgstr "Nettoyé en"
-
-#, python-brace-format
-msgid "Cleaned as: “{text}”"
-msgstr "Nettoyé en : « {text} »"
 
 msgid "Cleaned text (after the normalization rules)"
 msgstr "Texte nettoyé (après les règles de normalisation)"
@@ -4365,9 +4358,6 @@ msgstr "Canal de publication enregistré"
 
 msgid "Venue text"
 msgstr "Texte du canal"
-
-msgid "Venue to look up"
-msgstr "Canal de publication à rechercher"
 
 msgid "Venues"
 msgstr "Canaux"

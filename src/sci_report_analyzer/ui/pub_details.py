@@ -1989,8 +1989,3 @@ def _rank_editor(s: PubStat, done, venue_scope, for_venue, venue_id, step: _Step
                 step.cancel_button()
                 ui.button(_("Save"), on_click=save_level).props("dense")
             level_legend()
-
-
-def person_publications(person_id: int) -> list[Publication]:
-    with session_scope() as s:
-        return list(s.scalars(select(Publication).where(Publication.person_id == person_id)))

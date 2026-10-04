@@ -39,34 +39,33 @@ from ..ranking.service import load_settings, save_settings, service
 from ..sources import ADAPTERS
 from . import scimago_years, unsaved
 from .colours import ColourInput
-from .theme import badge_details, fmt_dt, frame, level_hint, level_options, rank_chip, track_chip
+from .theme import fmt_dt, frame, level_hint, level_options, track_chip
 
-# The settings, in groups: (group, [(tab, label, depth)]); a tab of None is a heading
-# (e.g. "Language-specific" above the languages' cleaning rules).
+# The settings, in groups: (group, [(tab, label)]).
 NAV = (
     (
         N_("Sources"),
-        (("sources", N_("Publication sources"), 0), ("keys", N_("API keys"), 0)),
+        (("sources", N_("Publication sources")), ("keys", N_("API keys"))),
     ),
     (
         N_("Venues"),
         (
-            ("matching", N_("Ranking sources"), 0),
-            ("rules", N_("Cleaning rules"), 0),
-            ("kinds", N_("Venue kinds"), 0),
-            ("detection", N_("Detection rules"), 0),
-            ("tracks", N_("Tracks"), 0),
+            ("matching", N_("Ranking sources")),
+            ("rules", N_("Cleaning rules")),
+            ("kinds", N_("Venue kinds")),
+            ("detection", N_("Detection rules")),
+            ("tracks", N_("Tracks")),
         ),
     ),
-    (N_("Annotations"), (("tags", N_("Tags & categories"), 0),)),
+    (N_("Annotations"), (("tags", N_("Tags & categories")),)),
     (
         N_("Reports"),
         (
-            ("contribution", N_("Contribution roles"), 0),
-            ("reports", N_("Citation templates"), 0),
+            ("contribution", N_("Contribution roles")),
+            ("reports", N_("Citation templates")),
         ),
     ),
-    (N_("Data"), (("data", N_("Data & cache"), 0), ("io", N_("Import / export"), 0))),
+    (N_("Data"), (("data", N_("Data & cache")), ("io", N_("Import / export")))),
 )
 PANELS = {
     "sources": lambda: _publication_sources(),
@@ -104,7 +103,7 @@ def register() -> None:
             ui.add_css(NAV_CSS)
             ui.label(_("Settings")).classes("text-2xl")
             edits = unsaved.Edits()
-            labels = {name: label for _g, entries in NAV for name, label, _d in entries if name}
+            labels = {name: label for _g, entries in NAV for name, label in entries}
             with ui.row().classes("w-full no-wrap items-start gap-4"):
                 with ui.column().classes("shrink-0 w-56 gap-0"):
                     with (
@@ -116,14 +115,10 @@ def register() -> None:
                             ui.label(_(group)).classes(
                                 "text-xs text-grey-7 uppercase font-bold mt-3 mb-1 px-2"
                             )
-                            for name, label, depth in entries:
-                                pad = f"pl-{2 + 4 * depth}"
-                                if name is None:
-                                    ui.label(_(label)).classes(f"text-sm text-grey-8 py-1 {pad}")
-                                else:
-                                    edits.tabs[name] = (
-                                        ui.tab(name, _(label)).classes(pad).mark(f"settings-{name}")
-                                    )
+                            for name, label in entries:
+                                edits.tabs[name] = (
+                                    ui.tab(name, _(label)).classes("pl-2").mark(f"settings-{name}")
+                                )
                     # The screens with unsaved changes, and their Save / Cancel.
                     edits_panel = ui.element("div").classes("w-full")
                 with ui.tab_panels(tabs, value=tab).props("vertical").classes("grow min-w-0"):
@@ -666,33 +661,6 @@ def rules_tab() -> None:
         ).mark("norm-impact")
         unsaved.cancel_button()
         ui.button(_("Save the rules"), icon="save", on_click=save).mark("norm-save")
-
-
-# ---- corrections & levels ------------------------------------------------------------------
-
-
-def lookup_tab() -> None:
-    out = ui.column().classes("w-full")
-
-    async def run(e) -> None:
-        out.clear()
-        if not e.value:
-            return
-        badge = await service.resolve(e.value)
-        with out:
-            ui.label(_("Cleaned as: “{text}”").format(text=service.clean(e.value))).classes(
-                "text-sm text-grey"
-            )
-            with ui.row().classes("items-center gap-2"):
-                rank_chip(badge)
-                ui.label(badge_details(badge).replace("\n", " · ") if badge else _("not ranked"))
-            ui.label(_("Candidates")).classes("font-medium mt-2")
-            for b in service.candidates(e.value):
-                with ui.row().classes("items-center gap-2"):
-                    rank_chip(b)
-                    ui.label(f"{b.name} · {b.source} · {round(b.score * 100)}%")
-
-    ui.input(_("Venue to look up"), on_change=run).props("debounce=500 clearable").classes("w-full")
 
 
 # ---- tags ----------------------------------------------------------------------------------

@@ -13,6 +13,7 @@ from nicegui import ui
 from .. import annotations, categories, documents, folders, manual, pdftext, reflist, reports
 from ..i18n import N_, _
 from ..sources.base import SourceError
+from .categories_editor import categories_dialog
 from .mdedit import MarkdownEditor, quote
 from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
@@ -1408,9 +1409,3 @@ def excerpt_url(e: categories.ExcerptView) -> str:
     if e.document_id:
         return f"/doc/{e.document_id}" + (f"?{page}" if page else "")
     return f"/pdf/{e.publication_id}" + (f"?{page}" if page else "")
-
-
-def categories_dialog(folder_id: int, changed_cb: Callable[[], None] | None = None) -> None:
-    from .categories_editor import categories_dialog as dialog
-
-    dialog(folder_id, changed_cb)
