@@ -1,21 +1,5 @@
 # To do
 
-## Notes in a folder: no more lost text
-
-A person's notes within a folder are one text, open in several places at once (each of their
-PDFs in the folder, the side panel in another window). The last save wins even when the
-window was out of date, which erased notes twice: an editor holding older text saved over
-the "Starred papers" section the migration had just appended, then a save of an empty text
-erased the rest.
-
-- Refuse stale saves: a save is refused if the notes changed since that editor loaded
-  them; say so, and offer to reload (or to copy the unsaved text).
-- Never save an emptied text without asking (confirmation before clearing all the notes).
-- Finish `old_reports.migrate()` before pages are served (it now runs in the background
-  after start-up, while editors may already show the notes as they were).
-- The folder dialog's "Notes" field (the folder's own short text): save it only when
-  edited (the dialog may show a stale copy).
-
 ## Folders: a hierarchy, shared settings
 
 (To do after the other items are merged.)
