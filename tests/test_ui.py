@@ -242,8 +242,6 @@ async def test_quit_button(user: User, monkeypatch) -> None:
 
 
 async def test_panel_reloads_after_resync(user: User, monkeypatch) -> None:
-    import asyncio
-
     from sci_report_analyzer import sync
     from sci_report_analyzer.sources import ADAPTERS
     from sci_report_analyzer.sources.base import FetchResult
@@ -2164,7 +2162,6 @@ async def test_propose_merges_one_at_a_time(user: User) -> None:
 
 
 async def test_joint_venue_with_different_levels(user: User) -> None:
-    from helpers import add_source, make_person, pub
     from sqlalchemy import select
 
     from sci_report_analyzer import pubview, venues
@@ -2211,7 +2208,6 @@ async def test_joint_venue_with_different_levels(user: User) -> None:
 async def test_joint_venue_level_explained_and_chosen(user: User) -> None:
     """The level of a joint venue says where it comes from (the lowest of its conferences'),
     and is chosen right there; or it is not a joint venue."""
-    from helpers import add_source, make_person, pub
     from sqlalchemy import select
 
     from sci_report_analyzer import pubview, venues
@@ -2253,8 +2249,6 @@ async def test_joint_venue_level_explained_and_chosen(user: User) -> None:
 
 
 async def test_problems_on_folder_cards(user: User) -> None:
-    from helpers import add_source, make_person, pub
-
     from sci_report_analyzer import folders, pubview
 
     pid = make_person()
