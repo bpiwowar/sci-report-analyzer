@@ -272,6 +272,7 @@ def track_mapping(data: SettingsFile) -> TrackMapping:
 
 # ---- venues --------------------------------------------------------------------------------
 
+# A venue's manual decisions as exported (``Venue.MANUAL_FIELDS``, the level as one field).
 _VENUE_FIELDS = (
     "kind",
     "level",
