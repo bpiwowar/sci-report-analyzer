@@ -642,8 +642,8 @@ def register() -> None:
             page=page,
         )
         side.attach(box)
+        side.folder_notes()
         with side.section("notes", "sell", _("Tags and notes"), fill=True):
-            side.folder_notes()
             tags_box = ui.column().classes("w-full gap-2").mark("pdf-notes")
             with tags_box:
                 ui.spinner()
