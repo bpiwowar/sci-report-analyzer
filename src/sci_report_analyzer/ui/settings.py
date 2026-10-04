@@ -636,7 +636,11 @@ def rules_tab() -> None:
             if new != m.key:
                 diff.append((m, new))
         with changes:
-            ui.label(_("{n} venue text(s) get another key").format(n=len(diff))).classes("text-sm")
+            ui.label(
+                ngettext(
+                    "{n} venue text gets another key", "{n} venue texts get another key", len(diff)
+                ).format(n=len(diff))
+            ).classes("text-sm")
             for m, new in diff[:30]:
                 ui.label(f"[{m.source}] {m.raw}: “{m.key}” → “{new}”").classes("text-xs font-mono")
 
@@ -651,7 +655,11 @@ def rules_tab() -> None:
         save_settings(new)
         n = venue_match.refresh()
         ui.notify(
-            _("Cleaning rules saved — {n} venue text(s) re-matched").format(n=n),
+            ngettext(
+                "Cleaning rules saved — {n} venue text re-matched",
+                "Cleaning rules saved — {n} venue texts re-matched",
+                n,
+            ).format(n=n),
             type="positive",
         )
         return True
@@ -1916,7 +1924,11 @@ def import_dialog(data: settings_io.SettingsFile) -> None:
                 )
                 return
             ui.label(
-                _("{n} conflict(s): choose which value to keep").format(n=len(conflicts))
+                ngettext(
+                    "{n} conflict: choose which value to keep",
+                    "{n} conflicts: choose which value to keep",
+                    len(conflicts),
+                ).format(n=len(conflicts))
             ).classes("font-medium")
             with ui.row():
                 ui.button(_("Take all imported"), on_click=lambda: _all(True)).props("dense flat")

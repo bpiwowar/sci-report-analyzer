@@ -181,7 +181,7 @@ def _sync(person_ids: list[int] | None) -> None:
         if any(ln.is_stale or ln.sync_state == "error" for ln in person.links):
             started += start_sync(person.id, only_stale=True)
     ui.notify(
-        ngettext("Started {n} sync(s)", "Started {n} sync(s)", started).format(n=started)
+        ngettext("Started {n} sync", "Started {n} syncs", started).format(n=started)
         if started
         else _("Everything is up to date")
     )
@@ -276,8 +276,8 @@ def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
     if total := sum(problems.values()):
         ui.label(
             ngettext(
-                "{n} paper(s) with problems in the people's periods",
-                "{n} paper(s) with problems in the people's periods",
+                "{n} paper with problems in the people's periods",
+                "{n} papers with problems in the people's periods",
                 total,
             ).format(n=total)
         ).classes("text-sm text-orange-9").tooltip(_(_PROBLEMS_TIP)).mark("folder-problems")
@@ -427,9 +427,9 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
 
         confirm(
             ngettext(
-                "Delete {n} person(s) and all their data (sources, publications, "
+                "Delete {n} person and all their data (sources, publications, "
                 "tags, stars, periods)?",
-                "Delete {n} person(s) and all their data (sources, publications, "
+                "Delete {n} people and all their data (sources, publications, "
                 "tags, stars, periods)?",
                 len(ids),
             ).format(n=len(ids)),
@@ -473,7 +473,7 @@ def _card(
         with ui.row().classes("items-center justify-between w-full"):
             ui.label(person.name).classes("text-lg font-medium")
             ui.label(
-                ngettext("{n} publications", "{n} publications", n_pubs).format(n=n_pubs)
+                ngettext("{n} publication", "{n} publications", n_pubs).format(n=n_pubs)
             ).classes("text-grey text-sm")
         if person.affiliation:
             ui.label(person.affiliation).classes("text-sm text-grey -mt-2")
@@ -497,14 +497,14 @@ def _card(
             if pending:
                 ui.badge(
                     ngettext(
-                        "{n} candidate(s) to review", "{n} candidate(s) to review", len(pending)
+                        "{n} candidate to review", "{n} candidates to review", len(pending)
                     ).format(n=len(pending)),
                     color="orange",
                 )
             if stale:
                 ui.badge(
                     ngettext(
-                        "{n} source(s) not up to date", "{n} source(s) not up to date", len(stale)
+                        "{n} source not up to date", "{n} sources not up to date", len(stale)
                     ).format(n=len(stale)),
                     color="warning",
                 )
@@ -512,7 +512,7 @@ def _card(
                 ui.badge(_("syncing…"), color="info")
             if problems:
                 ui.badge(
-                    ngettext("{n} problem(s)", "{n} problem(s)", problems).format(n=problems),
+                    ngettext("{n} problem", "{n} problems", problems).format(n=problems),
                     color="orange-8",
                 ).classes("cursor-pointer").on(
                     "click.stop", lambda: ui.navigate.to(f"{url}?problems=1")

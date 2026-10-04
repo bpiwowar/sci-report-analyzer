@@ -2305,7 +2305,7 @@ async def test_problems_on_folder_cards(user: User) -> None:
     assert pubview.problem_years([pid]) == {pid: [2018, 2021]}
     assert pubview.count_in_period([2019, 2021, None], 2020, 2024) == 2  # no year: in
     await user.open(f"/?folder={fid}")
-    await user.should_see(marker=f"problems-{pid}", content="1 problem(s)")
+    await user.should_see(marker=f"problems-{pid}", content="1 problem")
     await user.should_see(marker="folder-problems")
 
 
