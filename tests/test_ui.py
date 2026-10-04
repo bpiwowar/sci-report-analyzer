@@ -862,6 +862,45 @@ async def test_tracks_settings(user: User) -> None:
     assert "industry_papers" not in [t.id for t in load_settings().tracks]
 
 
+async def test_unsaved_settings(user: User) -> None:
+    """The screens with changes are shown in the left panel, saved from there, or
+    discarded (each screen's own, or all of them once confirmed)."""
+    from sci_report_analyzer.ranking.service import load_settings
+
+    def colour() -> str:
+        return next(t for t in load_settings().tracks if t.id == "short").colour
+
+    def nav(tab: str) -> dict:
+        return user.find(f"settings-{tab}").elements.pop().props
+
+    await user.open("/settings?tab=tracks")
+    await user.should_see(marker="track-short")
+    assert not user.find("settings-save-all").elements.pop().enabled
+    user.find("track-colour-short").elements.pop().value = "#123456"
+    await user.should_see("Unsaved: Tracks", retries=20)
+    assert nav("tracks").get("alert") == "orange" and "alert" not in nav("rules")
+    user.find("settings-save-all").click()
+    await user.should_see("Tracks saved")
+    await user.should_not_see("Unsaved: Tracks", retries=20)
+    assert colour() == "#123456" and "alert" not in nav("tracks")
+    # A screen's own changes discarded (not saved).
+    user.find("track-colour-short").elements.pop().value = "#654321"
+    await user.should_see("Unsaved: Tracks", retries=20)
+    user.find("settings-cancel-tracks").click()
+    await user.should_not_see("Unsaved: Tracks", retries=20)
+    assert user.find("track-colour-short").elements.pop().value == "#123456"
+    # All the changes discarded, once confirmed.
+    user.find("track-colour-short").elements.pop().value = "#654321"
+    user.find("detect-pattern-workshop").elements.pop().value = r"\bseminars?\b"
+    await user.should_see("Unsaved: Detection rules, Tracks", retries=20)
+    user.find("settings-cancel-all").click()
+    user.find("settings-cancel-confirm").click()
+    await user.should_see("Changes discarded")
+    await user.should_not_see(marker="settings-unsaved", content="Unsaved", retries=20)
+    assert user.find("track-colour-short").elements.pop().value == "#123456"
+    assert colour() == "#123456"
+
+
 async def test_rule_origins(user: User) -> None:
     """A cleaning rule shows whether it is a default one, changed (reset) or added."""
     from sci_report_analyzer.ranking.service import load_settings, save_settings
