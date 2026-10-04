@@ -2783,3 +2783,42 @@ def test_panel_statistics_counted() -> None:
     assert (shares.first, shares.last) == (50, 25)
     assert sum(shares.totals[1:]) == 3  # (by years: those with one)
     assert role_shares([paper(2020, "q1")], ["first"]) is None
+
+
+async def test_related_conferences_of_a_conference(user: User) -> None:
+    """A conference's dialog lists its workshops (with their years) and the joint
+    conferences including it, each opening its own dialog."""
+    from sci_report_analyzer import venues
+    from sci_report_analyzer.db.models import Publication
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = make_person("Jane Doe")
+    texts = {
+        "main": WIDG,
+        "ws": "Workshop on Tiny Widgets",
+        "other": "Symposium on Gadget Design (SGD)",
+        "joint": "Joint Widget and Gadget Days",
+    }
+    add_source(
+        pid,
+        "hal",
+        "jd",
+        [pub(k, f"Paper {k}", 2023, t, authors=["Jane Doe"]) for k, t in texts.items()],
+    )
+    await user.open(f"/person/{pid}")
+    await user.should_see("Paper main")
+    with session_scope() as s:
+        ids = {k: s.get(Publication, _pub_id(f"Paper {k}")).venue_id for k in texts}
+    venues.save_hosts(ids["ws"], [{"venue_id": ids["main"], "from": 2020, "to": None}])
+    venues.set_joint_parts(ids["joint"], [ids["main"], ids["other"]])
+    assert venues.related_conferences(ids["main"]) == venues.RelatedConferences(
+        workshops=[(ids["ws"], texts["ws"], 2020, None)], joint=[(ids["joint"], texts["joint"])]
+    )
+    await user.open(f"/venues?focus={ids['main']}")
+    await user.should_see("Related conferences (2)")
+    user.find("venue-tab-related").click()
+    await user.should_see("2020–…")
+    await user.should_see(marker=f"venue-related-joint-{ids['joint']}")
+    user.find(f"venue-related-workshop-{ids['ws']}").click()
+    await user.should_see(marker="venue-back")  # the workshop's dialog
+    await user.should_not_see(marker="venue-tab-related")  # (not a conference)

@@ -1982,6 +1982,9 @@ msgstr "Conférence conjointe"
 msgid "Joint conferences"
 msgstr "Conférences conjointes"
 
+msgid "Joint conferences including this one (set in the joint conference's dialog)."
+msgstr "Conférences conjointes qui l'incluent (à définir dans la fenêtre de la conférence conjointe)."
+
 msgid "Joint venue"
 msgstr "Canal conjoint"
 
@@ -2629,6 +2632,9 @@ msgstr ""
 "Aucune pour l'instant : validez des candidats ci-dessous, ou ajoutez un "
 "profil par URL."
 
+msgid "None."
+msgstr "Aucune."
+
 msgid "None: as first cited"
 msgstr "Aucune : dans l'ordre des citations"
 
@@ -3259,6 +3265,10 @@ msgstr "Rejeter"
 #, python-brace-format
 msgid "Rejected ({n})"
 msgstr "Rejetés ({n})"
+
+#, python-brace-format
+msgid "Related conferences ({n})"
+msgstr "Conférences liées ({n})"
 
 msgid "Related venues?"
 msgstr "Canaux liés ?"
@@ -4739,6 +4749,9 @@ msgstr "Atelier : le rang de sa conférence principale en {year}, « {host} »"
 
 msgid "Workshops"
 msgstr "Ateliers"
+
+msgid "Workshops whose main conference this is (set in the workshop's dialog)."
+msgstr "Ateliers dont c'est la conférence principale (à définir dans la fenêtre de l'atelier)."
 
 msgid "Wrongly found here: forget it"
 msgstr "Trouvé ici à tort : l'oublier"
