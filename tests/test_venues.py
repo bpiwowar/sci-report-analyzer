@@ -129,6 +129,47 @@ def test_detect_kind():
     assert detect_kind(None, ev, **kw) == "intl_conference"
 
 
+def test_detect_shared_task():
+    kw = {
+        "national_keywords": load_settings().national_keywords,
+        "international_keywords": load_settings().international_keywords,
+    }
+
+    def kind(venue, title=None, **more):
+        return detect_kind(None, KindEvidence(venue, title=title, **more), **kw)
+
+    # Their venues: working notes, campaigns (before workshops: SemEval is no workshop).
+    for venue in (
+        "International Workshop on Semantic Evaluation (SemEval-2017)",
+        "Text Retrieval Conference (TREC)",
+        "CLEF (Online Working Notes/Labs/Workshop)",
+        "NTCIR Conference on Evaluation of Information Access Technologies",
+        "MediaEval Benchmarking Initiative for Multimedia Evaluation",
+    ):
+        assert kind(venue) == "shared_task", venue
+    # A venue mixing them with research papers: the titles tell.
+    wmt = "Conference on Machine Translation"
+    for title in (
+        "FOOBAR at SemEval-2019 Task 7: Quick Tagging of Tiny Things",
+        "SemEval-2031 Task 4: Detecting Imaginary Phenomena",
+        "Findings of the WMT 2029 Toy Translation Shared Task",
+        "Overview of the CLEF Widget Lab 2028",
+        "Spotting Widgets at the CLEF Gadget Evaluation lab 2027",
+        "Overview of the 2030 PictoGen Task, Notebook for the ImageCLEF Lab at CLEF 2030",
+        "Spotting Widgets @ TREC",
+    ):
+        assert kind(wmt, title) == "shared_task", title
+    for title in (
+        "Better Translation of Tiny Things",
+        "An Overview of Terminological Resources for Widgets",
+        "Clefs and Treble: A Musical Study",
+    ):
+        assert kind(wmt, title) == "intl_conference", title
+    assert kind("BioNLP Workshop and Shared Task") == "intl_workshop"
+    # Not a journal's paper (a report on a campaign).
+    assert kind("SIGIR Forum", "Report on CLEF 2029", doc_type="Article") == "intl_journal"
+
+
 def test_venue_rows():
     pid = make_person()
     add_source(pid, "hal", "idhal:x", [pub("a", "Paper A", 2020, "Journées de Foo")])
