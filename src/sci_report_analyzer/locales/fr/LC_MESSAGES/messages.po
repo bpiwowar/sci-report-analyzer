@@ -137,6 +137,9 @@ msgstr ""
 "Un dossier (p. ex. un comité) regroupe des personnes ; chacune y a sa "
 "propre période."
 
+msgid "A colour is a hex code, e.g. #2196f3"
+msgstr "Une couleur est un code hexadécimal, p. ex. #2196f3"
+
 msgid "A folder cannot go within itself"
 msgstr "Un dossier ne peut pas aller en lui-même"
 
@@ -2631,6 +2634,9 @@ msgstr "Liste numérotée"
 msgid "Numbered papers: with the tag"
 msgstr "Articles numérotés : avec l'étiquette"
 
+msgid "OK"
+msgstr "OK"
+
 #, python-brace-format
 msgid "ORCID {orcid} set: candidates with it are shown in green"
 msgstr "ORCID {orcid} défini : les candidats qui l'ont sont affichés en vert"
@@ -2717,6 +2723,9 @@ msgstr "Autres et prépublications"
 
 msgid "Other (report…)"
 msgstr "Autre (rapport…)"
+
+msgid "Other colour"
+msgstr "Autre couleur"
 
 msgid "Other papers"
 msgstr "Autres articles"
@@ -3539,6 +3548,9 @@ msgid "Sources whose venue texts the rule applies to (empty: all)"
 msgstr ""
 "Sources aux textes de canal de publication desquelles la règle s’applique"
 " (vide : toutes)"
+
+msgid "Spectrum"
+msgstr "Spectre"
 
 msgid "Split"
 msgstr "Côte à côte"

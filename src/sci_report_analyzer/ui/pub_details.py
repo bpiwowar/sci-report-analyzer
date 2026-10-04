@@ -39,6 +39,7 @@ from ..source_settings import active_links
 from ..sources import ADAPTERS
 from ..sources.base import normalize_doi
 from . import scimago_years
+from .colours import ColourInput
 from .theme import (
     author_html,
     badge_details,
@@ -1254,7 +1255,7 @@ def _new_category(name: str, act) -> None:
             .classes("w-full")
             .mark("category-name")
         )
-        colour = ui.color_input(_("Colour"), value="#0969da", preview=True).classes("w-full")
+        colour = ColourInput(_("Colour"), value="#0969da").classes("w-full")
 
         def save() -> None:
             if not cname.value.strip():
