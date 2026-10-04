@@ -228,3 +228,29 @@ def test_migrations_keep_the_venues_variants_and_links(tmp_path):
     db_session.run_migrations(engine)
     with sqlite3.connect(db) as c:
         assert c.execute("SELECT venue_id FROM venue_key").fetchall() == [(1,)]
+
+
+def test_prefix_rules_for_every_source(tmp_path):
+    """The DOI-only "Proceedings of" / "The" rules saved become the general ones (not when
+    edited)."""
+    import json
+
+    from sci_report_analyzer.db.migrations.versions import (
+        b3e9d7a2c5f4_prefix_rules_every_source as m,
+    )
+
+    db = tmp_path / "db.sqlite"
+    cfg = _cfg()
+    with create_engine(f"sqlite:///{db}").begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "f8b2c6d4a3e1")
+    edited = {**m.OLD["leadingThe"], "pattern": r"^\s*the\s+(?=journal)"}
+    with sqlite3.connect(db) as c:
+        c.execute(
+            "INSERT INTO app_setting (key, value) VALUES ('matching', ?)",
+            (json.dumps({"norm_rules": [m.OLD["proceedingsOf"], edited]}),),
+        )
+    _migrate(db)
+    with sqlite3.connect(db) as c:
+        value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
+    assert value["norm_rules"] == [m.RULES["proceedingsOf"], edited]

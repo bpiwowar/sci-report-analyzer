@@ -959,7 +959,7 @@ def _emnlp_setup():
                 "Findings of the Association for Computational Linguistics: EMNLP 2023",
             ),
             pub("j", "Joint paper", 2019, EMNLP_IJCNLP),
-            pub("k", "Proceedings paper", 2019, f"Proceedings of the {EMNLP_IJCNLP}"),
+            pub("k", "Proceedings paper", 2019, f"Proc. {EMNLP_IJCNLP}"),
         ],
     )
     _stats(pid)

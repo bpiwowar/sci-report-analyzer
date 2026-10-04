@@ -10,6 +10,7 @@ from sci_report_analyzer.ranking.matcher import Matcher
 from sci_report_analyzer.ranking.normalize import (
     DEFAULT_NORM_RULES,
     LANGUAGE_RULES,
+    PREFIX_RULES,
     apply_rules,
     clean_venue,
     normalize,
@@ -56,9 +57,10 @@ def test_cleaning(case):
         return
     # The reference keeps spelled ordinals ("Thirty-sixth", "Première") and drops the others:
     # the language rules replace them all ("Zth"), a mark left out here.
-    # Parenthesised text is kept (but acronyms): the reference's "cleanNoParens".
+    # Parenthesised text is kept (but acronyms): the reference's "cleanNoParens". A
+    # proceedings' "Proceedings of the" and a leading "The" are removed (not by the reference).
     assert without_ordinal_marks(clean_venue(case["venue"])) == without_ordinal_marks(
-        apply_rules(case["cleanNoParens"], LANGUAGE_RULES)
+        apply_rules(case["cleanNoParens"], (*PREFIX_RULES, *LANGUAGE_RULES))
     )
     assert normalize(case["venue"]) == case["norm"]
     assert tokenize(case["venue"]) == case["tokens"]
