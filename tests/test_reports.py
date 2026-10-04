@@ -249,14 +249,10 @@ def test_folder_numbering_templates_and_status():
         reports.save_folder_templates(fid, [reports.Template("", "{.year}", "")])
 
 
-async def test_folder_notes_citation_status(user: User, monkeypatch, tmp_path):
+async def test_folder_notes_citation_status(user: User, fake_viewer):
     from sci_report_analyzer import pdfs
 
     pid, period = _setup()
-    viewer = tmp_path / "pdfjs"
-    (viewer / "web").mkdir(parents=True)
-    (viewer / "web" / "viewer.html").write_text("<html></html>")
-    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
     stats = await pubview.load_stats(pid)
     keys = reports.citation_keys(stats)
     a = next(s.id for s in stats if s.title == "Deep ranking for search")
