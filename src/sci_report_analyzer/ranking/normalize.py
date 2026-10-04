@@ -348,3 +348,21 @@ def clean_venue(segment: str | None) -> str:
     ``"ECCV 2018 workshops"`` stays ``"ECCV workshops"``.
     """
     return apply_rules(segment, DEFAULT_NORM_RULES)
+
+
+def rule_origin(rule: NormRule) -> str:
+    """Where a cleaning rule comes from: "default" (a built-in one, as by default), "edited"
+    (a built-in one, changed) or "added" (by hand)."""
+    default = next((d for d in DEFAULT_NORM_RULES if d.id == rule.id), None)
+    if default is None:
+        return "added"
+    return "default" if rule.model_dump() == default.model_dump() else "edited"
+
+
+def in_order(rules: Iterable[NormRule], languages: Iterable[str]) -> list[NormRule]:
+    """The cleaning rules as applied: those of a language first (in the order of
+    ``languages``), then the general ones."""
+    order = list(languages)
+    return sorted(
+        rules, key=lambda r: order.index(r.language) if r.language in order else len(order)
+    )
