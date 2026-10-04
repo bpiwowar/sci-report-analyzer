@@ -46,9 +46,8 @@ from .theme import (
     author_html,
     badge_details,
     int_or_none,
-    level_hint,
     level_legend,
-    level_options,
+    level_picker,
     merge_direction,
     rank_chip,
     source_tag,
@@ -59,9 +58,6 @@ from .theme import (
 
 if TYPE_CHECKING:
     from .panel import PublicationsPanel
-
-CORE_RANKS = ["A*", "A", "B", "C"]
-QUARTILES = ["Q1", "Q2", "Q3", "Q4"]
 
 
 async def _record_details(m: MemberView, box: ui.element, *, links: bool) -> None:
@@ -1931,25 +1927,9 @@ def _rank_editor(s: PubStat, done, venue_scope, for_venue, venue_id, step: _Step
             step.cancel_button()
 
         with ui.tab_panel("level").classes("p-0"):
-            with ui.row().classes("items-center gap-2"):
-                vtype = ui.select(
-                    {"conference": _("Conference (CORE)"), "journal": _("Journal (quartile)")},
-                    value="journal" if s.kind.endswith("journal") else "conference",
-                ).props("dense outlined")
-                start = QUARTILES if vtype.value == "journal" else CORE_RANKS
-                rank = ui.select(
-                    level_options(start),
-                    value=start[0] if start is QUARTILES else "A",
-                    new_value_mode="add-unique",
-                    with_input=True,
-                ).props("dense outlined")
-                vtype.on_value_change(
-                    lambda e: rank.set_options(
-                        level_options(CORE_RANKS if e.value == "conference" else QUARTILES),
-                        value="A" if e.value == "conference" else "Q1",
-                    )
-                )
-            level_hint(rank)
+            vtype, rank = level_picker(
+                "journal" if s.kind.endswith("journal") else "conference", None
+            )
             lvl_box = venue_scope()
             lvl_note = note_input(lvl_box)
 
