@@ -2657,3 +2657,24 @@ def test_earlier_ui_states_normalized() -> None:
         "tag_filter": [annotations.starred_tag_id()],
     }
     assert summary_settings() == {"details": {"q4": "off", "q1": "count"}, "years": True}
+
+
+def test_cleaning_rules_origin_order_and_impact() -> None:
+    from sci_report_analyzer import venue_match
+    from sci_report_analyzer.ranking.normalize import NormRule, default_rules, in_order, rule_origin
+
+    rules = default_rules()
+    assert rule_origin(rules[0]) == "default"
+    edited = rules[0].model_copy(update={"name": "Mine"})
+    assert rule_origin(edited) == "edited"
+    added = NormRule(id="mine", name="Mine", pattern=r"\bjournal\b", ignore_case=True)
+    assert rule_origin(added) == "added"
+    fr = NormRule(id="fr", name="Fr", pattern="x", language="fr")
+    assert in_order([added, fr], ["en", "fr"]) == [fr, added]
+
+    add_source(
+        make_person("Jane Doe"), "dblp", "x/1", [pub("a", "A paper", 2021, "Neural Journal")]
+    )
+    venue_match.refresh()
+    [(m, key)] = venue_match.key_changes([*rules, added])
+    assert (m.raw, key) == ("Neural Journal", "neural")
