@@ -16,6 +16,20 @@ erased the rest.
 - The folder dialog's "Notes" field (the folder's own short text): save it only when
   edited (the dialog may show a stale copy).
 
+## Folders: a hierarchy, shared settings
+
+(To do after the other items are merged.)
+
+- Folders can be nested; a folder's settings are inherited from its parent (shared).
+- The settings are decoupled from the folder: their own table, and a relation table
+  folder → settings, so that several folders use the same settings.
+- Sharing is all or nothing: a folder uses its parent's settings (all of them), or its own.
+- The shared settings:
+  1. the starring system (the numbered tag, the number formats, the templates, the
+     starting notes: `Folder.citations`);
+  2. the excerpt categories.
+- Rename "People" to "Reports" in the UI.
+
 ## Settings: saving
 
 Saving the preferences is easy to forget (each screen has its own save button).
