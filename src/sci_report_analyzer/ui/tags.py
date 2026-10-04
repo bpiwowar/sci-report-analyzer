@@ -163,10 +163,22 @@ def note_editor(
 
 
 def paper_tags_and_notes(
-    s, period, tags: list[Tag], reload: Callable[[], None], manage: Callable[[], None]
+    s,
+    period,
+    tags: list[Tag],
+    reload: Callable[[], None],
+    manage: Callable[[], None],
+    *,
+    quote_tool: Callable[[Callable[[], MarkdownEditor | None]], None] | None = None,
 ) -> None:
     """A paper's tags (global, and within ``period``) and its notes (its own, and within
-    the period), in its details."""
+    the period), in its details; ``quote_tool``: a button of the notes' toolbars, given their
+    editor (next to the PDF: quoting the selected text)."""
+    editors: dict[str, MarkdownEditor] = {}
+
+    def tools(name: str) -> Callable[[], None] | None:
+        return (lambda: quote_tool(lambda: editors.get(name))) if quote_tool else None
+
     ui.label(_("Tags")).classes("font-medium")
     pid = period.id if period else None
 
@@ -246,7 +258,7 @@ def paper_tags_and_notes(
         s.note = text or None
         reload()
 
-    note_editor(
+    editors["paper"] = note_editor(
         _("Note (on the paper)"),
         s.note,
         save_note,
@@ -254,6 +266,7 @@ def paper_tags_and_notes(
         mode="split",
         stacked=True,
         height="8rem",
+        toolbar=tools("paper"),
     )
     if period is not None:
 
@@ -265,7 +278,7 @@ def paper_tags_and_notes(
                 s.period_notes.pop(pid, None)
             reload()
 
-        note_editor(
+        editors["period"] = note_editor(
             _("Note within {period}").format(period=period.name),
             s.period_notes.get(pid),
             save_period_note,
@@ -273,4 +286,5 @@ def paper_tags_and_notes(
             mode="split",
             stacked=True,
             height="8rem",
+            toolbar=tools("period"),
         )

@@ -1,6 +1,7 @@
 """Documents of a person within a period / folder: storage, the papers found in them
 (titles, ids, citations, links by hand), bookmarks, and their pages."""
 
+import asyncio
 import re
 
 import pytest
@@ -12,6 +13,7 @@ from sqlalchemy import select
 from sci_report_analyzer import documents, folders, pdfs, pubview
 from sci_report_analyzer.db.models import Publication
 from sci_report_analyzer.db.session import session_scope
+from sci_report_analyzer.ui.mdedit import MarkdownEditor, quote
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
 
@@ -263,6 +265,35 @@ async def test_paper_pdf_bookmarks(user: User, monkeypatch, tmp_path):
     await user.should_see(marker="bookmark-0")
     assert documents.bookmarks("pub", ids["a"]) == [{"name": "Page 4", "p": 4, "y": None}]
     await user.should_see("Page 4")
+
+
+async def test_quote_into_the_notes(user: User, monkeypatch, tmp_path):
+    assert quote("Ranking\n models are  deep", "p. 2") == "> Ranking models are deep (p. 2)"
+    assert quote("Selected on the page") == "> Selected on the page"
+    _, period, ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection: dict = {"text": "Our ranking model\nbeats sparse ones", "p": 1}
+    user.javascript_rules[re.compile(r"vrPdf\.quoted\(\)")] = lambda _: selection
+    inserted = []  # (at the cursor, in the browser)
+    monkeypatch.setattr(MarkdownEditor, "insert_block", lambda self, text: inserted.append(text))
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="doc-note")
+    user.find(marker="note-quote").click()
+    for _i in range(50):  # (its JavaScript: once the selection is back)
+        if inserted:
+            break
+        await asyncio.sleep(0.02)
+    assert inserted == ["> Our ranking model beats sparse ones (p. 1)"]
+    # Nothing selected: says so.
+    selection = {}
+    user.find(marker="note-quote").click()
+    await user.should_see("Select the text to quote")
+    # On a paper's PDF: in its notes (the period's too).
+    pdfs.save(ids["a"], PDF, None)
+    await user.open(f"/pdf/{ids['a']}?period={period}")
+    await user.should_see(marker="period-note")
+    assert len(user.find(marker="note-quote").elements) == 2
 
 
 async def test_last_place(user: User, monkeypatch, tmp_path):

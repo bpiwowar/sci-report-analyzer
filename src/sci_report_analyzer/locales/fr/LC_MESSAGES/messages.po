@@ -2632,6 +2632,11 @@ msgstr "Citation"
 msgid "Quote its text too"
 msgstr "Citer aussi son texte"
 
+msgid "Quote the text selected in the PDF (or the highlight clicked), with its page (Q)"
+msgstr ""
+"Citer le texte sélectionné dans le PDF (ou le surlignage cliqué), avec sa "
+"page (Q)"
+
 msgid "Rank"
 msgstr "Rang"
 
@@ -2969,6 +2974,11 @@ msgstr "Sélectionnez d'abord la référence (ou son titre) dans le PDF"
 msgid "Select the text to file (or an area with text, or click a highlight) first"
 msgstr ""
 "Sélectionnez d'abord le texte à classer (ou une zone avec du texte, ou "
+"cliquez sur un surlignage)"
+
+msgid "Select the text to quote (or an area with text, or click a highlight) first"
+msgstr ""
+"Sélectionnez d'abord le texte à citer (ou une zone avec du texte, ou "
 "cliquez sur un surlignage)"
 
 msgid "Semantic Scholar API key (optional)"

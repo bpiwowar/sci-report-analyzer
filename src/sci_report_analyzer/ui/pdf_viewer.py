@@ -120,6 +120,15 @@ window.vrPdf = {
     if (this.at) emitEvent('vr-pdf-at', this.at);
     this.at = null;
   },
+  // The text to quote in a note: selected in the PDF (or a highlight clicked), else on the
+  // page (but in a note's editor).
+  quoted() {
+    const sel = this.selection() || this.highlighted();
+    if (sel && sel.text) return sel;
+    const s = window.getSelection(), text = s && !s.isCollapsed ? s.toString().trim() : '';
+    const n = s && s.anchorNode, at = n && (n.nodeType === 1 ? n : n.parentElement);
+    return text && !(at && at.closest('.cm-editor')) ? {text, p: null} : null;
+  },
   // Through the link service, as a link: a step back and forward (the viewer's history).
   go(p, y) {
     const a = this.app();
@@ -355,6 +364,7 @@ window.vrPdf = {
     e: () => document.getElementById('vr-pdf-excerpt') && emitEvent('vr-pdf-excerpt'),
     b: () => emitEvent('vr-pdf-bookmark'),
     f: () => emitEvent('vr-pdf-find'),  // (without a selection: says so)
+    q: () => emitEvent('vr-pdf-quote'),  // (into the note last used)
   },
   key(ev) {
     if (ev.key === 'Escape' && (this.area || this.areaOn)) {
@@ -673,6 +683,7 @@ def viewer_frame(
                 "flat dense round color=white id=vr-pdf-find"
             ).mark("pdf-find")
         ui.on("vr-pdf-find", side.find_selection)
+        ui.on("vr-pdf-quote", lambda: side.quote())
         # An area (a rectangle) of a page, selected: its text, as a text selection.
         ui.button(icon="highlight_alt").props("flat dense round color=white id=vr-pdf-area").on(
             "click", js_handler="() => vrPdf.areaMode()"
@@ -774,7 +785,12 @@ async def _side(side: Side, box: ui.column, details_box: ui.column, pub_id: int)
                 tags_dialog(changed_tags)
 
         paper_tags_and_notes(
-            s, state["period"], tags, lambda: changed(side.person_id, but=side.host), manage
+            s,
+            state["period"],
+            tags,
+            lambda: changed(side.person_id, but=side.host),
+            manage,
+            quote_tool=side.quote_tool,
         )
 
     box.clear()

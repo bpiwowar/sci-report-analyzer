@@ -12,6 +12,7 @@ from nicegui import ui
 from .. import categories, documents, folders, manual, reflist
 from ..i18n import N_, _
 from ..sources.base import SourceError
+from .mdedit import MarkdownEditor, quote
 from .panel import PublicationsPanel
 from .pdf_viewer import changed, watch
 from .pub_details import show_details
@@ -65,6 +66,8 @@ class Side:
         self.categories: Callable[[], None] | None = None
         # A link from a selection to a paper (documents): (pub id, page, rects, text).
         self.link: Callable[[int, int, list, str], None] | None = None
+        # The notes' editors (the selected text quoted into them), the last one used first.
+        self.notes: list[MarkdownEditor] = []
 
     def attach(self, box: ui.column) -> None:
         self.box = box
@@ -225,6 +228,49 @@ class Side:
         names = {n.id: n.path for n in categories.tree(self.folder[0])} if self.folder else {}
         marks = categories.tints(self.period_id, key, names)
         self.box.client.run_javascript(f"vrDoc.mark({json.dumps(marks)})")
+
+    def quote_tool(self, editor: Callable[[], MarkdownEditor | None]) -> None:
+        """In the toolbar of a note's ``editor`` (made after it: hence a function): quote the
+        selected text there; Q quotes into the note last used."""
+
+        def used() -> None:
+            if (e := editor()) is not None:
+                self.notes[:] = [e, *(x for x in self.notes if x is not e)]
+
+        async def click() -> None:
+            used()
+            if (e := editor()) is not None:
+                await self.quote(e)
+
+        ui.button(icon="post_add", on_click=click).props("flat dense round size=sm").tooltip(
+            _("Quote the text selected in the PDF (or the highlight clicked), with its page (Q)")
+        ).mark("note-quote")
+
+        def made() -> None:  # (the note's editor: listed, last; first once used)
+            if (e := editor()) is not None:
+                self.notes.append(e)
+                e.box.on("focusin", used)
+
+        ui.timer(0, made, once=True)
+
+    async def quote(self, editor: MarkdownEditor | None = None) -> None:
+        """Quote the text selected (in the PDF; else on the page) into ``editor`` (else the
+        note last used), as a Markdown quote with its page."""
+        if editor is None:  # (Q: the notes' tab shown)
+            notes = [e for e in self.notes if not e.editor.is_deleted]
+            if not notes:
+                return
+            editor = notes[0]
+            self.select("notes")
+        sel = await ui.run_javascript("vrPdf.quoted()")
+        if not sel or not (sel.get("text") or "").strip():
+            ui.notify(
+                _("Select the text to quote (or an area with text, or click a highlight) first"),
+                type="warning",
+            )
+            return
+        page = sel.get("p")
+        editor.insert_block(quote(sel["text"], _("p. {page}").format(page=page) if page else ""))
 
     async def find_selection(self) -> None:
         sel = await ui.run_javascript("vrPdf.selection()")
