@@ -17,10 +17,10 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import Client, app, background_tasks, ui
 
-from .. import annotations, documents, pdfs
+from .. import annotations, documents, livereload, pdfs
 from ..db.models import Publication
 from ..db.session import session_scope
-from ..i18n import _, ngettext
+from ..i18n import N_, _, ngettext
 from .theme import MARKDOWN_CSS
 
 if TYPE_CHECKING:
@@ -29,11 +29,14 @@ if TYPE_CHECKING:
     from .viewer_side import Side
 
 NO_CONFIRM = "ui.pdf.no_confirm"  # AppSetting: download without asking first
-HIDE_PARAMS = "ui.pdf.hide_params"  # AppSetting: the editing tools without their options
 SIDE_WIDTH = "ui.pdf.side_width"  # AppSetting: the width (px) of the side column
 SIDE_DEFAULT, SIDE_MIN = 384, 240
 PANE_TOKEN = re.compile(r"[a-z0-9]{1,40}")  # (of a PDF window, its side panel elsewhere)
 _no_confirm: bool | None = None  # (cached NO_CONFIRM)
+TAG_LIST_TIP = N_(
+    "Tag from a list: find the papers of the selected list (e.g. an area over numbered "
+    "references) and tag them (L)"
+)
 
 _TYPES = {
     ".mjs": "text/javascript",
@@ -78,7 +81,7 @@ document.addEventListener('mousedown', (ev) => {
 _SCRIPT = """
 <script>
 window.vrPdf = {
-  url: %(url)s, texts: %(texts)s, saving: false, saved: null, hideParams: %(hide)s,
+  url: %(url)s, texts: %(texts)s, saving: false, saved: null,
   win() {
     const f = document.getElementById('vr-pdf-frame');
     return f && f.contentWindow;
@@ -172,15 +175,16 @@ window.vrPdf = {
   // The selected text, its page (where it starts) and its rectangles (one per line, PDF
   // units, the fifth number their page): those of the text only (never a whole page, as
   // the range's own rectangles over two pages).
-  // Without one: the area drawn (see area), if any.
+  // Without one: the areas drawn (see areas), if any: their texts, in order, one per line.
   selection() {
     const w = this.win(), a = this.app();
     if (!w || !a) return null;
     const sel = w.getSelection();
     const text = sel && !sel.isCollapsed && sel.rangeCount ? sel.toString().trim() : '';
     if (!text) {
-      const x = this.area;
-      return x ? {text: x.text, p: x.p, rects: [[...x.rect, x.p]], area: true} : null;
+      const xs = this.areas;
+      return xs.length ? {text: this.areaText(), p: xs[0].p, rects: xs.map(x => [...x.rect, x.p]),
+                          area: true} : null;
     }
     const range = sel.getRangeAt(0), doc = range.startContainer.ownerDocument;
     let root = range.commonAncestorContainer;
@@ -217,7 +221,7 @@ window.vrPdf = {
     return {text, p, rects: rects.map(r => [...r.slice(0, 4).map(round), r[4]])};
   },
   // The text of a page within rectangles (PDF units): from the text layer, its characters
-  // whose middle is in one of them (a new line: a space).
+  // whose middle is in one of them, a line per line (e.g. a list's items: see the tagging).
   textIn(pv, rects) {
     const layer = pv && pv.div.querySelector('.textLayer');
     if (!layer) return '';
@@ -244,7 +248,7 @@ window.vrPdf = {
         if (inside(c.left + c.width / 2, c.top + c.height / 2)) part += node.data[i];
       }
       if (!part) continue;
-      if (top !== null && Math.abs(r.top - top) > r.height / 2) text += ' ';  // (a new line)
+      if (top !== null && Math.abs(r.top - top) > r.height / 2) text += '\\n';  // (a new line)
       text += part; top = r.top;
     }
     return text.trim();  // (its spaces: normalized when filed)
@@ -268,10 +272,11 @@ window.vrPdf = {
     const round = (v) => Math.round(v * 10) / 10;
     return text ? {text, p, rects: rects.map(r => [...r.map(round), p])} : null;
   },
-  // An area of a page (a rectangle drawn with the mouse: in the area mode, or with Alt), as a
-  // selection: the text within, its page and its rectangle (PDF units). Kept until a click
-  // elsewhere, a text selection, or Escape.
-  area: null, areaOn: false, drag: null,
+  // Areas of the pages (rectangles drawn with the mouse: in the area mode, or with Alt; with
+  // Shift, one more), as a selection: the texts within (in the order drawn), the page of the
+  // first, their rectangles (PDF units). Kept until a click elsewhere, a text selection, or
+  // Escape.
+  areas: [], areaOn: false, drag: null,
   areaMode(on) {
     this.areaOn = on === undefined ? !this.areaOn : on;
     const a = this.app();
@@ -280,11 +285,12 @@ window.vrPdf = {
     const b = document.getElementById('vr-pdf-area');
     if (b) b.style.background = this.areaOn ? 'rgba(255, 255, 255, 0.3)' : '';
   },
+  areaText() { return this.areas.map(x => x.text).filter(t => t).join('\\n'); },
   clearArea() {
-    if (!this.area) return;
-    const pv = this.app()?.pdfViewer?.getPageView(this.area.p - 1);
-    this.area = null;
-    if (pv) this.drawArea(pv);
+    if (!this.areas.length) return;
+    const pages = new Set(this.areas.map(x => x.p));
+    this.areas = [];
+    for (const p of pages) this.drawArea(this.app()?.pdfViewer?.getPageView(p - 1));
     this.actions();
   },
   // (the box of a page's viewport, on the screen)
@@ -294,22 +300,25 @@ window.vrPdf = {
     const r = pv.div.getBoundingClientRect();
     return {left: r.left + pv.div.clientLeft, top: r.top + pv.div.clientTop};
   },
+  // The areas of a page, and ``rect`` (being drawn).
   drawArea(pv, rect) {
     if (!pv || !pv.div || !pv.viewport) return;
     pv.div.querySelectorAll('.vr-area').forEach(e => e.remove());
-    rect = rect || (this.area && this.area.p === pv.id ? this.area.rect : null);
-    if (!rect) return;
-    const [x0, y0] = pv.viewport.convertToViewportPoint(rect[0], rect[1]);
-    const [x1, y1] = pv.viewport.convertToViewportPoint(rect[2], rect[3]);
-    const mark = pv.div.ownerDocument.createElement('div');
-    mark.className = 'vr-area';
-    Object.assign(mark.style, {
-      position: 'absolute', left: Math.min(x0, x1) + 'px', top: Math.min(y0, y1) + 'px',
-      width: Math.abs(x1 - x0) + 'px', height: Math.abs(y1 - y0) + 'px', zIndex: 5,
-      pointerEvents: 'none', userSelect: 'none', border: '1px dashed #1976d2',
-      background: 'rgba(25, 118, 210, 0.12)',
-    });
-    pv.div.appendChild(mark);
+    const rects = this.areas.filter(x => x.p === pv.id).map(x => x.rect);
+    if (rect) rects.push(rect);
+    for (const r of rects) {
+      const [x0, y0] = pv.viewport.convertToViewportPoint(r[0], r[1]);
+      const [x1, y1] = pv.viewport.convertToViewportPoint(r[2], r[3]);
+      const mark = pv.div.ownerDocument.createElement('div');
+      mark.className = 'vr-area';
+      Object.assign(mark.style, {
+        position: 'absolute', left: Math.min(x0, x1) + 'px', top: Math.min(y0, y1) + 'px',
+        width: Math.abs(x1 - x0) + 'px', height: Math.abs(y1 - y0) + 'px', zIndex: 5,
+        pointerEvents: 'none', userSelect: 'none', border: '1px dashed #1976d2',
+        background: 'rgba(25, 118, 210, 0.12)',
+      });
+      pv.div.appendChild(mark);
+    }
   },
   // (the rectangle from where the drag started to the mouse, within the page: PDF units)
   dragRect(ev) {
@@ -325,12 +334,13 @@ window.vrPdf = {
     const a = this.app(), w = this.win();
     if (!a || !a.pdfViewer || ev.button !== 0) return;
     const pageDiv = ev.target.closest && ev.target.closest('.page');
-    if (!pageDiv) return;  // (the viewer's toolbars: the area kept)
+    if (!pageDiv) return;  // (the viewer's toolbars: the areas kept)
     const editing = a.pdfViewer.annotationEditorMode > 0;
-    if (!(this.areaOn || (ev.altKey && !editing))) { this.clearArea(); return; }
+    const more = ev.shiftKey && this.areas.length > 0 && !editing;  // (one more area)
+    if (!(this.areaOn || more || (ev.altKey && !editing))) { this.clearArea(); return; }
     ev.preventDefault(); ev.stopPropagation();
     w.getSelection().removeAllRanges();
-    this.clearArea();
+    if (!ev.shiftKey) this.clearArea();
     const pv = a.pdfViewer.getPageView(+pageDiv.dataset.pageNumber - 1), box = this.pageBox(pv);
     this.drag = {pv, x: ev.clientX - box.left, y: ev.clientY - box.top};
   },
@@ -346,42 +356,97 @@ window.vrPdf = {
     this.drag = null;
     if (rect[2] - rect[0] < 2 || rect[3] - rect[1] < 2) { this.drawArea(pv); return; }  // (a click)
     const round = (v) => Math.round(v * 10) / 10;
-    this.area = {p: pv.id, rect: rect.map(round), text: this.textIn(pv, [rect])};
+    this.areas.push({p: pv.id, rect: rect.map(round), text: this.textIn(pv, [rect])});
     this.drawArea(pv);
     this.actions();
+  },
+  // Copying (⌘C, Ctrl+C) without a text selection (but in a field): the areas' text. (The
+  // copy event, and the clipboard from the key: a browser may fire no copy event then.)
+  copyArea(ev) {
+    const text = this.areas.length ? this.areaText() : '';
+    if (!text) return false;
+    const t = ev.target, w = t && t.ownerDocument ? t.ownerDocument.defaultView : window;
+    if (t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select')))) {
+      return false;
+    }
+    for (const win of [window, this.win()]) {
+      const sel = win && win.getSelection();
+      if (sel && !sel.isCollapsed && sel.toString().trim()) return false;
+    }
+    if (ev.type === 'copy') {
+      ev.clipboardData.setData('text/plain', text);
+      ev.preventDefault(); ev.stopImmediatePropagation();
+    } else (w || window).navigator.clipboard?.writeText(text).catch(() => {});
+    return true;
   },
   // The actions on the selected text, greyed out without one (adding an excerpt: also with a
   // highlight selected).
   actions() {
     const sel = this.win()?.getSelection();
-    const text = !!((sel && !sel.isCollapsed && sel.toString().trim()) || this.area?.text);
+    const text = !!((sel && !sel.isCollapsed && sel.toString().trim()) || this.areaText());
     const ed = this.app()?.pdfViewer?._layerProperties?.annotationEditorUIManager
       ?.firstSelectedEditor;
     const hl = !!(ed && ed.editorType === 'highlight');
-    for (const [id, ok] of [['vr-pdf-find', text], ['vr-pdf-excerpt', text || hl]]) {
+    for (const [id, ok] of [['vr-pdf-find', text], ['vr-pdf-tag-list', text],
+                            ['vr-pdf-excerpt', text || hl]]) {
       const b = document.getElementById(id);
       if (b) { b.disabled = !ok; b.classList.toggle('disabled', !ok); }
     }
   },
-  // Toggle an editing mode of the viewer (highlight, text, drawing, image).
+  // Toggle an editing mode of the viewer (highlight, text, drawing, image, comments).
   mode(m) {
     const a = this.app();
     if (!a || !a.pdfViewer) return;
     const now = a.pdfViewer.annotationEditorMode;
     a.eventBus.dispatch('switchannotationeditormode', {source: this, mode: now === m ? 0 : m});
   },
-  // The options of the editing tools (colour, thickness…: highlight, text, drawing), shown
-  // under their buttons while in their mode: hidden or shown again (the mode stays on; PDF.js
-  // has no option for it). (An image's, adding it: always shown.)
-  params(hide) {
-    this.hideParams = hide === undefined ? !this.hideParams : hide;
-    this.win()?.document.body.classList.toggle('vr-no-params', this.hideParams);
-    const b = document.getElementById('vr-pdf-params');
-    if (b) b.style.background = this.hideParams ? '' : 'rgba(255, 255, 255, 0.3)';
-    return this.hideParams;
-  },
   // What an excerpt is made of: the selected text, else the highlight clicked.
   excerpted() { return this.selection() || this.highlighted(); },
+  // The highlights of PDF.js under an excerpt just filed (its rectangles, PDF units, the fifth
+  // number their page, else ``p``): removed, its tint in their place (not both). A highlight
+  // is under it when the middle of one of its lines is in one of its rectangles, or the other
+  // way round (a highlight within a line).
+  async unhighlight(rects, p) {
+    const a = this.app(), ui = a?.pdfViewer?._layerProperties?.annotationEditorUIManager;
+    if (!ui || !rects || !rects.length) return;
+    const mid = (r) => [(r[0] + r[2]) / 2, (r[1] + r[3]) / 2];
+    const inside = (pt, r) => pt[0] >= r[0] && pt[0] <= r[2] && pt[1] >= r[1] && pt[1] <= r[3];
+    const lines = (q) => {  // (quadrilaterals: their boxes)
+      const out = [];
+      for (let i = 0; i + 7 < q.length; i += 8) {
+        out.push([Math.min(q[i], q[i + 2]), Math.min(q[i + 1], q[i + 5]),
+                  Math.max(q[i], q[i + 2]), Math.max(q[i + 1], q[i + 5])]);
+      }
+      return out;
+    };
+    const under = (q, page) => {
+      const own = rects.filter(r => (r[4] ?? p) === page);
+      return !!q && lines(q).some(l => own.some(r => inside(mid(l), r) || inside(mid(r), l)));
+    };
+    for (const page of new Set(rects.map(r => r[4] ?? p))) {
+      if (!page) continue;
+      // (highlights being edited, or added: PDF.js's editors)
+      for (const ed of [...ui.getEditors(page - 1)]) {
+        if (ed.editorType !== 'highlight' || !ed._drawOutlines) continue;
+        if (under(ed._drawOutlines.serializeQuadPoints(ed.pageTranslation, ed.pageDimensions),
+                  page)) ed.remove();
+      }
+      // (those of the file, not edited yet: turned into editors, removed, as PDF.js does)
+      const pv = a.pdfViewer.getPageView(page - 1);
+      const layer = pv?.annotationEditorLayer?.annotationEditorLayer;
+      const found = pv?.annotationLayer?.annotationLayer?.getEditableAnnotations?.() || [];
+      for (const el of [...found]) {
+        if (!layer || el.data.annotationType !== 9 /* highlight */) continue;
+        if (ui.isDeletedAnnotationElement(el.data.id) || !under(el.data.quadPoints, page)) continue;
+        const ed = await layer.deserialize(el);
+        if (!ed) continue;
+        layer.addOrRebuild(ed);
+        ed.remove();
+        el.hide();
+      }
+    }
+    this.actions();
+  },
   // Highlight the selected text (else: the highlighting mode, on or off).
   highlight() {
     const ui = this.app()?.pdfViewer?._layerProperties?.annotationEditorUIManager;
@@ -395,15 +460,21 @@ window.vrPdf = {
     t: () => vrPdf.mode(3),  // (free text)
     d: () => vrPdf.mode(15),  // (drawing)
     i: () => vrPdf.mode(13),  // (an image)
+    c: () => vrPdf.mode(16),  // (the comments)
     a: () => vrPdf.areaMode(),
     e: () => document.getElementById('vr-pdf-excerpt') && vrPane.emit('vr-pdf-excerpt'),
     b: () => vrPane.emit('vr-pdf-bookmark'),
     f: () => vrPane.emit('vr-pdf-find'),  // (without a selection: says so)
     q: () => vrPane.emit('vr-pdf-quote'),  // (into the note last used)
+    l: () => vrPane.emit('vr-pdf-tag-list'),  // (the papers of a list, tagged)
   },
   key(ev) {
-    if (ev.key === 'Escape' && (this.area || this.areaOn)) {
+    if (ev.key === 'Escape' && (this.areas.length || this.areaOn)) {
       this.clearArea(); this.areaMode(false);
+      return;
+    }
+    if (ev.key === 'c' && (ev.metaKey || ev.ctrlKey) && !ev.altKey && !ev.shiftKey) {
+      this.copyArea(ev);  // (the copy event still fired)
       return;
     }
     const act = this.keys[ev.key];
@@ -415,6 +486,7 @@ window.vrPdf = {
   },
 };
 document.addEventListener('keydown', (ev) => vrPdf.key(ev));
+document.addEventListener('copy', (ev) => vrPdf.copyArea(ev), true);
 // The side panel in another window (the pane, e.g. on another screen): the two windows talk
 // through a channel of the browser, named after a token of this one (kept when it is
 // reloaded). This one answers the pane's questions (the selection, where the reader is), goes
@@ -443,6 +515,7 @@ window.vrPane = {
     } else if (m.kind === 'bye') this.back();
     else if (m.kind === 'go') vrPdf.go(m.p, m.y);
     else if (m.kind === 'area') vrPdf.areaMode();
+    else if (m.kind === 'unhighlight') vrPdf.unhighlight(m.rects, m.p);
     else if (m.kind === 'ask') {
       const asked = ['selection', 'highlighted', 'excerpted', 'location', 'quoted'];
       let result = null;
@@ -535,6 +608,8 @@ document.addEventListener('webviewerloaded', (e) => {
   const w = e.detail.source;
   w.PDFViewerApplicationOptions.set('disablePreferences', true);
   w.PDFViewerApplicationOptions.set('enableHighlightFloatingButton', true);
+  // Comments (notes) on the annotations, e.g. a highlight's (its toolbar), and their list.
+  w.PDFViewerApplicationOptions.set('enableComment', true);
   // Its history (back and forward after following a link): not made for an embedded viewer.
   w.PDFViewerApplication.isViewerEmbedded = false;
   w.PDFViewerApplicationOptions.set('externalLinkTarget', 4);  // (TOP, as when embedded)
@@ -547,6 +622,7 @@ document.addEventListener('webviewerloaded', (e) => {
   w.history.replaceState = (...args) => { replace(...args); vrPdf.nav(); };
   w.addEventListener('popstate', () => vrPdf.nav());
   w.addEventListener('keydown', (ev) => vrPdf.key(ev), true);
+  w.document.addEventListener('copy', (ev) => vrPdf.copyArea(ev), true);
   w.document.addEventListener('selectionchange', () => {
     const sel = w.getSelection();
     if (sel && !sel.isCollapsed && sel.toString().trim()) vrPdf.clearArea();
@@ -563,16 +639,14 @@ document.addEventListener('webviewerloaded', (e) => {
     #secondaryDownload, #viewBookmark, #viewBookmarkSeparator, #editorSignature,
     #imageAltTextSettings, #imageAltTextSettingsSeparator, #documentProperties
     { display: none !important; }
-    .vr-area-mode .page, .vr-area-mode .page * { cursor: crosshair !important; }
-    .vr-no-params :is(#editorHighlightParamsToolbar, #editorInkParamsToolbar,
-      #editorFreeTextParamsToolbar) { display: none !important; }`;
+    .vr-area-mode .page, .vr-area-mode .page * { cursor: crosshair !important; }`;
   w.document.head.appendChild(style);
-  vrPdf.params(vrPdf.hideParams);
   w.PDFViewerApplication.initializedPromise.then(() => {
     const a = w.PDFViewerApplication;
     // (the shortcuts in the editing buttons' tooltips)
     for (const [id, k] of [['editorHighlightButton', 'H'], ['editorFreeTextButton', 'T'],
-                           ['editorInkButton', 'D'], ['editorStampButton', 'I']]) {
+                           ['editorInkButton', 'D'], ['editorStampButton', 'I'],
+                           ['editorCommentButton', 'C']]) {
       const b = w.document.getElementById(id);
       if (b) b.addEventListener('mouseenter', () => {
         if (b.title && !b.title.endsWith(`(${k})`)) b.title += ` (${k})`;
@@ -658,6 +732,7 @@ window.vrPane = {
 window.vrPdf = {
   go(p, y) { vrPane.post({kind: 'go', p, y}); },
   areaMode() { vrPane.post({kind: 'area'}); },
+  unhighlight(rects, p) { vrPane.post({kind: 'unhighlight', rects, p}); },
   selection() { return vrPane.ask('selection'); },
   highlighted() { return vrPane.ask('highlighted'); },
   excerpted() { return vrPane.ask('excerpted'); },
@@ -689,8 +764,8 @@ document.addEventListener('click', (ev) => {
 }, true);
 // The PDF window's shortcuts on the selection, here too (but when typing).
 document.addEventListener('keydown', (ev) => {
-  const name = {q: 'vr-pdf-quote', e: 'vr-pdf-excerpt', b: 'vr-pdf-bookmark', f: 'vr-pdf-find'}[
-    ev.key];
+  const name = {q: 'vr-pdf-quote', e: 'vr-pdf-excerpt', b: 'vr-pdf-bookmark', f: 'vr-pdf-find',
+                l: 'vr-pdf-tag-list'}[ev.key];
   if (!name || ev.ctrlKey || ev.metaKey || ev.altKey || ev.repeat) return;
   if (name === 'vr-pdf-excerpt' && !document.getElementById('vr-pdf-excerpt')) return;
   const t = ev.target;
@@ -853,12 +928,7 @@ def viewer_frame(
     }
     ui.add_css(MARKDOWN_CSS)
     ui.add_head_html(_SPLITTER % {"min": SIDE_MIN})
-    hide = bool(annotations.ui_state(HIDE_PARAMS, False))
-    ui.add_head_html(
-        _SCRIPT
-        % {"url": json.dumps(file_url), "texts": json.dumps(texts), "hide": json.dumps(hide)}
-        + script
-    )
+    ui.add_head_html(_SCRIPT % {"url": json.dumps(file_url), "texts": json.dumps(texts)} + script)
     with ui.row().classes("w-full items-center no-wrap gap-2 px-3 py-1 bg-primary text-white"):
         ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
         for icon, step, tip in (
@@ -871,6 +941,7 @@ def viewer_frame(
                 ).mark(f"pdf-{step}")
         ui.label(title).classes("ellipsis grow min-w-0 font-medium")
         ui.label("").classes("text-sm opacity-80").props("id=vr-pdf-status").mark("pdf-status")
+        livereload.banner(dense=True)  # (--live-reload: a new version, to restart)
         # (the actions on a selection, greyed out without one: their tooltips on a wrapper, a
         # disabled button showing none)
         with ui.element("span").tooltip(
@@ -881,12 +952,19 @@ def viewer_frame(
             ).props("flat dense round color=white id=vr-pdf-find").mark("pdf-find")
         ui.on("vr-pdf-find", side.find_selection)
         ui.on("vr-pdf-quote", lambda: side.quote())
+        with ui.element("span").tooltip(_(TAG_LIST_TIP)):
+            ui.button(
+                icon="playlist_add_check",
+                on_click=_here(side, "vr-pdf-tag-list", side.tag_selection),
+            ).props("flat dense round color=white id=vr-pdf-tag-list").mark("pdf-tag-list")
+        ui.on("vr-pdf-tag-list", side.tag_selection)
         # An area (a rectangle) of a page, selected: its text, as a text selection.
         with ui.element("span").tooltip(
             _(
                 "Select an area of a page (A, or Alt+drag): draw a rectangle on the page, the "
-                "text inside it becomes the selection, to quote (Q), add as an excerpt (E) or "
-                "find its paper (F). Escape to leave."
+                "text inside it becomes the selection, to quote (Q), add as an excerpt (E), find "
+                "its paper (F), tag the papers of a list (L) or copy (⌘C / Ctrl+C). Shift+drag "
+                "adds another area (their texts, in order). Escape to leave."
             )
         ):
             ui.button(icon="highlight_alt").props("flat dense round color=white id=vr-pdf-area").on(
@@ -902,17 +980,6 @@ def viewer_frame(
                     icon="playlist_add", on_click=_here(side, "vr-pdf-excerpt", side.add_excerpt)
                 ).props("flat dense round color=white id=vr-pdf-excerpt").mark("pdf-excerpt")
             ui.on("vr-pdf-excerpt", side.add_excerpt)
-        # (shown: highlighted, as the area mode)
-        with ui.element("span").tooltip(
-            _(
-                "Hide or show the options panel of highlighting, text and drawing (colour, "
-                "thickness…): the mode stays on"
-            )
-        ):
-            ui.button(icon="tune").props("flat dense round color=white id=vr-pdf-params").on(
-                "click", js_handler="() => emitEvent('vr-pdf-params', vrPdf.params())"
-            ).mark("pdf-params")
-        ui.on("vr-pdf-params", lambda e: annotations.save_ui_state(HIDE_PARAMS, bool(e.args)))
         ui.button(
             icon="bookmark_add",
             on_click=_here(side, "vr-pdf-bookmark", lambda: side.add_bookmark(*bookmarked)),
@@ -1012,11 +1079,16 @@ def _pane_frame(
         ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
         ui.label(title).classes("ellipsis grow min-w-0 font-medium")
         ui.label("").classes("text-sm opacity-80").props("id=vr-pane-status").mark("pane-status")
+        livereload.banner(dense=True)
         ui.button(icon="manage_search", on_click=side.find_selection).props(
             "flat dense round color=white"
         ).tooltip(_("Find the paper of the selected text, e.g. a reference (F)")).mark("pdf-find")
         ui.on("vr-pdf-find", side.find_selection)
         ui.on("vr-pdf-quote", lambda: side.quote())
+        ui.button(icon="playlist_add_check", on_click=side.tag_selection).props(
+            "flat dense round color=white"
+        ).tooltip(_(TAG_LIST_TIP)).mark("pdf-tag-list")
+        ui.on("vr-pdf-tag-list", side.tag_selection)
         if side.folder and side.source[0] == "doc":
             with ui.element("span").tooltip(
                 _(
