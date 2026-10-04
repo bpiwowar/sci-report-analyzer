@@ -5466,3 +5466,33 @@ msgstr "Les garder"
 
 msgid "Discard"
 msgstr "Abandonner"
+
+#, python-brace-format
+msgid "{n} variant now matched by the rule was removed"
+msgid_plural "{n} variants now matched by the rule were removed"
+msgstr[0] "{n} variante désormais reconnue par la règle a été supprimée"
+msgstr[1] "{n} variantes désormais reconnues par la règle ont été supprimées"
+
+msgid "Variants of another track"
+msgstr "Variantes d'une autre session"
+
+#, python-brace-format
+msgid ""
+"The rule matches these variants of the venue, of another track than its "
+"own ({track}). Remove them (their texts then take the rule's track), or "
+"edit the regex so that it no longer matches them."
+msgstr ""
+"La règle reconnaît ces variantes du canal, d'une autre session que la "
+"sienne ({track}). Supprimez-les (leurs textes prennent alors la session de "
+"la règle), ou modifiez la regex pour qu'elle ne les reconnaisse plus."
+
+msgid "Edit the regex"
+msgstr "Modifier la regex"
+
+msgid "Remove them"
+msgstr "Les supprimer"
+
+msgid "Turn into a venue rule (to edit): its near variants match too"
+msgstr ""
+"En faire une règle du canal (à modifier) : ses variantes proches sont "
+"aussi reconnues"

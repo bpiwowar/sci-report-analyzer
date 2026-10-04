@@ -214,16 +214,20 @@ def venue_rule_dialog(
     sample: tuple[str, str] | None = None,
     venue_id: int | None = None,
     index: int | None = None,
+    prefill: VenuePattern | None = None,
 ) -> None:
     """Add or edit a venue's regex rule: the source venue texts it matches belong to the venue.
 
     ``sample`` is a (source, raw venue text) the rule is made for (from a publication);
-    ``venue_id`` / ``index`` pick the venue and, when editing, its rule.
+    ``venue_id`` / ``index`` pick the venue and, when editing, its rule; ``prefill``: a new
+    rule's start (e.g. from a variant). The venue's variants the rule matches are removed
+    when it is saved; those of another track are in conflict with it: they are removed
+    (taking the rule's track) or the rule is edited, as the user chooses.
     """
     source, raw = sample or (None, "")
     options = venues.venue_options()
     rules = venues.venue_patterns(venue_id) if venue_id is not None else []
-    old = rules[index] if index is not None and index < len(rules) else None
+    old = rules[index] if index is not None and index < len(rules) else prefill
     label = ADAPTERS[source].label if source else None
 
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl vr-details"):
@@ -244,7 +248,7 @@ def venue_rule_dialog(
             .classes("w-full")
             .mark("rule-venue")
         )
-        if old is None:
+        if index is None:
             target.props("clearable")
         else:
             target.disable()  # an existing rule stays on its venue
@@ -289,7 +293,7 @@ def venue_rule_dialog(
             .props("dense outlined")
             .classes("w-full")
         )
-        if label and old is None:
+        if label and index is None:
             ui.button(
                 _("Only {source} texts").format(source=label),
                 on_click=lambda: only.set_value([source]),
@@ -371,8 +375,16 @@ def venue_rule_dialog(
         for el in (pattern, only, icase, track, target):
             el.on_value_change(preview)
 
-        def store(new_rules: list[VenuePattern], message: str) -> None:
-            venues.save_patterns(target.value, new_rules)
+        def store(
+            new_rules: list[VenuePattern], message: str, drop: list[venues.RuleVariant]
+        ) -> None:
+            venues.save_patterns(target.value, new_rules, [v.key for v in drop])
+            if drop:
+                message += " · " + ngettext(
+                    "{n} variant now matched by the rule was removed",
+                    "{n} variants now matched by the rule were removed",
+                    len(drop),
+                ).format(n=len(drop))
             # Refresh the caller first: a closed dialog is deleted, with its client context.
             done(message)
             dlg.close()
@@ -383,19 +395,59 @@ def venue_rule_dialog(
                 preview()
                 return
             new_rules = venues.venue_patterns(target.value)
-            if old is not None:
+            if index is not None:
                 new_rules[index] = rule
             else:
                 new_rules.append(rule)
-            store(new_rules, _("Venue rule saved"))
+            found = venues.rule_variants(target.value, rule)
+            if found.conflicting:
+                conflict(rule, found, new_rules)
+            else:
+                store(new_rules, _("Venue rule saved"), found.redundant)
+
+        def conflict(
+            rule: VenuePattern, found: venues.RuleVariants, new_rules: list[VenuePattern]
+        ) -> None:
+            """Variants of another track than the rule's, matched by it: never both."""
+
+            def track_name(track: str | None) -> str:
+                return tracks.name(track) if track else _("no track")
+
+            with ui.dialog() as ask, ui.card().classes("max-w-xl"):
+                ui.label(_("Variants of another track")).classes("text-lg font-medium")
+                ui.label(
+                    _(
+                        "The rule matches these variants of the venue, of another track than "
+                        "its own ({track}). Remove them (their texts then take the rule's "
+                        "track), or edit the regex so that it no longer matches them."
+                    ).format(track=track_name(rule.track))
+                ).classes("text-sm")
+                with ui.column().classes("gap-0").mark("rule-conflicts"):
+                    for v in found.conflicting:
+                        ui.label(f"{v.text} ({track_name(v.track)})").classes("text-sm font-mono")
+
+                def remove() -> None:
+                    ask.close()
+                    drop = [*found.redundant, *found.conflicting]
+                    store(new_rules, _("Venue rule saved"), drop)
+
+                with ui.row().classes("w-full justify-end"):
+                    ui.button(_("Edit the regex"), on_click=ask.close).props("flat").mark(
+                        "rule-conflict-edit"
+                    )
+                    ui.button(_("Remove them"), on_click=remove).props("color=negative").mark(
+                        "rule-conflict-remove"
+                    )
+            ask.on_value_change(lambda e: None if e.value else ask.delete())
+            ask.open()
 
         def delete_rule() -> None:
             new_rules = venues.venue_patterns(target.value)
             new_rules.pop(index)
-            store(new_rules, _("Venue rule deleted"))
+            store(new_rules, _("Venue rule deleted"), [])
 
         with ui.row().classes("w-full justify-end gap-2"):
-            if old is not None:
+            if index is not None:
                 ui.button(_("Delete rule"), on_click=delete_rule).props("flat color=negative").mark(
                     "rule-delete"
                 )
