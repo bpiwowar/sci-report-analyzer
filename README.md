@@ -39,8 +39,9 @@ notes and stored PDFs. Venues are ranked with Scimago, CORE (every edition since
 - **Categories** per folder (an ordered tree, drag and drop, optional years): passages
   selected in the PDFs are filed in them, listed per person, and inserted in notes as
   Markdown.
-- **Folders within folders** (a tree, to nest, move and rename them): a folder uses its
-  parent's settings (its categories, the citations in its notes), or its own ones.
+- **Folders within folders** (a tree on the Reports page, to nest, move and rename them): a
+  folder uses its parent's settings (its categories, the citations in its notes), or its own
+  ones; settings can be moved up to a folder it is in (shared by those within it) or copied.
 - **Venues** (Conferences / Journals pages): variants after cleaning, two-level
   classification (kind → rank), default levels per kind, manual decisions per paper or per
   venue that are never overridden.
