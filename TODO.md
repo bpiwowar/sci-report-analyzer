@@ -89,11 +89,3 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
   the general one), and usable inside other templates: e.g. `.starred` =
   `.index (.short-venue .year)`, where `.index` is itself expanded (the paper's index
   among the folder's starred papers, as set above).
-
-## Notes: citations everywhere
-
-The folder notes (the global notes, for all the folder's documents and papers) should have
-the citation icons and capabilities of the document's note (`documents_page.py`,
-`_note_tools`): "Cite a paper" (a picker of the folder's papers, `[@key]` inserted at the
-cursor) and "Copy the note, its citations numbered and the papers cited listed", in the PDF
-viewer and on the documents page.

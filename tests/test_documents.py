@@ -6,6 +6,7 @@ import re
 
 import pytest
 from helpers import add_source, make_person, note_saved, pub
+from nicegui import ui
 from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
 from sqlalchemy import select
@@ -348,6 +349,47 @@ async def test_folder_notes(user: User, monkeypatch, tmp_path):
     await user.open(f"/pdf/{zid}")
     await user.should_see(marker="paper-note")
     await user.should_not_see(marker="folder-note")
+
+
+async def test_folder_notes_cite_and_copy(user: User, monkeypatch, tmp_path):
+    """The folder's notes cite a paper and copy with the references, in the PDF viewer and on
+    the documents page."""
+    _, period, ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    pdfs.save(ids["a"], PDF, None)
+    inserted = []
+    monkeypatch.setattr(MarkdownEditor, "insert", lambda self, text: inserted.append(text))
+    copied = []
+    monkeypatch.setattr(ui.clipboard, "write", lambda text: copied.append(text))
+    await user.open(f"/pdf/{ids['a']}?period={period}")
+    await user.should_see(marker="folder-note-cite")
+    await asyncio.sleep(0.5)  # (the papers loaded)
+    user.find(marker="folder-note-cite").click()
+    await user.should_see(marker="folder-note-cite-paper")
+    select_ = user.find(marker="folder-note-cite-paper").elements.pop()
+    options = list(select_.options)
+    assert len(options) >= 3
+    assert select_.options[options[0]].startswith(TITLES["a"])  # (the paper shown first)
+    select_.value = options[0]
+    assert inserted == [f"[@{options[0]}]"]
+    user.find(marker="folder-note").elements.pop().value = f"See [@{options[0]}]."
+    user.find(marker="folder-note-copy").click()
+    assert len(copied) == 1 and copied[0].startswith("See [1].")
+    assert TITLES["a"] in copied[0]
+    # The documents page has them too.
+    copied.clear()
+    inserted.clear()
+    doc = documents.add(period, "CV.pdf", PDF)
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="folder-note-copy")
+    await asyncio.sleep(0.5)
+    user.find(marker="folder-note-copy").click()
+    assert len(copied) == 1
+    user.find(marker="folder-note-cite").click()
+    await user.should_see(marker="folder-note-cite-paper")
+    select_ = user.find(marker="folder-note-cite-paper").elements.pop()
+    select_.value = next(iter(select_.options))
+    assert len(inserted) == 1 and re.fullmatch(r"\[@\w+\]", inserted[0])
 
 
 async def test_last_place(user: User, monkeypatch, tmp_path):
