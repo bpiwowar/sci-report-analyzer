@@ -10,8 +10,8 @@ from nicegui import ui
 
 from .. import annotations, folders
 from ..i18n import _, ngettext
-from .categories_editor import _DRAG, _DROP, _LEAVE, _OVER
 from .dialogs import actions, confirm, ok_handler, transient_dialog
+from .dnd import draggable, drop_zone
 
 TOP = 0  # "parent" value of the top level
 ALL = 0  # "folder" value of the All people (cleanup) view (on the Reports page)
@@ -45,16 +45,14 @@ def folders_tree(current: int, select: Callable[[int], None], changed: Callable[
             then()
         changed()
 
-    def dropped(args, target: folders.FolderNode | None) -> None:
+    def dropped(folder_id: int, target: folders.FolderNode | None, where: str) -> None:
         """Onto the middle of a folder: within it; its top or bottom: next to it (in its
         parent); the bottom zone (no target): at the top level."""
-        if not isinstance(args, dict) or not args.get("id"):
-            return
         parent = None
         if target is not None:
-            parent = target.id if args.get("where") == "inside" else target.parent_id
-        if int(args["id"]) != (target.id if target else None):
-            move(int(args["id"]), parent)
+            parent = target.id if where == "inside" else target.parent_id
+        if folder_id != (target.id if target else None):
+            move(folder_id, parent)
 
     def toggle(folder_id: int) -> None:
         collapsed.symmetric_difference_update({folder_id})
@@ -103,13 +101,10 @@ def folders_tree(current: int, select: Callable[[int], None], changed: Callable[
                     + (" bg-amber-2" if n.id == current else "")
                 )
                 .style(f"padding-left:{1.1 * n.depth}rem")
-                .props("draggable=true")
                 .mark(f"folder-node-{n.id}")
             )
-            row.on("dragstart", js_handler=_DRAG % n.id)
-            row.on("dragover", js_handler=_OVER)
-            row.on("dragleave", js_handler=_LEAVE)
-            row.on("drop", lambda e, n=n: dropped(e.args, n), js_handler=_DROP)
+            draggable(row, "folder", n.id)
+            drop_zone(row, "folder", lambda i, w, n=n: dropped(i, n, w), middle="inside")
             row.on(
                 "click",
                 lambda n=n: select(n.id),
@@ -158,9 +153,7 @@ def folders_tree(current: int, select: Callable[[int], None], changed: Callable[
                 .style("border: 1px dashed #bbb")
                 .mark("folder-drop-top")
             )
-            end_zone.on("dragover", js_handler=_OVER)
-            end_zone.on("dragleave", js_handler=_LEAVE)
-            end_zone.on("drop", lambda e: dropped(e.args, None), js_handler=_DROP)
+            drop_zone(end_zone, "folder", lambda i, w: dropped(i, None, w), zoned=False)
 
     with ui.column().classes("w-full gap-0"):
         listing()

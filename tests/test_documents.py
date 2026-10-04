@@ -866,8 +866,13 @@ async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
     user.find(marker="category-search").type("imp").trigger("keydown.enter")
     await user.should_see("Moved to Impact")
     assert next(x for x in categories.excerpts(period) if x.id == e.id).category_id == impact
-    # Merged: its merge icon, then a click on the other one (confirmed).
+    # Dragged onto the top of another one: before it, in its category.
     [other] = [x for x in categories.excerpts(period) if x.id != e.id]
+    user.find(marker=f"excerpt-{other.id}").trigger("drop", {"id": e.id, "where": "before"})
+    await user.should_see(marker=f"excerpt-{e.id}")
+    assert [x.id for x in categories.excerpts(period)] == [e.id, other.id]
+    assert {x.category_id for x in categories.excerpts(period)} == {other.category_id}
+    # Merged: its merge icon, then a click on the other one (confirmed).
     user.find(marker=f"excerpt-merge-{e.id}").click()
     await user.should_see(marker="excerpt-merge-cancel")
     user.find(content="Our ranking model beats sparse ones").click()

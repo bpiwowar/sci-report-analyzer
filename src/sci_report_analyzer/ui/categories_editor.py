@@ -11,30 +11,8 @@ from .. import categories, folders
 from ..i18n import _, ngettext
 from .colours import ColourMenu
 from .dialogs import actions, transient_dialog
+from .dnd import draggable, drop_zone
 from .theme import int_or_none
-
-# Drag and drop: where a category is dropped (onto the top / middle / bottom of another).
-_WHERE = (
-    "const r = e.currentTarget.getBoundingClientRect(), f = (e.clientY - r.top) / r.height;"
-    " const w = f < 0.3 ? 'before' : f > 0.7 ? 'after' : 'inside';"
-)
-_DRAG = (
-    "(e) => { e.dataTransfer.setData('text/plain', '%d'); e.dataTransfer.effectAllowed = 'move'; }"
-)
-_OVER = (
-    "(e) => { e.preventDefault(); " + _WHERE + " const s = e.currentTarget.style;"
-    " s.boxShadow = w === 'before' ? 'inset 0 2px 0 #1976d2'"
-    " : w === 'after' ? 'inset 0 -2px 0 #1976d2' : 'none';"
-    " s.background = w === 'inside' ? 'rgba(25, 118, 210, 0.12)' : ''; }"
-)
-_LEAVE = (
-    "(e) => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = ''; }"
-)
-_DROP = (
-    "(e) => { e.preventDefault(); " + _WHERE + " e.currentTarget.style.boxShadow = 'none';"
-    " e.currentTarget.style.background = '';"
-    " emit({id: +e.dataTransfer.getData('text/plain'), where: w}); }"
-)
 
 
 def shared_note(folder_id: int) -> None:
@@ -76,13 +54,10 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                     ui.row()
                     .classes("w-full items-center no-wrap gap-1 rounded")
                     .style(f"padding-left:{1.5 * n.depth}rem")
-                    .props("draggable=true")
                     .mark(f"category-{n.id}")
                 )
-                row.on("dragstart", js_handler=_DRAG % n.id)
-                row.on("dragover", js_handler=_OVER)
-                row.on("dragleave", js_handler=_LEAVE)
-                row.on("drop", lambda e, n=n: dropped(e.args, n.id), js_handler=_DROP)
+                draggable(row, "category", n.id)
+                drop_zone(row, "category", lambda i, w, n=n: dropped(i, n.id, w), middle="inside")
                 with row:
                     ui.icon("drag_indicator", color="grey").classes("cursor-move").tooltip(
                         _(
@@ -160,19 +135,16 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                     .style("border: 1px dashed #bbb")
                     .mark("category-drop-end")
                 )
-                end_zone.on("dragover", js_handler=_OVER)
-                end_zone.on("dragleave", js_handler=_LEAVE)
                 last = next(n for n in reversed(nodes) if n.depth == 0)
-                end_zone.on(
-                    "drop",
-                    lambda e, last=last: dropped({**(e.args or {}), "where": "after"}, last.id),
-                    js_handler=_DROP,
+                drop_zone(
+                    end_zone,
+                    "category",
+                    lambda i, _w, last=last: dropped(i, last.id, "after"),
+                    zoned=False,
                 )
 
-        def dropped(args, target: int) -> None:
-            if not isinstance(args, dict) or not args.get("id"):
-                return
-            if categories.place(int(args["id"]), target, args.get("where") or "inside"):
+        def dropped(category_id: int, target: int, where: str) -> None:
+            if categories.place(category_id, target, where):
                 done()
             else:
                 ui.notify(_("A category cannot go within itself"), type="warning")
