@@ -5446,3 +5446,23 @@ msgstr ""
 
 msgid "Select the list (or an area over it) in the PDF first"
 msgstr "Sélectionnez d'abord la liste (ou une zone qui la couvre) dans le PDF"
+
+
+msgid "Cancel changes"
+msgstr "Annuler les modifications"
+
+#, python-brace-format
+msgid "Unsaved: {screens}"
+msgstr "Non enregistré : {screens}"
+
+msgid "Discard the unsaved changes?"
+msgstr "Abandonner les modifications non enregistrées ?"
+
+msgid "Changes discarded"
+msgstr "Modifications abandonnées"
+
+msgid "Keep them"
+msgstr "Les garder"
+
+msgid "Discard"
+msgstr "Abandonner"

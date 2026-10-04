@@ -9,6 +9,7 @@ from nicegui import ui
 
 from .. import annotations, folders, reports
 from ..i18n import N_, _
+from . import unsaved
 
 TEMPLATES_HELP = N_(
     "How a paper is cited: `[@key]` followed by the template. `{.notes}`, `{.tags}`, "
@@ -98,22 +99,25 @@ def templates_section() -> None:
         default["attrs"] = d.default
         refresh()
 
-    def save() -> None:
+    def save() -> bool:
         cfg.default = default["attrs"]
         try:
             reports.save_templates(cfg)
         except ValueError as e:
             ui.notify(str(e), type="negative")
-            return
+            return False
         default["attrs"] = cfg.default
         refresh()
         ui.notify(_("Saved"), type="positive")
+        return True
 
+    save = unsaved.track(lambda: (cfg.items, default["attrs"]), save)
     with ui.row().classes("mt-2"):
         ui.button(_("Add a template"), icon="add", on_click=add).props("flat").mark(
             "report-template-add"
         )
         ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat")
+        unsaved.cancel_button()
         ui.button(_("Save"), icon="save", on_click=save).mark("report-templates-save")
 
 

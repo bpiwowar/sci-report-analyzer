@@ -37,7 +37,7 @@ from ..ranking.normalize import (
 )
 from ..ranking.service import load_settings, save_settings, service
 from ..sources import ADAPTERS
-from . import scimago_years
+from . import scimago_years, unsaved
 from .theme import badge_details, fmt_dt, frame, level_hint, level_options, rank_chip, track_chip
 
 # The settings, in groups: (group, [(tab, label, depth)]); a tab of None is a heading
@@ -102,26 +102,35 @@ def register() -> None:
         with frame(_("Settings")):
             ui.add_css(NAV_CSS)
             ui.label(_("Settings")).classes("text-2xl")
+            edits = unsaved.Edits()
+            labels = {name: label for _g, entries in NAV for name, label, _d in entries if name}
             with ui.row().classes("w-full no-wrap items-start gap-4"):
-                with (
-                    ui.tabs(value=tab)
-                    .props("vertical dense")
-                    .classes("vr-settings-nav shrink-0 w-56") as tabs
-                ):
-                    for group, entries in NAV:
-                        ui.label(_(group)).classes(
-                            "text-xs text-grey-7 uppercase font-bold mt-3 mb-1 px-2"
-                        )
-                        for name, label, depth in entries:
-                            pad = f"pl-{2 + 4 * depth}"
-                            if name is None:
-                                ui.label(_(label)).classes(f"text-sm text-grey-8 py-1 {pad}")
-                            else:
-                                ui.tab(name, _(label)).classes(pad).mark(f"settings-{name}")
+                with ui.column().classes("shrink-0 w-56 gap-0"):
+                    with (
+                        ui.tabs(value=tab)
+                        .props("vertical dense")
+                        .classes("vr-settings-nav w-full") as tabs
+                    ):
+                        for group, entries in NAV:
+                            ui.label(_(group)).classes(
+                                "text-xs text-grey-7 uppercase font-bold mt-3 mb-1 px-2"
+                            )
+                            for name, label, depth in entries:
+                                pad = f"pl-{2 + 4 * depth}"
+                                if name is None:
+                                    ui.label(_(label)).classes(f"text-sm text-grey-8 py-1 {pad}")
+                                else:
+                                    edits.tabs[name] = (
+                                        ui.tab(name, _(label)).classes(pad).mark(f"settings-{name}")
+                                    )
+                    # The screens with unsaved changes, and their Save / Cancel.
+                    edits_panel = ui.element("div").classes("w-full")
                 with ui.tab_panels(tabs, value=tab).props("vertical").classes("grow min-w-0"):
                     for name, panel in PANELS.items():
                         with ui.tab_panel(name):
-                            panel()
+                            edits.screen(name, labels[name], panel)
+                with edits_panel:
+                    edits.panel()
 
 
 def contribution_tab() -> None:
@@ -267,19 +276,22 @@ def contribution_tab() -> None:
         cfg.roles, cfg.rules, cfg.fallback = d.roles, d.rules, d.fallback
         refresh_all()
 
-    def save() -> None:
+    def save() -> bool:
         try:
             contribution.save_config(cfg)
         except ValueError as e:
             ui.notify(str(e), type="negative")
-            return
+            return False
         ui.notify(_("Saved (reload a person's page to see it)"), type="positive")
+        return True
 
+    save = unsaved.track(lambda: (cfg.roles, cfg.rules, cfg.fallback), save)
     with ui.row().classes("mt-2"):
         ui.button(_("Add a rule"), icon="add", on_click=add_rule).props("flat").mark(
             "contribution-add-rule"
         )
         ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat")
+        unsaved.cancel_button()
         ui.button(_("Save"), icon="save", on_click=save).mark("contribution-save")
 
 
@@ -316,7 +328,10 @@ def _publication_sources() -> None:
         source_settings.set_disabled({n for n, b in boxes.items() if not b.value})
         ui.notify(_("Saved: re-sync to fetch from newly enabled sources"), type="positive")
 
-    ui.button(_("Save"), icon="save", on_click=save).props("dense").mark("use-sources-save")
+    save = unsaved.track(lambda: {n: b.value for n, b in boxes.items()}, save)
+    with ui.row().classes("gap-2"):
+        unsaved.cancel_button()
+        ui.button(_("Save"), icon="save", on_click=save).props("dense").mark("use-sources-save")
     ui.label(_("Primary source")).classes("text-lg mt-4")
     ui.label(
         _(
@@ -363,7 +378,10 @@ def matching_tab() -> None:
         save_settings(new)
         ui.notify(_("Saved — cached matches cleared"), type="positive")
 
-    ui.button(_("Save"), icon="save", on_click=save).classes("mt-2")
+    save = unsaved.track(lambda: ({k: b.value for k, b in boxes.items()}, slider.value), save)
+    with ui.row().classes("gap-2 mt-2"):
+        unsaved.cancel_button()
+        ui.button(_("Save"), icon="save", on_click=save)
 
 
 # Where a rule comes from (its card's background, a marker): label, tooltip.
@@ -627,9 +645,9 @@ def rules_tab() -> None:
     test.on_value_change(preview)
     test_source.on_value_change(preview)
 
-    def save() -> None:
+    def save() -> bool:
         if not valid():
-            return
+            return False
         new = load_settings()
         new.norm_rules = edited()
         save_settings(new)
@@ -638,11 +656,15 @@ def rules_tab() -> None:
             _("Cleaning rules saved — {n} venue text(s) re-matched").format(n=n),
             type="positive",
         )
+        return True
 
+    # (The rules without a pattern are not saved: no change.)
+    save = unsaved.track(edited, save)
     with ui.row().classes("gap-2"):
         ui.button(_("Check the effect on the venue texts"), icon="rule", on_click=impact).props(
             "flat"
         ).mark("norm-impact")
+        unsaved.cancel_button()
         ui.button(_("Save the rules"), icon="save", on_click=save).mark("norm-save")
 
 
@@ -1135,13 +1157,15 @@ def keys_tab() -> None:
         ui.label(_("(or set the {env} environment variable)").format(env=env)).classes(
             "text-xs text-grey"
         )
-    ui.button(
-        _("Save"),
-        on_click=lambda: (
-            keys.save_keys({k: i.value for k, i in inputs.items()}),
-            ui.notify(_("Saved"), type="positive"),
-        ),
-    )
+
+    def save() -> None:
+        keys.save_keys({k: i.value for k, i in inputs.items()})
+        ui.notify(_("Saved"), type="positive")
+
+    save = unsaved.track(lambda: {k: i.value for k, i in inputs.items()}, save)
+    with ui.row().classes("gap-2"):
+        unsaved.cancel_button()
+        ui.button(_("Save"), on_click=save)
 
 
 # ---- venue kinds ---------------------------------------------------------------------------
@@ -1241,7 +1265,19 @@ def kinds_tab() -> None:
         save_settings(new)
         ui.notify(_("Saved"), type="positive")
 
-    ui.button(_("Save"), icon="save", on_click=save).classes("mt-2")
+    save = unsaved.track(
+        lambda: (
+            edition.value,
+            {k: v.value for k, v in selects.items()},
+            natl.value,
+            intl.value,
+            scope.value,
+        ),
+        save,
+    )
+    with ui.row().classes("gap-2 mt-2"):
+        unsaved.cancel_button()
+        ui.button(_("Save"), icon="save", on_click=save)
 
 
 # ---- detection rules -----------------------------------------------------------------------
@@ -1394,17 +1430,21 @@ def detection_tab() -> None:
             for d in mine:
                 card(d)
 
-    def save() -> None:
+    def save() -> bool:
         bad = [_(detection.DEFAULTS[k].name) for k, rx in compiled().items() if rx is None]
         if bad:
             ui.notify(_("Invalid rule: {names}").format(names=", ".join(bad)), type="negative")
-            return
+            return False
         new = load_settings()
         new.detection_rules = list(rules.values())
         save_settings(new)
         ui.notify(_("Detection rules saved"), type="positive")
+        return True
 
-    ui.button(_("Save the rules"), icon="save", on_click=save).classes("mt-2").mark("detect-save")
+    save = unsaved.track(lambda: list(rules.values()), save)
+    with ui.row().classes("gap-2 mt-2"):
+        unsaved.cancel_button()
+        ui.button(_("Save the rules"), icon="save", on_click=save).mark("detect-save")
 
 
 # ---- tracks --------------------------------------------------------------------------------
@@ -1659,11 +1699,11 @@ def tracks_tab() -> None:
         listing.refresh()
         preview()
 
-    def save() -> None:
+    def save() -> bool:
         bad = [t.name() for t in defs for r in t.rules if r.pattern and r.compiled() is None]
         if bad:
             ui.notify(_("Invalid rule: {names}").format(names=", ".join(bad)), type="negative")
-            return
+            return False
         new = load_settings()
         new.tracks = [t.model_copy(deep=True) for t in defs]
         save_settings(new)
@@ -1673,11 +1713,14 @@ def tracks_tab() -> None:
         saved_ids.clear()
         saved_ids.update(t.id for t in defs)
         ui.notify(_("Tracks saved"), type="positive")
+        return True
 
+    save = unsaved.track(lambda: defs, save)
     with ui.row().classes("gap-2 mt-2"):
         ui.button(_("Reset the built-in tracks"), icon="restart_alt", on_click=reset).props(
             "flat"
         ).mark("tracks-reset")
+        unsaved.cancel_button()
         ui.button(_("Save the tracks"), icon="save", on_click=save).mark("tracks-save")
 
 
