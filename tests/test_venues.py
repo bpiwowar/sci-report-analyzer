@@ -411,11 +411,11 @@ def test_workshop_ranked_as_its_main_conference():
     # The main conference's rank in CORE2018 (in force in 2019), in its own category.
     assert (ws.badge.coreRank, ws.badge.coreEdition) == ("B", "CORE2018")
     assert ws.category.key == "workshop:b" and ws.category.label == "Workshop CORE B"
-    assert ws.category.workshop and ws.host_id == host
+    assert ws.category.workshop and ws.host_name == "Symposium on Timely Rankings"
 
     venues.save_hosts(wid, [{"venue_id": host, "from": 2020, "to": None}])
     ws = _stats(pid)["Workshop paper"]
-    assert ws.badge is None and ws.host_id is None  # not its main conference in 2019
+    assert ws.badge is None and ws.host_name is None  # not its main conference in 2019
 
 
 def test_workshop_takes_host_edition_like_its_papers():

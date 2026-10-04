@@ -12,13 +12,17 @@ from sci_report_analyzer.ranking.normalize import (
     LANGUAGE_RULES,
     PREFIX_RULES,
     apply_rules,
-    clean_venue,
     normalize,
     tokenize,
     without_ordinal_marks,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def clean_venue(segment: str | None) -> str:
+    """A venue text cleaned with the default rules."""
+    return apply_rules(segment, DEFAULT_NORM_RULES)
 
 
 def _load(name):

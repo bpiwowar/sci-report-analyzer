@@ -147,7 +147,6 @@ class PubStat:
     author_pos_manual: bool = False
     note: str | None = None  # Markdown
     # A workshop's main conference (in the paper's year), which gives its rank.
-    host_id: int | None = None
     host_name: str | None = None
     # The person's role (a contribution Role's key), from their position.
     contribution: str | None = None
@@ -909,7 +908,6 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     doi_manual=pub.doi_manual,
                     author_pos_manual=pub.author_pos_override is not None,
                     note=pub.note,
-                    host_id=host.id if host else None,
                     host_name=host.name if host else None,
                 )
             )
