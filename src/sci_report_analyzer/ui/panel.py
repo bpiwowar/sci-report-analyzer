@@ -169,10 +169,7 @@ class PublicationsPanel:
         self._from_query(query or {})
 
     def _saved_tags(self, state: dict) -> list[int]:
-        if "tag_filter" in state:
-            return self._known_tags(state["tag_filter"])
-        # Earlier: a "starred only" switch.
-        return [self.starred_id] if state.get("starred_only") else []
+        return self._known_tags(state.get("tag_filter", []))
 
     def _known_tags(self, ids) -> list[int]:
         """The tags that can filter: global ones, and per-period ones with a period."""
@@ -768,10 +765,9 @@ class PublicationsPanel:
         cats = category_list(rows)
         saved = summary_settings()
         off_kinds = set(saved.get("off_kinds", []))
-        # Earlier settings: unticked categories, and a switch for the years.
+        # (earlier settings: a switch for the years)
         default = "years" if saved.get("years", True) else "list"
-        levels = {k: "off" for k in saved.get("off_categories", [])}
-        levels.update(saved.get("details") or {})
+        levels = dict(saved.get("details") or {})
         for c in cats:
             levels.setdefault(c.key, default)
         other = _("Other")

@@ -100,7 +100,6 @@ ui.add_css(
 def register() -> None:
     @ui.page("/settings")
     def settings_page(tab: str = "sources") -> None:
-        tab = "tags" if tab == "flags" else tab  # (the former "Flags, tags & categories")
         if tab not in PANELS:
             tab = "sources"
         with frame(_("Settings")):
