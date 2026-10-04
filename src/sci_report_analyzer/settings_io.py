@@ -64,7 +64,7 @@ class JointIO(BaseModel):
 class VenueIO(BaseModel):
     name: str
     variants: list[VariantIO] = Field(default_factory=list)
-    short_name: str | None = None
+    short_name: str | None = None  # set by hand only ("": the venue has no acronym)
     url: str | None = None
     kind: str | None = None  # manual kind only
     level_type: str | None = None
@@ -112,7 +112,7 @@ def export_settings(*, include_jcr: bool = False) -> SettingsFile:
                         )
                         for k in v.keys
                     ],
-                    short_name=v.short_name,
+                    short_name=_short(v),
                     url=v.url,
                     kind=v.kind if v.kind_manual else None,
                     level_type=v.level_type,
@@ -255,6 +255,11 @@ def _find_venue(s, name: str) -> Venue | None:
     return v
 
 
+def _short(v: Venue) -> str | None:
+    """A venue's acronym set by hand ("": none), not an inferred one."""
+    return (v.short_name or "") if v.short_manual else None
+
+
 def _venue_values(v: Venue | VenueIO) -> dict[str, Any]:
     kind = v.kind if isinstance(v, VenueIO) or v.kind_manual else None
     level = f"{v.level_type} {v.level_rank}" if v.level_rank else None
@@ -263,7 +268,7 @@ def _venue_values(v: Venue | VenueIO) -> dict[str, Any]:
         "level": level,
         "record_key": v.record_key,
         "match_text": v.match_text,
-        "short_name": v.short_name,
+        "short_name": v.short_name if isinstance(v, VenueIO) else _short(v),
         "url": v.url,
         "patterns": _patterns(v.patterns),
         "identifiers": v.identifiers or None,
@@ -377,7 +382,7 @@ def _import_venue(s, vio: VenueIO, *, force: bool, take: set[str]) -> tuple[Venu
     if wanted("match_text"):
         venue.match_text = vio.match_text
     if wanted("short_name"):
-        venue.short_name = vio.short_name
+        venue.short_name, venue.short_manual = vio.short_name or None, True
     if wanted("url"):
         venue.url = vio.url
     if wanted("patterns"):
@@ -421,6 +426,7 @@ def import_settings(
                 v.kind_manual = False
                 v.level_type = v.level_rank = v.record_key = v.match_text = None
                 v.short_name = v.url = v.patterns = v.identifiers = v.hosts = None
+                v.short_manual = False
                 if v.joint and (v.joint.get("manual") or v.joint.get("use")):
                     v.joint = None
             if data.jcr is not None:

@@ -297,6 +297,35 @@ async def test_venue_dialog_and_manual_level(user: User) -> None:
     await user.should_see("Test a venue string")
 
 
+async def test_venue_dialog_no_acronym_or_validated(user: User) -> None:
+    from sqlalchemy import select
+
+    from sci_report_analyzer import venues
+    from sci_report_analyzer.db.models import Venue
+    from sci_report_analyzer.db.session import session_scope
+
+    _seed()
+    vid, _new = venues.add_venue("Meeting on Odd Things (MOT)", "intl_conference")
+    with session_scope() as s:
+        s.get(Venue, vid).short_manual = False  # inferred
+    await user.open(f"/venues?focus={vid}")
+    await user.should_see(marker="venue-short-validate")
+    user.find("venue-short-validate").click()
+    user.find("venue-save").click()
+    await user.should_see("Test a venue string")
+    with session_scope() as s:
+        v = s.scalar(select(Venue).where(Venue.id == vid))
+        assert (v.short_name, v.short_manual) == ("MOT", True)
+    await user.open(f"/venues?focus={vid}")
+    await user.should_see(marker="venue-no-short")
+    user.find("venue-no-short").click()
+    user.find("venue-save").click()
+    await user.should_see("Test a venue string")
+    with session_scope() as s:
+        v = s.get(Venue, vid)
+        assert (v.short_name, v.short_manual) == (None, True)
+
+
 async def test_venue_dialog_search_and_use_record(user: User) -> None:
     from sqlalchemy import select
 

@@ -544,8 +544,10 @@ class Venue(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
-    # Short name set by hand (e.g. "ICLR"); otherwise taken from the ranking record / texts.
+    # Short name (e.g. "ICLR"): set by hand when short_manual (none: the venue has no
+    # acronym), else inferred from the ranking record / texts (and cached here).
     short_name: Mapped[str | None]
+    short_manual: Mapped[bool] = mapped_column(default=False)
     # The venue's website (e.g. the conference series' or journal's home page).
     url: Mapped[str | None]
     # Kind (first level): detected automatically unless kind_manual.
@@ -597,7 +599,7 @@ class Venue(Base):
             or self.level_rank
             or self.record_key
             or self.match_text
-            or self.short_name
+            or self.short_manual
             or self.url
             or self.patterns
             or self.identifiers

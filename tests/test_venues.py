@@ -880,15 +880,41 @@ def test_venue_choices_show_acronyms_first():
                 Venue(name="Symposium on Timely Rankings (STR)"),
                 Venue(name="Workshop on Quiet Ranks", short_name="QR"),
                 Venue(name="Another Meeting"),
+                Venue(name="Meeting on Odd Things (MOT)", short_manual=True),  # no acronym
             ]
         )
     choices = list(venues.venue_choices().values())
     # Sorted by acronym, else name; the acronym is searchable as it is in the label.
     assert choices == [
         "Another Meeting",
+        "Meeting on Odd Things (MOT)",
         "[QR] Workshop on Quiet Ranks",
         "[STR] Symposium on Timely Rankings (STR)",
     ]
+
+
+def test_acronym_inferred_set_by_hand_or_none():
+    """An inferred acronym is stored as such (not a decision); one set by hand, or "none",
+    wins and is kept by a merge."""
+    pid = make_person()
+    add_source(pid, "hal", "idhal:x", [pub("a", "Paper A", 2020, "Meeting on Odd Things (MOT)")])
+    stats(pid)
+    asyncio.run(venues.venue_rows())
+    with session_scope() as s:
+        v = s.scalar(select(Venue).where(Venue.name.like("Meeting on Odd Things%")))
+        vid = v.id
+        assert (v.short_name, v.short_manual, v.has_manual) == ("MOT", False, False)
+    venues.update_venue(vid, short_name=None, short_manual=True)  # "no acronym"
+    (row,) = [r for r in asyncio.run(venues.venue_rows()) if r.id == vid]
+    assert row.short_name is None and row.short_manual
+    other, _new = venues.add_venue("Odd Things Meeting", "intl_conference")
+    venues.merge_venues(other, [vid])
+    with session_scope() as s:
+        v = s.get(Venue, other)
+        assert (v.short_name, v.short_manual) == (None, True)
+    venues.update_venue(other, short_name=None)  # empty: inferred again
+    with session_scope() as s:
+        assert not s.get(Venue, other).short_manual
 
 
 def test_a_track_wins_whatever_the_venue_and_different_tracks_conflict():

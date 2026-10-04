@@ -84,7 +84,7 @@ imported.
 |-------|------|---------|-|
 | `name` | string | required | |
 | `variants` | list of [Variant](#variant) | `[]` | |
-| `short_name` | string \| null | null | e.g. `"ICLR"` |
+| `short_name` | string \| null | null | Set by hand, e.g. `"ICLR"`; `""`: the venue has no acronym; null: inferred (not exported) |
 | `url` | string \| null | null | website |
 | `kind` | string \| null | null | a manual [kind](#venue-kinds) only (an automatic one is not exported) |
 | `level_type` | `"conference"` \| `"journal"` \| null | null | null with a `level_rank`: conference |
