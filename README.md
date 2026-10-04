@@ -47,7 +47,7 @@ notes and stored PDFs. Venues are ranked with Scimago, CORE (every edition since
   venue that are never overridden.
 - Author highlighting: the person (with aliases) and their PhD students (from theses.fr),
   with potential matches to confirm.
-- **Settings**: ranking sources, confidence threshold, rewrite and cleaning rules, venue
+- **Settings**: ranking sources, confidence threshold, cleaning and detection rules, venue
   kinds, **tracks** (names, colours, detection rules), datasets, JCR import, API keys, and
   **import / export** (replace, or merge
   with per-conflict choices) to share them.
@@ -60,7 +60,8 @@ uv tool run sci-report-analyzer   # http://127.0.0.1:8081
 
 or install it with `uv tool install sci-report-analyzer` and run `sci-report-analyzer`. Options:
 `--port`, `--host`, `--data-dir`, `--no-browser`. Press Ctrl-C, or the power button in the
-header, to quit.
+header, to quit. The app is in English or French: switch with the language button in the
+header (`SCI_REPORT_ANALYZER_LANG=fr` or `en` overrides it).
 
 Data lives in `~/.local/share/sci-report-analyzer` (override with `SCI_REPORT_ANALYZER_DATA`). Your email is
 required before anything is fetched (it identifies you to the sources); it and the API keys can
@@ -73,7 +74,7 @@ over `sci-report-analyzer.sqlite` (removing the `-wal` / `-shm` files, if any).
 
 ## Data sources
 
-Venue ranks come from third-party data, credited here and in the app (Settings → Data):
+Venue ranks come from third-party data, credited here and in the app (Settings → Data & cache):
 
 - **[SCImago Journal & Country Rank](https://www.scimagojr.com)** (journals), downloaded
   by the app from this repository (`datasets/journals.json`, checked every week). *SCImago, (n.d.). SJR — SCImago Journal & Country Rank [Portal].* SCImago allows
