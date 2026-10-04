@@ -688,6 +688,35 @@ def test_categories_and_markdown():
     assert (lead.years, lead.members) == ("2019–2020", [])
 
 
+def test_excerpt_filed_first_in_any_category():
+    """Dropped onto a category's heading (another one, an empty sub-category, its own): the
+    excerpt (with its group) moves there, first."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    teaching = categories.add(folder, "Teaching")
+    projects = categories.add(folder, "Projects", research)
+    doc = documents.add(period, "Application.pdf", PDF)
+    a = categories.add_excerpt(research, period, "Wrote papers.", 1, [], document_id=doc)
+    b = categories.add_excerpt(teaching, period, "Taught.", 1, [], document_id=doc)
+    c = categories.add_excerpt(teaching, period, "Supervised.", 2, [], document_id=doc)
+    m = categories.add_excerpt(research, period, "More papers.", 2, [], document_id=doc)
+    categories.merge_excerpts(m, a)  # (a group: moved with its lead)
+
+    def where() -> list[tuple[int, int]]:
+        return [(v.id, v.category_id) for v in categories.excerpts(period, grouped=True)]
+
+    categories.file_excerpt_first(m, teaching)
+    assert where() == [(a, teaching), (b, teaching), (c, teaching)]
+    assert {e.category_id for e in categories.excerpts(period)} == {teaching}
+    categories.file_excerpt_first(c, teaching)  # (its own: first)
+    assert [v.id for v in categories.excerpts(period, grouped=True)] == [c, a, b]
+    categories.file_excerpt_first(b, projects)  # (an empty sub-category)
+    assert (b, projects) in where()
+
+
 def test_category_colours():
     """Each category has a colour (the palette's, in turn; changed): that of its excerpts,
     tinted in it on the PDFs."""
@@ -872,6 +901,10 @@ async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
     await user.should_see(marker=f"excerpt-{e.id}")
     assert [x.id for x in categories.excerpts(period)] == [e.id, other.id]
     assert {x.category_id for x in categories.excerpts(period)} == {other.category_id}
+    # Dragged onto the heading of another category (here empty): first in it.
+    user.find(marker=f"category-header-{impact}").trigger("drop", {"id": e.id})
+    await user.should_see(marker=f"excerpt-{e.id}")
+    assert next(x for x in categories.excerpts(period) if x.id == e.id).category_id == impact
     # Merged: its merge icon, then a click on the other one (confirmed).
     user.find(marker=f"excerpt-merge-{e.id}").click()
     await user.should_see(marker="excerpt-merge-cancel")

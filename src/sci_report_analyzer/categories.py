@@ -770,3 +770,27 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2) -> str:
     if influence and gather is None:
         out += [f"{'#' * min(level, 6)} Rayonnement\n", *influence]
     return "\n".join(out).strip() + "\n" if out else ""
+
+
+def file_excerpt_first(excerpt_id: int, category_id: int) -> None:
+    """Move an excerpt (with the others of its group) to another category (or its own),
+    first there (e.g. dropped onto the category's heading)."""
+    with session_scope() as s:
+        e = s.get(Excerpt, excerpt_id)
+        if e is None:
+            return
+        e = s.get(Excerpt, e.group_id) if e.group_id else e
+        for x in [e, *_members(s, e.id)]:
+            x.category_id = category_id
+        others = s.scalars(
+            select(Excerpt)
+            .where(
+                Excerpt.category_id == category_id,
+                Excerpt.period_id == e.period_id,
+                Excerpt.group_id.is_(None),
+                Excerpt.id != e.id,
+            )
+            .order_by(Excerpt.position, Excerpt.id)
+        )
+        for k, x in enumerate([e, *others], 1):
+            x.position = k

@@ -1006,9 +1006,17 @@ class _ExcerptsSection:
             items = by_cat.get(n.id, [])
             with (
                 ui.row()
-                .classes("w-full items-center gap-1")
+                .classes("w-full items-center gap-1 rounded")
                 .style(f"padding-left:{1.2 * n.depth}rem")
+                .mark(f"category-header-{n.id}") as header
             ):
+                # (an excerpt dropped onto its heading: first in it, from any category)
+                drop_zone(
+                    header,
+                    "excerpt",
+                    lambda source_id, _where, n=n: self.drop_on_category(source_id, n.id),
+                    zoned=False,
+                )
                 ui.element("div").classes("w-3 h-3 rounded-full shrink-0").style(
                     f"background: {n.colour}"
                 ).tooltip(_("The colour of its excerpts (edit the categories to change it)")).mark(
@@ -1157,7 +1165,7 @@ class _ExcerptsSection:
                                 _(
                                     "Merge with another excerpt: click it then (or drag this "
                                     "one onto it; onto its top or bottom edge: placed before or "
-                                    "after)"
+                                    "after; onto a category's heading: first in it)"
                                 ),
                                 self.merge_mode,
                             ),
@@ -1177,6 +1185,11 @@ class _ExcerptsSection:
             self.side.refresh_excerpts()
         else:
             self.merge(source_id, target)
+
+    def drop_on_category(self, source_id: int, category_id: int) -> None:
+        """An excerpt dropped onto a category's heading: moved there, first."""
+        categories.file_excerpt_first(source_id, category_id)
+        self.side.refresh_excerpts()
 
     def split(self, x: categories.ExcerptView) -> None:
         categories.split_excerpt(x.id)
