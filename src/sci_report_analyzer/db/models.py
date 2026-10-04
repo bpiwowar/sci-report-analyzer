@@ -494,7 +494,7 @@ class PeriodDocument(Base):
 class Report(Base):
     """A report (Markdown) on a person within a period / folder, citing their papers
     (``[@key]``, see reports.py): those with some tags. Its view is gone, merged into the
-    folder's notes (where it was appended, see old_reports.py): kept for its data."""
+    folder's notes (where it was appended): kept for its data."""
 
     __tablename__ = "report"
 

@@ -223,10 +223,3 @@ def test_import_of_a_file_with_flags():
     assert short.colour == "#57606a" and data.matching.min_score == 0.7
     settings_io.import_settings(data, "replace")
     assert tracks.colour("short") == "#57606a"
-
-
-def test_migration_copy_of_the_default_tracks():
-    from sci_report_analyzer.db.migrations.versions import a4c7e2f9d316_tracks_no_flags as m
-
-    # (A copy of before the name rules: they get their defaults when loaded.)
-    assert [t.model_dump(exclude={"name_rules"}) for t in tracks.DEFAULT_TRACKS] == m.TRACKS

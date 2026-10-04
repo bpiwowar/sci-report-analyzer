@@ -52,7 +52,7 @@ def folder_notes_editor(
     with the folder's skeleton (saved once edited).
 
     A save is refused if the notes changed since the editor loaded them (saved elsewhere:
-    another window, the old reports appended…), and clearing them all asks first."""
+    another window…), and clearing them all asks first."""
     holder: list[MarkdownEditor] = []
     base = {"text": folders.notes_of(period_id)}  # (the notes as last loaded or saved here)
     text = base["text"]

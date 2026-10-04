@@ -17,6 +17,8 @@ from . import backup
 
 logger = logging.getLogger(__name__)
 
+MIGRATIONS_DIR = Path(__file__).parent / "migrations"  # (the Alembic scripts)
+
 _engine: Engine | None = None
 _factory: sessionmaker[Session] | None = None
 
@@ -70,7 +72,7 @@ def run_migrations(engine: Engine) -> None:
     from alembic.script import ScriptDirectory
 
     cfg = Config()
-    cfg.set_main_option("script_location", str(Path(__file__).parent / "migrations"))
+    cfg.set_main_option("script_location", str(MIGRATIONS_DIR))
     head = ScriptDirectory.from_config(cfg).get_current_head()
     with engine.connect() as conn:
         current = MigrationContext.configure(conn).get_current_revision()

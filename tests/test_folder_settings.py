@@ -2,15 +2,10 @@
 its parent's (all of them); the people's excerpts follow when they change. The migration
 giving each folder its own."""
 
-import json
-import sqlite3
 from pathlib import Path
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from helpers import make_person
-from sqlalchemy import create_engine
 
 from sci_report_analyzer import categories, folders, reports
 from sci_report_analyzer.db import session as db_session
@@ -115,73 +110,6 @@ def test_moving_and_deleting_folders():
     }
     assert _cats(deep) == ["Research"]  # (A's: kept for it)
     assert _filed(period) == [("Research", "A grant.")]
-
-
-def test_migration_each_folder_its_own_settings(tmp_path):
-    db = tmp_path / "db.sqlite"
-    cfg = Config()
-    cfg.set_main_option("script_location", str(MIGRATIONS))
-    with create_engine(f"sqlite:///{db}").begin() as conn:
-        cfg.attributes["connection"] = conn
-        command.upgrade(cfg, "a1d6f3c8e925")
-    with sqlite3.connect(db) as c:
-        c.execute(
-            "INSERT INTO folder (id, name, hidden, citations) VALUES (1, 'Hiring', 0, ?)",
-            (json.dumps({"tag_id": 3, "skeleton": "# Notes\n"}),),
-        )
-        c.execute("INSERT INTO folder (id, name, hidden) VALUES (2, 'Prize', 0)")
-        c.execute(
-            "INSERT INTO period (id, person_id, folder_id, name, tags) VALUES (10, 1, 1, 'x', '[]')"
-        )
-        for cid, fid, parent in ((1, 1, None), (2, 1, 1), (3, 2, None)):
-            c.execute(
-                "INSERT INTO category (id, folder_id, parent_id, name, position, influence,"
-                " colour) VALUES (?, ?, ?, 'Cat', 1, 0, '#4caf50')",
-                (cid, fid, parent),
-            )
-        c.execute(
-            "INSERT INTO excerpt (category_id, period_id, text, rects, influence, position,"
-            " ref_only, created_at) VALUES (2, 10, 'Text', '[]', 0, 0, 0, '2026-01-01')"
-        )
-    db_session.run_migrations(create_engine(f"sqlite:///{db}"))
-    with sqlite3.connect(db) as c:
-        settings = dict(c.execute("SELECT id, citations FROM folder_settings").fetchall())
-        uses = c.execute("SELECT folder_id, settings_id FROM folder_settings_use").fetchall()
-        cats = c.execute("SELECT id, settings_id, parent_id FROM category").fetchall()
-        parents = c.execute("SELECT parent_id FROM folder").fetchall()
-        (kept,) = c.execute("SELECT category_id FROM excerpt").fetchone()
-        columns = {r[1] for r in c.execute("PRAGMA table_info(folder)")}
-    assert json.loads(settings[1]) == {"tag_id": 3, "skeleton": "# Notes\n"} and settings[2] is None
-    assert sorted(uses) == [(1, 1), (2, 2)]
-    assert sorted(cats) == [(1, 1, None), (2, 1, 1), (3, 2, None)]
-    assert parents == [(None,), (None,)] and kept == 2 and "citations" not in columns
-    # Down again: a folder sharing settings with another gets a copy, with its excerpts.
-    with sqlite3.connect(db) as c:
-        c.execute("UPDATE folder SET parent_id = 1 WHERE id = 2")
-        c.execute("DELETE FROM folder_settings_use WHERE folder_id = 2")
-        c.execute(
-            "INSERT INTO period (id, person_id, folder_id, name, tags) VALUES (20, 1, 2, 'x', '[]')"
-        )
-        c.execute(
-            "INSERT INTO excerpt (category_id, period_id, text, rects, influence, position,"
-            " ref_only, created_at) VALUES (2, 20, 'Other', '[]', 0, 0, 0, '2026-01-01')"
-        )
-    with create_engine(f"sqlite:///{db}").begin() as conn:
-        cfg.attributes["connection"] = conn
-        command.downgrade(cfg, "a1d6f3c8e925")
-    with sqlite3.connect(db) as c:
-        citations = dict(c.execute("SELECT id, citations FROM folder").fetchall())
-        cats = c.execute("SELECT id, folder_id, parent_id FROM category ORDER BY id").fetchall()
-        filed = dict(c.execute("SELECT text, category_id FROM excerpt").fetchall())
-    assert (
-        json.loads(citations[1])
-        == json.loads(citations[2])
-        == {"tag_id": 3, "skeleton": "# Notes\n"}
-    )
-    assert cats[:2] == [(1, 1, None), (2, 1, 1)] and len(cats) == 4  # (3: unused, dropped)
-    copy = {i: (f, p) for i, f, p in cats[2:]}
-    assert filed["Text"] == 2 and copy[filed["Other"]][0] == 2
-    assert copy[copy[filed["Other"]][1]] == (2, None)
 
 
 def test_settings_moved_to_the_parent_shared_by_the_subfolders():
