@@ -33,9 +33,12 @@ longer matches them.
   are added, removed, kept), shown to the user before applying, instead of silently
   keeping the local tracks the file lacks.
 - "Mark as a track" (a venue that is a track of a conference with no venue of its
-  own) proposes the conference's name with the track part removed
-  (`venues.track_free_name`), using a hard-coded list of track words: use the tracks'
-  own rules instead, so that added tracks are handled too.
+  own): no suggested conference name from hard-coded track words
+  (`venues.track_free_name`, `_TRACK_PARTS`, `_TRACK_WORDS`: remove them). If a name is
+  proposed at all, it comes from a setting of each track (Settings → Tracks): how to
+  extract the conference name from a venue text (a regex with a capture group, or a
+  replacement regex), editable, with its default / edited / added marker like the
+  other rules.
 
 ## PDF viewer: the restart notice
 
