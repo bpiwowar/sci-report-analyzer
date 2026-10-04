@@ -30,8 +30,7 @@ from .theme import (
     badge_details,
     chip_html,
     frame,
-    level_hint,
-    level_options,
+    level_picker,
     merge_direction,
     rank_chip,
     source_tag,
@@ -46,7 +45,6 @@ TABS = {
     "shared_tasks": (N_("Shared tasks"), ("shared_task",)),
     "other": (N_("Other & preprints"), ("preprint", "other")),
 }
-LEVELS = ["A*", "A", "B", "C", "Q1", "Q2", "Q3", "Q4"]
 
 
 def _papers(n: int) -> str:
@@ -1350,21 +1348,9 @@ def venue_dialog(
                 )
 
                 ui.label(_("Level (by hand)")).classes("font-medium mt-2")
-                with ui.row().classes("items-center gap-2"):
-                    ltype = ui.select(
-                        {"conference": _("Conference (CORE)"), "journal": _("Journal (quartile)")},
-                        value=state["level_type"],
-                    ).props("dense outlined")
-                    lrank = (
-                        ui.select(
-                            {"": _("— automatic"), **level_options(LEVELS)},
-                            value=state["level_rank"],
-                            new_value_mode="add-unique",
-                        )
-                        .props("dense outlined")
-                        .classes("w-72")
-                    )
-                level_hint(lrank).bind_visibility_from(lrank, "value")
+                ltype, lrank = level_picker(
+                    state["level_type"], state["level_rank"], allow_auto=True
+                )
 
                 ui.label(_("Ranking record (by hand)")).classes("font-medium mt-2")
                 chosen = {"key": state["record_key"]}

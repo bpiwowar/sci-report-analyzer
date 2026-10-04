@@ -376,6 +376,49 @@ def level_options(levels: list[str]) -> dict[str, str]:
     return {lv: f"{lv} — {short(LEVEL_HELP[lv])}" if lv in LEVEL_HELP else lv for lv in levels}
 
 
+CORE_RANKS = ["A*", "A", "B", "C"]
+QUARTILES = ["Q1", "Q2", "Q3", "Q4"]
+
+
+def level_picker(
+    level_type: str, rank: str | None, *, allow_auto: bool = False
+) -> tuple[ui.select, ui.select]:
+    """A level set by hand: its type (conference or journal) and its rank, among those of
+    the type (CORE ranks, quartiles) or typed; ``allow_auto``: or none (automatic). Returns
+    the type and rank selects; the rank explained below."""
+    auto = {"": _("— automatic")} if allow_auto else {}
+
+    def options(t: str, current: str | None = None) -> dict[str, str]:
+        levels = CORE_RANKS if t == "conference" else QUARTILES
+        extra = [current] if current and current not in levels else []
+        return {**auto, **level_options([*levels, *extra])}
+
+    def type_changed(e) -> None:
+        keep = allow_auto and not rank_select.value
+        rank_select.set_options(
+            options(e.value), value="" if keep else "A" if e.value == "conference" else "Q1"
+        )
+
+    with ui.row().classes("items-center gap-2"):
+        type_select = ui.select(
+            {"conference": _("Conference (CORE)"), "journal": _("Journal (quartile)")},
+            value=level_type,
+            on_change=type_changed,
+        ).props("dense outlined")
+        rank_select = (
+            ui.select(
+                options(level_type, rank),
+                value=rank or ("" if allow_auto else "A" if level_type == "conference" else "Q1"),
+                new_value_mode="add-unique",
+                with_input=True,
+            )
+            .props("dense outlined")
+            .classes("w-72")
+        )
+    level_hint(rank_select).bind_visibility_from(rank_select, "value")
+    return type_select, rank_select
+
+
 def level_hint(select) -> ui.label:
     """A label explaining the level currently chosen in ``select``."""
     return (
