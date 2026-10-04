@@ -47,7 +47,9 @@ def _person(c, pid: int, papers) -> None:
             )
 
 
-def test_citation_keys_from_the_surname(tmp_path):
+def test_cleanup_7c1e4a9b2d30(tmp_path):
+    """Citation keys renamed in the texts, the reports kept in the notes, then dropped with
+    the other data never read."""
     db = tmp_path / "db.sqlite"
     _upgrade(db, "f6b3d8a2c5e9")
     with sqlite3.connect(db) as c:
@@ -77,15 +79,26 @@ def test_citation_keys_from_the_surname(tmp_path):
             ),
         )
         c.execute("UPDATE publication SET note = '[@jane2020neural]' WHERE id IN (2, 5)")
-        c.execute("INSERT INTO app_setting VALUES ('ui.reflist.1.0.1', '[]'), ('ui.x', '1')")
+        c.execute(
+            "INSERT INTO app_setting VALUES ('ui.reflist.1.0.1', '[]'), ('ui.x', '1'),"
+            " ('old_reports', '{}')"
+        )
+        c.execute(
+            "INSERT INTO report VALUES (1, 'Read [@jane2020neural].', '[]', '', ''),"
+            " (2, '  ', '[]', '', '')"
+        )
     _upgrade(db, "7c1e4a9b2d30")
     with sqlite3.connect(db) as c:
         assert c.execute("SELECT notes FROM period").fetchone()[0] == (
             "[@doe2020neural; @doe2020neurala] and @neveol2021deep{.notes}, "
             "[-@roe2019same]; jane@jane2020neural.org, @jane2020neuralx, "
-            "`@doe2020neural`."
+            "`@doe2020neural`.\n\n## Report\n\nRead [@doe2020neural].\n"
         )
         notes = dict(c.execute("SELECT id, note FROM publication WHERE note IS NOT NULL"))
         # (person 2: their paper's key is doe2020other, no jane2020neural to rename)
         assert notes == {2: "[@doe2020neural]", 5: "[@jane2020neural]"}
         assert c.execute("SELECT key FROM app_setting").fetchall() == [("ui.x",)]
+        tables = {t for (t,) in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "report" not in tables
+        assert "sync_started_at" not in {r[1] for r in c.execute("PRAGMA table_info(source_link)")}
+        assert "discipline" not in {r[1] for r in c.execute("PRAGMA table_info(thesis)")}

@@ -45,7 +45,6 @@ def thesis_from(t: dict[str, Any], role: str) -> FetchedThesis:
         status=t.get("status"),
         defence_date=t.get("date_soutenance"),
         start_date=t.get("date_inscription"),
-        discipline=t.get("discipline"),
         institution=(t.get("etablissement_soutenance") or {}).get("nom"),
         url=f"https://theses.fr/{tid}",
     )

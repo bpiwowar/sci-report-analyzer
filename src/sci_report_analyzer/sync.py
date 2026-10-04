@@ -125,7 +125,6 @@ def store_result(link_id: int, result: FetchResult) -> int:
                     "supervisors",
                     "status",
                     "defence_date",
-                    "discipline",
                     "institution",
                     "url",
                 ):
@@ -235,7 +234,7 @@ async def sync_dois(person_id: int, *, refresh: bool = False, remerge: bool = Tr
         if not dois and link is None:
             return
         link_id = _doi_link(s, person).id
-    _set_state(link_id, sync_state="running", sync_started_at=utcnow(), last_error=None)
+    _set_state(link_id, sync_state="running", last_error=None)
     try:
         counts = await doi_source.ensure(list(dois), refresh=refresh)
         count = store_result(link_id, doi_source.result_for(dois))
@@ -263,7 +262,7 @@ async def sync_link(link_id: int, *, remerge: bool = True) -> None:
     if link.source == "doi":
         await sync_dois(person_id, remerge=remerge)
         return
-    _set_state(link_id, sync_state="running", sync_started_at=utcnow(), last_error=None)
+    _set_state(link_id, sync_state="running", last_error=None)
     try:
         result = await adapter.fetch(ext, names)
         count = store_result(link_id, result)
