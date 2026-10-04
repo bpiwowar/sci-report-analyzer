@@ -3,7 +3,7 @@
 import asyncio
 
 import pytest
-from helpers import add_source, make_person, note_saved, pub
+from helpers import add_source, make_person, note_status, pub
 from nicegui import ElementFilter, ui
 from nicegui.testing import User
 from sqlalchemy import select
@@ -129,7 +129,7 @@ async def test_viewer_page(user: User, fake_viewer):
     await user.should_see(marker="paper-note")  # its tags and notes, next to it
     user.find(marker="paper-new-tag").type("to read").trigger("keydown.enter")
     user.find(marker="paper-note").elements.pop().value = "Read section 3, $x^2$"
-    await note_saved(user, "paper-note")
+    await note_status(user, "paper-note")
     await user.should_see(kind=ui.markdown)
     rows = {r.id: r for r in await pubview.load_stats(pid)}
     tag = next(t for t in annotations.all_tags() if t.name == "to read")

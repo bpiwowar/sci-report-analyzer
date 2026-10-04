@@ -5,7 +5,7 @@ import asyncio
 import re
 
 import pytest
-from helpers import add_source, make_person, note_saved, pub
+from helpers import add_source, make_person, note_status, pub
 from nicegui import ui
 from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
@@ -191,7 +191,7 @@ async def test_document_page(user: User, monkeypatch, fake_viewer):
     # The document's own note.
     await user.should_see(marker="doc-note")
     user.find(marker="doc-note").elements.pop().value = "Strong candidate"
-    await note_saved(user, "doc-note")
+    await note_status(user, "doc-note")
     await user.should_see("Strong candidate")
     assert documents.info(doc).note == "Strong candidate"
     # Citing a paper: those of the document first (the latest first).
@@ -313,7 +313,7 @@ async def test_folder_notes(user: User, monkeypatch, fake_viewer):
     await user.open(f"/pdf/{ids['a']}?period={period}")
     await user.should_see(marker="folder-note")
     user.find(marker="folder-note").elements.pop().value = "Shortlist: **two** papers"
-    await note_saved(user, "folder-note")
+    await note_status(user, "folder-note")
     assert folders.notes_of(period) == "Shortlist: **two** papers"
     # The person's within the folder: not another person's, not the folder's own notes.
     other_period = folders.add_person(folder, make_person("Ann Smith"))
@@ -343,15 +343,6 @@ async def test_folder_notes(user: User, monkeypatch, fake_viewer):
     await user.should_not_see(marker="folder-note")
 
 
-async def _status(user: User, mark: str, text: str) -> None:
-    """Wait until a note editor's status is ``text`` (e.g. once typing pauses)."""
-    for _i in range(40):
-        if user.find(marker=f"{mark}-status").elements.pop().text == text:
-            return
-        await asyncio.sleep(0.1)
-    raise AssertionError(f"{mark}: not {text!r}")
-
-
 async def test_folder_notes_stale_save_refused(user: User, monkeypatch, fake_viewer):
     """An editor whose notes changed since it loaded them (saved elsewhere) does not save over
     them: it says so, and offers to copy its text or to reload."""
@@ -367,7 +358,7 @@ async def test_folder_notes_stale_save_refused(user: User, monkeypatch, fake_vie
     appended = "Mine.\n\n## Starred papers\n\nAppended."
     folders.set_notes(period, appended)
     user.find(marker="folder-note").elements.pop().value = "Mine, edited."
-    await _status(user, "folder-note", "Not saved")
+    await note_status(user, "folder-note", "Not saved")
     assert folders.notes_of(period) == appended
     await user.should_see(marker="folder-note-conflict")
     user.find(marker="folder-note-copy-unsaved").click()
@@ -378,7 +369,7 @@ async def test_folder_notes_stale_save_refused(user: User, monkeypatch, fake_vie
     assert editor.value == appended
     await user.should_not_see(marker="folder-note-conflict")
     editor.value = appended + " More."
-    await note_saved(user, "folder-note")
+    await note_status(user, "folder-note")
     assert folders.notes_of(period) == appended + " More."
     # Saving from the notes as they are: not refused.
     assert folders.set_notes(period, "Same.", base=folders.notes_of(period))
@@ -395,7 +386,7 @@ async def test_folder_notes_cleared_after_asking(user: User, fake_viewer):
     await user.should_see(marker="folder-note")
     editor = user.find(marker="folder-note").elements.pop()
     editor.value = ""
-    await _status(user, "folder-note", "Not saved")
+    await note_status(user, "folder-note", "Not saved")
     await user.should_see(marker="folder-note-restore")
     assert folders.notes_of(period) == "Precious notes."
     user.find(marker="folder-note-restore").click()
@@ -404,13 +395,13 @@ async def test_folder_notes_cleared_after_asking(user: User, fake_viewer):
     assert folders.notes_of(period) == "Precious notes."
     # Confirmed: cleared.
     editor.value = "  "
-    await _status(user, "folder-note", "Not saved")
+    await note_status(user, "folder-note", "Not saved")
     user.find(marker="folder-note-clear").click()
-    await _status(user, "folder-note", "Saved")
+    await note_status(user, "folder-note", "Saved")
     assert folders.notes_of(period) == ""
     # Empty already: nothing to ask.
     editor.value = "New start."
-    await note_saved(user, "folder-note")
+    await note_status(user, "folder-note")
     assert folders.notes_of(period) == "New start."
 
 
