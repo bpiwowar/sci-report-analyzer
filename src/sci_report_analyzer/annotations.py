@@ -7,9 +7,9 @@ from typing import Any
 
 from sqlalchemy import select
 
+from .db.app_settings import get_setting, set_setting
 from .db.models import (
     STARRED,
-    AppSetting,
     Period,
     PeriodNote,
     PeriodTag,
@@ -203,26 +203,16 @@ def set_hidden(pub_id: int, hidden: bool) -> None:
         s.get(Publication, pub_id).hidden = hidden
 
 
-def ui_state(key: str, default: Any = None) -> Any:
-    with session_scope() as s:
-        row = s.get(AppSetting, key)
-        return row.value if row else default
-
-
-def save_ui_state(key: str, value: Any) -> None:
-    with session_scope() as s:
-        s.merge(AppSetting(key=key, value=value))
+# (the UI's names)
+ui_state, save_ui_state = get_setting, set_setting
 
 
 def panel_state(person_id: int) -> dict[str, Any]:
-    with session_scope() as s:
-        row = s.get(AppSetting, f"ui.person.{person_id}")
-        return dict(row.value) if row else {}
+    return dict(get_setting(f"ui.person.{person_id}", {}))
 
 
 def save_panel_state(person_id: int, state: dict[str, Any]) -> None:
-    with session_scope() as s:
-        s.merge(AppSetting(key=f"ui.person.{person_id}", value=state))
+    set_setting(f"ui.person.{person_id}", state)
 
 
 # ---- name aliases (the person and their PhD students) ---------------------------------------

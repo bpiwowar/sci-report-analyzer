@@ -36,7 +36,8 @@ from lark import Lark, Transformer
 from lark.exceptions import LarkError
 
 from .authors import surname
-from .db.models import AppSetting, Folder, FolderSettings, Period
+from .db.app_settings import get_setting, set_setting
+from .db.models import Folder, FolderSettings, Period
 from .db.session import session_scope
 from .i18n import _
 from .pubview import PubStat, hashtag, saved_summary, tagged
@@ -711,9 +712,7 @@ def check_templates(items: list[Template], over: dict[str, str] | None = None) -
 
 
 def _general() -> Templates:
-    with session_scope() as s:
-        row = s.get(AppSetting, TEMPLATES_KEY)
-        saved = dict(row.value or {}) if row else {}
+    saved = dict(get_setting(TEMPLATES_KEY) or {})
     if not saved.get("items"):
         return default_templates()
     items = [
@@ -755,8 +754,7 @@ def save_templates(t: Templates) -> None:
         raise ValueError(err)
     if all(x.attrs != t.default for x in t.items):
         t.default = t.items[0].attrs if t.items else ""
-    with session_scope() as s:
-        s.merge(AppSetting(key=TEMPLATES_KEY, value=asdict(t)))
+    set_setting(TEMPLATES_KEY, asdict(t))
 
 
 def save_folder_templates(folder_id: int, items: list[Template]) -> None:

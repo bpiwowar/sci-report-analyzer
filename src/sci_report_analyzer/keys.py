@@ -5,8 +5,7 @@ from __future__ import annotations
 
 import os
 
-from .db.models import AppSetting
-from .db.session import session_scope
+from .db.app_settings import get_setting, set_setting
 from .i18n import N_, _
 
 
@@ -34,14 +33,11 @@ _SETTING = "api_keys"
 
 
 def stored_keys() -> dict[str, str]:
-    with session_scope() as s:
-        row = s.get(AppSetting, _SETTING)
-        return dict(row.value) if row else {}
+    return dict(get_setting(_SETTING, {}))
 
 
 def save_keys(values: dict[str, str]) -> None:
-    with session_scope() as s:
-        s.merge(AppSetting(key=_SETTING, value={k: v for k, v in values.items() if v}))
+    set_setting(_SETTING, {k: v for k, v in values.items() if v})
 
 
 def get_key(name: str) -> str | None:
