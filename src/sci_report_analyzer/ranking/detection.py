@@ -13,13 +13,13 @@ can be part of another (``part_of``): a text matches the latter if it matches ei
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable, Iterator
-from contextlib import contextmanager
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from pydantic import BaseModel
 
 from ..i18n import N_, Labels
+from .inforce import InForce, leftmost
 from .normalize import safe_compile
 
 
@@ -218,8 +218,6 @@ def compile_rules(rules: Iterable[DetectionRule]) -> dict[str, re.Pattern[str] |
 
 
 # The rules in force: those of the settings (``use``), compiled on first use.
-_source: Callable[[], Iterable[DetectionRule]] | None = None
-_compiled: dict[str, re.Pattern[str]] | None = None
 _defaults: dict[str, re.Pattern[str]] | None = None
 
 
@@ -235,37 +233,15 @@ def _with_defaults(rules: Iterable[DetectionRule]) -> dict[str, re.Pattern[str]]
     return {k: v or defaults[k] for k, v in compile_rules(rules).items()}
 
 
-def use(source: Callable[[], Iterable[DetectionRule]] | None) -> None:
-    """Take the rules in force from ``source`` (the settings), from their next use."""
-    global _source
-    _source = source
-    reset()
-
-
-def reset() -> None:
-    """Forget the compiled rules (the settings changed)."""
-    global _compiled
-    _compiled = None
-
-
-@contextmanager
-def using(rules: Iterable[DetectionRule]) -> Iterator[None]:
-    """The given rules in force meanwhile (a preview of edited rules)."""
-    global _compiled
-    before = _compiled
-    _compiled = _with_defaults(rules)
-    try:
-        yield
-    finally:
-        _compiled = before
+_IN_FORCE: InForce[dict[str, re.Pattern[str]]] = InForce(_with_defaults)
+use = _IN_FORCE.use
+reset = _IN_FORCE.reset
+using = _IN_FORCE.using
 
 
 def regex(rule_id: str) -> re.Pattern[str]:
     """The regex of a rule, as set."""
-    global _compiled
-    if _compiled is None:
-        _compiled = _with_defaults(_source() if _source else ())
-    return _compiled[rule_id]
+    return _IN_FORCE.get()[rule_id]
 
 
 # Each rule's own and those part of it ({"workshop": ("workshop", "workshop_at", …)}).
@@ -285,5 +261,4 @@ class Rule:
 
     def search(self, text: str, *args) -> re.Match[str] | None:
         """The leftmost match of its regexes (the first one's, on a tie)."""
-        found = (regex(p).search(text, *args) for p in PARTS[self.id])
-        return min((m for m in found if m), key=lambda m: m.start(), default=None)
+        return leftmost((regex(p) for p in PARTS[self.id]), text, *args)
