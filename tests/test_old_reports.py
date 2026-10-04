@@ -136,3 +136,36 @@ async def test_old_reports_appended_once():
     # The citations render in the notes, numbered as the report did.
     ctx = reports.folder_context(stats, period)
     assert reports.render(f"[@{keys[b]}]", ctx).unknown == []
+
+
+def test_moved_before_the_pages_are_served(monkeypatch):
+    """At start-up, the old reports are appended before any page is registered (an editor
+    never shows the notes without them)."""
+    from sci_report_analyzer import main
+
+    fid = folders.save_folder(None, "Hiring")
+    pid = make_person("Jane Doe")
+    period = folders.add_person(fid, pid)
+    with session_scope() as s:
+        s.add(Report(period_id=period, text="Kept text."))
+    _pending()
+    seen = []
+    monkeypatch.setattr(main.backup, "daily", lambda db: None)
+    monkeypatch.setattr(main.app, "on_startup", lambda f: None)
+    monkeypatch.setattr(main.app, "on_shutdown", lambda f: None)
+    for m in (
+        main.person,
+        main.settings,
+        main.help_page,
+        main.venues_page,
+        main.pdf_viewer,
+        main.documents_page,
+    ):
+        monkeypatch.setattr(m, "register", lambda: None)
+    monkeypatch.setattr(
+        main.persons,
+        "register",
+        lambda: seen.append((old_reports.pending(), folders.notes_of(period).strip())),
+    )
+    main.setup()
+    assert seen == [(False, "## Starred papers\n\nKept text.")]
