@@ -154,7 +154,11 @@ Les actes édités (présidence) conservent le rang de leur canal dans des caté
 ## Panneau
 
 Cliquez sur une barre ou une entrée de légende pour filtrer de façon croisée : les autres graphiques et la liste sont restreints
-à la sélection. Un article non classé affiche plutôt son type (par exemple « Conf. nat. », « Livre »).
+à la sélection (un nouveau clic la retire). **Maj**-clic ajoute une entrée à la sélection
+(ou la retire), **Alt**-clic la sélectionne seule : par exemple Q1, Q2, CORE A* et CORE A ensemble.
+Un article correspond à l'une des entrées choisies sur un graphique, et à celles de tous les
+graphiques. Les puces à côté des filtres retirent une entrée ; **Réinitialiser** efface tous les
+filtres (recherche, étiquettes, sessions, sélection…), sauf la période et ses années. Un article non classé affiche plutôt son type (par exemple « Conf. nat. », « Livre »).
 
 Cliquez sur une publication pour ouvrir ses détails :
 

@@ -992,6 +992,28 @@ def match_sel(s: PubStat, sel: Sel) -> bool:
     return False
 
 
+def match_sels(s: PubStat, sels: Iterable[Sel], skip: Iterable[str] = ()) -> bool:
+    """Whether a paper matches selections: one of each facet's (e.g. Q1 or CORE A*), for all
+    the facets (but the skipped ones, e.g. those of the chart the data is for)."""
+    skip = set(skip)
+    by_facet: dict[str, list[Sel]] = {}
+    for sel in sels:
+        if sel.facet not in skip:
+            by_facet.setdefault(sel.facet, []).append(sel)
+    return all(any(match_sel(s, sel) for sel in group) for group in by_facet.values())
+
+
+def pick_sel(sels: list[Sel], sel: Sel, *, add: bool = False, only: bool = False) -> list[Sel]:
+    """The selections after a click on one: added or removed (``add``, shift+click), the only
+    one (``only``, alt+click), else the only one, or none when it was already (a click)."""
+    same = [x for x in sels if (x.facet, x.label) == (sel.facet, sel.label)]
+    if only:
+        return [sel]
+    if add:
+        return [x for x in sels if x not in same] if same else [*sels, sel]
+    return [] if same and len(sels) == 1 else [sel]
+
+
 def year_bin_defs(years: list[int]) -> list[tuple[str, int, int]]:
     if not years:
         return []

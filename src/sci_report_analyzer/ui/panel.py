@@ -23,7 +23,8 @@ from ..pubview import (
     Sel,
     category_list,
     load_stats,
-    match_sel,
+    match_sels,
+    pick_sel,
     save_summary_settings,
     summary_lines,
     summary_settings,
@@ -54,15 +55,46 @@ def _int(v: str | None) -> int | None:
         return None
 
 
-def encode_sel(sel: Sel) -> str:
-    return json.dumps(dataclasses.asdict(sel), separators=(",", ":"))
+def encode_sels(sels: list[Sel]) -> str:
+    return json.dumps([dataclasses.asdict(s) for s in sels], separators=(",", ":"))
 
 
-def decode_sel(text: str | None) -> Sel | None:
+def decode_sels(text: str | None) -> list[Sel]:
     try:
-        return Sel(**json.loads(text)) if text else None
+        value = json.loads(text) if text else []
+        # (earlier links: a single selection)
+        return [Sel(**s) for s in (value if isinstance(value, list) else [value])]
     except (ValueError, TypeError):
-        return None
+        return []
+
+
+def click_mode(e) -> dict[str, bool]:
+    """The modifier keys of a click (shift: add or remove, alt: only this one)."""
+    args = getattr(e, "args", None)
+    if isinstance(args, list):
+        args = args[0] if args else None
+    args = args if isinstance(args, dict) else {}
+    return {"add": bool(args.get("shiftKey")), "only": bool(args.get("altKey"))}
+
+
+# A click on a bar, with its modifier keys (the chart's own event has no serialisable keys).
+CHART_CLICK_JS = (
+    "(e) => e.componentType === 'series' && emit({seriesName: e.seriesName, "
+    "dataIndex: e.dataIndex, shiftKey: !!e.event?.event?.shiftKey, "
+    "altKey: !!e.event?.event?.altKey})"
+)
+
+
+def on_chart_click(chart: ui.echart, handler: Callable[[str, int, dict[str, bool]], None]) -> None:
+    """Call ``handler(series name, data index, modifiers)`` on a click on a bar."""
+    chart.on(
+        "componentClick",
+        lambda e: handler(e.args["seriesName"], e.args["dataIndex"], click_mode(e)),
+        js_handler=CHART_CLICK_JS,
+    )
+
+
+MULTI_TIP = N_("Shift-click: add to the selection (or remove) · Alt-click: only this one")
 
 
 class PublicationsPanel:
@@ -79,7 +111,8 @@ class PublicationsPanel:
         self.loaded = False
         self.lo: int | None = None
         self.hi: int | None = None
-        self.sel: Sel | None = None
+        # Cross-filter selections: papers matching one of each facet's (e.g. Q1 or CORE A*).
+        self.sels: list[Sel] = []
         self.period_id: int | None = None
         # Tags to show (any of them): global ones, and ones within the period.
         self.tag_filter: list[int] = []
@@ -152,7 +185,7 @@ class PublicationsPanel:
         self.manual_only = q.get("manual") == "1"
         self.venue_filter = _int(q.get("venue", "")) or None
         self.open_pub = _int(q.get("pub", "")) or None
-        self.sel = decode_sel(q.get("sel"))
+        self.sels = decode_sels(q.get("sel"))
 
     def url_params(self) -> dict[str, str]:
         out = dict(self.url_extra)
@@ -179,8 +212,8 @@ class PublicationsPanel:
         ):
             if on:
                 out[key] = "1"
-        if self.sel:
-            out["sel"] = encode_sel(self.sel)
+        if self.sels:
+            out["sel"] = encode_sels(self.sels)
         if self.venue_filter:
             out["venue"] = str(self.venue_filter)
         return out
@@ -315,10 +348,38 @@ class PublicationsPanel:
             parts.append(_("{n} hidden by the filters").format(n=len(pubs) - out))
         return ", ".join(parts)
 
-    def pick(self, sel: Sel) -> None:
-        self.sel = (
-            None if self.sel and (self.sel.facet, self.sel.label) == (sel.facet, sel.label) else sel
+    def pick(self, sel: Sel, e=None) -> None:
+        """A click on a bar, legend entry or chip (shift: add or remove, alt: only this one)."""
+        self.sels = pick_sel(self.sels, sel, **click_mode(e))
+        self.render()
+
+    def unpick(self, sel: Sel) -> None:
+        self.sels = [x for x in self.sels if x != sel]
+        self.render()
+
+    def filtering(self) -> bool:
+        """Whether some filter is on (the period and its years aside)."""
+        return bool(
+            self.sels
+            or self.tag_filter
+            or self.track_filter
+            or self.text
+            or self.hide_preprints
+            or self.problems_only
+            or self.manual_only
+            or self.venue_filter
+            or self.show_outside
         )
+
+    def reset_filters(self) -> None:
+        """Clear the filters (but the period and its years)."""
+        self.sels = []
+        self.tag_filter = []
+        self.track_filter = []
+        self.text = ""
+        self.hide_preprints = self.problems_only = self.manual_only = self.show_outside = False
+        self.venue_filter = None
+        self._save_state()
         self.render()
 
     # ---- rendering ----------------------------------------------------------------------
@@ -338,23 +399,20 @@ class PublicationsPanel:
                 ).classes("text-grey")
                 return
             filtered = self.base_rows()
-            sel = self.sel
-            conditioned = [s for s in filtered if match_sel(s, sel)] if sel else filtered
+            sels = self.sels
+
+            def matching(*skip: str) -> list[PubStat]:
+                """The papers of a chart: within the selections of the other charts."""
+                return [s for s in filtered if match_sels(s, sels, skip)]
+
+            conditioned = matching()
             self._toolbar(filtered, conditioned)
             cats = category_list(filtered)
-            cat_data = filtered if sel and sel.facet == "category" else conditioned
-            self._distribution(cat_data, cats, sel)
-            year_data = filtered if sel and sel.facet == "year" else conditioned
-            self._years(year_data, cats, sel)
+            self._distribution(matching("category"), cats, sels)
+            self._years(matching("year"), cats, sels)
             with ui.row().classes("w-full gap-4 no-wrap"):
-                co_data = filtered if sel and sel.facet == "coauthors" else conditioned
-                self._coauthors(co_data, sel)
-                pos_data = (
-                    filtered
-                    if sel and sel.facet in ("contribution", "phd", "authorcat")
-                    else conditioned
-                )
-                self._contributions(pos_data, sel)
+                self._coauthors(matching("coauthors"), sels)
+                self._contributions(matching("contribution", "phd", "authorcat"), sels)
             self._list(conditioned)
             ui.label(_(DISCLAIMER)).classes("text-xs text-grey")
         self.push_url()
@@ -366,7 +424,7 @@ class PublicationsPanel:
                 ngettext(
                     "{n} of {total} publications", "{n} of {total} publications", len(filtered)
                 ).format(n=len(conditioned), total=len(filtered))
-                if self.sel
+                if self.sels
                 else ngettext("{n} publications", "{n} publications", len(filtered)).format(
                     n=len(filtered)
                 )
@@ -404,7 +462,7 @@ class PublicationsPanel:
                     self.lo = self.hi = None
                 self.tag_filter = self._known_tags(self.tag_filter)
                 self.primary = source_settings.primary_for(self.person_id, self.period_id)
-                self.sel = None
+                self.sels = []
                 self._save_state()
                 self.render()
 
@@ -414,7 +472,7 @@ class PublicationsPanel:
 
             def set_year(which: str, v) -> None:
                 setattr(self, which, int(v) if v not in (None, "") else None)
-                self.sel = None
+                self.sels = []
                 self.render()
 
             if years:
@@ -445,7 +503,7 @@ class PublicationsPanel:
 
                 def set_tags(e) -> None:
                     self.tag_filter = list(e.value or [])
-                    self.sel = None
+                    self.sels = []
                     self._save_state()
                     self.render()
 
@@ -469,7 +527,7 @@ class PublicationsPanel:
 
                 def set_tracks(e) -> None:
                     self.track_filter = list(e.value or [])
-                    self.sel = None
+                    self.sels = []
                     self.render()
 
                 order = {t: i for i, t in enumerate(tracks.track_ids())}
@@ -503,7 +561,7 @@ class PublicationsPanel:
 
                 def set_problems(e) -> None:
                     self.problems_only = e.value
-                    self.sel = None
+                    self.sels = []
                     self.render()
 
                 ui.switch(
@@ -516,7 +574,7 @@ class PublicationsPanel:
 
                 def set_manual(e) -> None:
                     self.manual_only = e.value
-                    self.sel = None
+                    self.sels = []
                     self.render()
 
                 ui.switch(
@@ -542,7 +600,7 @@ class PublicationsPanel:
 
                 def clear_venue() -> None:
                     self.venue_filter = None
-                    self.sel = None
+                    self.sels = []
                     self.render()
 
                 ui.chip(
@@ -555,7 +613,7 @@ class PublicationsPanel:
 
                 def set_show_hidden(e) -> None:
                     self.show_hidden = e.value
-                    self.sel = None
+                    self.sels = []
                     self.render()
 
                 ui.switch(
@@ -570,7 +628,7 @@ class PublicationsPanel:
 
                 def set_show_outside(e) -> None:
                     self.show_outside = e.value
-                    self.sel = None
+                    self.sels = []
                     self.render()
 
                 ui.switch(
@@ -582,11 +640,16 @@ class PublicationsPanel:
                 ).tooltip(
                     _("Papers the primary source doesn't list: not counted (add them there)")
                 ).mark("show-outside")
-            if self.sel:
-                with ui.chip(
-                    self.sel.label, removable=True, color="primary", text_color="white"
-                ) as chip:
-                    chip.on("remove", lambda: self.pick(self.sel))
+            for sel in self.sels:
+                ui.chip(sel.label, removable=True, color="primary", text_color="white").on(
+                    "remove", lambda s=sel: self.unpick(s)
+                ).mark("selection")
+            if self.filtering():
+                ui.button(_("Reset"), icon="filter_alt_off", on_click=self.reset_filters).props(
+                    "flat dense no-caps"
+                ).tooltip(_("Clear the filters (the period and its years are kept)")).mark(
+                    "reset-filters"
+                )
 
     def render_names(self) -> None:
         """Refresh the name variants (shown outside the panel, in the Sources tab)."""
@@ -835,23 +898,23 @@ class PublicationsPanel:
         dlg.on_value_change(lambda e: None if e.value else dlg.delete())
         dlg.open()
 
-    def _distribution(self, rows: list[PubStat], cats, sel: Sel | None) -> None:
+    def _distribution(self, rows: list[PubStat], cats, sels: list[Sel]) -> None:
         total = len(rows)
         counts: dict[str, int] = {}
         predatory = 0
         for s in rows:
             counts[s.category.key] = counts.get(s.category.key, 0) + 1
             predatory += bool(s.badge and s.badge.predatory)
-        owns = sel is not None and sel.facet == "category"
+        chosen = {x.key for x in sels if x.facet == "category"}
         present = [c for c in cats if counts.get(c.key)]
 
         def pct(n: int) -> str:
             return f"{round(100 * n / total) if total else 0}%"
 
-        with ui.row().classes("w-full h-6 no-wrap rounded overflow-hidden"):
+        with ui.row().classes("w-full h-6 no-wrap rounded overflow-hidden select-none"):
             for c in present:
                 n = counts[c.key]
-                dim = owns and sel.key != c.key
+                dim = chosen and c.key not in chosen
                 seg = (
                     span(
                         f'<span class="{"vr-track" if c.striped else ""}'
@@ -862,28 +925,36 @@ class PublicationsPanel:
                     .classes("cursor-pointer")
                     .style(f"width:{100 * n / max(total, 1)}%")
                 )
-                seg.tooltip(f"{c.label}: {pct(n)} ({n})")
-                seg.on("click", lambda c=c: self.pick(Sel("category", c.label, key=c.key)))
-        with ui.row().classes("w-full gap-3"):
+                seg.tooltip(f"{c.label}: {pct(n)} ({n}) · {_(MULTI_TIP)}")
+                seg.on(
+                    "click",
+                    lambda e, c=c: self.pick(Sel("category", c.label, key=c.key), e),
+                    ["shiftKey", "altKey"],
+                )
+        with ui.row().classes("w-full gap-3 select-none"):
             items = [(c.key, c.label, c.colour, stripes(c), counts[c.key]) for c in present]
             if predatory:
                 items.append(("predatory", _("⚠ predatory"), PREDATORY_COLOUR, "", predatory))
             for key, label, colour, striped, n in items:
-                dim = owns and sel.key != key
-                dim_cls = "vr-dim" if dim else ""
+                dim = chosen and key not in chosen
+                dim_cls = "vr-dim" if dim else "underline" if key in chosen else ""
                 el = span(
                     f'<span class="{dim_cls}"><i'
                     f' style="display:inline-block;width:10px;height:10px;background:{colour};'
                     f'margin-right:4px{striped}"></i>{escape(label)} {pct(n)} <b>({n})</b></span>'
                 ).classes("cursor-pointer text-sm")
-                el.on("click", lambda k=key, lab=label: self.pick(Sel("category", lab, key=k)))
+                el.on(
+                    "click",
+                    lambda e, k=key, lab=label: self.pick(Sel("category", lab, key=k), e),
+                    ["shiftKey", "altKey"],
+                ).tooltip(_(MULTI_TIP)).mark(f"category-{key}")
 
-    def _years(self, rows: list[PubStat], cats, sel: Sel | None) -> None:
+    def _years(self, rows: list[PubStat], cats, sels: list[Sel]) -> None:
         years = [s.year for s in rows if s.year is not None]
         if len(set(years)) < 2:
             return
         bins = year_bin_defs(years)
-        owns = sel is not None and sel.facet == "year"
+        chosen = {x.label for x in sels if x.facet == "year"}
         series = []
         for c in cats:
             data = []
@@ -893,7 +964,7 @@ class PublicationsPanel:
                     for s in rows
                     if s.category.key == c.key and s.year is not None and lo <= s.year <= hi
                 )
-                dim = owns and sel.label != label
+                dim = chosen and label not in chosen
                 data.append({"value": n, "itemStyle": {"opacity": DIM_OPACITY if dim else 1}})
             if any(d["value"] for d in data):
                 item = {"color": c.colour}
@@ -915,41 +986,46 @@ class PublicationsPanel:
                         "emphasis": {"focus": "none"},
                     }
                 )
-        chart = ui.echart(
-            {
-                "title": {
-                    "text": _("Publications by year · {start}–{end} ({n})").format(
-                        start=min(years), end=max(years), n=len(years)
-                    ),
-                    "textStyle": {"fontSize": 13},
-                },
-                "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
-                "grid": {"left": 30, "right": 10, "top": 35, "bottom": 25},
-                "xAxis": {"type": "category", "data": [b[0] for b in bins]},
-                "yAxis": {"type": "value", "minInterval": 1},
-                "aria": {"enabled": True, "decal": {"show": False}},
-                "series": series,
-            }
-        ).classes("w-full h-56")
+        chart = (
+            ui.echart(
+                {
+                    "title": {
+                        "text": _("Publications by year · {start}–{end} ({n})").format(
+                            start=min(years), end=max(years), n=len(years)
+                        ),
+                        "textStyle": {"fontSize": 13},
+                    },
+                    "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+                    "grid": {"left": 30, "right": 10, "top": 35, "bottom": 25},
+                    "xAxis": {"type": "category", "data": [b[0] for b in bins]},
+                    "yAxis": {"type": "value", "minInterval": 1},
+                    "aria": {"enabled": True, "decal": {"show": False}},
+                    "series": series,
+                }
+            )
+            .classes("w-full h-56")
+            .mark("years-chart")
+        )
 
-        def click(e) -> None:
-            label, lo, hi = bins[e.data_index]
-            self.pick(Sel("year", label, lo=lo, hi=hi))
+        def click(_series: str, index: int, mode: dict[str, bool]) -> None:
+            label, lo, hi = bins[index]
+            self.sels = pick_sel(self.sels, Sel("year", label, lo=lo, hi=hi), **mode)
+            self.render()
 
-        chart.on_point_click(click)
+        on_chart_click(chart, click)
 
     def _hist(
-        self, title: str, counts: dict[int, int], colour: str, facet: str, sel: Sel | None
+        self, title: str, counts: dict[int, int], colour: str, facet: str, sels: list[Sel]
     ) -> ui.echart:
         keys = list(range(1, HIST_CAP + 1)) if counts else []
         top = max((k for k in counts), default=0)
         keys = [k for k in keys if k <= max(top, 1)]
         labels = [f"{k}+" if k == HIST_CAP else str(k) for k in keys]
-        owns = sel is not None and sel.facet == facet
+        chosen = {x.value for x in sels if x.facet == facet}
         data = [
             {
                 "value": counts.get(k, 0),
-                "itemStyle": {"opacity": DIM_OPACITY if owns and sel.value != k else 1},
+                "itemStyle": {"opacity": DIM_OPACITY if chosen and k not in chosen else 1},
             }
             for k in keys
         ]
@@ -964,22 +1040,17 @@ class PublicationsPanel:
             }
         ).classes("w-full h-48")
 
-        def click(e) -> None:
-            k = keys[e.data_index]
-            self.pick(
-                Sel(
-                    facet,
-                    (_("co-authors {n}") if facet == "coauthors" else _("position {n}")).format(
-                        n=labels[e.data_index]
-                    ),
-                    value=k,
-                )
+        def click(_series: str, index: int, mode: dict[str, bool]) -> None:
+            label = (_("co-authors {n}") if facet == "coauthors" else _("position {n}")).format(
+                n=labels[index]
             )
+            self.sels = pick_sel(self.sels, Sel(facet, label, value=keys[index]), **mode)
+            self.render()
 
-        chart.on_point_click(click)
+        on_chart_click(chart, click)
         return chart
 
-    def _coauthors(self, rows: list[PubStat], sel: Sel | None) -> None:
+    def _coauthors(self, rows: list[PubStat], sels: list[Sel]) -> None:
         with_authors = [s.num_authors for s in rows if s.num_authors is not None]
         with ui.column().classes("w-1/2"):
             if not with_authors:
@@ -995,17 +1066,17 @@ class PublicationsPanel:
                 counts,
                 "#6639ba",
                 "coauthors",
-                sel,
+                sels,
             )
 
-    def _contributions(self, rows: list[PubStat], sel: Sel | None) -> None:
+    def _contributions(self, rows: list[PubStat], sels: list[Sel]) -> None:
         """The person's role in the papers (first author, contributor… last author), overall
         and by years: shares of the papers of each column."""
         known = [s for s in rows if s.contribution]
         with ui.column().classes("w-1/2 gap-0").mark("contributions"):
             if not known:
                 return
-            owns = sel is not None and sel.facet == "contribution"
+            chosen = [x for x in sels if x.facet == "contribution"]
             years = [s.year for s in known if s.year is not None]
             bins = year_bin_defs(years) if len(set(years)) > 1 else []
             columns = [(_("All"), None, None), *bins]
@@ -1028,12 +1099,12 @@ class PublicationsPanel:
                     continue
                 data = []
                 for (_label, lo, _hi), n, total in zip(columns, counts, totals, strict=True):
-                    picked = owns and sel.key == key and sel.lo == (lo or 0)
+                    picked = any(x.key == key and x.lo == (lo or 0) for x in chosen)
                     data.append(
                         {
                             "value": round(100 * n / total, 1) if total else 0,
                             "count": n,
-                            "itemStyle": {"opacity": DIM_OPACITY if owns and not picked else 1},
+                            "itemStyle": {"opacity": DIM_OPACITY if chosen and not picked else 1},
                         }
                     )
                 series.append(
@@ -1073,15 +1144,15 @@ class PublicationsPanel:
                 }
             ).classes("w-full h-64")
 
-            def click(e) -> None:
-                key = next(r.key for r in cfg.roles if r.label == e.series_name)
-                col, lo, hi = columns[e.data_index]
-                label = _("{role} author").format(role=e.series_name.lower()) + (
-                    f" ({col})" if lo else ""
-                )
-                self.pick(Sel("contribution", label, lo=lo or 0, hi=hi or 0, key=key))
+            def click(series: str, index: int, mode: dict[str, bool]) -> None:
+                key = next(r.key for r in cfg.roles if r.label == series)
+                col, lo, hi = columns[index]
+                label = _("{role} author").format(role=series.lower()) + (f" ({col})" if lo else "")
+                sel = Sel("contribution", label, lo=lo or 0, hi=hi or 0, key=key)
+                self.sels = pick_sel(self.sels, sel, **mode)
+                self.render()
 
-            chart.on_point_click(click)
+            on_chart_click(chart, click)
             with ui.row().classes("items-center gap-1 -mt-1"):
                 with ui.icon("help_outline", size="xs").classes("text-grey"), ui.tooltip():
                     ui.label(_("The first rule that matches:"))
@@ -1098,30 +1169,41 @@ class PublicationsPanel:
                     ui.chip(
                         f"{label} ({with_phd})",
                         selectable=True,
-                        selected=sel is not None and sel.facet == "phd",
-                        on_click=lambda: self.pick(Sel("phd", _("with a PhD student"))),
-                    ).props("dense").tooltip(
+                        selected=any(x.facet == "phd" for x in sels),
+                    ).props("dense clickable").on(
+                        "click",
+                        lambda e: self.pick(Sel("phd", _("with a PhD student")), e),
+                        ["shiftKey", "altKey"],
+                    ).tooltip(
                         _("papers co-authored with a (confirmed) PhD student from theses.fr")
-                    )
+                        + " · "
+                        + _(MULTI_TIP)
+                    ).mark("phd-chip")
                 for c in self.categories:
                     n = sum(f"cat:{c.id}" in s.author_marks for s in rows)
                     if not n:
                         continue
-                    active = sel is not None and sel.facet == "authorcat" and sel.key == str(c.id)
+                    active = any(x.facet == "authorcat" and x.key == str(c.id) for x in sels)
                     ui.chip(
                         _("with {category} {pct}% ({n})").format(
                             category=c.name, pct=round(100 * n / max(len(rows), 1)), n=n
                         ),
                         selectable=True,
                         selected=active,
-                        on_click=lambda c=c: self.pick(
+                    ).props("dense clickable").on(
+                        "click",
+                        lambda e, c=c: self.pick(
                             Sel(
                                 "authorcat",
                                 _("with {category}").format(category=c.name),
                                 key=str(c.id),
-                            )
+                            ),
+                            e,
                         ),
-                    ).props("dense").style(f"--q-primary:{c.colour}").mark(f"authorcat-{c.id}")
+                        ["shiftKey", "altKey"],
+                    ).tooltip(_(MULTI_TIP)).style(f"--q-primary:{c.colour}").mark(
+                        f"authorcat-{c.id}"
+                    )
 
     def list_tag(self) -> int | None:
         """The tag filtered on, when it is the only one and was put from a list (the papers
@@ -1170,7 +1252,7 @@ class PublicationsPanel:
 
     def _all_years(self) -> None:
         self.lo = self.hi = None
-        self.sel = None
+        self.sels = []
         self.render()
 
     def _row(self, s: PubStat, period) -> None:
