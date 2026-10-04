@@ -45,6 +45,16 @@ longer matches them.
 With `--live-reload`, the "restart" offer (a new version of the code) must also show on
 the PDF viewer page (it does not there now), e.g. in its header bar.
 
+## PDF: area selection
+
+- Several areas at once (e.g. Shift+drag adds a rectangle to the selection): their texts,
+  in order, are the selection.
+- "Tag from a list" on the selection (as in the publications panel, `reflist.py`): find
+  the papers of the selected list (e.g. an area over a numbered list of references) and
+  tag them.
+- Copy the selected area's text to the clipboard (⌘C / Ctrl+C, as a text selection,
+  and in the tooltip).
+
 ## PDF: excerpts and PDF.js highlights
 
 When adding an excerpt from text already highlighted with PDF.js, remove that PDF.js
