@@ -29,9 +29,9 @@ from .base import (
     FetchResult,
     SourceAdapter,
     SourceError,
-    client,
     contact_email,
     normalize_doi,
+    request_with_backoff,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,32 +78,13 @@ _batch_throttle = _Throttle(1, BATCH_INTERVAL)
 
 async def _get(url: str, *, throttle: _Throttle | None = None, **kw: Any) -> httpx.Response | None:
     """GET with throttling and backoff; None when the DOI is unknown there (404)."""
-    delay = 2.0
-    for attempt in range(RETRIES + 1):
-        async with throttle or _throttle:
-            try:
-                res = await client().get(url, **kw)
-            except httpx.TransportError as e:
-                if attempt == RETRIES:
-                    raise SourceError(_("network error: {error}").format(error=e)) from e
-                res = None
-        if res is not None:
-            if res.status_code in (404, 410):
-                return None
-            if res.status_code == 429 or res.status_code >= 500:
-                if attempt == RETRIES:
-                    raise SourceError(
-                        _("HTTP {status} from {url}").format(status=res.status_code, url=url)
-                    )
-                wait = float(res.headers.get("Retry-After") or delay)
-                (throttle or _throttle).pause(min(wait, 60))
-                logger.info("HTTP %s from %s, retrying in %.1fs", res.status_code, url, wait)
-            else:
-                res.raise_for_status()
-                return res
-        await asyncio.sleep(delay)
-        delay *= 2
-    raise SourceError(_("giving up on {url}").format(url=url))
+    res = await request_with_backoff(
+        "GET", url, retries=RETRIES, delay=2.0, throttle=throttle or _throttle, **kw
+    )
+    if res.status_code in (404, 410):
+        return None
+    res.raise_for_status()
+    return res
 
 
 # ---- parsing -------------------------------------------------------------------------------
