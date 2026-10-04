@@ -287,18 +287,12 @@ def _detected_kind(
     ), "detected"
 
 
-# Sources whose venue text is only a fallback (ORCID: a free "journal title" declared by
-# hand or copied from elsewhere, often missing or wrong for conference papers).
-UNRELIABLE_VENUE = frozenset({"orcid"})
-
-
 def venue_members(views: list[MemberView]) -> list[MemberView]:
     """Members whose venue ranks the paper: published versions, reliable sources first."""
     published = [mv for mv in views if not mv.archival] or views
+    unreliable = service.settings.unreliable_venue_sources
     reliable = [
-        mv
-        for mv in published
-        if mv.source not in UNRELIABLE_VENUE and mv.venue and mv.venue_reliable
+        mv for mv in published if mv.source not in unreliable and mv.venue and mv.venue_reliable
     ]
     return reliable or published
 
@@ -413,7 +407,7 @@ def pick_reason(best: MemberView, views: list[MemberView]) -> str:
             "; the DOI record is not used: a book chapter without an event (e.g. in a volume "
             "of a series such as LNCS) names no real venue"
         )
-    if any(v.archival or v.source in UNRELIABLE_VENUE for v in skipped):
+    if any(v.archival or v.source in service.settings.unreliable_venue_sources for v in skipped):
         why += _("; preprints and ORCID venues are only used when nothing else is available")
     return why
 
@@ -574,8 +568,6 @@ def _authorship(
 
 
 OWNER = "owner"
-# A PhD student on a paper more than this many years after their defence: a former student.
-FORMER_AFTER = 2
 
 
 @dataclass
@@ -603,7 +595,8 @@ class PeopleIndex:
     Marks: ``owner`` / ``student`` for confirmed names (exact name or alias, or an author
     position given by an id-based source), ``owner?`` / ``student?`` for potential matches
     (same surname and initial) waiting for a manual validation, ``former`` for a confirmed
-    student on a paper more than ``FORMER_AFTER`` years after their defence.
+    student on a paper more than ``former_student_after`` years (a setting) after their
+    defence.
     """
 
     owner_exact: set[str]
@@ -665,6 +658,7 @@ class PeopleIndex:
         marks: list[str | None] = []
         notes: dict[int, tuple[str, str | None]] = {}
         owner_found = False
+        former_after = service.settings.former_student_after
         for i, a in enumerate(authors):
             f = fold_name(a)
             if not owner_found and (f in self.owner_exact or (pos_exact and pos == i + 1)):
@@ -691,7 +685,7 @@ class PeopleIndex:
             mark = None
             for st in self.students:
                 if f in st.exact:
-                    if year and st.defence_year and year - st.defence_year > FORMER_AFTER:
+                    if year and st.defence_year and year - st.defence_year > former_after:
                         former = _("former {note}").format(note=st.note)
                         mark, notes[i] = "former", (former, st.name)
                     else:

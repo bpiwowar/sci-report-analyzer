@@ -16,11 +16,10 @@ from sqlalchemy.orm import Session
 
 from .db.models import Person, Publication, SourceLink, SourcePub, utcnow
 from .ranking.normalize import is_non_venue, normalize
+from .ranking.service import service
 from .sources import PRIORITY
 from .sources.base import normalize_doi
 
-TITLE_JACCARD = 0.9
-YEAR_SLACK = 1
 _MIN_TITLE_TOKENS = 3
 
 
@@ -53,7 +52,7 @@ def _years_compatible(a: SourcePub, b: SourcePub) -> bool:
         return True  # a preprint can precede the published version by years
     if a.year is None or b.year is None:
         return True
-    return abs(a.year - b.year) <= YEAR_SLACK
+    return abs(a.year - b.year) <= service.settings.merge_year_slack
 
 
 def cluster(pubs: Sequence[SourcePub]) -> list[list[int]]:
@@ -63,6 +62,7 @@ def cluster(pubs: Sequence[SourcePub]) -> list[list[int]]:
     by_title: dict[str, list[int]] = defaultdict(list)
     token_index: dict[str, list[int]] = defaultdict(list)
     tokens = [_title_tokens(p.title) for p in pubs]
+    jaccard = service.settings.merge_title_jaccard
 
     for i, p in enumerate(pubs):
         if p.doi:
@@ -90,9 +90,7 @@ def cluster(pubs: Sequence[SourcePub]) -> list[list[int]]:
             if j <= i or uf.find(i) == uf.find(j) or len(tokens[j]) < _MIN_TITLE_TOKENS:
                 continue
             inter = len(toks & tokens[j])
-            if inter / len(toks | tokens[j]) >= TITLE_JACCARD and _years_compatible(
-                pubs[i], pubs[j]
-            ):
+            if inter / len(toks | tokens[j]) >= jaccard and _years_compatible(pubs[i], pubs[j]):
                 uf.union(i, j)
 
     # Two different DOIs of non-archival records are distinct works (e.g. a conference paper
