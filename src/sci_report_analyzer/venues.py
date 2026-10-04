@@ -443,17 +443,12 @@ def use_venue(
 
 
 def clear_manual(venue_id: int) -> None:
-    update_venue(
-        venue_id,
-        kind=None,
-        hosts=None,
-        joint=None,
-        level_type=None,
-        level_rank=None,
-        record_key=None,
-        match_text=None,
-        short_name=None,
-    )
+    """Erase a venue's manual decisions (``Venue.MANUAL_FIELDS``; its variants stay)."""
+    with session_scope() as s:
+        s.get(Venue, venue_id).clear_manual()
+        s.flush()
+        _rename_joints(s)
+    _changed(rematch=True)
 
 
 # ---- workshops -------------------------------------------------------------------------------

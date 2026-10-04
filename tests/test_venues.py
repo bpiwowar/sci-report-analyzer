@@ -293,6 +293,58 @@ def test_clear_manual_decisions_by_level():
     assert a.venue_id is not None and not (a.badge and a.badge.manual)
 
 
+def _set_every_manual_field(pid):
+    from sci_report_analyzer import annotations
+
+    add_source(
+        pid,
+        "hal",
+        "idhal:x",
+        [pub("a", "Paper A", 2020, "Venue One"), pub("b", "Paper B", 2020, "Venue Two")],
+    )
+    a, b = stats(pid)["Paper A"], stats(pid)["Paper B"]
+    venues.update_venue(
+        a.venue_id,
+        kind="intl_workshop",
+        level_type="conference",
+        level_rank="A",
+        record_key="core:x",
+        match_text="Venue",
+        short_name="VO",
+        url="https://venue.example.org",
+        patterns=[{"pattern": "venue one"}],
+    )
+    venues.save_issns(a.venue_id, ["12345678"])
+    venues.save_hosts(a.venue_id, [{"venue_id": b.venue_id}])
+    venues.update_venue(a.venue_id, short_name="")  # "no acronym", by hand
+    annotations.set_overrides(a.id, year_override=2019, note="n")
+    annotations.set_rank_override(a.id, {"record_key": "core:x"}, "why")
+    annotations.set_kind_override(a.id, "natl_journal")
+    annotations.set_doi(a.id, "10.1234/abc")
+    return a
+
+
+def test_clear_manual_clears_every_field():
+    from sci_report_analyzer import venue_match
+
+    a = _set_every_manual_field(make_person())
+    venue_match.clear_manual(venues=True, papers=True)
+    assert venue_match.manual_counts() == {"venues": 0, "variants": 0, "papers": 0}
+    with session_scope() as s:
+        v, p = s.get(Venue, a.venue_id), s.get(Publication, a.id)
+        assert v is None or not (v.has_manual or v.short_manual or v.hosts or v.url)
+        assert not p.has_overrides and p.doi_manual is None and p.rank_note is None
+
+
+def test_clear_manual_of_one_venue():
+    a = _set_every_manual_field(make_person())
+    venues.clear_manual(a.venue_id)
+    with session_scope() as s:
+        v = s.get(Venue, a.venue_id)
+        assert not v.has_manual and not v.short_manual
+        assert all(getattr(v, f) in (None, False) for f in v.MANUAL_FIELDS if f != "kind")
+
+
 def test_merge_conflicting_venues_keeps_rules_and_tracks():
     from sci_report_analyzer.ranking.service import VenuePattern
 

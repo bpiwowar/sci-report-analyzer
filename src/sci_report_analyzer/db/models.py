@@ -196,20 +196,29 @@ class Publication(Base):
     # Global tags (per-period ones: PeriodTag).
     tags: Mapped[list[Tag]] = relationship(secondary="publication_tag", lazy="selectin")
 
+    # The fields set by hand, with their value once cleared (tags, stars, hidden papers and
+    # manual merges are kept apart).
+    MANUAL_FIELDS: ClassVar[dict[str, Any]] = {
+        "venue_manual": False,
+        "venue_source": None,
+        "rank_override": None,
+        "rank_note": None,
+        "kind_override": None,
+        "track_override": None,
+        "doi_manual": None,
+        "year_override": None,
+        "author_pos_override": None,
+        "note": None,
+    }
+
     @property
     def has_overrides(self) -> bool:
         """Whether something was set by hand (kept when the paper leaves the sources)."""
-        return bool(
-            self.venue_manual
-            or self.venue_source
-            or self.rank_override
-            or self.kind_override
-            or self.track_override
-            or self.year_override
-            or self.author_pos_override is not None
-            or self.note
-            or self.doi_manual
-        )
+        return any(getattr(self, f) not in (v, "") for f, v in self.MANUAL_FIELDS.items())
+
+    def clear_manual(self) -> None:
+        for f, v in self.MANUAL_FIELDS.items():
+            setattr(self, f, v)
 
 
 class Period(Base):
@@ -615,20 +624,36 @@ class Venue(Base):
                 return h.get("venue_id")
         return None
 
+    # The fields set by hand, with their value once cleared (the kind, short name and joint
+    # parts are then found again automatically).
+    MANUAL_FIELDS: ClassVar[dict[str, Any]] = {
+        "kind": None,
+        "kind_manual": False,
+        "level_type": None,
+        "level_rank": None,
+        "record_key": None,
+        "match_text": None,
+        "short_name": None,
+        "short_manual": False,
+        "url": None,
+        "patterns": None,
+        "identifiers": None,
+        "hosts": None,
+        "joint": None,
+    }
+    # (found automatically too: only their flag says they were set by hand)
+    _INFERRED: ClassVar[frozenset[str]] = frozenset({"kind", "level_type", "short_name", "joint"})
+
     @property
     def has_manual(self) -> bool:
-        return bool(
-            self.kind_manual
-            or self.level_rank
-            or self.record_key
-            or self.match_text
-            or self.short_manual
-            or self.url
-            or self.patterns
-            or self.identifiers
-            or self.hosts
-            or bool(self.joint and (self.joint.get("manual") or self.joint.get("use")))
+        j = self.joint or {}
+        return bool(j.get("manual") or j.get("use")) or any(
+            getattr(self, f) for f in self.MANUAL_FIELDS if f not in self._INFERRED
         )
+
+    def clear_manual(self) -> None:
+        for f, v in self.MANUAL_FIELDS.items():
+            setattr(self, f, v)
 
     @property
     def parts(self) -> list[int]:
