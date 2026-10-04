@@ -24,18 +24,20 @@ uses.
 ### Versioning
 
 `format` must be `"sci-report-analyzer-settings"`, or the file is rejected. `version` (now
-`5`) is written but not checked on import. Every other field is optional: a missing one takes
+`6`) is written but not checked on import. Every other field is optional: a missing one takes
 its default, an unknown one is ignored. Older files therefore import as long as their fields
 kept their meaning. A file of version 4 or before may have `flags` (`{"name", "colour",
 "track"}`; gone since version 5, see [Tracks](#track)): when its `matching` has no `tracks`,
-the colour of a flag with a track becomes that track's; the other flags are ignored.
+the colour of a flag with a track becomes that track's; the other flags are ignored. Since
+version 6 a track has `name_rules`: a built-in track without them (an older file) gets their
+defaults.
 
 ### Top level
 
 | Field | Type | Default | |
 |-------|------|---------|-|
 | `format` | `"sci-report-analyzer-settings"` | that | required in effect (the only accepted value) |
-| `version` | int | `5` | informative |
+| `version` | int | `6` | informative |
 | `exported_at` | string \| null | null | ISO 8601, UTC, seconds (`2026-10-04T09:00:00+00:00`) |
 | `matching` | [Matching](#matching) | defaults | |
 | `venues` | list of [Venue](#venue) | `[]` | only venues with a manual decision or a manual variant are exported |
@@ -125,6 +127,7 @@ conference); the first whose rules match a venue text gives its track.
 | `names` | object: language → string | `{}` | its name by language (`{"en": "Short", "fr": "Court"}`); a missing one: the English one, else the id |
 | `colour` | string | `"#2f6fb0"` | CSS colour (its chips, its categories' stripes) |
 | `rules` | list of [TrackRule](#trackrule) | `[]` | |
+| `name_rules` | list of [NameRule](#namerule) | a built-in track's: its defaults; else `[]` | the name of the conference of a venue marked as the track |
 
 The built-in tracks (`ranking.tracks.DEFAULT_TRACKS`): `findings` (`#2f6fb0`), `tutorial`
 (`#1a7f37`), `demo` (`#8a6fd0`), `short` (`#d4a72c`); they cannot be deleted. A variant's,
@@ -140,6 +143,21 @@ database, `"main"` for the main track) is a track's `id`.
 | `ignore_case` | bool | true | |
 | `language` | string \| null | null | the language of its words (`en`, `fr`); null: general |
 | `examples` | list of string | `[]` | venue texts it should match (shown in Settings) |
+
+#### NameRule
+
+A replacement regex (`ranking.tracks.NameRule`): a venue marked as a track of a conference
+with no venue of its own (Venues → *Mark as a track*) is proposed the name its track's name
+rules give from its name, applied in turn (spaces then collapsed); none when they change
+nothing.
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `id` | string | required | a built-in rule's id (`name_demo_part`…: its default known), else an added one's (`<track>_name_<n>`) |
+| `pattern` | string | required | Python regex (`re.sub`); `""`: changes nothing |
+| `replacement` | string | `""` | `\1`, `\g<name>` for the groups |
+| `ignore_case` | bool | true | |
+| `examples` | list of string | `[]` | venue names it should change (shown in Settings) |
 
 ### Venue
 
@@ -221,19 +239,24 @@ Keys of `ranking.kinds.KINDS`: `intl_conference`, `intl_workshop`, `intl_journal
   URL, rules, identifiers, hosts, manual joint; variants and paper links are kept), the JCR
   rows when the file has `jcr`, then applies the file; the matching settings are replaced
   as a whole, except the local tracks added by hand that the file lacks (papers, variants
-  or venue rules may be of them): they are kept, after the file's.
+  or venue rules may be of them): they are kept, after the file's, unless removed.
 - **Merge**: keeps local values and adds the imported ones. A value set on both sides and
   different is a conflict (matching field, cleaning or detection rule or track by `id`,
   venue field, variant); the local value stays unless the imported one is taken. A track
   only in the file is added (after the local ones). JCR rows whose
   `name` is already there are skipped.
 
+Before importing, the file's tracks are shown against the local ones (by `id`): added (in
+the file only), in both (identical, or which one is kept), and the local tracks added by
+hand that the file lacks, each kept or removed as chosen (a removed one is no paper's,
+variant's or venue rule's track any more).
+
 ### Example
 
 ```json
 {
   "format": "sci-report-analyzer-settings",
-  "version": 5,
+  "version": 6,
   "exported_at": "2026-10-04T09:00:00+00:00",
   "matching": {
     "sources": {"scimago": true, "core": true, "jcr": true, "openalex": false, "predatory": true},

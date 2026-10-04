@@ -9,6 +9,10 @@ its id (``VenueKey.track``, a venue rule's track, ``Publication.track_override``
 A venue text is of a track when one of the track's rules (Python regexes, each general or of
 a language) matches it. Findings is detected apart (``FINDINGS_ID``): a Findings volume is
 also ranked as its main conference (see ``RankingService``).
+
+A venue that is a track of a conference with no venue of its own is renamed to the
+conference's name (Venues → "Mark as a track"): the one the track's name rules (replacement
+regexes) give from its name, if any.
 """
 
 from __future__ import annotations
@@ -17,8 +21,9 @@ import re
 import unicodedata
 from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from ..i18n import language
 
@@ -47,14 +52,52 @@ class TrackRule(BaseModel):
             return None
 
 
+class NameRule(BaseModel):
+    """A replacement regex giving, from the name of a venue of the track, the name of its
+    conference (the rules of a track are applied in turn)."""
+
+    id: str
+    pattern: str  # empty: changes nothing (a disabled rule)
+    replacement: str = ""  # (\1, \g<name>… for the groups)
+    ignore_case: bool = True
+    examples: list[str] = Field(default_factory=list)
+
+    def compiled(self) -> re.Pattern[str] | None:
+        """Its regex; none when invalid."""
+        try:
+            return re.compile(self.pattern, re.I if self.ignore_case else 0)
+        except re.error:
+            return None
+
+    def apply(self, text: str) -> str:
+        rx = self.compiled() if self.pattern else None
+        if rx is None:
+            return text
+        try:
+            return rx.sub(self.replacement, text)
+        except (re.error, IndexError):  # (a group the regex lacks)
+            return text
+
+
 class Track(BaseModel):
     """A track: its id, its name in each language ({"en": "Short", "fr": "Court"}), its
-    colour (its chips, its categories' stripes) and its rules."""
+    colour (its chips, its categories' stripes), its rules, and its name rules (the name
+    of the conference of one of its venues)."""
 
     id: str
     names: dict[str, str] = Field(default_factory=dict)
     colour: str = FALLBACK_COLOUR
     rules: list[TrackRule] = Field(default_factory=list)
+    name_rules: list[NameRule] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_name_rules(cls, data: Any) -> Any:
+        """A built-in track saved before the name rules gets their defaults."""
+        if not isinstance(data, dict) or "name_rules" in data:
+            return data
+        rules = DEFAULT_NAME_RULES_OF.get(data.get("id"), [])
+        return {**data, "name_rules": [r.model_copy() for r in rules]}
 
     def name(self, lang: str | None = None) -> str:
         """Its name in ``lang`` (that of the moment by default), else in English."""
@@ -64,6 +107,86 @@ class Track(BaseModel):
 
 def _rule(rid: str, pattern: str, lang: str | None, *examples: str) -> TrackRule:
     return TrackRule(id=rid, pattern=pattern, language=lang, examples=list(examples))
+
+
+def _name_rule(rid: str, pattern: str, replacement: str, *examples: str, **kw) -> NameRule:
+    return NameRule(id=rid, pattern=pattern, replacement=replacement, examples=list(examples), **kw)
+
+
+# A track's part of a venue name, between parentheses ("(System Demonstrations)").
+_IN_PARENS = r"\s*[(\[][^)\]]*\b{words}\b[^)\]]*[)\]]"
+# A track's words with what follows them ("System Demonstrations Track"), after a separator.
+_TRAILING = r"[\s:,;–—-]*\b{words}(?:\s+(?:track|session|papers?))?\b"
+_DEMO = r"(?:system\s+)?d[eé]mo(?:nstration)?s?"
+_TUTORIAL = r"tutori[ae]ls?"
+_SHORT = r"(?:short\s+papers?|articles?\s+courts?)"
+
+# The built-in name rules of the built-in tracks.
+DEFAULT_NAME_RULES_OF: dict[str, list[NameRule]] = {
+    FINDINGS_ID: [
+        _name_rule(
+            "name_findings_of",
+            r"^findings\s+of(?:\s+the)?\s+",
+            "",
+            "Findings of the Association for Computational Linguistics: ACL 2023",
+        ),
+        _name_rule(
+            "name_findings_part", _IN_PARENS.format(words="findings"), "", "WIDG (Findings)"
+        ),
+    ],
+    "tutorial": [
+        _name_rule(
+            "name_tutorial_of", r"^tutori[ae]ls?\s+(?:of|at)(?:\s+the)?\s+", "", "Tutorials of WIDG"
+        ),
+        _name_rule(
+            "name_tutorial_part", _IN_PARENS.format(words=_TUTORIAL), "", "WIDG (Tutorials)"
+        ),
+        _name_rule(
+            "name_tutorial_words",
+            _TRAILING.format(words=_TUTORIAL),
+            "",
+            "ECIR 2024 Tutorials",
+            "Foo 2024, tutoriels",
+        ),
+    ],
+    "demo": [
+        # An acronym in front of the track ("WIDG (Demonstration) Conference on …"): at the
+        # end, as in the conference's usual name ("Conference on … (WIDG)").
+        _name_rule(
+            "name_demo_acronym",
+            r"^([A-Z][A-Za-z0-9&+-]{1,11})\s*[(\[][^)\]]*\b(?i:" + _DEMO + r")\b[^)\]]*[)\]]"
+            r"\s*(.+?)(?:\s*\(\1\))?$",
+            r"\2 (\1)",
+            "WIDG (Demonstration) Conference on Widget Processing (WIDG)",
+            ignore_case=False,
+        ),
+        _name_rule(
+            "name_demo_part",
+            _IN_PARENS.format(words=_DEMO),
+            "",
+            "ACL 2023 (System Demonstrations)",
+        ),
+        _name_rule(
+            "name_demo_words",
+            _TRAILING.format(words=_DEMO),
+            "",
+            "Proceedings of the Conference on Widgets: System Demonstrations",
+            "WIDG Demo Track",
+        ),
+    ],
+    "short": [
+        _name_rule(
+            "name_short_part",
+            _IN_PARENS.format(words=_SHORT),
+            "",
+            "ACL 2022 (Volume 2: Short Papers)",
+        ),
+        _name_rule(
+            "name_short_words", _TRAILING.format(words=_SHORT), "", "WIDG 2024 Short Papers"
+        ),
+    ],
+}
+DEFAULT_NAME_RULES = {r.id: r for rules in DEFAULT_NAME_RULES_OF.values() for r in rules}
 
 
 DEFAULT_TRACKS: tuple[Track, ...] = (
@@ -157,6 +280,29 @@ def origin(track: Track) -> str:
     if d is None:
         return "added"
     return "default" if track.model_dump() == d.model_dump() else "edited"
+
+
+def name_rule_origin(rule: NameRule) -> str:
+    """ "default", "edited" or "added", as ``origin``."""
+    d = DEFAULT_NAME_RULES.get(rule.id)
+    if d is None:
+        return "added"
+    same = (rule.pattern, rule.replacement, rule.ignore_case)
+    return "default" if same == (d.pattern, d.replacement, d.ignore_case) else "edited"
+
+
+def conference_name(
+    track_id: str, text: str, rules: Iterable[NameRule] | None = None
+) -> str | None:
+    """The name of the conference a venue named ``text`` is a track of, from the track's
+    name rules (or ``rules``); none when they change nothing (or leave nothing)."""
+    if rules is None:
+        rules = t.name_rules if (t := get(track_id)) else ()
+    out = text
+    for r in rules:
+        out = r.apply(out)
+    out = re.sub(r"\s+", " ", out).strip()
+    return out if out and out != text.strip() else None
 
 
 def rule_origin(rule: TrackRule) -> str:

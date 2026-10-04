@@ -29,6 +29,7 @@ from ..pubview import (
     summary_settings,
     year_bin_defs,
 )
+from ..ranking import tracks
 from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR
 from ..ranking.kinds import KIND_SHORT
 from ..sources import ADAPTERS
@@ -82,6 +83,8 @@ class PublicationsPanel:
         self.period_id: int | None = None
         # Tags to show (any of them): global ones, and ones within the period.
         self.tag_filter: list[int] = []
+        # Tracks to show (any of them; tracks.MAIN: the main track).
+        self.track_filter: list[str] = []
         self.text = ""
         self.hide_preprints = False
         self.show_hidden = False
@@ -137,6 +140,7 @@ class PublicationsPanel:
             self.tag_filter = self._known_tags(_int(x) for x in q["tags"].split(","))
         elif "starred" in q and self.period_id:  # earlier links
             self.tag_filter = [self.starred_id] if q["starred"] == "1" else []
+        self.track_filter = [t for t in q.get("tracks", "").split(",") if t]
         if "from" in q:
             self.lo = _int(q["from"])
         if "to" in q:
@@ -155,6 +159,8 @@ class PublicationsPanel:
         p = next((p for p in self.periods if p.id == self.period_id), None)
         if self.tag_filter:
             out["tags"] = ",".join(map(str, self.tag_filter))
+        if self.track_filter:
+            out["tracks"] = ",".join(self.track_filter)
         if self.lo is not None and (not p or self.lo != p.start_year):
             out["from"] = str(self.lo)
         if self.hi is not None and (not p or self.hi != p.end_year):
@@ -258,6 +264,8 @@ class PublicationsPanel:
             if not self.in_years(s):
                 continue
             if self.tag_filter and not s.tags_in(self.period_id) & set(self.tag_filter):
+                continue
+            if self.track_filter and (s.track or tracks.MAIN) not in self.track_filter:
                 continue
             if self.hide_preprints and s.archival_only:
                 continue
@@ -453,6 +461,28 @@ class PublicationsPanel:
             ui.button(icon="sell", on_click=self.manage_tags).props("flat round dense").tooltip(
                 _("Manage tags (names, colours)")
             ).mark("manage-tags-panel")
+            # The tracks of the papers (in their order), when some are of one.
+            present = {s.track for s in self.stats if s.track} | {
+                t for t in self.track_filter if t != tracks.MAIN
+            }
+            if present:
+
+                def set_tracks(e) -> None:
+                    self.track_filter = list(e.value or [])
+                    self.sel = None
+                    self.render()
+
+                order = {t: i for i, t in enumerate(tracks.track_ids())}
+                ordered = sorted(present, key=lambda t: (order.get(t, len(order)), t))
+                ui.select(
+                    {tracks.MAIN: _("main track"), **{t: tracks.name(t) for t in ordered}},
+                    value=self.track_filter,
+                    multiple=True,
+                    label=_("tracks"),
+                    on_change=set_tracks,
+                ).props("dense outlined use-chips clearable").classes("min-w-32").tooltip(
+                    _("Papers of one of these tracks")
+                ).mark("track-filter")
 
             def set_text(e) -> None:
                 self.text = e.value or ""

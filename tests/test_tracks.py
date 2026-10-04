@@ -86,6 +86,40 @@ def test_edited_rule_and_invalid_one():
     assert tracks.detect("ACL 2023 (System Demonstrations)") is None
 
 
+def test_conference_name_from_the_name_rules():
+    """The name of the conference a venue is a track of: from the track's name rules (each
+    built-in one changes its examples), editable; none when they change nothing."""
+    for t in tracks.DEFAULT_TRACKS:
+        for r in t.name_rules:
+            assert r.examples and all(r.apply(ex) != ex for ex in r.examples), r.id
+    widg = "Conference on Widget Processing (WIDG)"
+    demo = "WIDG (Demonstration) Conference on Widget Processing"
+    assert tracks.conference_name("demo", f"{demo} (WIDG)") == widg
+    assert tracks.conference_name("demo", demo) == widg  # (its acronym in front)
+    assert tracks.conference_name("demo", "WIDG Demo Track") == "WIDG"
+    assert tracks.conference_name("tutorial", "Tutorials of WIDG") == "WIDG"
+    assert tracks.conference_name("demo", "Demo") is None  # nothing left
+    assert tracks.conference_name("demo", widg) is None  # nothing changed
+    # Settings saved before the name rules: the built-in tracks get their defaults.
+    st = MatchSettings.model_validate({"tracks": [{"id": "demo", "colour": "#000000"}]})
+    assert st.tracks[0].name_rules == tracks.DEFAULTS["demo"].name_rules
+    # Edited (origin, and in force once saved); an added track has none.
+    st = load_settings()
+    demo_track = next(t for t in st.tracks if t.id == "demo")
+    rule = demo_track.name_rules[1]
+    assert tracks.name_rule_origin(rule) == "default"
+    rule.replacement = " (the conference)"
+    assert tracks.name_rule_origin(rule) == "edited" and tracks.origin(demo_track) == "edited"
+    demo_track.name_rules.append(tracks.NameRule(id="demo_name_1", pattern="^Proc\\. "))
+    assert tracks.name_rule_origin(demo_track.name_rules[-1]) == "added"
+    save_settings(st)
+    assert tracks.conference_name("demo", "ACL (Demos)") == "ACL (the conference)"
+    assert tracks.conference_name("demo", "Proc. WIDG") == "WIDG"
+    _add_track("industry", "Industry", r"\bindustry track\b")
+    assert tracks.get("industry").name_rules == []
+    assert tracks.conference_name("industry", "WIDG Industry Track") is None
+
+
 def test_using_previews_edited_tracks():
     defs = tracks.default_tracks()
     defs[2].rules[0].pattern = r"\bshowcase\b"
@@ -142,6 +176,36 @@ def test_replace_import_keeps_local_added_tracks():
     assert [t.id for t in load_settings().tracks][-1] == "industry"
 
 
+def test_import_track_mapping():
+    """Before an import: the file's tracks against the local ones; a local track added by
+    hand that the file lacks is kept, or removed (then no paper is of it)."""
+    _add_track("talks", "Talks", r"\btalks?\b")
+    exported = settings_io.export_settings().model_dump_json()
+    save_settings(MatchSettings())
+    _add_track("industry", "Industry", r"\bindustry track\b")
+    st = load_settings()
+    next(t for t in st.tracks if t.id == "short").colour = "#123456"
+    save_settings(st)
+    pid = make_person()
+    add_source(pid, "dblp", "x/1", [pub("a", "A paper", 2024, "WIDG 2024")])
+    (s,) = asyncio.run(pubview.load_stats(pid))
+    annotations.set_track_override(s.id, "industry")
+    data = settings_io.parse_file(exported)
+    m = settings_io.track_mapping(data)
+    assert [t.id for t in m.added] == ["talks"] and [t.id for t in m.local] == ["industry"]
+    differ = [local.id for local, imported in m.both if m.differ(local, imported)]
+    assert differ == ["short"]
+    settings_io.import_settings(data, "merge", remove_tracks={"industry", "short"})
+    ids = [t.id for t in load_settings().tracks]
+    assert "talks" in ids and "industry" not in ids and "short" in ids  # (built in: kept)
+    with session_scope() as ss:
+        assert ss.get(Publication, s.id).track_override is None
+    # Kept unless removed.
+    _add_track("industry", "Industry", r"\bindustry track\b")
+    settings_io.import_settings(data, "replace")
+    assert [t.id for t in load_settings().tracks][-1] == "industry"
+
+
 def test_import_of_a_file_with_flags():
     """A file of before tracks: its flags' colours become the tracks' (the other flags are
     ignored)."""
@@ -164,4 +228,5 @@ def test_import_of_a_file_with_flags():
 def test_migration_copy_of_the_default_tracks():
     from sci_report_analyzer.db.migrations.versions import a4c7e2f9d316_tracks_no_flags as m
 
-    assert [t.model_dump() for t in tracks.DEFAULT_TRACKS] == m.TRACKS
+    # (A copy of before the name rules: they get their defaults when loaded.)
+    assert [t.model_dump(exclude={"name_rules"}) for t in tracks.DEFAULT_TRACKS] == m.TRACKS

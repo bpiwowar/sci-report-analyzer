@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, select
 from sqlalchemy.orm import object_session, selectinload
 
-from . import venue_match
+from . import annotations, venue_match
 from .db.models import JcrRecord, Venue, VenueKey
 from .db.session import session_scope
 from .i18n import _
@@ -33,7 +33,7 @@ from .ranking.service import (
 )
 
 FORMAT = "sci-report-analyzer-settings"
-VERSION = 5
+VERSION = 6
 
 
 class VariantIO(BaseModel):
@@ -179,10 +179,15 @@ def _detection_text(r) -> str:
 
 
 def _track_text(t: tracks.Track) -> str:
-    """A track's names, colour and rules."""
+    """A track's names, colour, rules and name rules."""
     names = " / ".join(n for n in t.names.values() if n)
     rules = " | ".join(_detection_text(r) for r in t.rules if r.pattern)
-    return f"{names} {t.colour}: {rules}"
+    name_rules = " | ".join(
+        f"{r.pattern} → “{r.replacement}”" + (" " + _("[ignore case]") if r.ignore_case else "")
+        for r in t.name_rules
+        if r.pattern
+    )
+    return f"{names} {t.colour}: {rules}" + (f" · {name_rules}" if name_rules else "")
 
 
 _SCALARS = (
@@ -240,6 +245,29 @@ def _replacing(local: MatchSettings, data: MatchSettings) -> MatchSettings:
     ids = {t.id for t in data.tracks}
     kept = [t for t in local.tracks if t.id not in ids and t.id not in tracks.DEFAULTS]
     return data.model_copy(update={"tracks": [*data.tracks, *kept]})
+
+
+@dataclass
+class TrackMapping:
+    """How the file's tracks map to the local ones (by their ids)."""
+
+    added: list[tracks.Track]  # in the file only: added
+    both: list[tuple[tracks.Track, tracks.Track]]  # (local, imported): the same id
+    local: list[tracks.Track]  # added by hand here, not in the file: kept, or removed
+
+    def differ(self, local: tracks.Track, imported: tracks.Track) -> bool:
+        return _track_text(local) != _track_text(imported)
+
+
+def track_mapping(data: SettingsFile) -> TrackMapping:
+    """The file's tracks against the local ones (shown before an import)."""
+    local = {t.id: t for t in load_settings().tracks}
+    ids = {t.id for t in data.matching.tracks}
+    return TrackMapping(
+        added=[t for t in data.matching.tracks if t.id not in local],
+        both=[(local[t.id], t) for t in data.matching.tracks if t.id in local],
+        local=[t for t in local.values() if t.id not in ids and t.id not in tracks.DEFAULTS],
+    )
 
 
 # ---- venues --------------------------------------------------------------------------------
@@ -439,6 +467,7 @@ def import_settings(
     data: SettingsFile,
     mode: Literal["replace", "merge"],
     take_imported: set[str] | None = None,
+    remove_tracks: set[str] | None = None,
 ) -> dict[str, int]:
     """Apply an import.
 
@@ -446,6 +475,8 @@ def import_settings(
     record, search text, venue rules, identifiers; variants and paper links are kept).
     ``merge`` keeps local values and adds the imported ones; for conflicting entries, those whose
     ``Conflict.id`` is in ``take_imported`` are overwritten, the others stay local.
+    The local tracks added by hand that the file lacks are kept, but those in
+    ``remove_tracks`` (``TrackMapping.local``): no paper, variant or rule is of them then.
     """
     take = take_imported or set()
     counts = {"venues": 0, "jcr": 0}
@@ -484,13 +515,15 @@ def import_settings(
                     counts["jcr"] += 1
 
     if replace:
-        save_settings(_replacing(load_settings(), data.matching))
+        new = _replacing(load_settings(), data.matching)
     else:
-        save_settings(
-            _apply_matching(
-                load_settings(), data.matching, {t.removeprefix("matching:") for t in take}
-            )
+        new = _apply_matching(
+            load_settings(), data.matching, {t.removeprefix("matching:") for t in take}
         )
+    gone = {t.id for t in track_mapping(data).local} & (remove_tracks or set())
+    new.tracks = [t for t in new.tracks if t.id not in gone]
+    save_settings(new)
+    annotations.forget_tracks(gone)
     service.invalidate(
         data=bool(counts["jcr"]) or (replace and data.jcr is not None), clear_cache=True
     )
