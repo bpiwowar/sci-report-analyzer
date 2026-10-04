@@ -32,6 +32,18 @@ copy gives the full text:
   person whose notes are empty, e.g. `## Publications` / `[]{.publications}` /
   `## Activities` / `[]{.excerpts}` / `## Starred papers`.
 
+## Folder notes: the copied references
+
+In the references of a copy, a cited paper without the folder's tag (e.g. a thesis cited
+beside the 10 starred papers) is numbered like the starred ones (`**#11**`): folders 2 and
+4 had set "Number format" to `**#{index}**` before "Number of a listed paper" existed, so
+both formats are now the same.
+
+- The others must read differently from the listed papers: warn in the folder dialog when
+  the two formats give the same text, and offer to reset "Number format" (`[{index}]`).
+- Perhaps two lists in the references: the papers with the tag, then "Other papers cited"
+  (each in its own format).
+
 ## Settings: saving
 
 Saving the preferences is easy to forget (each screen has its own save button).
