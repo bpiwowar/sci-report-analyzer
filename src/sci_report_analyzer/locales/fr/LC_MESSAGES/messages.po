@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-04 12:19+0200\n"
+"POT-Creation-Date: 2026-10-04 12:31+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -134,6 +134,14 @@ msgstr "Une conférence commune qui l'inclut"
 msgid "A joint conference including this venue"
 msgstr "Une conférence commune incluant ce canal"
 
+#, python-brace-format
+msgid ""
+"A joint venue whose conferences have different levels: the lowest is used"
+" ({name}) until you choose one"
+msgstr ""
+"Un canal conjoint dont les conférences ont des niveaux différents : le "
+"plus bas est utilisé ({name}) tant que vous n'en choisissez pas un"
+
 msgid ""
 "A journal gets its quartile of a paper's year: download the years missing"
 " from scimagojr.com (it blocks the app) and drop their CSVs here, the "
@@ -199,6 +207,9 @@ msgstr "Un rôle n'a pas de nom"
 
 msgid "A rule added by hand"
 msgstr "Une règle ajoutée à la main"
+
+msgid "A single conference: its texts name others too"
+msgstr "Une seule conférence : ses textes en nomment d'autres aussi"
 
 msgid "A sync is already running"
 msgstr "Une synchronisation est déjà en cours"
@@ -2324,6 +2335,9 @@ msgstr "Ni un DOI ni un document HAL (ou leur URL)"
 msgid "Not a SciReport Analyzer settings file: {error}"
 msgstr "Ce n’est pas un fichier de paramètres SciReport Analyzer : {error}"
 
+msgid "Not a joint venue"
+msgstr "Pas un canal conjoint"
+
 msgid "Not an ORCID (e.g. 0000-0002-1825-0097)"
 msgstr "Ce n'est pas un ORCID (p. ex. 0000-0002-1825-0097)"
 
@@ -3437,6 +3451,16 @@ msgstr "La langue des mots de la règle"
 
 msgid "The language whose words the rule removes (any: a general rule)"
 msgstr "La langue dont la règle retire des mots (toutes : une règle générale)"
+
+#, python-brace-format
+msgid "The level its conferences share ({names})"
+msgstr "Le niveau commun à ses conférences ({names})"
+
+#, python-brace-format
+msgid "The level of {name}, chosen among its conferences (Joint venue, above)"
+msgstr ""
+"Le niveau de {name}, choisi parmi ses conférences (Canal conjoint, plus "
+"haut)"
 
 msgid ""
 "The main conference a workshop text names: the text of the first group "

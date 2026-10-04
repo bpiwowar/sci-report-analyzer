@@ -1799,6 +1799,49 @@ async def test_joint_venue_with_different_levels(user: User) -> None:
         assert s.get(Venue, joint).joint["use"] == alpha
 
 
+async def test_joint_venue_level_explained_and_chosen(user: User) -> None:
+    """The level of a joint venue says where it comes from (the lowest of its conferences'),
+    and is chosen right there; or it is not a joint venue."""
+    from helpers import add_source, make_person, pub
+    from sqlalchemy import select
+
+    from sci_report_analyzer import pubview, venues
+    from sci_report_analyzer.db.models import Publication, Venue
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = make_person()
+    add_source(
+        pid,
+        "hal",
+        "h",
+        [
+            pub("a", "Alpha paper", 2023, "Conférence Alpha (ALPHA)"),
+            pub("b", "Beta paper", 2023, "Conférence Beta (BETA)"),
+            pub("j", "Joint paper", 2023, "ALPHA-BETA 2023 Conférence commune"),
+        ],
+    )
+    await pubview.load_stats(pid)
+    with session_scope() as s:
+        ids = {
+            t: s.scalar(select(Publication.venue_id).where(Publication.title == t))
+            for t in ("Alpha paper", "Beta paper", "Joint paper")
+        }
+    alpha, beta, joint = ids.values()
+    for vid, rank in ((alpha, "B"), (beta, "A")):
+        venues.update_venue(vid, kind="natl_conference", level_type="conference", level_rank=rank)
+
+    await user.open(f"/venues?focus={joint}")
+    await user.should_see("the lowest is used", marker="venue-record")
+    user.find(f"venue-joint-use-{beta}").click()
+    with session_scope() as s:
+        assert s.get(Venue, joint).joint["use"] == beta
+    await user.open(f"/venues?focus={joint}")
+    await user.should_see("chosen among its conferences", marker="venue-record")
+    user.find("venue-parts-none").click()
+    with session_scope() as s:
+        assert s.get(Venue, joint).joint["parts"] == []
+
+
 async def test_problems_on_folder_cards(user: User) -> None:
     from helpers import add_source, make_person, pub
 
