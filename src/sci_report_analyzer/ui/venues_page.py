@@ -814,6 +814,12 @@ def _joint_editor(row: venues.VenueRow, finish, go) -> None:
             ui.button(_("Save"), icon="save", on_click=lambda: save([p for p in parts if p])).props(
                 "dense unelevated size=sm color=primary"
             ).mark("venue-parts-save")
+            if parts:
+                ui.button(_("Not a joint venue"), on_click=lambda: save([])).props(
+                    "dense flat size=sm"
+                ).tooltip(_("A single conference: its texts name others too")).mark(
+                    "venue-parts-none"
+                )
             if row.parts_manual:
                 ui.button(_("Automatic"), on_click=lambda: save(None)).props(
                     "dense flat size=sm"
@@ -1293,7 +1299,22 @@ def venue_dialog(
                         else:
                             if row.badge:
                                 rank_chip(row.badge)
-                            if not row.badge:
+                            joint = row.badge.extra.get("joint") if row.badge else None
+                            if joint and row.joint_use is not None:
+                                text = _(
+                                    "The level of {name}, chosen among its conferences "
+                                    "(Joint venue, above)"
+                                ).format(name=row.badge.name)
+                            elif joint and row.badge.extra.get("joint_differ"):
+                                text = _(
+                                    "A joint venue whose conferences have different levels: "
+                                    "the lowest is used ({name}) until you choose one"
+                                ).format(name=row.badge.name)
+                            elif joint:
+                                text = _("The level its conferences share ({names})").format(
+                                    names=" + ".join(joint)
+                                )
+                            elif not row.badge:
                                 text = _("Automatic matching: no ranking record found")
                             elif row.badge.exact or row.badge.manual:
                                 text = _("Automatic matching (currently: {name})").format(
@@ -1314,6 +1335,29 @@ def venue_dialog(
                             ui.button(_("Automatic"), on_click=lambda: pick(None)).props(
                                 "dense flat"
                             ).tooltip(_("Forget the chosen record: match automatically"))
+                    # A joint venue: its level is one of its conferences', to choose here.
+                    if not b and row.badge and row.badge.extra.get("joint") and row.parts:
+                        with ui.column().classes("gap-1 pl-4 w-full").mark("venue-joint-use"):
+                            for pid, name, badge in row.parts:
+                                used = row.joint_use == pid
+                                with ui.row().classes("items-center gap-2 no-wrap w-full"):
+                                    rank_chip(badge)
+                                    ui.label(name).classes("text-sm")
+                                    ui.space()
+                                    if used:
+                                        ui.badge(_("its level is used"), color="positive")
+                                    ui.button(
+                                        _("Undo") if used else _("Use this level"),
+                                        icon=None if used else "check",
+                                        on_click=lambda p=pid, u=used: use_part(None if u else p),
+                                    ).props("dense flat size=sm no-caps color=primary").mark(
+                                        f"venue-joint-use-{pid}"
+                                    )
+
+                def use_part(part_id: int | None) -> None:
+                    venues.set_joint_use(row.id, part_id)
+                    ui.notify(_("Level saved"), type="positive")
+                    finish()
 
                 def pick(key: str | None) -> None:
                     chosen["key"] = key
