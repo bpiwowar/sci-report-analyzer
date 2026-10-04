@@ -1251,8 +1251,16 @@ class _Step:
     """One step of the matching process: its result, and an editor revealed by "override"."""
 
     def __init__(
-        self, n: int, title: str, *, manual: bool = False, reset=None, editable: bool = True
+        self,
+        n: int,
+        title: str,
+        mark: str,
+        *,
+        manual: bool = False,
+        reset=None,
+        editable: bool = True,
     ) -> None:
+        """``title``: marked with ``N_``; ``mark``: of its override button, ``override-…``."""
         self.box = ui.column().classes("w-full gap-1 border rounded p-2")
         with self.box:
             with ui.row().classes("w-full items-center no-wrap gap-2"):
@@ -1273,7 +1281,7 @@ class _Step:
                     ui.button(icon="edit", on_click=self.toggle)
                     .props("flat round dense size=sm")
                     .tooltip(_("Override"))
-                    .mark(f"override-{title.split()[0].lower()}")
+                    .mark(f"override-{mark}")
                 )
                 self.override_btn.visible = editable
             self.result = ui.column().classes("w-full gap-0 pl-7")
@@ -1337,6 +1345,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
     step = _Step(
         1,
         N_("Venue from the sources"),
+        "venue",
         manual=bool(s.venue_source or s.venue_manual),
         reset=lambda: (
             annotations.set_venue_source(s.id, None),
@@ -1629,6 +1638,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
     step = _Step(
         2,
         N_("Kind of publication"),
+        "kind",
         manual=s.kind_source != "detected",
         reset=(
             lambda: (annotations.set_kind_override(s.id, None), done(_("Kind back to automatic")))
@@ -1680,6 +1690,7 @@ def _matching_tab(s: PubStat, done, show_venue) -> None:
     step = _Step(
         3,
         N_("Rank"),
+        "rank",
         manual=rank_manual,
         reset=(
             lambda: (annotations.set_rank_override(s.id, None), done(_("Back to the venue's rank")))
