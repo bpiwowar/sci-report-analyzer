@@ -32,17 +32,19 @@ copy gives the full text:
   person whose notes are empty, e.g. `## Publications` / `[]{.publications}` /
   `## Activities` / `[]{.excerpts}` / `## Starred papers`.
 
-## Folder notes: the copied references
+## Folder notes: two numberings
 
-In the references of a copy, a cited paper without the folder's tag (e.g. a thesis cited
-beside the 10 starred papers) is numbered like the starred ones (`**#11**`): folders 2 and
-4 had set "Number format" to `**#{index}**` before "Number of a listed paper" existed, so
-both formats are now the same.
+The papers with the folder's tag (starred) and the other papers cited are numbered
+apart, each from 1: the starred ones as listed (`**#1**` … `**#10**`, "Number of a
+listed paper"), the others as first cited (`[1]`, `[2]`…, "Number format"). Today the
+others continue the starred ones' count (a thesis cited beside 10 starred papers is
+`[11]`, or `**#11**` when both formats are the same).
 
-- The others must read differently from the listed papers: warn in the folder dialog when
-  the two formats give the same text, and offer to reset "Number format" (`[{index}]`).
-- Perhaps two lists in the references: the papers with the tag, then "Other papers cited"
-  (each in its own format).
+- In the text (`[@key]`, `.number`, `.index`) and in the copied references (the starred
+  papers, then the others, each list in its own format).
+- `.index` is then ambiguous between the two lists: the number within its own list.
+- Folders 2 and 4 have "Number format" `**#{index}**` (set before the listed format
+  existed): reset it to `[{index}]`, or warn in the dialog when both formats are equal.
 
 ## Settings: saving
 
