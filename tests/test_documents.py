@@ -662,6 +662,61 @@ def test_categories_and_markdown():
     assert (lead.years, lead.members) == ("2019–2020", [])
 
 
+def test_nested_influence():
+    """Optionally, the "rayonnement" excerpts only in its section, under their categories."""
+    from sci_report_analyzer import categories, reports
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    societies = categories.add(folder, "Comités et sociétés savantes")
+    research = categories.add(folder, "Recherche")
+    projects = categories.add(folder, "Projets", research)
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    member = categories.add_excerpt(
+        societies, period, "Membre du Comité Galactique.", 1, [], document_id=doc
+    )
+    categories.update_excerpt(member, influence=True)
+    led = categories.add_excerpt(projects, period, "Projet Nébuleuse.", 2, [], document_id=doc)
+    categories.update_excerpt(led, start=2021, end=2024, influence=True)
+    categories.add_excerpt(projects, period, "Projet Comète.", 3, [], document_id=doc)
+    flat = categories.markdown(folder, period)
+    assert flat.startswith("## Comités et sociétés savantes\n\n- Membre du Comité Galactique.")
+    assert categories.markdown(folder, period, nested=False) == flat
+    assert categories.markdown(folder, period, nested=True) == (
+        "## Recherche\n\n### Projets\n\n- Projet Comète. %% Dossier, p. 3 %%\n\n"
+        "## Rayonnement\n\n"
+        "### Comités et sociétés savantes\n\n- Membre du Comité Galactique. %% Dossier, p. 1 %%\n\n"
+        "### Recherche\n\n#### Projets\n\n- Projet Nébuleuse. %% Dossier, p. 2 %% — 2021–2024\n"
+    )
+    # In the folder's "rayonnement" category: after its own excerpts, one level below it.
+    outreach = categories.add(folder, "Rayonnement")
+    categories.add_excerpt(outreach, period, "Prix Andromède.", 4, [], document_id=doc)
+    categories.set_influence(folder, outreach)
+    assert categories.markdown(folder, period, nested=True, level=3).endswith(
+        "### Rayonnement\n\n- Prix Andromède. %% Dossier, p. 4 %%\n\n"
+        "#### Comités et sociétés savantes\n\n"
+        "- Membre du Comité Galactique. %% Dossier, p. 1 %%\n\n"
+        "#### Recherche\n\n##### Projets\n\n"
+        "- Projet Nébuleuse. %% Dossier, p. 2 %% — 2021–2024\n"
+    )
+    # The folder's default, and a block's own choice (its classes).
+    assert not reports.nested_influence(folder)
+    reports.save_nested_influence(folder, True)
+    assert categories.markdown(folder, period) == categories.markdown(folder, period, nested=True)
+    ctx = reports.folder_context([], period)
+    out = reports.render("# Dossier\n\n[]{.excerpts}\n", ctx).text
+    assert "\n## Comités" not in out and "\n### Comités et sociétés savantes\n" in out
+    out = reports.render("# Dossier\n\n[]{.excerpts .flat-influence}\n", ctx).text
+    assert "## Comités et sociétés savantes\n" in out and "**Comités et sociétés savantes**" in out
+    reports.save_nested_influence(folder, False)
+    ctx = reports.folder_context([], period)
+    assert reports.render("[]{.excerpts}", ctx).text.startswith("## Comités")
+    out = reports.render("# Dossier\n\n[]{.excerpts  .nested-influence}\n", ctx).text
+    assert out.startswith("# Dossier\n\n## Recherche") and "\n### Rayonnement\n" not in out
+    assert "## Rayonnement\n\n- Prix Andromède." in out
+    assert "\n### Comités et sociétés savantes\n" in out
+
+
 def test_category_colours():
     """Each category has a colour (the palette's, in turn; changed): that of its excerpts,
     tinted in it on the PDFs."""

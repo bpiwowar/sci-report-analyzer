@@ -291,9 +291,11 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     user.find(marker="folder-number-format").clear().type("[{index}]")
     user.find(marker="folder-listed-format").clear().type("§{index}")
     await user.should_not_see(marker="folder-same-formats")
+    user.find(marker="folder-nested-influence").click()
     user.find(marker="folder-citations-save").click()
     await user.should_see("Good: §1.")
     assert reports.numbering(fid) == reports.Numbering(star, "[{index}]", "§{index}")
+    assert reports.nested_influence(fid)
     # Beside the papers (in place of the preview): those to discuss, whether cited.
     user.find(marker="folder-note-mode").elements.pop().value = "side"
     await user.should_see("1 of the 1 papers to discuss cited", marker="folder-papers-count")

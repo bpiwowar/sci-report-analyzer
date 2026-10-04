@@ -256,6 +256,21 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
             )
             .mark("folder-skeleton")
         )
+        nested = (
+            ui.checkbox(
+                _("Rayonnement excerpts only in the Rayonnement section, by category"),
+                value=reports.nested_influence(folder_id),
+            )
+            .tooltip(
+                _(
+                    "In []{.excerpts} (and the copied excerpts): the excerpts flagged "
+                    "“rayonnement” taken out of their categories, listed under subsections "
+                    "named after them; one block: []{.excerpts .nested-influence} or "
+                    "[]{.excerpts .flat-influence}"
+                )
+            )
+            .mark("folder-nested-influence")
+        )
 
         def add() -> None:
             own.append(reports.Template("", "{.index (.short-venue .year)}", ""))
@@ -272,6 +287,7 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
                 reports.Numbering(tag.value or None, fmt.value or "", listed.value or ""),
             )
             reports.save_skeleton(folder_id, skeleton.value or "")
+            reports.save_nested_influence(folder_id, bool(nested.value))
             dlg.close()
             ui.notify(_("Saved"), type="positive")
             if on_saved:

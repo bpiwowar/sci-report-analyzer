@@ -289,7 +289,13 @@ ou les copier en Markdown (sans guillemets, leurs emplacements dans des commenta
 p. 12 %%`, puis leurs années ; ceux qui témoignent du rayonnement sont aussi listés, par catégorie, dans une dernière
 section « Rayonnement » ; l'icône de badge nomme les documents, par exemple un long nom de fichier sous la forme
 « Application ») ;
-le bouton ❝ du rapport les insère, par catégorie.
+le bouton ❝ du rapport les insère, par catégorie (le bloc `[]{.excerpts}`, tenu à jour).
+En option, les extraits de rayonnement ne figurent que dans la section Rayonnement (la
+catégorie « rayonnement », sinon la dernière section), sous des sous-sections au nom de leurs
+catégories (imbriquées comme elles, un niveau plus bas), et sont retirés de leurs catégories
+(une catégorie restée vide disparaît) : les réglages du dossier (« Extraits de rayonnement
+seulement dans la section Rayonnement ») pour ses notes et la copie, ou un seul bloc avec
+`[]{.excerpts .nested-influence}` (et `[]{.excerpts .flat-influence}` comme par défaut).
 
 Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers

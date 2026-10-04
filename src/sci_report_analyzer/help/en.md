@@ -288,7 +288,13 @@ or copy as Markdown (unquoted, their places in Obsidian comments: `%% Applicatio
 p. 12 %%`, then their years; those showing influence also listed, by category, in a last
 “Rayonnement” section; the badge icon names the documents, e.g. a long file name as
 “Application”);
-the report's ❝ button inserts them, by category.
+the report's ❝ button inserts them, by category (the block `[]{.excerpts}`, kept up to
+date). Optionally, the influence excerpts are only in the Rayonnement section (the
+“rayonnement” category, else the last one), under subsections named after their categories
+(nested as these, one level below), and taken out of their categories (one left empty is
+left out): the folder's settings (“Rayonnement excerpts only in the Rayonnement section”)
+for its notes and the copy, or one block with `[]{.excerpts .nested-influence}` (and
+`[]{.excerpts .flat-influence}` as by default).
 
 **Folders** (Reports page) group people, e.g. for a hiring committee: a folder has a name,
 a date and can be hidden. Each person has their **own period** in each of their folders
