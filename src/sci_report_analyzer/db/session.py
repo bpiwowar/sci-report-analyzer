@@ -80,9 +80,21 @@ def run_migrations(engine: Engine) -> None:
             logger.info("Migrating %s -> %s: no backup (not a SQLite file)", current, head)
         else:
             saved = backup.before_migration(db, current, str(head))
-    with engine.begin() as conn:
-        cfg.attributes["connection"] = conn
-        command.upgrade(cfg, "head")
+    with engine.connect() as conn:
+        # Without foreign keys: a migration recreating a table (SQLite's batch mode) must not
+        # cascade the drop of the old one (a venue's variants, its papers' links).
+        sqlite = engine.dialect.name == "sqlite"
+        if sqlite:
+            conn.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            conn.commit()
+        try:
+            with conn.begin():
+                cfg.attributes["connection"] = conn
+                command.upgrade(cfg, "head")
+        finally:
+            if sqlite:
+                conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+                conn.commit()
     if saved is not None:
         backup.migration_done(saved)
 

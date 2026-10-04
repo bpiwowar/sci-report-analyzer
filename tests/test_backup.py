@@ -204,3 +204,23 @@ def test_ordinal_marks_in_saved_rules(tmp_path):
     with sqlite3.connect(db) as c:
         value = json.loads(c.execute("SELECT value FROM app_setting").fetchone()[0])
     assert [r["replacement"] for r in value["norm_rules"]] == ["Zth", "#"]
+
+
+def test_migrations_keep_the_venues_variants_and_links(tmp_path):
+    """Migrations run without foreign keys: a table copied (SQLite's batch mode) and its old
+    one dropped must not cascade (a venue's variants, its papers' links)."""
+    from sqlalchemy import event
+
+    db = tmp_path / "db.sqlite"
+    with create_engine(f"sqlite:///{db}").begin() as conn:
+        cfg = _cfg()
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "d2b7e4c91a56")
+    with sqlite3.connect(db) as c:
+        c.execute("INSERT INTO venue (id, name, kind_manual, created_at) VALUES (1, 'W', 0, '')")
+        c.execute("INSERT INTO venue_key (key, venue_id, manual) VALUES ('w', 1, 1)")
+    engine = create_engine(f"sqlite:///{db}")
+    event.listen(engine, "connect", db_session._sqlite_pragmas)  # (foreign keys on)
+    db_session.run_migrations(engine)
+    with sqlite3.connect(db) as c:
+        assert c.execute("SELECT venue_id FROM venue_key").fetchall() == [(1,)]

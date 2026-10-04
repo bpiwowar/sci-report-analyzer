@@ -19,10 +19,14 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("venue", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("short_manual", sa.Boolean(), nullable=False, server_default=sa.false())
-        )
+    # A plain ADD COLUMN: a batch one copies the table, and dropping the old one deleted the
+    # venues' variants (ON DELETE CASCADE) and their papers' links.
+    if "short_manual" in {c["name"] for c in sa.inspect(op.get_bind()).get_columns("venue")}:
+        return  # (already there)
+    op.add_column(
+        "venue",
+        sa.Column("short_manual", sa.Boolean(), nullable=False, server_default=sa.false()),
+    )
     op.execute("UPDATE venue SET short_manual = 1 WHERE short_name IS NOT NULL")
 
 
