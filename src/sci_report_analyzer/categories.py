@@ -14,6 +14,11 @@ from .db.models import Category, Excerpt, PeriodDocument, Publication
 from .db.session import session_scope
 from .i18n import _
 
+# The colours given to new categories, in turn (each category's can be changed); the first
+# one also tints the excerpts of a category without any.
+PALETTE = ["#ffc107", "#4caf50", "#2196f3", "#e91e63", "#9c27b0", "#ff5722", "#009688", "#795548"]
+DEFAULT_COLOUR = PALETTE[0]
+
 
 def years_label(a: int | None, b: int | None) -> str:
     """Years: "2020–2025", "since 2020", "until 2025" (else "")."""
@@ -35,6 +40,7 @@ class Node:
     end_year: int | None
     children: list[Node] = field(default_factory=list)
     influence: bool = False  # (the folder's "rayonnement": see set_influence)
+    colour: str = DEFAULT_COLOUR  # (that of its excerpts: their tint on the PDFs)
 
     @property
     def years(self) -> str:
@@ -63,6 +69,7 @@ def tree(folder_id: int) -> list[Node]:
             path = f"{prefix} › {c.name}" if prefix else c.name
             n = Node(c.id, c.name, c.parent_id, depth, path, c.start_year, c.end_year)
             n.influence = bool(c.influence)
+            n.colour = c.colour or DEFAULT_COLOUR
             out.append(n)
             n.children = walk(c.id, depth + 1, path)
             nodes.append(n)
@@ -72,8 +79,16 @@ def tree(folder_id: int) -> list[Node]:
     return out
 
 
+def next_colour(s, folder_id: int) -> str:
+    """The colour of a new category of a folder: the first of the palette none has yet
+    (all taken: in turn)."""
+    used = list(s.scalars(select(Category.colour).where(Category.folder_id == folder_id)))
+    free = [c for c in PALETTE if c not in used]
+    return free[0] if free else PALETTE[len(used) % len(PALETTE)]
+
+
 def add(folder_id: int, name: str, parent_id: int | None = None) -> int:
-    """A new category (the last of its siblings); returns its id."""
+    """A new category (the last of its siblings, in the next colour); returns its id."""
     with session_scope() as s:
         last = s.scalar(
             select(func.max(Category.position)).where(
@@ -88,6 +103,7 @@ def add(folder_id: int, name: str, parent_id: int | None = None) -> int:
             parent_id=parent_id,
             name=name.strip() or "Category",
             position=(last or 0) + 1,
+            colour=next_colour(s, folder_id),
         )
         s.add(c)
         s.flush()
@@ -102,6 +118,13 @@ def update(
             if name is not None and name.strip():
                 c.name = name.strip()
             c.start_year, c.end_year = start, end
+
+
+def set_colour(cat_id: int, colour: str | None) -> None:
+    """The colour of a category's excerpts (their tint on the PDFs; None: the default)."""
+    with session_scope() as s:
+        if c := s.get(Category, cat_id):
+            c.colour = colour or None
 
 
 def set_influence(folder_id: int, cat_id: int | None) -> None:
@@ -251,6 +274,7 @@ def copy_tree(source_folder: int, folder_id: int) -> int:
                 start_year=n.start_year,
                 end_year=n.end_year,
                 influence=n.influence,
+                colour=n.colour,
             )
             s.add(c)
             s.flush()
@@ -275,7 +299,7 @@ class ExcerptView:
     start_year: int | None = None
     end_year: int | None = None
     influence: bool = False
-    colour: str | None = None
+    colour: str = DEFAULT_COLOUR  # (its category's)
     group_id: int | None = None  # (merged: the excerpt leading its group)
     members: list[ExcerptView] = field(default_factory=list)  # (leading a group: the others)
     ref_only: bool = False  # (merged as a reference only: its place cited, not its text)
@@ -351,10 +375,9 @@ def add_excerpt(
     start: int | None = None,
     end: int | None = None,
     influence: bool = False,
-    colour: str | None = None,
 ) -> int:
-    """File a passage (its years, influence flag and colour: see update_excerpt); one filed
-    there already is kept."""
+    """File a passage (its years and influence flag: see update_excerpt); one filed there
+    already is kept."""
     text = " ".join(text.split())
     with session_scope() as s:
         same = s.scalar(  # (filed there already)
@@ -386,7 +409,6 @@ def add_excerpt(
             start_year=start,
             end_year=end,
             influence=influence,
-            colour=colour or None,
         )
         s.add(e)
         s.flush()
@@ -399,7 +421,8 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
     ``grouped``: those leading a group (or alone), the others of the group as ``members``."""
     with session_scope() as s:
         rows = s.execute(
-            select(Excerpt, PeriodDocument.name, Publication.title)
+            select(Excerpt, PeriodDocument.name, Publication.title, Category.colour)
+            .join(Category, Excerpt.category_id == Category.id)
             .outerjoin(PeriodDocument, Excerpt.document_id == PeriodDocument.id)
             .outerjoin(Publication, Excerpt.publication_id == Publication.id)
             .where(Excerpt.period_id == period_id)
@@ -419,13 +442,13 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
                 e.start_year,
                 e.end_year,
                 e.influence,
-                e.colour,
+                colour or DEFAULT_COLOUR,
                 e.group_id,
                 ref_only=e.ref_only,
                 group_text=e.group_text,
                 original=e.original or e.text,
             )
-            for e, doc, title in rows
+            for e, doc, title, colour in rows
         ]
     if not grouped:
         return views
@@ -438,7 +461,7 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
 
 def tints(period_id: int, document_id: int, names: dict[int, str]) -> list[dict]:
     """The excerpts of a document, to tint on its pages: each part of a group (even one
-    cited as a reference only, or under the group's text), in the group's colour;
+    cited as a reference only, or under the group's text), in its category's colour;
     ``names``: the paths of the categories."""
     return [
         {
@@ -509,7 +532,7 @@ def remove_excerpt(excerpt_id: int) -> None:
                 lead = others[0]
                 lead.group_id = None
                 lead.start_year, lead.end_year = e.start_year, e.end_year
-                lead.influence, lead.colour = e.influence, e.colour
+                lead.influence = e.influence
                 lead.group_text = e.group_text
                 for x in others[1:]:
                     x.group_id = lead.id
@@ -523,22 +546,19 @@ def update_excerpt(
     start: int | None = None,
     end: int | None = None,
     influence: bool = False,
-    colour: str | None = None,
 ) -> None:
-    """Its text (unless None or blank), years, "influence" flag and colour (None: the
-    default tint)."""
+    """Its text (unless None or blank), years and "influence" flag."""
     with session_scope() as s:
         if e := s.get(Excerpt, excerpt_id):
             if text is not None and text.strip():
                 e.text = " ".join(text.split())
             e.start_year, e.end_year, e.influence = start, end, influence
-            e.colour = colour or None
 
 
 def merge_excerpts(source_id: int, target_id: int, *, ref_only: bool = False) -> str | None:
     """Group an excerpt (with its group, if any) with another one: each keeps its text and
     place (``ref_only``: only its place is cited); the group takes the target group's
-    category, years, influence, colour and text. Returns why it cannot be done, if so."""
+    category, years, influence and text. Returns why it cannot be done, if so."""
     with session_scope() as s:
         a, b = s.get(Excerpt, source_id), s.get(Excerpt, target_id)
         if a is None or b is None:

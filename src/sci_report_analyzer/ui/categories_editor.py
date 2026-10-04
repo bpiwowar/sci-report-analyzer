@@ -53,7 +53,7 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
             _(
                 "Excerpts of the people's documents (a passage selected in a PDF) are filed in "
                 "them; in this order in the reports. Drag to order and nest them. Years "
-                "(optional): those a category is about."
+                "(optional): those a category is about. Its colour tints its excerpts."
             )
         ).classes("text-sm text-grey")
 
@@ -81,6 +81,19 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                             "its middle (inside it)"
                         )
                     )
+                    with (
+                        ui.button()
+                        .props("round dense unelevated size=xs")
+                        .style(f"background: {n.colour} !important")
+                        .tooltip(_("The colour of its excerpts (their tint on the PDFs)"))
+                        .mark(f"category-colour-{n.id}")
+                    ):
+                        picker = ui.color_picker(
+                            on_pick=lambda e, n=n: (categories.set_colour(n.id, e.color), done())
+                        ).set_color(n.colour)
+                        picker.q_color.props["palette"] = categories.PALETTE
+                        picker.q_color.props["default-view"] = "palette"
+                        picker.q_color.mark(f"category-colour-pick-{n.id}")
                     title = (
                         ui.input(value=n.name)
                         .props("dense borderless")

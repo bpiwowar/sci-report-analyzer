@@ -5394,3 +5394,29 @@ msgstr "Non enregistré : les notes ont été modifiées ailleurs depuis leur ch
 
 msgid "Show the notes as saved (the text typed here is lost: copy it first)"
 msgstr "Afficher les notes enregistrées (le texte tapé ici est perdu : copiez-le d'abord)"
+
+msgid ""
+"They are on one item (in the order of their PDFs), with the second one's "
+"category, years, influence and text (its pencil edits the text of the "
+"group)."
+msgstr ""
+"Ils forment un seul élément (dans l'ordre de leurs PDF), avec la "
+"catégorie, les années, le rayonnement et le texte du second (son crayon "
+"modifie le texte du groupe)."
+
+msgid ""
+"Excerpts of the people's documents (a passage selected in a PDF) are "
+"filed in them; in this order in the reports. Drag to order and nest them."
+" Years (optional): those a category is about. Its colour tints its "
+"excerpts."
+msgstr ""
+"Les extraits des documents des personnes (un passage sélectionné dans un "
+"PDF) y sont classés, dans cet ordre dans les rapports. Faites-les glisser"
+" pour les ordonner et les imbriquer. Années (facultatif) : celles que "
+"concerne une catégorie. Sa couleur teinte ses extraits."
+
+msgid "The colour of its excerpts (their tint on the PDFs)"
+msgstr "La couleur de ses extraits (leur teinte dans les PDF)"
+
+msgid "The colour of its excerpts (edit the categories to change it)"
+msgstr "La couleur de ses extraits (modifiez les catégories pour la changer)"

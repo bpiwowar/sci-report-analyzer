@@ -678,26 +678,11 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
     dlg.open()
 
 
-# An excerpt's colours (its tint on the PDF; None: the default, amber).
-COLOURS = {
-    None: "#ffc107",
-    "#4caf50": N_("green"),
-    "#2196f3": N_("blue"),
-    "#e91e63": N_("pink"),
-    "#9c27b0": N_("purple"),
-    "#ff5722": N_("orange"),
-}
-
-
 def excerpt_properties(
-    start: int | None = None,
-    end: int | None = None,
-    influence: bool = False,
-    colour: str | None = None,
+    start: int | None = None, end: int | None = None, influence: bool = False
 ) -> Callable[[], dict]:
-    """The fields of an excerpt's years, influence flag and colour; returns their values
-    (the keywords of categories.add_excerpt / update_excerpt)."""
-    chosen = {"colour": colour if colour in COLOURS else None}
+    """The fields of an excerpt's years and influence flag; returns their values (the
+    keywords of categories.add_excerpt / update_excerpt)."""
 
     def year(v: float | None) -> int | None:
         return int(v) if v else None
@@ -711,24 +696,10 @@ def excerpt_properties(
         flag.tooltip(_("Shows the person's influence (“rayonnement”: invited talks, prizes…)"))
         ui.icon("public", size="xs", color="teal").classes("-ml-2")
 
-    @ui.refreshable
-    def swatches() -> None:
-        with ui.row().classes("items-center gap-1"):
-            ui.label(_("Colour")).classes("text-sm text-grey")
-            for c in COLOURS:
-                ring = "ring-2 ring-offset-1 ring-grey-8" if c == chosen["colour"] else ""
-                ui.element("div").classes(f"w-5 h-5 rounded-full cursor-pointer {ring}").style(
-                    f"background: {c or COLOURS[None]}"
-                ).on("click", lambda c=c: (chosen.update(colour=c), swatches.refresh())).tooltip(
-                    _(COLOURS[c]) if c else _("amber (the default)")
-                ).mark(f"excerpt-colour-{(c or 'default').lstrip('#')}")
-
-    swatches()
     return lambda: {
         "start": year(start_in.value),
         "end": year(end_in.value),
         "influence": bool(flag.value),
-        "colour": chosen["colour"],
     }
 
 
@@ -987,6 +958,11 @@ def categories_section(side: Side) -> Callable[[], None]:
                 .classes("w-full items-center gap-1")
                 .style(f"padding-left:{1.2 * n.depth}rem")
             ):
+                ui.element("div").classes("w-3 h-3 rounded-full shrink-0").style(
+                    f"background: {n.colour}"
+                ).tooltip(_("The colour of its excerpts (edit the categories to change it)")).mark(
+                    f"category-dot-{n.id}"
+                )
                 ui.label(n.name).classes("font-medium text-sm" if not n.depth else "text-sm")
                 if n.influence:
                     ui.icon("campaign", size="xs", color="amber-9").tooltip(
@@ -1020,8 +996,7 @@ def categories_section(side: Side) -> Callable[[], None]:
                     _droppable(block, e, lambda source_id, zone, e=e: dropped(source_id, zone, e))
                     if e.group_text:
                         ui.label(e.group_text).classes("text-sm line-clamp-4").style(
-                            f"border-left: 3px solid {e.colour or COLOURS[None]}; "
-                            "padding-left: 0.4rem"
+                            f"border-left: 3px solid {e.colour}; padding-left: 0.4rem"
                         ).tooltip(_("The text of the group (edit it with its pencil)")).mark(
                             f"excerpt-group-text-{e.id}"
                         )
@@ -1042,7 +1017,7 @@ def categories_section(side: Side) -> Callable[[], None]:
         with ui.row().classes("w-full items-start no-wrap gap-1").mark(f"excerpt-part-{x.id}"):
             ui.icon("subdirectory_arrow_right" if member else "format_quote", size="xs").classes(
                 "mt-1"
-            ).style(f"color: {lead.colour or COLOURS[None]}")
+            ).style(f"color: {lead.colour}")
             with ui.column().classes("gap-0 grow min-w-0"):
                 label = ui.label(x.text).classes(
                     "cursor-pointer hover:underline "
@@ -1197,7 +1172,7 @@ def categories_section(side: Side) -> Callable[[], None]:
             ui.label(
                 _(
                     "They are on one item (in the order of their PDFs), with the second one's "
-                    "category, years, influence, colour and text (its pencil edits the text of "
+                    "category, years, influence and text (its pencil edits the text of "
                     "the group)."
                 )
             ).classes("text-sm text-grey")
@@ -1306,7 +1281,7 @@ def categories_section(side: Side) -> Callable[[], None]:
                     )
                 ).classes("text-xs text-grey")
             originals(e, text)
-            props = excerpt_properties(e.start_year, e.end_year, e.influence, e.colour)
+            props = excerpt_properties(e.start_year, e.end_year, e.influence)
 
             def save() -> None:
                 if e.members:
