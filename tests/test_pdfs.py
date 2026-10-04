@@ -3,7 +3,7 @@
 import asyncio
 
 import pytest
-from helpers import add_source, make_person, note_status, pub
+from helpers import PDF, add_source, make_person, note_status, pub
 from nicegui import ElementFilter, ui
 from nicegui.testing import User
 from sqlalchemy import select
@@ -15,8 +15,6 @@ from sci_report_analyzer.sources.base import FetchResult
 from sci_report_analyzer.ui import pdf_viewer
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
-
-PDF = b"%PDF-1.4\n% a tiny test file\n%%EOF\n"
 
 
 def _person() -> tuple[int, int, dict[str, int]]:

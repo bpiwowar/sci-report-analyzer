@@ -5,7 +5,7 @@ import asyncio
 import re
 
 import pytest
-from helpers import add_source, make_person, note_status, pub
+from helpers import PDF, add_source, make_person, note_status, pub
 from nicegui import ui
 from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
@@ -18,7 +18,6 @@ from sci_report_analyzer.ui.mdedit import MarkdownEditor, quote
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
 
-PDF = b"%PDF-1.4\n% a tiny test file\n%%EOF\n"
 TITLES = {
     "a": "Deep ranking models for search",
     "b": "Neural retrieval models for long documents",

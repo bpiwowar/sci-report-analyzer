@@ -3,7 +3,7 @@
 import asyncio
 
 import pytest
-from helpers import add_source, make_person, pub
+from helpers import PDF, add_source, make_person, pub
 from nicegui.testing import User
 
 from sci_report_analyzer import annotations, folders, pubview, reports
@@ -260,7 +260,7 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     annotations.toggle_tag(a, star, period)
     fid = folders.folder_of_period(period)[0]
     reports.save_numbering(fid, reports.Numbering(star, "#{index}", "#{index}"))
-    pdfs.save(a, b"%PDF-1.4\n%%EOF\n", None)
+    pdfs.save(a, PDF, None)
     await user.open(f"/pdf/{a}?period={period}")
     await user.should_see(marker="citation-status")
     await user.should_see("0 of the 1 papers to discuss cited")

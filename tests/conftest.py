@@ -1,5 +1,4 @@
 import gc
-import gzip
 import json
 import os
 import shutil
@@ -13,12 +12,13 @@ _TMP = Path(tempfile.mkdtemp(prefix="sci-report-analyzer-test-"))
 os.environ["SCI_REPORT_ANALYZER_DATA"] = str(_TMP)
 os.environ.setdefault("SCI_REPORT_ANALYZER_EMAIL", "test@example.org")
 
+from helpers import load_fixture  # noqa: E402
+
 from sci_report_analyzer import config  # noqa: E402
 from sci_report_analyzer.db import session as db_session  # noqa: E402
 from sci_report_analyzer.ranking import datasets  # noqa: E402
 from sci_report_analyzer.ranking.service import service  # noqa: E402
 
-FIXTURES = Path(__file__).parent / "fixtures"
 pytest_plugins = ["nicegui.testing.user_plugin"]
 
 
@@ -40,8 +40,7 @@ def _detach_dialog_finalizers() -> None:
 
 def _write_datasets(d: Path) -> None:
     d.mkdir(parents=True, exist_ok=True)
-    with gzip.open(FIXTURES / "golden_records.json.gz", "rt") as f:
-        records = json.load(f)
+    records = load_fixture("golden_records.json.gz")
     journals = [r for r in records if r["type"] == "journal"]
     confs = [r for r in records if r["type"] == "conference"]
     # Ranks so that categories are exercised.
