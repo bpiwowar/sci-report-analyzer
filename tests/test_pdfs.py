@@ -129,12 +129,7 @@ async def test_viewer_page(user: User, monkeypatch, tmp_path):
     pdfs.save(a, PDF, None)
     await user.open(f"/pdf/{a}")
     await user.should_see(marker="pdf-frame")
-    # The editing tools' options panel: shown, until hidden (remembered).
-    await user.should_see(marker="pdf-params")
-    assert "hideParams: false" in user.client.head_html
-    annotations.save_ui_state(pdf_viewer.HIDE_PARAMS, True)
-    await user.open(f"/pdf/{a}")
-    assert "hideParams: true" in user.client.head_html
+    assert "'enableComment', true" in user.client.head_html  # (PDF.js's comments, on)
     await user.should_see(marker="paper-note")  # its tags and notes, next to it
     user.find(marker="paper-new-tag").type("to read").trigger("keydown.enter")
     user.find(marker="paper-note").elements.pop().value = "Read section 3, $x^2$"
@@ -160,6 +155,29 @@ async def test_viewer_page(user: User, monkeypatch, tmp_path):
     await user.should_see(marker="pdf-bookmark")
     await user.should_not_see(marker="pdf-excerpt")
     await user.should_not_see(marker="side-tab-categories")
+
+
+async def test_viewer_restart_notice(user: User, monkeypatch, tmp_path):
+    """With --live-reload: a new version of the code, offered in the viewer's header too."""
+    from sci_report_analyzer import livereload
+
+    _, _, ids = _person()
+    a = ids["Deep ranking for search"]
+    viewer = tmp_path / "pdfjs"
+    (viewer / "web").mkdir(parents=True)
+    (viewer / "web" / "viewer.html").write_text("<html></html>")
+    monkeypatch.setattr(pdfs, "viewer_dir", lambda: viewer)
+    pdfs.save(a, PDF, None)
+    monkeypatch.setattr(livereload, "enabled", True)
+    monkeypatch.setattr(livereload, "changed", {"ui/pdf_viewer.py"})
+    await user.open(f"/pdf/{a}")
+    await user.should_see(marker="pdf-frame")
+    await user.should_see("New version available (1 file changed)")
+    await user.should_see("Restart & reload")
+    # The side panel in its own window: there too.
+    await user.open(f"/pdf/{a}?pane=k3y9token")
+    await user.should_see(marker="pane-back")
+    await user.should_see("New version available (1 file changed)")
 
 
 async def test_viewer_details(user: User, monkeypatch, tmp_path):

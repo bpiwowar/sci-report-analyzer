@@ -50,15 +50,20 @@ def restart() -> None:
     asyncio.get_running_loop().call_later(0.5, os.execv, sys.executable, argv)
 
 
-def banner() -> None:
-    """A banner (per page) announcing that a new version is available."""
+def banner(*, dense: bool = False) -> None:
+    """A banner (per page) announcing that a new version is available; ``dense``: in a header
+    bar (e.g. the PDF viewer's), on its colour."""
     if not enabled:
         return
     from .sync import _running
 
     state = {"dismissed": 0, "confirm": False}
-    box = ui.row().classes("w-full items-center gap-3 bg-indigo-1 text-indigo-10 rounded p-2")
+    if dense:
+        box = ui.row().classes("items-center no-wrap gap-1 shrink-0 text-sm")
+    else:
+        box = ui.row().classes("w-full items-center gap-3 bg-indigo-1 text-indigo-10 rounded p-2")
     box.set_visibility(False)
+    box.mark("live-reload")
 
     def apply() -> None:
         busy = any(not t.done() for t in _running.values())
@@ -75,11 +80,21 @@ def banner() -> None:
         box.set_visibility(False)
 
     with box:
-        ui.icon("system_update")
-        label = ui.label()
-        ui.space()
-        button = ui.button(_("Restart & reload"), icon="restart_alt", on_click=apply).props("dense")
-        ui.button(_("Later"), on_click=later).props("dense flat")
+        if dense:  # (its text in a tooltip, the header's room kept)
+            with ui.icon("system_update"):
+                label = ui.tooltip()
+            button = ui.button(_("Restart & reload"), icon="restart_alt", on_click=apply)
+            button.props("dense outline color=white")
+            ui.button(icon="close", on_click=later).props("dense flat round color=white").tooltip(
+                _("Later")
+            )
+        else:
+            ui.icon("system_update")
+            label = ui.label()
+            ui.space()
+            button = ui.button(_("Restart & reload"), icon="restart_alt", on_click=apply)
+            button.props("dense")
+            ui.button(_("Later"), on_click=later).props("dense flat")
 
     def check() -> None:
         # Shown again if more files change after "Later".

@@ -17,6 +17,7 @@ from .mdedit import MarkdownEditor, quote
 from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
 from .pub_details import show_details
+from .reflist import tag_from_list
 
 if TYPE_CHECKING:
     from ..pubview import PubStat
@@ -220,7 +221,15 @@ class Side:
             publication_id=key if kind == "pub" else None,
             **props,
         )
+        self.unhighlight(page, rects)
         self.refresh_excerpts()
+
+    def unhighlight(self, page: int | None, rects: list) -> None:
+        """The highlights of PDF.js under an excerpt just filed: removed (its tint instead)."""
+        if rects:
+            self.box.client.run_javascript(
+                f"vrPdf.unhighlight({json.dumps(rects)}, {json.dumps(page)})"
+            )
 
     def merge_excerpt(
         self,
@@ -243,6 +252,7 @@ class Side:
             publication_id=key if kind == "pub" else None,
         )
         why = categories.merge_excerpts(new, lead.id, ref_only=ref_only)
+        self.unhighlight(page, rects)
         with self.box:  # (not the picker's dialog, closed: its elements are gone)
             if why:
                 ui.notify(why, type="warning")
@@ -499,6 +509,16 @@ class Side:
             name = name.replace("[", "(").replace("]", ")")
             where = f"[{name}, {where}]({url})" if where else f"[{name}]({url})"
         editor.insert_block(quote(sel["text"], where))
+
+    async def tag_selection(self) -> None:
+        """Tag the papers of the list selected in the PDF (e.g. an area over numbered
+        references), as in the publications panel."""
+        sel = await ui.run_javascript("vrPdf.selection()")
+        text = (sel or {}).get("text") or ""
+        if not text.strip():
+            ui.notify(_("Select the list (or an area over it) in the PDF first"), type="warning")
+            return
+        tag_from_list(self.host, text, show_tagged=False)
 
     async def find_selection(self) -> None:
         sel = await ui.run_javascript("vrPdf.selection()")

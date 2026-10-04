@@ -18,7 +18,9 @@ if TYPE_CHECKING:
 NONE = 0  # the "no paper" choice of an item
 
 
-def tag_from_list(panel: PublicationsPanel) -> None:
+def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool = True) -> None:
+    """The dialog, its list ``text`` given (e.g. selected in a PDF: its papers found at once);
+    ``show_tagged``: the panel shows the tagged papers afterwards (filtered by the tag)."""
     period = panel.period
     pid = period.id if period else None
     tags = {
@@ -39,9 +41,10 @@ def tag_from_list(panel: PublicationsPanel) -> None:
                 "matches, then put a tag on the papers, with their numbers in the list."
             )
         ).classes("text-sm text-grey")
-        text = (
+        text_box = (
             ui.textarea(
-                placeholder=_("1- Title. Authors. Venue, 2023. Lien : https://hal.science/…")
+                value=text,
+                placeholder=_("1- Title. Authors. Venue, 2023. Lien : https://hal.science/…"),
             )
             .props("outlined")
             .classes("w-full font-mono text-sm")
@@ -144,7 +147,7 @@ def tag_from_list(panel: PublicationsPanel) -> None:
             ui.button(_("Put the tag"), icon="sell", on_click=lambda: apply()).mark("reflist-apply")
 
     def find() -> None:
-        items = reflist.split_items(text.value or "")
+        items = reflist.split_items(text_box.value or "")
         if not items:
             ui.notify(_("No item in the text"), type="warning")
             return
@@ -211,12 +214,13 @@ def tag_from_list(panel: PublicationsPanel) -> None:
         annotations.tag_numbered(chosen.id, numbers, where)
         annotations.save_tag_list(panel.person_id, chosen.id, where, entries)
         dlg.close()
-        panel.tag_filter = [chosen.id]
-        panel.sel = None
-        panel._save_state()
+        if show_tagged:
+            panel.tag_filter = [chosen.id]
+            panel.sel = None
+            panel._save_state()
         await panel.reload()
         # The tagged papers the panel does not show (e.g. outside the period's years).
-        shown = {s.id for s in panel.base_rows()}
+        shown = {s.id for s in panel.base_rows()} if show_tagged else set(numbers)
         rest = [s for s in panel.stats if s.id in numbers and s.id not in shown]
         with panel.dialogs:
             ui.notify(
@@ -234,3 +238,5 @@ def tag_from_list(panel: PublicationsPanel) -> None:
 
     dlg.on_value_change(lambda e: None if e.value else dlg.delete())
     dlg.open()
+    if text.strip():
+        find()

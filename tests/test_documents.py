@@ -737,8 +737,17 @@ def test_category_colours():
 async def test_excerpt_from_an_area(user: User, monkeypatch, tmp_path):
     """An area (a rectangle) of a page, selected: its text filed as an excerpt, the
     rectangle as its place (tinted as a text's)."""
+    from nicegui import Client
+
     from sci_report_analyzer import categories
 
+    scripts = []
+    run = Client.run_javascript
+    monkeypatch.setattr(
+        Client,
+        "run_javascript",
+        lambda self, code, **kw: (scripts.append(code), run(self, code))[1],
+    )
     _, period, _ = _person()
     folder = folders.folders()[0].id
     figures = categories.add(folder, "Figures")
@@ -765,6 +774,37 @@ async def test_excerpt_from_an_area(user: User, monkeypatch, tmp_path):
     )
     [tint] = categories.tints(period, doc, {})
     assert (tint["page"], tint["rects"]) == (2, [[60.5, 400, 320, 520.2, 2]])
+    # PDF.js's highlights under it: removed (its tint in their place).
+    assert "vrPdf.unhighlight([[60.5, 400, 320, 520.2, 2]], 2)" in scripts
+
+
+async def test_tag_from_a_list_in_the_pdf(user: User, monkeypatch, tmp_path):
+    """A list selected in the PDF (e.g. areas over numbered references): its papers found
+    and tagged, as from a pasted list."""
+    from sci_report_analyzer import annotations
+
+    pid, period, ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "", "p": 3, "rects": [], "area": True}
+    user.javascript_rules[re.compile(r"vrPdf\.selection\(\)")] = lambda _: selection
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-tag-list")
+    user.find(marker="pdf-tag-list").click()
+    await user.should_see("Select the list (or an area over it) in the PDF first")
+    selection["text"] = (
+        "1- Neural retrieval models for long documents. J. Doe. ECIR, 2022.\n"
+        "2- Deep ranking models for search. J. Doe. SIGIR, 2021."
+    )
+    user.find(marker="pdf-tag-list").click()
+    await user.should_see("2 of 2 items matched")  # (found at once)
+    user.find(marker="reflist-apply").click()
+    await user.should_see("“starred” put on 2 papers")
+    rows = {r.id: r for r in await pubview.load_stats(pid)}
+    starred = annotations.starred_tag_id()
+    assert rows[ids["b"]].number_of(starred, period) == 1
+    assert rows[ids["a"]].number_of(starred, period) == 2
+    assert not annotations.panel_state(pid).get("tag_filter")  # (the person's panel as it was)
 
 
 async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
