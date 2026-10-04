@@ -57,8 +57,6 @@ highlighting (check the PDF.js version and its editor modes / `annotationEditorM
 
 - The editor pane in a separate window (e.g. on another screen), kept in sync with the PDF
   window (quotes, positions).
-- Split view of the notes (Markdown editor | preview): keep the two scrolled in sync
-  (the preview follows the editor's position, and back), if possible.
 
 ## Folders (after the folder-wide notes above)
 

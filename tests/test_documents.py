@@ -896,6 +896,25 @@ async def test_numbered_citations_two_lists():
     assert cites == [ids["Neural"], ids["Sparse"]]
 
 
+async def test_split_scroll_sync_installed(user: User, monkeypatch, tmp_path):
+    from nicegui import Client
+
+    scripts = []
+    run = Client.run_javascript
+    monkeypatch.setattr(
+        Client,
+        "run_javascript",
+        lambda self, code, **kw: (scripts.append(code), run(self, code))[1],
+    )
+    _, period, _ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    doc = documents.add(period, "Application.pdf", PDF)
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="doc-note")
+    sync = [c for c in scripts if "follow(p, e)" in c]  # (the preview drives the editor too)
+    assert sync and "requestAnimationFrame" in sync[0]
+
+
 async def test_folder_notes_sync(user: User):
     from sci_report_analyzer.ui import folder_notes
 

@@ -122,16 +122,20 @@ class MarkdownEditor:
         self._sync_scroll()
 
     def _sync_scroll(self) -> None:
-        """The preview follows the editor's scrolling (at the same proportion)."""
+        """The preview and the editor follow each other's scrolling (at the same proportion);
+        the scroll caused by following is ignored, else they would chase each other."""
         self.editor.client.run_javascript(
             "(() => { let n = 0; const t = setInterval(() => {"
             f" const v = getElement({self.editor.id})?.editor,"
             f" p = getHtmlElement({self.preview.id});"
             " if (++n > 50) clearInterval(t); if (!v || !p) return; clearInterval(t);"
-            " v.scrollDOM.addEventListener('scroll', () => {"
-            " const s = v.scrollDOM;"
-            " const f = s.scrollTop / Math.max(1, s.scrollHeight - s.clientHeight);"
-            " p.scrollTop = f * (p.scrollHeight - p.clientHeight); });"
+            " const e = v.scrollDOM; let busy = false;"
+            " const frac = (x) => x.scrollTop / Math.max(1, x.scrollHeight - x.clientHeight);"
+            " const follow = (from, to) => { if (busy) return; busy = true;"
+            " to.scrollTop = frac(from) * (to.scrollHeight - to.clientHeight);"
+            " requestAnimationFrame(() => { busy = false; }); };"
+            " e.addEventListener('scroll', () => follow(e, p));"
+            " p.addEventListener('scroll', () => follow(p, e));"
             " }, 100); })()"
         )
 
