@@ -8,7 +8,6 @@ import io
 import logging
 import re
 import shutil
-import unicodedata
 import zipfile
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -21,8 +20,10 @@ from sqlalchemy.orm import selectinload
 from . import config
 from .db.models import PeriodDocument, Publication, PublicationPdf, SourcePub, utcnow
 from .db.session import session_scope
+from .files import atomic_write
 from .sources import PRIORITY
 from .sources.base import client, contact_email, normalize_doi
+from .text import ascii_fold
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +78,8 @@ async def install_viewer() -> None:
 # ---- Stored PDFs ----------------------------------------------------------------------------
 
 
-def _slug(title: str | None) -> str:
-    text = unicodedata.normalize("NFKD", title or "").encode("ascii", "ignore").decode()
-    return re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-")[:60] or "paper"
+def slug(title: str | None) -> str:
+    return re.sub(r"[^A-Za-z0-9]+", "-", ascii_fold(title or "")).strip("-")[:60] or "paper"
 
 
 def file_of(pub_id: int) -> Path | None:
@@ -114,12 +114,9 @@ def save(pub_id: int, data: bytes, origin: str | None, *, edited: bool = False) 
         if pub is None:
             raise PdfError("no such paper")
         row = s.get(PublicationPdf, pub_id)
-        rel = row.path if row else f"{pub.person_id}/{pub_id}-{_slug(pub.title)}.pdf"
+        rel = row.path if row else f"{pub.person_id}/{pub_id}-{slug(pub.title)}.pdf"
         path = pdf_dir() / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".part")
-        tmp.write_bytes(data)
-        tmp.replace(path)  # (never a half-written file)
+        atomic_write(path, data)
         if row is None:
             s.add(PublicationPdf(publication_id=pub_id, path=rel, origin=origin))
         elif edited:

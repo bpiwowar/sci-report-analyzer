@@ -5,7 +5,7 @@ giving each folder its own."""
 from pathlib import Path
 
 import pytest
-from helpers import make_person
+from helpers import make_person, own_settings
 
 from sci_report_analyzer import categories, folders, reports
 from sci_report_analyzer.db import session as db_session
@@ -30,7 +30,7 @@ def _filed(period_id: int) -> list[tuple[str, str]]:
 def test_a_subfolder_uses_its_parents_settings():
     top = folders.save_folder(None, "Hiring")
     sub = folders.save_folder(None, "Hiring 2026", parent_id=top)
-    assert folders.own_settings(top) and not folders.own_settings(sub)
+    assert own_settings(top) and not own_settings(sub)
     categories.add(top, "Research")
     categories.add(sub, "Teaching")  # (the parent's: shared)
     reports.save_skeleton(sub, "# Notes")
@@ -58,7 +58,7 @@ def test_own_settings_start_from_a_copy_and_excerpts_follow():
     period = folders.add_person(sub, ann)
     categories.add_excerpt(projects, period, "Led a project.", 1, [])
     folders.use_own_settings(sub)
-    assert folders.own_settings(sub) and folders.sharing(sub) == []
+    assert own_settings(sub) and folders.sharing(sub) == []
     assert _cats(sub) == _cats(top) and reports.skeleton(sub) == "# Start\n"
     [e] = categories.excerpts(period)
     assert e.category_id != projects and _filed(period) == [
@@ -72,7 +72,7 @@ def test_own_settings_start_from_a_copy_and_excerpts_follow():
     teaching = next(n.id for n in categories.tree(sub) if n.name == "Teaching")
     categories.add_excerpt(teaching, period, "Taught a course.", 2, [])
     assert folders.use_parent_settings(sub) == 1
-    assert not folders.own_settings(sub) and reports.skeleton(sub) == "# Start\n"
+    assert not own_settings(sub) and reports.skeleton(sub) == "# Start\n"
     assert _cats(top) == ["Research", "Research › Projects", "Research › Projects", "Teaching"]
     assert _filed(period) == [
         ("Research › Projects", "Led a project."),
@@ -96,7 +96,7 @@ def test_moving_and_deleting_folders():
     assert _cats(sub) == ["Activities", "Research"] and _filed(period) == [("Research", "A grant.")]
     # At the top level: still the settings it used, as its own (shared with B).
     assert folders.set_parent(sub, None) == 0
-    assert folders.own_settings(sub) and folders.sharing(sub) == ["B"]
+    assert own_settings(sub) and folders.sharing(sub) == ["B"]
     folders.set_parent(sub, a)
     folders.rename(sub, "Within A")
     assert [(n.path, n.own) for n in folders.tree() if n.id == sub] == [("A › Within A", True)]
@@ -133,7 +133,7 @@ def test_settings_moved_to_the_parent_shared_by_the_subfolders():
     with pytest.raises(ValueError):
         folders.move_settings(top, sub)  # (only to a folder it is in)
     assert folders.move_settings(sub, top) == 1  # ("Old", for the excerpt filed in it)
-    assert not folders.own_settings(sub) and folders.own_settings(top)
+    assert not own_settings(sub) and own_settings(top)
     assert reports.skeleton(top) == reports.skeleton(other) == "# Mine\n"
     assert _cats(top) == _cats(other) == _cats(deep) == ["Research", "Old"]
     assert _filed(period) == [("Old", "A prize.")] and _filed(mine) == [("Research", "A grant.")]

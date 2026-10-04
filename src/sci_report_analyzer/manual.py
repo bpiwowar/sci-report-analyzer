@@ -20,7 +20,7 @@ from .source_settings import enabled
 from .sources import doi as doi_source
 from .sources.base import normalize_doi
 from .sources.hal import document_id, is_document
-from .sync import _doi_link, add_link, added_dois, merge, sync_dois, sync_link
+from .sync import add_link, added_dois, doi_link, merge, sync_dois, sync_link
 
 _DOI = re.compile(r"10\.\d{4,9}/\S+")
 
@@ -82,7 +82,7 @@ async def _add_doi(person_id: int, doi: str) -> str:
     if record.status != "ok":
         raise ValueError(_("DOI {doi} is not registered").format(doi=doi))
     with session_scope() as s:
-        link = _doi_link(s, s.get(Person, person_id))
+        link = doi_link(s, s.get(Person, person_id))
         if doi not in (added := added_dois(link)):
             link.evidence = {**(link.evidence or {}), "added": [*added, doi]}
     await sync_dois(person_id)

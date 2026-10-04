@@ -1,9 +1,9 @@
 import asyncio
 from pathlib import Path
 
-from helpers import add_source, make_person, pub
+from helpers import add_source, make_person, pub, set_correction, set_level
 
-from sci_report_analyzer import annotations, pubview, venues
+from sci_report_analyzer import annotations, pubview
 from sci_report_analyzer.ranking.service import service
 
 
@@ -46,8 +46,8 @@ def test_venue_search_text_and_level():
         "x/1",
         [pub("a", "P1", 2020, "My Weird Venue 2021"), pub("b", "P2", 2020, "Tiny Workshop 2020")],
     )
-    venues.set_correction("My Weird Venue 2020", "Neural Computation")
-    venues.set_level("Tiny Workshop", "conference", "B")
+    set_correction("My Weird Venue 2020", "Neural Computation")
+    set_level("Tiny Workshop", "conference", "B")
     st = {s.title: s for s in asyncio.run(pubview.load_stats(pid))}
     assert st["P1"].badge is not None and st["P1"].badge.corrected
     assert st["P2"].badge.manual and st["P2"].badge.coreRank == "B"

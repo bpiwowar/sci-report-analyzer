@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 
@@ -70,7 +71,6 @@ class FetchedThesis:
     status: str | None = None
     defence_date: str | None = None
     start_date: str | None = None
-    discipline: str | None = None
     institution: str | None = None
     url: str | None = None
 
@@ -139,6 +139,11 @@ def to_int(v: Any) -> int | None:
         return None
 
 
+def first(v: Any) -> Any:
+    """The first of a list (none if empty), else the value itself."""
+    return (v[0] if v else None) if isinstance(v, list) else v
+
+
 def to_year(v: Any) -> int | None:
     m = re.search(r"\b(1[89]\d{2}|20\d{2})\b", str(v)) if v not in (None, "") else None
     return int(m.group(1)) if m else None
@@ -176,6 +181,62 @@ async def close_client() -> None:
         await _client.aclose()
 
 
+class Throttle(Protocol):
+    """Requests' pace (an async context around each one), held after a 429."""
+
+    async def __aenter__(self) -> Any: ...
+    async def __aexit__(self, *exc: object) -> Any: ...
+    def pause(self, seconds: float) -> None: ...
+
+
+async def request_with_backoff(
+    method: str,
+    url: str,
+    *,
+    retries: int = 4,
+    delay: float = 1.5,
+    throttle: Throttle | None = None,
+    **kw: Any,
+) -> httpx.Response:
+    """A request retried with backoff on network errors, 429 and 5xx (waiting as Retry-After
+    says, at most a minute; over two minutes: an error); the other answers are returned."""
+    for attempt in range(retries + 1):
+        async with throttle or contextlib.nullcontext():
+            try:
+                res = await client().request(method, url, **kw)
+            except httpx.TransportError as e:
+                if attempt == retries:
+                    raise SourceError(_("network error: {error}").format(error=e)) from e
+                res = None
+        wait = delay
+        if res is not None:
+            if res.status_code != 429 and res.status_code < 500:
+                return res
+            if attempt == retries:
+                raise SourceError(
+                    _("HTTP {status} from {url}").format(status=res.status_code, url=url)
+                )
+            with contextlib.suppress(ValueError):  # (not an HTTP date)
+                wait = float(res.headers.get("Retry-After") or delay)
+            if wait > 120:
+                try:
+                    message = res.json().get("message")
+                except (ValueError, AttributeError):
+                    message = None
+                raise SourceError(
+                    message
+                    or _("rate limited by {url} (retry in {wait}s)").format(
+                        url=url, wait=f"{wait:.0f}"
+                    )
+                )
+            if throttle is not None:
+                throttle.pause(min(wait, 60))
+            logger.info("HTTP %s from %s, retrying in %.1fs", res.status_code, url, wait)
+        await asyncio.sleep(min(wait, 60))
+        delay *= 2
+    raise SourceError(_("giving up on {url}").format(url=url))
+
+
 async def get_json(
     url: str,
     *,
@@ -186,39 +247,10 @@ async def get_json(
     retries: int = 4,
 ) -> Any:
     """GET/POST JSON with backoff on 429 / 5xx."""
-    delay = 1.5
-    for attempt in range(retries + 1):
-        try:
-            res = await client().request(method, url, params=params, headers=headers, data=data)
-        except httpx.TransportError as e:
-            if attempt == retries:
-                raise SourceError(_("network error: {error}").format(error=e)) from e
-            await asyncio.sleep(delay)
-            delay *= 2
-            continue
-        if res.status_code == 429 or res.status_code >= 500:
-            if attempt == retries:
-                raise SourceError(
-                    _("HTTP {status} from {url}").format(status=res.status_code, url=url)
-                )
-            wait = float(res.headers.get("Retry-After", delay)) if res.status_code == 429 else delay
-            if wait > 120:
-                try:
-                    message = res.json().get("message")
-                except ValueError:
-                    message = None
-                raise SourceError(
-                    message
-                    or _("rate limited by {url} (retry in {wait}s)").format(
-                        url=url, wait=f"{wait:.0f}"
-                    )
-                )
-            logger.info("HTTP %s from %s, retrying in %.1fs", res.status_code, url, wait)
-            await asyncio.sleep(min(wait, 60))
-            delay *= 2
-            continue
-        if res.status_code == 404:
-            raise SourceError(_("not found: {url}").format(url=url))
-        res.raise_for_status()
-        return res.json()
-    raise SourceError(_("giving up on {url}").format(url=url))
+    res = await request_with_backoff(
+        method, url, params=params, headers=headers, data=data, retries=retries
+    )
+    if res.status_code == 404:
+        raise SourceError(_("not found: {url}").format(url=url))
+    res.raise_for_status()
+    return res.json()

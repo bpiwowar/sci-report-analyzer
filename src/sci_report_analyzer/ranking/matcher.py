@@ -20,8 +20,9 @@ Record = dict[str, Any]
 _ISSN_CHARS = re.compile(r"[^\dxX]", re.ASCII)
 
 
-def issn_key(issn: str) -> str:
-    return _ISSN_CHARS.sub("", str(issn)).lower()
+def issn_key(issn: str | None) -> str:
+    """An ISSN compared ("1234-567X", "1234567x": "1234567x"); "" for none."""
+    return _ISSN_CHARS.sub("", str(issn)).lower() if issn else ""
 
 
 def record_key(rec: Record) -> str:

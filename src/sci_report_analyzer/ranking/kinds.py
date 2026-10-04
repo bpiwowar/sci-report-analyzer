@@ -87,8 +87,10 @@ VENUE_KINDS = Labels({k: v for k, v in dict.items(KINDS) if k not in PUBLICATION
 # Not in a venue at all: a book's or a chapter's "venue" is its own title, series or
 # publisher; a thesis', its university.
 NO_VENUE_KINDS = ("book", "chapter", "thesis")
+CONFERENCE_KINDS = ("intl_conference", "natl_conference")
+JOURNAL_KINDS = ("intl_journal", "natl_journal")
 # Conference-like kinds (a paper in them is in "proceedings"; levels are CORE ranks).
-CONFERENCE_LIKE = ("intl_conference", "natl_conference", *WORKSHOP_KINDS)
+CONFERENCE_LIKE = (*CONFERENCE_KINDS, *WORKSHOP_KINDS)
 
 # The regexes deciding a kind (Settings → Detection rules; defaults in ``detection``).
 # A workshop's rank is that of its main conference.

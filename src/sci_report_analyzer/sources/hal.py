@@ -11,6 +11,7 @@ from .base import (
     FetchedPub,
     FetchResult,
     SourceAdapter,
+    first,
     get_json,
     normalize_doi,
     to_year,
@@ -34,10 +35,6 @@ def venue_type(doc_type: str | None) -> str | None:
     if doc_type == "ART":
         return "journal"
     return None
-
-
-def _first(v: Any) -> Any:
-    return v[0] if isinstance(v, list) and v else v
 
 
 # A document id ("hal-01234567", "tel-04012345", "inria-00123456"), without its version.
@@ -104,20 +101,20 @@ def meta_from_doc(d: dict[str, Any], owner_names: list[str]) -> FetchedPub:
     pdf = d.get("fileMain_s") or (f"https://arxiv.org/pdf/{arxiv}" if arxiv else None)
     return FetchedPub(
         external_key=d["halId_s"],
-        title=_first(d.get("title_s")),
+        title=first(d.get("title_s")),
         year=to_year(d.get("producedDateY_i")),
         venue=venue,
         authors=authors,
         author_pos=author_position(authors, owner_names),
         num_authors=len(authors) or None,
-        issn=_first(d.get("issn_s")) or _first(d.get("eissn_s")),
+        issn=first(d.get("issn_s")) or first(d.get("eissn_s")),
         venue_type=vt,
         doi=_doi(d),
         url=d.get("uri_s") or f"https://hal.science/{d['halId_s']}",
         doc_type=doc_type,
         pdf_url=pdf,
         archival=doc_type in ARCHIVAL_TYPES,
-        raw={"arxiv": arxiv, "publisher_url": _first(d.get("publisherLink_s"))},
+        raw={"arxiv": arxiv, "publisher_url": first(d.get("publisherLink_s"))},
     )
 
 
@@ -159,7 +156,7 @@ class HalAdapter(SourceAdapter):
             },
         )
         resp = data.get("response", {})
-        return resp.get("numFound", 0), [_first(d.get("title_s")) for d in resp.get("docs", [])]
+        return resp.get("numFound", 0), [first(d.get("title_s")) for d in resp.get("docs", [])]
 
     async def search(self, name: str, affiliation: str | None = None) -> list[AuthorCandidate]:
         surname, _ = name_key(name)
@@ -183,7 +180,7 @@ class HalAdapter(SourceAdapter):
             ext = f"idhal:{d['idHal_s']}" if d.get("idHal_s") else f"name:{full}"
             if ext in seen:
                 continue
-            orcid = _first(d.get("orcidId_s"))
+            orcid = first(d.get("orcidId_s"))
             seen[ext] = AuthorCandidate(
                 source=self.name,
                 external_id=ext,
@@ -286,7 +283,7 @@ async def search_documents(words: list[str], rows: int = 10) -> list[dict[str, A
     return [
         {
             "hal": d["halId_s"],
-            "title": _first(d.get("title_s")),
+            "title": first(d.get("title_s")),
             "year": to_year(d.get("producedDateY_i")),
             "authors": d.get("authFullName_s") or [],
             "url": d.get("uri_s") or f"https://hal.science/{d['halId_s']}",

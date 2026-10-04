@@ -22,7 +22,6 @@ from .db.models import (
     utcnow,
 )
 from .db.session import session_scope
-from .i18n import N_
 from .merge import cluster, merge_person
 from .ranking.kinds import is_edited_volume
 from .ranking.normalize import normalize
@@ -32,20 +31,6 @@ from .sources import doi as doi_source
 from .sources.base import AuthorCandidate, FetchResult, SourceError, normalize_doi
 
 logger = logging.getLogger(__name__)
-
-# A link's update status (``SourceLink.status_label``: its link status, else its sync state),
-# compared in code in English and translated where shown, with ``_(status)``.
-STATUS_LABELS = (
-    N_("up to date"),
-    N_("updating…"),
-    N_("never synced"),
-    N_("out of date"),
-    N_("not used"),
-    N_("error"),
-    N_("candidate"),
-    N_("validated"),
-    N_("rejected"),
-)
 
 _running: dict[int, asyncio.Task] = {}
 
@@ -125,7 +110,6 @@ def store_result(link_id: int, result: FetchResult) -> int:
                     "supervisors",
                     "status",
                     "defence_date",
-                    "discipline",
                     "institution",
                     "url",
                 ):
@@ -177,7 +161,7 @@ def finish_link(link_id: int, result: FetchResult) -> None:
 # ---- syncing -------------------------------------------------------------------------------
 
 
-def _doi_link(s, person: Person) -> SourceLink:
+def doi_link(s, person: Person) -> SourceLink:
     link = next((ln for ln in person.links if ln.source == "doi"), None)
     if link is None:
         link = SourceLink(
@@ -234,8 +218,8 @@ async def sync_dois(person_id: int, *, refresh: bool = False, remerge: bool = Tr
         link = next((ln for ln in person.links if ln.source == "doi"), None)
         if not dois and link is None:
             return
-        link_id = _doi_link(s, person).id
-    _set_state(link_id, sync_state="running", sync_started_at=utcnow(), last_error=None)
+        link_id = doi_link(s, person).id
+    _set_state(link_id, sync_state="running", last_error=None)
     try:
         counts = await doi_source.ensure(list(dois), refresh=refresh)
         count = store_result(link_id, doi_source.result_for(dois))
@@ -263,7 +247,7 @@ async def sync_link(link_id: int, *, remerge: bool = True) -> None:
     if link.source == "doi":
         await sync_dois(person_id, remerge=remerge)
         return
-    _set_state(link_id, sync_state="running", sync_started_at=utcnow(), last_error=None)
+    _set_state(link_id, sync_state="running", last_error=None)
     try:
         result = await adapter.fetch(ext, names)
         count = store_result(link_id, result)
@@ -349,6 +333,11 @@ def purge(person_ids: Iterable[int]) -> dict[str, int]:
 def is_syncing(person_id: int) -> bool:
     task = _running.get(person_id)
     return bool(task and not task.done())
+
+
+def any_running() -> bool:
+    """Whether a sync is running (of anyone)."""
+    return any(not t.done() for t in _running.values())
 
 
 # ---- auto-matching -------------------------------------------------------------------------

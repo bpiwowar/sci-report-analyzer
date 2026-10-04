@@ -32,10 +32,10 @@ def install_interrupt_handler() -> None:
 
 def quit_button() -> None:
     """A header button that stops the server (after confirmation when a sync is running)."""
-    from .sync import _running
+    from .sync import any_running
 
     def ask() -> None:
-        busy = any(not t.done() for t in _running.values())
+        busy = any_running()
         with ui.dialog() as dialog, ui.card():
             ui.label(_("Quit SciReport Analyzer?")).classes("text-lg")
             if busy:

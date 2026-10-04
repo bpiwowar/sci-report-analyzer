@@ -278,12 +278,6 @@ def set_parent(folder_id: int, parent_id: int | None) -> int:
         return _resettle(s, before)
 
 
-def own_settings(folder_id: int) -> bool:
-    """Whether a folder uses settings of its own (else: its parent's)."""
-    with session_scope() as s:
-        return s.get(FolderSettingsUse, folder_id) is not None
-
-
 def use_own_settings(folder_id: int) -> None:
     """A folder gets settings of its own: a copy of those it used (its people's excerpts
     filed in the copies of their categories)."""
@@ -576,6 +570,49 @@ def delete_people(person_ids: list[int]) -> None:
         for pid in person_ids:
             if p := s.get(Person, pid):
                 s.delete(p)
+
+
+# ---- A person's periods ---------------------------------------------------------------------
+
+
+def periods(person_id: int, *, include_hidden_folders: bool = False) -> list[Period]:
+    """The person's own periods (by start), then their folder periods (latest folder first)."""
+    q = (
+        select(Period)
+        .outerjoin(Folder, Period.folder_id == Folder.id)
+        .where(Period.person_id == person_id)
+        .options(selectinload(Period.folder))
+    )
+    if not include_hidden_folders:
+        q = q.where(Period.folder_id.is_(None) | Folder.hidden.is_(False))
+    with session_scope() as s:
+        items = list(s.scalars(q))
+
+    def key(p: Period) -> tuple:
+        if p.folder is None:
+            return (0, p.start_year or 0, p.id)
+        day = p.folder.date.toordinal() if p.folder.date else 0
+        return (1, -day, p.id)
+
+    return sorted(items, key=key)
+
+
+def save_period(
+    person_id: int, name: str, start: int | None, end: int | None, period_id: int | None = None
+) -> int:
+    with session_scope() as s:
+        p = s.get(Period, period_id) if period_id else Period(person_id=person_id)
+        if period_id is None:
+            s.add(p)
+        p.name, p.start_year, p.end_year = name, start, end
+        s.flush()
+        return p.id
+
+
+def delete_period(period_id: int) -> None:
+    with session_scope() as s:
+        if p := s.get(Period, period_id):
+            s.delete(p)
 
 
 def folder_of_period(period_id: int | None) -> tuple[int, str] | None:

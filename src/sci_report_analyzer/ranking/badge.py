@@ -11,7 +11,6 @@ from ..i18n import N_, Labels, _
 from . import tracks
 from .matcher import Record, record_key
 
-SOURCES = ("scimago", "core", "jcr", "openalex", "predatory", "manual", "archival")
 TOGGLABLE_SOURCES = ("scimago", "core", "jcr", "openalex", "predatory")
 SOURCE_LABELS = Labels(
     {
@@ -36,7 +35,6 @@ class Badge:
     hindex: int | None = None
     coreRank: str | None = None
     coreEdition: str | None = None
-    coreId: str | None = None
     # Rank in each CORE edition listing the conference ({"CORE2018": "A", ...}).
     coreHistory: dict[str, str] | None = None
     # Scimago: the year of its fields, and its quartile each year ({"2021": "Q2", ...}).
@@ -44,14 +42,12 @@ class Badge:
     sjrHistory: dict[str, str] | None = None
     impactFactor: float | None = None
     twoYearMeanCitedness: float | None = None
-    worksCount: int | None = None
     score: float = 1.0
     exact: bool = True
     url: str | None = None
     recordKey: str | None = None
     corrected: bool = False
     predatory: bool = False
-    predatoryUrl: str | None = None
     findings: bool = False
     manual: bool = False
     archival: bool = False
@@ -205,7 +201,6 @@ def badge_from_record(rec: Record, score: float, exact: bool) -> Badge:
         hindex=rec.get("hindex"),
         coreRank=rec.get("coreRank"),
         coreEdition=rec.get("coreEdition"),
-        coreId=rec.get("coreId"),
         coreHistory=rec.get("coreHistory"),
         impactFactor=rec.get("impactFactor"),
         score=score,

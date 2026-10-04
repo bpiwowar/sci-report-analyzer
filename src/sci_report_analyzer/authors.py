@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Iterable
 
-_COMBINING = re.compile("[̀-ͯ]")
+from .text import ascii_key, strip_diacritics
 
 
 def natural_order(name: str) -> str:
@@ -22,9 +21,9 @@ def natural_order(name: str) -> str:
             return f"{first} {last}"
     words = name.split()
 
-    def caps(w: str) -> bool:
+    def caps(w: str) -> bool:  # (not initials: "R.L. Gordon")
         letters = [c for c in w if c.isalpha()]
-        return len(letters) >= 2 and all(c.isupper() for c in letters)
+        return len(letters) >= 2 and all(c.isupper() for c in letters) and "." not in w
 
     upper = [w for w in words if caps(w)]
     if upper and len(upper) < len(words):
@@ -33,7 +32,7 @@ def natural_order(name: str) -> str:
 
 
 def _fold(name: str) -> list[str]:
-    s = _COMBINING.sub("", unicodedata.normalize("NFD", natural_order(name))).lower()
+    s = strip_diacritics(natural_order(name)).lower()
     return [p for p in re.sub(r"[^a-z\s]", " ", s).split() if p]
 
 
@@ -43,6 +42,13 @@ def name_key(name: str) -> tuple[str, str]:
     if not parts:
         return "", ""
     return parts[-1], parts[0][0]
+
+
+def surname(name: str) -> str:
+    """The surname, whatever the order of the name ("Jane Doe", "Doe, Jane", "DOE Jane"),
+    in lowercase ASCII, its parts joined ("Kronland-Martinet": "kronlandmartinet")."""
+    words = [ascii_key(w) for w in natural_order(name).split()]
+    return next((w for w in reversed(words) if w), "")
 
 
 def same_author(a: str, b: str) -> bool:

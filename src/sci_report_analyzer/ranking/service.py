@@ -18,6 +18,7 @@ from ..db.models import AppSetting, JcrRecord, VenueCache, utcnow
 from ..db.session import session_scope
 from ..sources.base import SourceError, user_agent
 from ..sources.openalex import params as openalex_params
+from ..text import safe_compile
 from . import datasets, detection, tracks
 from .badge import (
     FINDINGS_RE,
@@ -35,7 +36,6 @@ from .normalize import (
     default_rules,
     is_non_venue,
     normalize,
-    safe_compile,
     tokenize,
     tokens_match,
     without_ordinal_marks,
@@ -393,7 +393,6 @@ class RankingService:
             type="conference" if s.get("type") == "conference" else "journal",
             hindex=stats.get("h_index"),
             twoYearMeanCitedness=stats.get("2yr_mean_citedness"),
-            worksCount=s.get("works_count"),
             score=self.settings.openalex_score,
             exact=False,
             url=s.get("homepage_url") or s.get("id"),
@@ -550,7 +549,6 @@ class RankingService:
                 exact=ph.exact,
             )
         badge.predatory = True
-        badge.predatoryUrl = ph.record.get("url")
         return badge
 
     def candidates(self, raw: str, issn: str | None = None, limit: int = 8) -> list[Badge]:

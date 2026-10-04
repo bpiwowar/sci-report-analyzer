@@ -1,6 +1,6 @@
 from datetime import date
 
-from helpers import add_source, make_person, pub
+from helpers import add_source, make_person, pub, toggle_star
 
 from sci_report_analyzer import annotations, folders
 
@@ -47,7 +47,7 @@ def test_folder_stars_are_per_person_and_folder():
     f1 = folders.save_folder(None, "F1")
     f2 = folders.save_folder(None, "F2")
     p1, p2 = folders.add_person(f1, a), folders.add_person(f2, a)
-    annotations.toggle_star(p1, pub_id)
+    toggle_star(p1, pub_id)
     stars = {f.name: f.members[0].stars for f in folders.folders()}
     assert stars == {"F1": 1, "F2": 0}
     assert p2 != p1

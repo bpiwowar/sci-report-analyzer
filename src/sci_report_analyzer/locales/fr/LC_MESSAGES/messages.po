@@ -4853,6 +4853,15 @@ msgstr "expression régulière invalide"
 msgid "it is restricted to {sources}"
 msgstr "elle est limitée à {sources}"
 
+#, python-brace-format
+msgid ""
+"it was exported by an older version of the app (format {version}): only "
+"files of format {min} or later can be imported"
+msgstr ""
+"il a été exporté par une version plus ancienne de l’application (format "
+"{version}) : seuls les fichiers au format {min} ou ultérieur peuvent être "
+"importés"
+
 msgid "it's them"
 msgstr "c'est la personne"
 

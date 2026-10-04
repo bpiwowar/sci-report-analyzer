@@ -33,6 +33,7 @@ from .db.models import (
     VenueText,
 )
 from .db.session import session_scope
+from .ranking.matcher import issn_key
 from .ranking.normalize import is_non_venue
 from .ranking.service import VenuePattern, service
 
@@ -56,8 +57,7 @@ class TextMatch:
     conflicts: tuple[int, ...] = field(default=())
 
 
-def norm_issn(issn: str | None) -> str | None:
-    return issn.replace("-", "").strip().upper() or None if issn else None
+norm_issn = issn_key  # (its former name)
 
 
 # ---- variants ------------------------------------------------------------------------------
@@ -253,41 +253,16 @@ def manual_counts() -> dict[str, int]:
 
 
 def clear_manual(*, venues: bool, papers: bool) -> dict[str, int]:
-    """Erase the manual decisions on the venues (kind, level, record, search text, short
-    name, venue rules, identifiers, variants set by hand) and / or on the papers (venue,
-    validated source, rank, kind, track, year, author position, note), then recompute everything
-    automatically. Tags, stars, hidden papers and manual merges are kept."""
+    """Erase the manual decisions on the venues (``Venue.MANUAL_FIELDS`` and the variants
+    set by hand) and / or on the papers (``Publication.MANUAL_FIELDS``), then recompute
+    everything automatically. Tags, stars, hidden papers and manual merges are kept."""
     counts = manual_counts()
     with session_scope() as s:
         if venues:
-            s.execute(
-                update(Venue).values(
-                    kind_manual=False,
-                    level_type=None,
-                    level_rank=None,
-                    record_key=None,
-                    match_text=None,
-                    short_name=None,
-                    patterns=None,
-                    identifiers=None,
-                    joint=None,
-                )
-            )
+            s.execute(update(Venue).values(**Venue.MANUAL_FIELDS))
             s.execute(update(VenueKey).values(manual=False, track=None))
         if papers:
-            s.execute(
-                update(Publication).values(
-                    venue_manual=False,
-                    venue_source=None,
-                    rank_override=None,
-                    rank_note=None,
-                    kind_override=None,
-                    track_override=None,
-                    year_override=None,
-                    author_pos_override=None,
-                    note=None,
-                )
-            )
+            s.execute(update(Publication).values(**Publication.MANUAL_FIELDS))
     reset_automatic()
     return {
         "venues": counts["venues"] + counts["variants"] if venues else 0,
@@ -359,7 +334,7 @@ def issn_venues() -> dict[str, int]:
     with session_scope() as s:
         for v in s.scalars(select(Venue).where(Venue.identifiers.is_not(None))):
             for issn in (v.identifiers or {}).get("issn") or []:
-                if n := norm_issn(issn):
+                if n := issn_key(issn):
                     out.setdefault(n, v.id)
     return out
 

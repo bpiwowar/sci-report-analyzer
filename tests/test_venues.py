@@ -1,6 +1,6 @@
 import asyncio
 
-from helpers import add_source, make_person, pub
+from helpers import add_source, make_person, pub, set_kind, set_level
 from sqlalchemy import select
 
 from sci_report_analyzer import pubview, sync, venues
@@ -77,7 +77,7 @@ def test_kind_default_level_unless_overridden():
     st = stats(pid)
     assert st["Paper A"].badge.coreRank == "C"
     assert st["Paper A"].badge.extra["kind_default"] == "natl_conference"
-    venues.set_level("Colloque de machin", "conference", "B")  # venue override wins
+    set_level("Colloque de machin", "conference", "B")  # venue override wins
     assert stats(pid)["Paper B"].badge.coreRank == "B"
 
 
@@ -91,7 +91,7 @@ def test_merge_venues_moves_variants_and_links():
     )
     st = stats(pid)
     a, b = st["Paper A"].venue_id, st["Paper B"].venue_id
-    venues.set_kind("Some Venue Alt", "natl_journal")
+    set_kind("Some Venue Alt", "natl_journal")
     venues.merge_venues(a, [b])
     with session_scope() as s:
         assert {k.key for k in s.get(Venue, a).keys} == {"some venue", "some venue alt"}
@@ -259,6 +259,15 @@ def test_issn_identifies_the_venue():
     assert a.venue_id == target and a.members[0].via == "identifier"
 
 
+def test_issns_saved_once_whatever_their_spelling():
+    pid = make_person()
+    add_source(pid, "hal", "idhal:x", [pub("a", "Paper A", 2020, "Venue One")])
+    vid = stats(pid)["Paper A"].venue_id
+    venues.save_issns(vid, ["1234-567X", " 1234567x", "", "2049-3630"])
+    with session_scope() as s:
+        assert s.get(Venue, vid).identifiers == {"issn": ["1234-567X", "2049-3630"]}
+
+
 def test_validated_source_settles_different_venues():
     from sci_report_analyzer import annotations
 
@@ -291,6 +300,58 @@ def test_clear_manual_decisions_by_level():
     assert venue_match.manual_counts() == {"venues": 0, "variants": 0, "papers": 0}
     a = stats(pid)["Paper A"]
     assert a.venue_id is not None and not (a.badge and a.badge.manual)
+
+
+def _set_every_manual_field(pid):
+    from sci_report_analyzer import annotations
+
+    add_source(
+        pid,
+        "hal",
+        "idhal:x",
+        [pub("a", "Paper A", 2020, "Venue One"), pub("b", "Paper B", 2020, "Venue Two")],
+    )
+    a, b = stats(pid)["Paper A"], stats(pid)["Paper B"]
+    venues.update_venue(
+        a.venue_id,
+        kind="intl_workshop",
+        level_type="conference",
+        level_rank="A",
+        record_key="core:x",
+        match_text="Venue",
+        short_name="VO",
+        url="https://venue.example.org",
+        patterns=[{"pattern": "venue one"}],
+    )
+    venues.save_issns(a.venue_id, ["12345678"])
+    venues.save_hosts(a.venue_id, [{"venue_id": b.venue_id}])
+    venues.update_venue(a.venue_id, short_name="")  # "no acronym", by hand
+    annotations.set_overrides(a.id, year_override=2019, note="n")
+    annotations.set_rank_override(a.id, {"record_key": "core:x"}, "why")
+    annotations.set_kind_override(a.id, "natl_journal")
+    annotations.set_doi(a.id, "10.1234/abc")
+    return a
+
+
+def test_clear_manual_clears_every_field():
+    from sci_report_analyzer import venue_match
+
+    a = _set_every_manual_field(make_person())
+    venue_match.clear_manual(venues=True, papers=True)
+    assert venue_match.manual_counts() == {"venues": 0, "variants": 0, "papers": 0}
+    with session_scope() as s:
+        v, p = s.get(Venue, a.venue_id), s.get(Publication, a.id)
+        assert v is None or not (v.has_manual or v.short_manual or v.hosts or v.url)
+        assert not p.has_overrides and p.doi_manual is None and p.rank_note is None
+
+
+def test_clear_manual_of_one_venue():
+    a = _set_every_manual_field(make_person())
+    venues.clear_manual(a.venue_id)
+    with session_scope() as s:
+        v = s.get(Venue, a.venue_id)
+        assert not v.has_manual and not v.short_manual
+        assert all(getattr(v, f) in (None, False) for f in v.MANUAL_FIELDS if f != "kind")
 
 
 def test_merge_conflicting_venues_keeps_rules_and_tracks():
@@ -1057,7 +1118,7 @@ def test_demo_track_merged_into_its_main_venue():
     )
     _stats(pid)
     main, demo = _venue_of("Main paper"), _venue_of("Demo paper")
-    venues.set_level("Conference on Widget Processing (WIDG)", "conference", "A*")
+    set_level("Conference on Widget Processing (WIDG)", "conference", "A*")
     rows = _rows()
     assert venues.guess_relation(rows[demo], rows[main]) == "~track:demo"
     assert venues.relate_venues(demo, [main], "~track:demo") == main
@@ -1073,7 +1134,7 @@ def test_mark_as_track_without_a_main_venue():
     add_source(pid, "hal", "h", [pub("d", "Demo paper", 2023, WIDG_DEMO)])
     _stats(pid)
     demo = _venue_of("Demo paper")
-    venues.set_level(WIDG_DEMO, "conference", "A*")
+    set_level(WIDG_DEMO, "conference", "A*")
     venues.mark_as_track(demo, "demo", tracks.conference_name("demo", WIDG_DEMO))
     with session_scope() as s:
         assert s.get(Venue, demo).name == "Conference on Widget Processing (WIDG)"

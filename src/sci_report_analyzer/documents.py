@@ -16,11 +16,13 @@ from typing import Any
 
 from sqlalchemy import select
 
-from .annotations import save_ui_state, ui_state
-from .db.models import AppSetting, Period, PeriodDocument, utcnow
+from .authors import name_key
+from .db.app_settings import delete_setting, get_setting, set_setting
+from .db.models import Period, PeriodDocument, utcnow
 from .db.session import session_scope
+from .files import atomic_write
 from .i18n import _
-from .pdfs import PdfError, _slug, is_pdf, pdf_dir
+from .pdfs import PdfError, is_pdf, pdf_dir, slug
 from .ranking.normalize import normalize
 
 SUBDIR = "documents"
@@ -49,16 +51,9 @@ def add(period_id: int, name: str, data: bytes) -> int:
         doc = PeriodDocument(period_id=period_id, name=name, path="")
         s.add(doc)
         s.flush()
-        doc.path = f"{SUBDIR}/{period.person_id}/{doc.id}-{_slug(name)}.pdf"
-        _write(pdf_dir() / doc.path, data)
+        doc.path = f"{SUBDIR}/{period.person_id}/{doc.id}-{slug(name)}.pdf"
+        atomic_write(pdf_dir() / doc.path, data)
         return doc.id
-
-
-def _write(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".part")
-    tmp.write_bytes(data)
-    tmp.replace(path)  # (never a half-written file)
 
 
 def save(doc_id: int, data: bytes) -> None:
@@ -69,7 +64,7 @@ def save(doc_id: int, data: bytes) -> None:
         doc = s.get(PeriodDocument, doc_id)
         if doc is None:
             raise PdfError(_("no such document"))
-        _write(pdf_dir() / doc.path, data)
+        atomic_write(pdf_dir() / doc.path, data)
         doc.edited_at = utcnow()
 
 
@@ -274,15 +269,15 @@ def _by_title(lines: list[dict[str, Any]], rows: list) -> list[Mention]:
 
 def _by_id(lines: list[dict[str, Any]], rows: list, near: list[Mention]) -> list[Mention]:
     """By DOI / HAL id, unless the title was found just before (the same reference)."""
-    from .reflist import _ids, _item
+    from .reflist import item_of, paper_ids
 
-    ids = {r.id: _ids(r) for r in rows}
+    ids = {r.id: paper_ids(r) for r in rows}
     seen: dict[int, list[int]] = {}
     for m in near:
         seen.setdefault(m.pub_id, []).append(m.line)
     out = []
     for i, ln in enumerate(lines):
-        item = _item(None, ln["t"])
+        item = item_of(None, ln["t"])
         if not (item.hal or item.doi):
             continue
         for r in rows:
@@ -458,10 +453,8 @@ _FIRST = re.compile(rf"({_AUTHOR})\s+(?:and|&)\s*$")
 
 
 def _surname(name: str) -> str:
-    """The surname of an author ("Jane Doe", "Doe, Jane"), normalized."""
-    name = name.split(",")[0] if "," in name else name
-    words = normalize(name).split()
-    return words[-1] if words else ""
+    """The surname of an author ("Jane Doe", "Doe, Jane", "DOE Jane"), normalized."""
+    return name_key(name)[0]
 
 
 def _author_years(
@@ -617,10 +610,10 @@ def reject(doc_id: int, m: Mention) -> None:
 
 def selection_item(text: str):
     """A selection of the document as a reference (reflist.Item) to look for."""
-    from .reflist import _item, _join
+    from .reflist import item_of, join_wrapped
 
-    joined = _join(text.splitlines())
-    return _item(None, _LABEL.sub("", joined, count=1) or joined)
+    joined = join_wrapped(text.splitlines())
+    return item_of(None, _LABEL.sub("", joined, count=1) or joined)
 
 
 # ---- Bookmarks (of a document, or of a paper's stored PDF) ----------------------------------
@@ -667,7 +660,7 @@ def _place_key(kind: str, key: int) -> str:
 def last_place(kind: str, key: int) -> dict[str, Any] | None:
     """Where the PDF of a document (``kind`` "doc") or of a paper ("pub") was last read:
     {"p": page, "zoom", "left", "top" (PDF units)}, or None."""
-    return ui_state(_place_key(kind, key))
+    return get_setting(_place_key(kind, key))
 
 
 def save_last_place(kind: str, key: int, place: dict[str, Any]) -> None:
@@ -678,13 +671,11 @@ def save_last_place(kind: str, key: int, place: dict[str, Any]) -> None:
     except (KeyError, TypeError, ValueError):
         return
     if p >= 1 and _ZOOM.fullmatch(zoom):
-        save_ui_state(_place_key(kind, key), {"p": p, "zoom": zoom, "left": left, "top": top})
+        set_setting(_place_key(kind, key), {"p": p, "zoom": zoom, "left": left, "top": top})
 
 
 def forget_place(kind: str, key: int) -> None:
-    with session_scope() as s:
-        if row := s.get(AppSetting, _place_key(kind, key)):
-            s.delete(row)
+    delete_setting(_place_key(kind, key))
 
 
 def place_hash(place: dict[str, Any] | None) -> str:
