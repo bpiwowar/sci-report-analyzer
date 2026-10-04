@@ -16,9 +16,9 @@ from typing import Any
 
 from sqlalchemy import select
 
-from .annotations import save_ui_state, ui_state
 from .authors import name_key
-from .db.models import AppSetting, Period, PeriodDocument, utcnow
+from .db.app_settings import delete_setting, get_setting, set_setting
+from .db.models import Period, PeriodDocument, utcnow
 from .db.session import session_scope
 from .i18n import _
 from .pdfs import PdfError, _slug, is_pdf, pdf_dir
@@ -666,7 +666,7 @@ def _place_key(kind: str, key: int) -> str:
 def last_place(kind: str, key: int) -> dict[str, Any] | None:
     """Where the PDF of a document (``kind`` "doc") or of a paper ("pub") was last read:
     {"p": page, "zoom", "left", "top" (PDF units)}, or None."""
-    return ui_state(_place_key(kind, key))
+    return get_setting(_place_key(kind, key))
 
 
 def save_last_place(kind: str, key: int, place: dict[str, Any]) -> None:
@@ -677,13 +677,11 @@ def save_last_place(kind: str, key: int, place: dict[str, Any]) -> None:
     except (KeyError, TypeError, ValueError):
         return
     if p >= 1 and _ZOOM.fullmatch(zoom):
-        save_ui_state(_place_key(kind, key), {"p": p, "zoom": zoom, "left": left, "top": top})
+        set_setting(_place_key(kind, key), {"p": p, "zoom": zoom, "left": left, "top": top})
 
 
 def forget_place(kind: str, key: int) -> None:
-    with session_scope() as s:
-        if row := s.get(AppSetting, _place_key(kind, key)):
-            s.delete(row)
+    delete_setting(_place_key(kind, key))
 
 
 def place_hash(place: dict[str, Any] | None) -> str:

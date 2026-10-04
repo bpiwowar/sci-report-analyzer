@@ -26,8 +26,7 @@ from lark.exceptions import (
     VisitError,
 )
 
-from .db.models import AppSetting
-from .db.session import session_scope
+from .db.app_settings import get_setting, set_setting
 from .i18n import _
 
 if TYPE_CHECKING:
@@ -251,9 +250,7 @@ def role(s: PubStat, cfg: Config) -> str | None:
 
 
 def load_config() -> Config:
-    with session_scope() as s:
-        row = s.get(AppSetting, KEY)
-        saved = dict(row.value or {}) if row else {}
+    saved = dict(get_setting(KEY) or {})
     if not saved.get("roles"):
         return default_config()
     return Config(
@@ -284,8 +281,7 @@ def validate(cfg: Config) -> None:
 
 def save_config(cfg: Config) -> None:
     validate(cfg)
-    with session_scope() as s:
-        s.merge(AppSetting(key=KEY, value=asdict(cfg)))
+    set_setting(KEY, asdict(cfg))
 
 
 def copy(cfg: Config) -> Config:

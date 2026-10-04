@@ -13,7 +13,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from . import venue_match
-from .db.models import AppSetting, Publication, SourceLink, SourcePub, Venue, VenueKey, utcnow
+from .db.app_settings import get_setting, set_setting
+from .db.models import Publication, SourceLink, SourcePub, Venue, VenueKey, utcnow
 from .db.session import session_scope
 from .i18n import _
 from .ranking.badge import (
@@ -1007,16 +1008,13 @@ PROPOSAL_SCORE = 0.5
 
 def not_same_pairs() -> set[tuple[int, int]]:
     """Pairs of venues said not to be the same (smallest id first)."""
-    with session_scope() as s:
-        row = s.get(AppSetting, NOT_SAME_KEY)
-        return {(a, b) for a, b in (row.value if row else [])}
+    return {(a, b) for a, b in get_setting(NOT_SAME_KEY, [])}
 
 
 def set_not_same(a: int, b: int) -> None:
     """Never propose to merge these two venues again."""
     pairs = not_same_pairs() | {(min(a, b), max(a, b))}
-    with session_scope() as s:
-        s.merge(AppSetting(key=NOT_SAME_KEY, value=sorted([a, b] for a, b in pairs)))
+    set_setting(NOT_SAME_KEY, sorted([a, b] for a, b in pairs))
 
 
 def merge_proposals(rows: list[VenueRow]) -> list[tuple[VenueRow, VenueRow, float]]:

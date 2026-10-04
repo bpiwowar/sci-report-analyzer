@@ -70,23 +70,16 @@ def language() -> str:
 
 def load_language() -> None:
     """The language of the settings (the environment's, if set)."""
-    from .db.models import AppSetting
-    from .db.session import session_scope
+    from .db.app_settings import get_setting
 
-    lang = os.environ.get(ENV)
-    if not lang:
-        with session_scope() as s:
-            row = s.get(AppSetting, SETTING_KEY)
-            lang = (row.value or {}).get("lang") if row else None
+    lang = os.environ.get(ENV) or (get_setting(SETTING_KEY) or {}).get("lang")
     set_language(lang)
 
 
 def save_language(lang: str) -> None:
-    from .db.models import AppSetting
-    from .db.session import session_scope
+    from .db.app_settings import set_setting
 
-    with session_scope() as s:
-        s.merge(AppSetting(key=SETTING_KEY, value={"lang": lang}))
+    set_setting(SETTING_KEY, {"lang": lang})
     set_language(lang)
 
 
