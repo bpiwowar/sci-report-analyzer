@@ -1224,14 +1224,25 @@ def venue_dialog(
         card.style("max-height: 90vh; overflow-y: auto")
         nav = _VenueNav(dlg, row, done, back)
         identity = _identity_fields(row, all_rows, state, nav)
+        related = (
+            venues.related_conferences(row.id) if row.kind in venues.CONFERENCE_KINDS else None
+        )
         with ui.tabs().classes("w-full").props("align=left dense") as tabs:
             t_rank = ui.tab("ranking", _("Name and ranking")).mark("venue-tab-ranking")
+            if related is not None:
+                n = len(related.workshops) + len(related.joint)
+                ui.tab("related", _("Related conferences ({n})").format(n=n)).mark(
+                    "venue-tab-related"
+                )
             ui.tab("matching", _("Matching (rules and variants)")).mark("venue-tab-matching")
             ui.tab("merge", _("Merge with other venues")).mark("venue-tab-merge")
         nav.tabs = tabs
         with ui.tab_panels(tabs, value=tab or t_rank).classes("w-full"):
             with ui.tab_panel("ranking").classes("q-px-none"):
                 ranking = _ranking_tab(row, state, nav)
+            if related is not None:
+                with ui.tab_panel("related").classes("q-px-none"):
+                    _related_tab(related, nav)
             with ui.tab_panel("matching").classes("q-px-none"):
                 matching = _matching_tab(row, state, nav)
             with ui.tab_panel("merge").classes("q-px-none"):
@@ -1262,6 +1273,46 @@ def venue_dialog(
             ).props("flat color=negative").mark("venue-clear-manual")
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(_("Save"), on_click=save).mark("venue-save")
+
+
+def _years(lo: int | None, hi: int | None) -> str:
+    """A span of years, either end open ("" when both are)."""
+    if lo is None and hi is None:
+        return ""
+    if lo == hi:
+        return str(lo)
+    return f"{lo or '…'}–{hi or '…'}"
+
+
+def _related_tab(related: venues.RelatedConferences, nav: _VenueNav) -> None:
+    """A conference's workshops and the joint conferences including it (each set in their
+    own dialog)."""
+    sections = [
+        (
+            _("Workshops"),
+            _("Workshops whose main conference this is (set in the workshop's dialog)."),
+            [(vid, name, _years(lo, hi)) for vid, name, lo, hi in related.workshops],
+            "workshop",
+        ),
+        (
+            _("Joint conferences"),
+            _("Joint conferences including this one (set in the joint conference's dialog)."),
+            [(vid, name, "") for vid, name in related.joint],
+            "joint",
+        ),
+    ]
+    for title, hint, items, mark in sections:
+        with ui.column().classes("w-full gap-0 q-mb-md").mark(f"venue-related-{mark}s"):
+            ui.label(f"{title} ({len(items)})").classes("text-subtitle2")
+            ui.label(hint).classes("text-xs text-grey")
+            if not items:
+                ui.label(_("None.")).classes("text-sm text-grey")
+            for vid, name, years in items:
+                with ui.row().classes("items-center gap-2 no-wrap"):
+                    _open_button(nav.go, vid, f"venue-related-{mark}-{vid}")
+                    ui.label(name).classes("text-sm")
+                    if years:
+                        ui.label(years).classes("text-xs text-grey")
 
 
 def _identity_fields(

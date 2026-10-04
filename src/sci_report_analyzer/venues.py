@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from . import venue_match
@@ -1240,6 +1240,31 @@ def conflicts() -> list[tuple[str, str, list[int]]]:
         for m in venue_match.matches().values()
         if m.conflicts and m.venue_id
     ]
+
+
+@dataclass
+class RelatedConferences:
+    """A conference's workshops ((venue id, name, from, to): the years it is their main
+    conference, included, either one open) and the joint conferences including it ((venue
+    id, name))."""
+
+    workshops: list[tuple[int, str, int | None, int | None]] = field(default_factory=list)
+    joint: list[tuple[int, str]] = field(default_factory=list)
+
+
+def related_conferences(venue_id: int) -> RelatedConferences:
+    out = RelatedConferences()
+    with session_scope() as s:
+        others = s.scalars(
+            select(Venue).where(or_(Venue.hosts.is_not(None), Venue.joint.is_not(None)))
+        )
+        for v in sorted(others, key=lambda v: v.name.casefold()):
+            for h in v.hosts or []:
+                if h.get("venue_id") == venue_id:
+                    out.workshops.append((v.id, v.name, h.get("from"), h.get("to")))
+            if venue_id in v.parts:
+                out.joint.append((v.id, v.name))
+    return out
 
 
 # ---- venue rules and identifiers ----------------------------------------------------------
