@@ -24,6 +24,19 @@ track) conflicts with it: never save a rule in conflict with variants. Ask the u
 remove those variants (they take the rule's track), or edit the regex so that it no
 longer matches them.
 
+## Tracks: follow-ups
+
+- Publications panel: a track filter (the flag filter is gone).
+- A new track's id (from its English name, fixed afterwards): ensure it is unique, and
+  warn the user that it cannot be changed later.
+- Settings import: validate the mapping of the file's tracks to the local ones (which
+  are added, removed, kept), shown to the user before applying, instead of silently
+  keeping the local tracks the file lacks.
+- "Mark as a track" (a venue that is a track of a conference with no venue of its
+  own) proposes the conference's name with the track part removed
+  (`venues.track_free_name`), using a hard-coded list of track words: use the tracks'
+  own rules instead, so that added tracks are handled too.
+
 ## PDF viewer: the restart notice
 
 With `--live-reload`, the "restart" offer (a new version of the code) must also show on
