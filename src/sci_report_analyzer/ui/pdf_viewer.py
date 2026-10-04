@@ -164,7 +164,6 @@ def register() -> None:
             pane=pane,
         )
         side.attach(box)
-        side.folder_notes()
         with side.section("notes", "sell", _("Tags and notes"), fill=True):
             tags_box = ui.column().classes("w-full gap-2").mark("pdf-notes")
             with tags_box:
@@ -175,6 +174,7 @@ def register() -> None:
                 ui.spinner()
         with side.section("bookmarks", "bookmarks", _("Bookmarks")):
             side.bookmarks = bookmarks_section("pub", pub_id)
+        side.folder_notes()  # (last: the paper's own first)
         side.on_attach.append(lambda: _side(side, tags_box, details_box, pub_id))
         ui.timer(0.05, lambda: _side(side, tags_box, details_box, pub_id), once=True)
 
