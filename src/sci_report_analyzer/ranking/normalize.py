@@ -219,18 +219,28 @@ LANGUAGE_RULES: tuple[NormRule, ...] = (
     ),
 )
 
-# The front matter of a DOI record's title (it names the volume: "Proceedings of the 2018
-# Conference on …"); its year and ordinal go with their own rules. Not for the other
-# sources: "Proceedings of Machine Learning Research" is a series' name.
+# The front matter of a proceedings' title ("Proceedings of the 2018 Conference on …"); its
+# year and ordinal go with their own rules. Not of a journal's or a series' name
+# ("Proceedings of the IEEE", "Proceedings of Machine Learning Research").
+PROCEEDINGS_OF = (
+    r"^\s*(?:companion\s+)?proceedings\s+of\s+(?:the\s+)?"
+    r"(?=(?:(?:19|20)\d{2}|\d+(?:st|nd|rd|th)|{ordinals:en})\b"
+    r"|\S+\s+(?:19|20)\d{2}\b"  # an edition ("COLING 2012")
+    r"|.*\b(?:conferences?|workshops?|symposium|meeting|congress|colloquium|forum|summit)\b)"
+)
+
 PREFIX_RULES: tuple[NormRule, ...] = (
     NormRule(
         id="proceedingsOf",
         name="Proceedings of",
-        description="Remove a leading “Proceedings of (the)” (or “Companion proceedings of”).",
-        pattern=r"^\s*(?:companion\s+)?proceedings\s+of\s+(?:the\s+)?",
+        description="Remove a leading “Proceedings of (the)” (or “Companion proceedings of”) "
+        "before a conference's name: followed by a year, an ordinal or an edition (“COLING "
+        "2012”), or naming a conference, workshop, symposium, meeting… (“Proceedings of the "
+        "IEEE” is kept).",
+        pattern=PROCEEDINGS_OF,
         replacement="",
         ignore_case=True,
-        sources=["doi"],
+        language="en",
         example="Proceedings of the 2018 Conference on Widgets: System Demonstrations",
     ),
     NormRule(
@@ -240,7 +250,7 @@ PREFIX_RULES: tuple[NormRule, ...] = (
         pattern=r"^\s*the\s+",
         replacement="",
         ignore_case=True,
-        sources=["doi"],
+        language="en",
         example="The Journal of Widget Studies",
     ),
 )

@@ -157,8 +157,10 @@ def test_venue_text_of_doi_containers():
     demo = "Proceedings of the 2018 Conference on Widgets: System Demonstrations"
     assert v(demo) == demo and detect_track(demo) == "demo"
     assert service.key(demo, "doi") == "conference on widgets system demonstrations"
-    assert service.key("The Journal of Widget Studies", "doi") == "journal of widget studies"
-    assert service.key("Proceedings of Widget Research", "dblp") == "proceedings of widget research"
+    assert service.key("The Journal of Widget Studies", "hal") == "journal of widget studies"
+    # A journal's or a series' name: kept.
+    assert service.key("Proceedings of Widget Research", "doi") == "proceedings of widget research"
+    assert service.key("Proceedings of WIDG 2012", "orcid") == "widg"
     assert doi.anthology_acronym("10.18653/v1/2022.acl-long.583") == "ACL"
     assert doi.anthology_acronym("10.18653/v1/p17-2035") == "ACL"
     assert doi.anthology_acronym("10.18653/v1/w18-6403") is None  # workshops vary

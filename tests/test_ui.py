@@ -808,8 +808,10 @@ async def test_language_cleaning_rules(user: User) -> None:
     user.find("norm-en-save").click()
     await user.should_see("Cleaning rules saved")
     rules = load_settings().norm_rules
-    assert [(r.id, r.language) for r in rules[:3]] == [
+    assert [(r.id, r.language) for r in rules[:5]] == [
         ("custom1en", "en"),
+        ("proceedingsOf", "en"),
+        ("leadingThe", "en"),
         ("ordinalsEn", "en"),
         ("ordinalsFr", "fr"),
     ]
