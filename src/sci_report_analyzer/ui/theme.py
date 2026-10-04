@@ -310,6 +310,14 @@ def source_tag(source: str, archival: bool = False, url: str | None = None) -> u
     return tag
 
 
+def int_or_none(v) -> int | None:
+    """An input's integer (a number, or its text), else None (empty, or not a number)."""
+    try:
+        return int(v) if v not in (None, "") else None
+    except ValueError:
+        return None
+
+
 def fmt_dt(dt) -> str:
     return dt.strftime("%Y-%m-%d %H:%M") if dt else "—"
 

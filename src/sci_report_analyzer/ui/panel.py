@@ -39,7 +39,16 @@ from .pdf_viewer import download_dialog, pdf_button, watch
 from .pub_details import open_details, source_badge
 from .reflist import tag_from_list
 from .tags import tag_chip, tags_dialog
-from .theme import DIM_OPACITY, NOTE_EXTRAS, author_html, rank_chip, span, stripes, track_chip
+from .theme import (
+    DIM_OPACITY,
+    NOTE_EXTRAS,
+    author_html,
+    int_or_none,
+    rank_chip,
+    span,
+    stripes,
+    track_chip,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +56,6 @@ DISCLAIMER = N_(
     "These rankings rate the venue (journal / conference), not the quality or impact "
     "of any individual paper."
 )
-
-
-def _int(v: str | None) -> int | None:
-    try:
-        return int(v) if v not in (None, "") else None
-    except ValueError:
-        return None
 
 
 def encode_sels(sels: list[Sel]) -> str:
@@ -181,21 +183,21 @@ class PublicationsPanel:
 
     def _from_query(self, q: dict[str, str]) -> None:
         if "tags" in q:
-            self.tag_filter = self._known_tags(_int(x) for x in q["tags"].split(","))
+            self.tag_filter = self._known_tags(int_or_none(x) for x in q["tags"].split(","))
         elif "starred" in q and self.period_id:  # earlier links
             self.tag_filter = [self.starred_id] if q["starred"] == "1" else []
         self.track_filter = [t for t in q.get("tracks", "").split(",") if t]
         if "from" in q:
-            self.lo = _int(q["from"])
+            self.lo = int_or_none(q["from"])
         if "to" in q:
-            self.hi = _int(q["to"])
+            self.hi = int_or_none(q["to"])
         self.text = q.get("q", "")
         self.hide_preprints = q.get("nopre") == "1"
         self.show_hidden = q.get("hidden") == "1"
         self.problems_only = q.get("problems") == "1"
         self.manual_only = q.get("manual") == "1"
-        self.venue_filter = _int(q.get("venue", "")) or None
-        self.open_pub = _int(q.get("pub", "")) or None
+        self.venue_filter = int_or_none(q.get("venue", "")) or None
+        self.open_pub = int_or_none(q.get("pub", "")) or None
         self.sels = decode_sels(q.get("sel"))
 
     def url_params(self) -> dict[str, str]:
@@ -482,7 +484,7 @@ class PublicationsPanel:
             ).classes("w-48").tooltip(_("Period of interest"))
 
             def set_year(which: str, v) -> None:
-                setattr(self, which, int(v) if v not in (None, "") else None)
+                setattr(self, which, int_or_none(v))
                 self.sels = []
                 self.render()
 

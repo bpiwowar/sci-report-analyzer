@@ -11,6 +11,7 @@ from .. import categories, folders
 from ..i18n import _, ngettext
 from .colours import ColourMenu
 from .dialogs import actions, transient_dialog
+from .theme import int_or_none
 
 # Drag and drop: where a category is dropped (onto the top / middle / bottom of another).
 _WHERE = (
@@ -34,10 +35,6 @@ _DROP = (
     " e.currentTarget.style.background = '';"
     " emit({id: +e.dataTransfer.getData('text/plain'), where: w}); }"
 )
-
-
-def _int(v) -> int | None:
-    return int(v) if v not in (None, "") else None
 
 
 def shared_note(folder_id: int) -> None:
@@ -123,7 +120,7 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                     )
 
                     def save(_e=None, n=n, t=title, a=start, b=end) -> None:
-                        categories.update(n.id, t.value, _int(a.value), _int(b.value))
+                        categories.update(n.id, t.value, int_or_none(a.value), int_or_none(b.value))
                         if changed:
                             changed()
 

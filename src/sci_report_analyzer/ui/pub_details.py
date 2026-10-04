@@ -44,6 +44,7 @@ from .dialogs import actions, close, confirm, ok_handler, transient_dialog
 from .theme import (
     author_html,
     badge_details,
+    int_or_none,
     level_hint,
     level_legend,
     level_options,
@@ -996,7 +997,7 @@ def _corrections_section(s: PubStat, done) -> None:
             annotations.set_overrides(
                 s.id,
                 year_override=int(year.value) if year.value else None,
-                author_pos_override=int(pos.value) if pos.value not in (None, "") else None,
+                author_pos_override=int_or_none(pos.value),
             )
             done(_("Corrections saved (kept on re-sync)"))
 
