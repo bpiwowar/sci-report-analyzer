@@ -18,3 +18,8 @@ prefilled from its cleaned text, to edit) so that its near variants match too.
 The variants the rule matches are then redundant: remove them automatically when the
 rule is saved (and when any venue rule is edited), with a short message ("3 variants now
 matched by the rule were removed").
+
+A variant matched by the rule but with another track (a demo variant, a rule without
+track) conflicts with it: never save a rule in conflict with variants. Ask the user:
+remove those variants (they take the rule's track), or edit the regex so that it no
+longer matches them.
