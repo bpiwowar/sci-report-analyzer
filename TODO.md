@@ -66,11 +66,6 @@ panel): it does not work (no effect, no tooltip).
 If the bundled PDF.js supports it, enable its "note" (comment) annotation tool along with
 highlighting (check the PDF.js version and its editor modes / `annotationEditorMode`).
 
-## PDF viewer: the editor pane
-
-- The editor pane in a separate window (e.g. on another screen), kept in sync with the PDF
-  window (quotes, positions).
-
 ## Folders (after the folder-wide notes above)
 
 - Mark some papers of a folder with tags (e.g. "starred"); several tags, each with its

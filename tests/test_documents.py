@@ -240,7 +240,7 @@ async def test_bookmarks_and_selection(user: User, monkeypatch, tmp_path):
         "y": 640.0,
         "text": "Publications",
     }
-    user.javascript_rules[re.compile(r"vrPdf\.selection\(\)")] = lambda _: selection
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
     await user.open(f"/doc/{doc}")
     await user.should_see(marker=f"doc-paper-{ids['a']}")
     user.find(marker="pdf-bookmark").click()
@@ -606,7 +606,7 @@ async def test_excerpt_from_an_area(user: User, monkeypatch, tmp_path):
     _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     selection = {"text": "", "p": 2, "rects": [[60.5, 400, 320, 520.2, 2]], "area": True}
-    user.javascript_rules[re.compile(r"vrPdf\.selection\(\)")] = lambda _: selection
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
     await user.open(f"/doc/{doc}")
     await user.should_see(marker="pdf-area")
     # Without text in it: nothing to file.
@@ -637,7 +637,7 @@ async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
     _viewer(monkeypatch, tmp_path)
     doc = documents.add(period, "Application.pdf", PDF)
     documents.set_lines(doc, LINES)
-    user.javascript_rules[re.compile(r"vrPdf\.selection\(\)")] = lambda _: {
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: {
         "text": "Our ranking model beats sparse ones",
         "p": 1,
         "rects": [[72, 680, 300, 690]],
@@ -705,7 +705,7 @@ async def test_excerpts_in_the_viewer(user: User, monkeypatch, tmp_path):
     await user.should_not_see(marker=f"excerpt-part-{e.id}")
     assert all(x.id != e.id for x in categories.excerpts(period))
     # Selected again (elsewhere): might be already an excerpt, merged with it as a reference.
-    user.javascript_rules[re.compile(r"vrPdf\.selection\(\)")] = lambda _: {
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: {
         "text": "Our ranking model: it beats sparse ones",
         "p": 2,
         "rects": [[72, 600, 300, 610]],
@@ -978,3 +978,92 @@ async def test_folder_notes_sync(user: User):
     folder_notes._editors()[folder] = {clean, saver, same}  # (as the registry's sets)
     folder_notes.saved(folder, "new", saver)
     assert seen == ["new"]  # (the other one only: not the saver, not the one up to date)
+
+
+def _page_event(user: User, name: str, args) -> None:
+    """An event of the page (ui.on: ``name`` camel-cased), as sent by its JavaScript."""
+    layout = user.client.layout
+    [lid] = [i for i, x in layout._event_listeners.items() if x.type == name]
+    layout._handle_event({"listener_id": lid, "args": args})
+
+
+async def test_side_panel_in_another_window(user: User, monkeypatch, tmp_path):
+    """The side panel in its own window (the pane, its PDF window's token in the URL): its
+    tabs without the PDF, its questions to the PDF (the selection) as in the PDF window."""
+    _, period, ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "Our ranking model beats sparse ones", "p": 1}
+    user.javascript_rules[re.compile(r"vrPdf\.quoted\(\)")] = lambda _: selection
+    inserted = []
+    monkeypatch.setattr(MarkdownEditor, "insert_block", lambda self, text: inserted.append(text))
+    await user.open(f"/doc/{doc}?pane=k3y9token")
+    await user.should_see(marker="pane-back")
+    await user.should_see(marker="doc-note")
+    await user.should_see(marker="folder-note")
+    await user.should_not_see(marker="pdf-frame")
+    await user.should_not_see(marker="pdf-pane")
+    user.find(marker="note-quote").click()  # (the folder's first: names its source)
+    for _i in range(50):
+        if inserted:
+            break
+        await asyncio.sleep(0.02)
+    assert inserted == [
+        f"> Our ranking model beats sparse ones ([Application, p. 1](/doc/{doc}?page=1))"
+    ]
+    # A paper's: its notes (the period's too).
+    pdfs.save(ids["a"], PDF, None)
+    await user.open(f"/pdf/{ids['a']}?period={period}&pane=k3y9token")
+    await user.should_see(marker="period-note")
+    await user.should_not_see(marker="pdf-frame")
+    # Not a token: the PDF window itself.
+    await user.open(f"/doc/{doc}?pane=<script>")
+    await user.should_see(marker="pdf-frame")
+    await user.should_see(marker="pdf-pane")
+
+
+async def test_side_panel_detached_and_back(user: User, monkeypatch, tmp_path):
+    """While the side panel is in another window: hidden in the PDF window, the header's
+    actions sent there; back, up to date (the note edited there)."""
+    from nicegui import Client
+
+    scripts = []
+    run = Client.run_javascript
+    monkeypatch.setattr(
+        Client,
+        "run_javascript",
+        lambda self, code, **kw: (scripts.append(code), run(self, code))[1],
+    )
+    _, period, _ids = _person()
+    _viewer(monkeypatch, tmp_path)
+    doc = documents.add(period, "Application.pdf", PDF)
+    user.javascript_rules[re.compile(r"vrPdf\.location\(\)")] = lambda _: {
+        "p": 2,
+        "y": None,
+        "text": "",
+    }
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="doc-note")
+    [side] = user.find(marker="pdf-side").elements
+    _page_event(user, "vrPane", True)
+    for _i in range(50):
+        if not side.visible:
+            break
+        await asyncio.sleep(0.02)
+    assert not side.visible
+    user.find(marker="pdf-bookmark").click()  # (in the pane: sent there)
+    for _i in range(50):
+        if any("vrPane.emit" in c for c in scripts):
+            break
+        await asyncio.sleep(0.02)
+    assert 'vrPane.emit("vr-pdf-bookmark")' in scripts
+    assert documents.bookmarks("doc", doc) == []
+    documents.set_note(doc, "Edited in the pane")
+    _page_event(user, "vrPane", False)
+    for _i in range(50):
+        if side.visible and user.find(marker="doc-note").elements.pop().value.strip():
+            break
+        await asyncio.sleep(0.02)
+    assert user.find(marker="doc-note").elements.pop().value == "Edited in the pane"
+    user.find(marker="pdf-bookmark").click()  # (here again)
+    await user.should_see(marker="bookmark-0")
