@@ -34,6 +34,7 @@ class Node:
     start_year: int | None
     end_year: int | None
     children: list[Node] = field(default_factory=list)
+    influence: bool = False  # (the folder's "rayonnement": see set_influence)
 
     @property
     def years(self) -> str:
@@ -61,6 +62,7 @@ def tree(folder_id: int) -> list[Node]:
         for c in kids.get(parent, []):
             path = f"{prefix} › {c.name}" if prefix else c.name
             n = Node(c.id, c.name, c.parent_id, depth, path, c.start_year, c.end_year)
+            n.influence = bool(c.influence)
             out.append(n)
             n.children = walk(c.id, depth + 1, path)
             nodes.append(n)
@@ -100,6 +102,14 @@ def update(
             if name is not None and name.strip():
                 c.name = name.strip()
             c.start_year, c.end_year = start, end
+
+
+def set_influence(folder_id: int, cat_id: int | None) -> None:
+    """The category gathering the excerpts flagged "influence" of the others (none:
+    ``None``); at most one per folder."""
+    with session_scope() as s:
+        for c in s.scalars(select(Category).where(Category.folder_id == folder_id)):
+            c.influence = c.id == cat_id
 
 
 def move(cat_id: int, delta: int) -> None:
@@ -240,6 +250,7 @@ def copy_tree(source_folder: int, folder_id: int) -> int:
                 position=len(ids) + 1,
                 start_year=n.start_year,
                 end_year=n.end_year,
+                influence=n.influence,
             )
             s.add(c)
             s.flush()
@@ -620,19 +631,28 @@ def _markdown_item(e: ExcerptView) -> str:
 def markdown(folder_id: int, period_id: int, *, level: int = 2) -> str:
     """The excerpts by category (headings; a category's years in its heading), as Markdown
     (unquoted, their places between Obsidian comments: ``%% Application, p. 4; p. 12 %%``),
-    with their years, then a "Rayonnement" section: those with the "influence" flag, one item
-    per category (its path in bold, them nested below; left in their categories too).
-    The categories with no excerpt (nor below) are left out."""
+    with their years. The excerpts with the "influence" flag (left in their categories too)
+    are also listed, one item per category (its path in bold, them nested below), in the
+    folder's "rayonnement" category (after its own excerpts; see set_influence), else in a
+    "Rayonnement" section at the end. The categories with no excerpt (nor below) are left
+    out."""
     nodes = tree(folder_id)
     by_cat: dict[int, list[ExcerptView]] = {}
     for e in excerpts(period_id, grouped=True):
         by_cat.setdefault(e.category_id, []).append(e)
+    gather = next((n for n in nodes if n.influence), None)
+    influence: list[str] = []  # (by category, in tree order)
+    for n in nodes:
+        if n is not gather and (
+            flagged := [_markdown_item(e) for e in by_cat.get(n.id, []) if e.influence]
+        ):
+            influence += [f"- **{n.path}**", *(f"  - {x}" for x in flagged)]
 
     def count(n: Node) -> int:
-        return len(by_cat.get(n.id, [])) + sum(count(c) for c in n.children)
+        own = len(by_cat.get(n.id, [])) + (len(influence) if n is gather else 0)
+        return own + sum(count(c) for c in n.children)
 
     out: list[str] = []
-    influence: list[str] = []  # (by category, in tree order)
     for n in nodes:
         if not count(n):
             continue
@@ -641,10 +661,10 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2) -> str:
         out.append(f"{heading} {n.name}{years}\n")
         for e in by_cat.get(n.id, []):  # (a group: its quotes, on one item)
             out.append("- " + _markdown_item(e))
-        if by_cat.get(n.id):
+        if n is gather:
+            out += influence
+        if by_cat.get(n.id) or (n is gather and influence):
             out.append("")
-        if flagged := [_markdown_item(e) for e in by_cat.get(n.id, []) if e.influence]:
-            influence += [f"- **{n.path}**", *(f"  - {x}" for x in flagged)]
-    if influence:
+    if influence and gather is None:
         out += [f"{'#' * min(level, 6)} Rayonnement\n", *influence]
     return "\n".join(out).strip() + "\n" if out else ""

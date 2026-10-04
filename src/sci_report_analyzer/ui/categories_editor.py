@@ -109,6 +109,23 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                         field.on("blur", save)
                         field.on("keydown.enter", save)
                     ui.button(
+                        icon="campaign",
+                        on_click=lambda n=n: (
+                            categories.set_influence(folder_id, None if n.influence else n.id),
+                            done(),
+                        ),
+                    ).props(
+                        "flat dense round size=sm "
+                        + ("color=amber-9" if n.influence else "color=grey-5")
+                    ).tooltip(
+                        _("The “rayonnement” category: it also lists the influence excerpts")
+                        if n.influence
+                        else _(
+                            "Make it the “rayonnement” category: the excerpts flagged "
+                            "“influence” in the other categories are listed in it too"
+                        )
+                    ).mark(f"category-influence-{n.id}")
+                    ui.button(
                         icon="subdirectory_arrow_right",
                         on_click=lambda n=n: (categories.add(folder_id, _("New"), n.id), done()),
                     ).props("flat dense round size=sm").tooltip(_("Add a subcategory")).mark(
