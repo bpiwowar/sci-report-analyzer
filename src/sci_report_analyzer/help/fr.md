@@ -296,6 +296,10 @@ catégories (imbriquées comme elles, un niveau plus bas), et sont retirés de l
 (une catégorie restée vide disparaît) : les réglages du dossier (« Extraits de rayonnement
 seulement dans la section Rayonnement ») pour ses notes et la copie, ou un seul bloc avec
 `[]{.excerpts .nested-influence}` (et `[]{.excerpts .flat-influence}` comme par défaut).
+Chaque catégorie peut avoir un texte propre à la personne (Markdown, par exemple un résumé de
+ses éléments ; son crayon, au survol, dans l'onglet des catégories, ou un clic sur le texte) :
+placé après son titre, avant ses éléments (en mode imbriqué, celui d'une catégorie restée
+vide va sous sa sous-section de la section Rayonnement).
 
 Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers

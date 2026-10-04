@@ -752,6 +752,39 @@ async def test_folder_notes_without_a_document(user: User) -> None:
     await user.should_see(marker="notes-not-found")
 
 
+async def test_section_text_of_a_category(user: User) -> None:
+    """A category's section text: edited from the categories' tab (its pencil), shown there
+    rendered, and in the notes' excerpts; emptied: removed."""
+    from sci_report_analyzer import categories, folders
+
+    pid = _seed()
+    fid = folders.save_folder(None, "Hiring committee")
+    period = folders.add_person(fid, pid, 2020, 2024)
+    research = categories.add(fid, "Research")
+    categories.add_excerpt(research, period, "Led a project.", 1, [])
+    folders.set_notes(period, "# Report\n\n[]{.excerpts}\n")
+    await user.open(f"/notes/{period}")
+    user.find(marker="side-tab-categories").click()
+    await user.should_see("Led a project.")
+    await user.should_not_see(marker=f"section-text-{research}")
+    user.find(marker=f"section-text-edit-{research}").click()
+    user.find(marker="section-text-input").elements.pop().value = "A *strong* record."
+    user.find(marker="section-text-save").click()
+    assert categories.section_texts(period) == {research: "A *strong* record."}
+    await user.should_see(marker=f"section-text-{research}", content="A *strong* record.")
+    md = categories.markdown(fid, period)
+    assert md.startswith("## Research\n\nA *strong* record.\n\n- Led a project.")
+    # (the notes' preview: their excerpts with it)
+    await user.should_see(kind=ui.markdown, content="## Research\n\nA *strong* record.")
+    # Clicked: edited again; emptied, removed.
+    user.find(marker=f"section-text-{research}").click()
+    await user.should_see(marker="section-text-input")
+    user.find(marker="section-text-input").elements.pop().value = "  "
+    user.find(marker="section-text-save").click()
+    assert categories.section_texts(period) == {}
+    await user.should_not_see(marker=f"section-text-{research}")
+
+
 async def test_remove_from_folder_keeping_or_deleting_data(user: User) -> None:
     from sci_report_analyzer import annotations, folders
 
