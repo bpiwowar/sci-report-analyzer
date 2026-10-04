@@ -222,6 +222,7 @@ class DocumentPage:
         return reports.note_context(stats, reports.citation_keys(stats))
 
     def _note_tools(self) -> None:
+        self.side.quote_tool(lambda: getattr(self, "note", None))
         ui.button(icon="format_quote", on_click=self._cite).props(
             "flat dense round size=sm"
         ).tooltip(_("Cite a paper ([@key], numbered when copied)")).mark("doc-note-cite")

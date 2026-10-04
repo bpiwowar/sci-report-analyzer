@@ -27,6 +27,12 @@ TOOLS = [
 MODES = {"edit": N_("Edit"), "split": N_("Split"), "preview": N_("Preview")}
 
 
+def quote(text: str, where: str = "") -> str:
+    """``text`` as a Markdown quote (one paragraph: e.g. the lines selected in a PDF), followed
+    by ``where`` it is from (e.g. its page), if any."""
+    return "> " + " ".join(text.split()) + (f" ({where})" if where else "")
+
+
 class MarkdownEditor:
     def __init__(
         self,
@@ -156,6 +162,26 @@ class MarkdownEditor:
         if self.mode.value == "preview":
             self.mode.value = "split"
         self._js(f"v.dispatch(v.state.replaceSelection({json.dumps(text)}))")
+
+    def insert_block(self, text: str) -> None:
+        """Insert ``text`` as a paragraph of its own at the cursor (replacing the selection;
+        within a line: after it; at the start: at the end, as in an editor never clicked)."""
+        if self.mode.value == "preview":
+            self.mode.value = "split"
+        self._js(
+            "const d = v.state.doc, s = v.state.selection.main; "
+            "let [from, to] = s.head === 0 && d.length ? [d.length, d.length] : [s.from, s.to]; "
+            "const line = d.lineAt(from); "
+            "if (from === to && from > line.from) from = to = line.to; "
+            "const before = d.sliceString(0, from), after = d.sliceString(to); "
+            "const pre = !before || before.endsWith('\\n\\n') ? '' "
+            ": before.endsWith('\\n') ? '\\n' : '\\n\\n'; "
+            "const post = after.startsWith('\\n\\n') ? '' : after.startsWith('\\n') ? '\\n' "
+            ": after ? '\\n\\n' : '\\n'; "
+            f"const t = pre + {json.dumps(text)} + post; "
+            "v.dispatch({changes: {from, to, insert: t}, selection: {anchor: from + t.length}, "
+            "scrollIntoView: true})"
+        )
 
     def wrap(self, before: str, after: str, placeholder: str = "") -> None:
         """Put the selection (else ``placeholder``, selected) between ``before`` and ``after``."""
