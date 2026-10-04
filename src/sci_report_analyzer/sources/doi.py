@@ -30,6 +30,7 @@ from .base import (
     SourceAdapter,
     SourceError,
     contact_email,
+    first,
     normalize_doi,
     request_with_backoff,
 )
@@ -88,10 +89,6 @@ async def _get(url: str, *, throttle: _Throttle | None = None, **kw: Any) -> htt
 
 
 # ---- parsing -------------------------------------------------------------------------------
-
-
-def _first(v: Any) -> Any:
-    return (v[0] if v else None) if isinstance(v, list) else v
 
 
 def _year(msg: dict[str, Any]) -> int | None:
@@ -243,7 +240,7 @@ def parse(msg: dict[str, Any], registry: str) -> dict[str, Any]:
     url = ((msg.get("resource") or {}).get("primary") or {}).get("URL") or msg.get("URL")
     journal = kind in _JOURNAL_TYPES
     return {
-        "title": _clean(_first(msg.get("title"))),
+        "title": _clean(first(msg.get("title"))),
         "year": _year(msg),
         "venue": venue or (publisher if archival else None),
         # A chapter of a book in a series, without an event, names no venue (a volume title
@@ -260,7 +257,7 @@ def parse(msg: dict[str, Any], registry: str) -> dict[str, Any]:
         "doc_type": "proceedings-article" if chapter_of_event else kind or None,
         "authors": _authors(msg.get("author")),
         # A series' ISSN (LNCS...) would match the series as a journal.
-        "issn": _first(msg.get("ISSN")) if journal else None,
+        "issn": first(msg.get("ISSN")) if journal else None,
         "url": url,
         "publisher": publisher or None,
         "archival": archival,

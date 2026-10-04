@@ -139,6 +139,11 @@ def to_int(v: Any) -> int | None:
         return None
 
 
+def first(v: Any) -> Any:
+    """The first of a list (none if empty), else the value itself."""
+    return (v[0] if v else None) if isinstance(v, list) else v
+
+
 def to_year(v: Any) -> int | None:
     m = re.search(r"\b(1[89]\d{2}|20\d{2})\b", str(v)) if v not in (None, "") else None
     return int(m.group(1)) if m else None

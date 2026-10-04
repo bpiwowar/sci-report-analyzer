@@ -17,16 +17,16 @@ from .db.models import Publication, SourceLink, SourcePub, Venue, VenueKey, utcn
 from .db.session import session_scope
 from .i18n import _
 from .ranking.badge import (
-    FINDINGS_RE,
     Badge,
     category_of,
     category_order,
     core_rank_at,
-    detect_track,
     edition_year,
 )
 from .ranking.detection import Rule
 from .ranking.kinds import (
+    CONFERENCE_KINDS,
+    JOURNAL_KINDS,
     KINDS,
     VENUE_KINDS,
     WORKSHOP_KINDS,
@@ -43,13 +43,10 @@ from .ranking.service import (
     paren_acronym,
     service,
 )
+from .ranking.tracks import detect as detect_track_of
 from .ranking.tracks import track_ids
 from .source_settings import active_links
-from .text import strip_diacritics
-
-CONFERENCE_KINDS = ("intl_conference", "natl_conference")
-JOURNAL_KINDS = ("intl_journal", "natl_journal")
-
+from .text import is_acronym, strip_diacritics
 
 _ACRONYM = re.compile(r"[A-Z][A-Za-z0-9&+-]{1,11}")
 
@@ -75,7 +72,7 @@ def auto_short_name(
     conference after "@" or "co-located with": only its own acronym is taken, if any."""
     if badge and not workshop:
         for a in badge.extra.get("aliases") or []:
-            if a and _ACRONYM.fullmatch(a) and sum(c.isupper() for c in a) >= 2:
+            if a and _ACRONYM.fullmatch(a) and is_acronym(a):
                 return a
     for text in texts:
         if workshop and text and (m := _HOST_PART.search(text)):
@@ -587,7 +584,7 @@ _WORD = re.compile(r"[^\W\d_][\w&+]*")
 
 def _acronyms(text: str | None) -> set[str]:
     """The words of a text that look like acronyms (two capitals or more), folded."""
-    return {_fold(w) for w in _WORD.findall(text or "") if sum(c.isupper() for c in w) >= 2}
+    return {_fold(w) for w in _WORD.findall(text or "") if is_acronym(w)}
 
 
 def detect_parts(rows: list[VenueRow]) -> dict[int, list[int]]:
@@ -1060,17 +1057,11 @@ def _texts(r: VenueRow) -> list[str]:
     return [r.name, *(ex for _k, ex, *_rest in r.variants if ex)]
 
 
-def _track_word(text: str) -> str | None:
-    if FINDINGS_RE.search(text):
-        return "findings"
-    return detect_track(text)
-
-
 def venue_track(r: VenueRow) -> str | None:
     """The track a venue looks like (Findings, demo…): named by its name or all its texts."""
-    if t := _track_word(r.name):
+    if t := detect_track_of(r.name):
         return t
-    tracks = {_track_word(t) for t in _texts(r)}
+    tracks = {detect_track_of(t) for t in _texts(r)}
     return tracks.pop() if len(tracks) == 1 else None
 
 
@@ -1208,9 +1199,15 @@ def mark_as_track(venue_id: int, track: str, name: str | None = None) -> None:
     _changed(rematch=True)
 
 
-def venue_options() -> dict[int, str]:
+def venue_names() -> dict[int, str]:
+    """The venues' names (by name)."""
     with session_scope() as s:
-        return {v.id: v.name for v in s.scalars(select(Venue).order_by(Venue.name))}
+        return {
+            vid: name for vid, name in s.execute(select(Venue.id, Venue.name).order_by(Venue.name))
+        }
+
+
+venue_options = venue_names  # (its former name)
 
 
 def venue_choices() -> dict[int, str]:
@@ -1352,11 +1349,6 @@ class PatternEffect:
     before: str | None  # the venue the text belongs to now (None: none)
     after: str | None  # its venue with the rule (None: back to automatic matching)
     conflict: bool = False  # another venue's rule matches it too
-
-
-def venue_names() -> dict[int, str]:
-    with session_scope() as s:
-        return {vid: name for vid, name in s.execute(select(Venue.id, Venue.name))}
 
 
 def pattern_effects(
