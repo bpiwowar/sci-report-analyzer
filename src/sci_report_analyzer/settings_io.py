@@ -1,9 +1,10 @@
 """Export / import of matching settings (shareable JSON).
 
 A settings file holds the matching settings (sources, thresholds, normalization rules,
-venue-kind settings), the venues with manual decisions (kind, level, ranking record, search
-text, variants, venue rules, identifiers), flag definitions and optionally imported JCR
-rows. People, publications and their annotations are never part of an import.
+venue-kind settings, detection rules), the venues with manual decisions (kind, level,
+ranking record, search text, variants, venue rules, identifiers), flag definitions and
+optionally imported JCR rows. People, publications and their annotations are never part
+of an import.
 
 The format (fields, versioning, import modes): ``docs/json-formats.md``. Bump ``VERSION`` and
 update it when a field changes.
@@ -32,7 +33,7 @@ from .ranking.service import (
 )
 
 FORMAT = "sci-report-analyzer-settings"
-VERSION = 3
+VERSION = 4
 
 
 class VariantIO(BaseModel):
@@ -164,6 +165,10 @@ def _rule_text(r) -> str:
     return f"{r.pattern} → “{r.replacement}”{case}{scope}{flags}"
 
 
+def _detection_text(r) -> str:
+    return r.pattern + (" " + _("[ignore case]") if r.ignore_case else "")
+
+
 _SCALARS = (
     "min_score",
     "national_keywords",
@@ -179,6 +184,7 @@ def _matching_fields(m: MatchSettings) -> dict[str, Any]:
     out.update({f"kind_levels.{k}": v for k, v in m.kind_levels.items()})
     # Normalization rules are compared one by one, keyed by their id.
     out.update({f"rules.{r.id}": _rule_text(r) for r in m.norm_rules})
+    out.update({f"detection.{r.id}": _detection_text(r) for r in m.detection_rules})
     return out
 
 
@@ -198,6 +204,10 @@ def _apply_matching(local: MatchSettings, data: MatchSettings, take: set[str]) -
             d["norm_rules"].append(r)
         elif f"rules.{r['id']}" in take:
             d["norm_rules"][rules[r["id"]]] = r
+    detection = {r["id"]: i for i, r in enumerate(d["detection_rules"])}
+    for r in imp["detection_rules"]:
+        if r["id"] in detection and f"detection.{r['id']}" in take:
+            d["detection_rules"][detection[r["id"]]] = r
     return MatchSettings.model_validate(d)
 
 

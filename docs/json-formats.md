@@ -24,7 +24,7 @@ uses.
 ### Versioning
 
 `format` must be `"sci-report-analyzer-settings"`, or the file is rejected. `version` (now
-`3`) is written but not checked on import. Every other field is optional: a missing one takes
+`4`) is written but not checked on import. Every other field is optional: a missing one takes
 its default, an unknown one is ignored. Older files therefore import as long as their fields
 kept their meaning.
 
@@ -33,7 +33,7 @@ kept their meaning.
 | Field | Type | Default | |
 |-------|------|---------|-|
 | `format` | `"sci-report-analyzer-settings"` | that | required in effect (the only accepted value) |
-| `version` | int | `3` | informative |
+| `version` | int | `4` | informative |
 | `exported_at` | string \| null | null | ISO 8601, UTC, seconds (`2026-10-04T09:00:00+00:00`) |
 | `matching` | [Matching](#matching) | defaults | |
 | `venues` | list of [Venue](#venue) | `[]` | only venues with a manual decision or a manual variant are exported |
@@ -53,6 +53,7 @@ kept their meaning.
 | `international_keywords` | list of string | built-in list | words making it international |
 | `unknown_scope` | `"international"` \| `"national"` | `"international"` | scope of a venue without a clue |
 | `kind_levels` | object: kind → level | `{}` | default level per [kind](#venue-kinds), e.g. `{"natl_conference": "C"}`; levels `A*`, `A`, `B`, `C`, `Q1`…`Q4` or any typed text |
+| `detection_rules` | list of [DetectionRule](#detectionrule) | the built-in rules | regexes classifying venues and papers, by `id`; a missing one takes its default |
 | `core_edition` | `"publication"` \| `"latest"` | `"publication"` | CORE edition giving a paper its rank |
 
 #### NormRule
@@ -73,6 +74,34 @@ the spelled ordinals.
 | `sources` | list of string | `[]` | sources it applies to (empty: all) |
 | `language` | string \| null | null | language whose words it removes (`en`, `fr`); null: a general rule |
 | `example` | string \| null | null | a venue text it changes |
+
+#### DetectionRule
+
+A regex classifying venues and papers (`ranking.detection.DetectionRule`; Settings →
+Detection rules). Python syntax (not `re.ASCII`); `(?-i:…)` makes a part case-sensitive;
+`{rule:<id>}` stands for another rule's pattern, in a group. An invalid pattern takes the
+rule's default.
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `id` | string | required | which rule (below); unknown ids are dropped |
+| `pattern` | string | required | |
+| `ignore_case` | bool | true | |
+
+The rules (defaults in `ranking.detection.DEFAULT_DETECTION_RULES`):
+
+| `id` | Searched in | Decides |
+|------|-------------|---------|
+| `shared_task_venue` | venue text | a shared task (unless a journal) |
+| `campaigns` | — | the campaigns' names, used as `{rule:campaigns}` by `shared_task_title` (case-sensitive by default) |
+| `shared_task_title` | paper title | a shared task paper (unless a journal) |
+| `workshop` | venue text | a workshop (ranked as its main conference) |
+| `workshop_host` | venue text | the workshop's main conference: the first group that matches |
+| `conference` | venue text | a conference, when neither the rankings nor the sources tell |
+| `journal` | venue text | a journal, likewise (after `conference`) |
+| `track_tutorial`, `track_demo`, `track_short` | venue text | a track, tried in this order |
+| `track_findings` | venue text | a Findings volume |
+| `joint` | venue text | a joint conference (its parts looked for) |
 
 ### Venue
 
@@ -164,16 +193,16 @@ Keys of `ranking.kinds.KINDS`: `intl_conference`, `intl_workshop`, `intl_journal
   as a whole. When the file has flags, local flags absent from it are deleted unless papers
   carry them.
 - **Merge**: keeps local values and adds the imported ones. A value set on both sides and
-  different is a conflict (matching field, rule by `id`, venue field, variant, flag); the
-  local value stays unless the imported one is taken. JCR rows whose `name` is already there
-  are skipped.
+  different is a conflict (matching field, cleaning or detection rule by `id`, venue field,
+  variant, flag); the local value stays unless the imported one is taken. JCR rows whose
+  `name` is already there are skipped.
 
 ### Example
 
 ```json
 {
   "format": "sci-report-analyzer-settings",
-  "version": 3,
+  "version": 4,
   "exported_at": "2026-10-04T09:00:00+00:00",
   "matching": {
     "sources": {"scimago": true, "core": true, "jcr": true, "openalex": false, "predatory": true},
@@ -196,6 +225,9 @@ Keys of `ranking.kinds.KINDS`: `intl_conference`, `intl_workshop`, `intl_journal
     "international_keywords": ["international", "ACM", "IEEE"],
     "unknown_scope": "international",
     "kind_levels": {"natl_conference": "C"},
+    "detection_rules": [
+      {"id": "workshop", "pattern": "\\bworkshops?\\b|\\bseminars?\\b", "ignore_case": true}
+    ],
     "core_edition": "publication"
   },
   "venues": [

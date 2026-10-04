@@ -31,6 +31,7 @@ from .i18n import N_, Labels, _, language
 from .merge import main_members
 from .ranking.badge import (
     BASE_CATEGORIES,
+    FINDINGS_RE,
     KIND_ORDER,
     Badge,
     Category,
@@ -278,8 +279,6 @@ def _detected_kind(
     ), "detected"
 
 
-_FINDINGS = re.compile(r"\bfindings\b", re.I)
-
 # Sources whose venue text is only a fallback (ORCID: a free "journal title" declared by
 # hand or copied from elsewhere, often missing or wrong for conference papers).
 UNRELIABLE_VENUE = frozenset({"orcid"})
@@ -453,7 +452,7 @@ async def workshop_badge(
 
 
 def _text_track(text: str | None) -> str | None:
-    return detect_track(text) or ("findings" if text and _FINDINGS.search(text) else None)
+    return detect_track(text) or ("findings" if text and FINDINGS_RE.search(text) else None)
 
 
 def _has_decision(v: Venue | None) -> bool:

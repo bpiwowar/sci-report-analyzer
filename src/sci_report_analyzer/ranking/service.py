@@ -11,20 +11,22 @@ from datetime import timedelta
 from typing import Any, Literal
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, func, select
 
 from ..db.models import AppSetting, JcrRecord, VenueCache, utcnow
 from ..db.session import session_scope
 from ..sources.base import SourceError, user_agent
 from ..sources.openalex import params as openalex_params
-from . import datasets
+from . import datasets, detection
 from .badge import (
+    FINDINGS_RE,
     TOGGLABLE_SOURCES,
     Badge,
     badge_archival,
     badge_from_record,
 )
+from .detection import DetectionRule, default_detection_rules
 from .kinds import DEFAULT_INTERNATIONAL_KEYWORDS, DEFAULT_NATIONAL_KEYWORDS
 from .matcher import Matcher
 from .normalize import (
@@ -44,7 +46,6 @@ MATCHING_KEY = "matching"
 LONG_TTL = timedelta(days=90)
 SHORT_TTL = timedelta(days=14)  # OpenAlex fallback and "not ranked"
 _ACRONYM_RE = re.compile(r"[A-Z]{3,}")
-_FINDINGS_RE = re.compile(r"\bfindings\b", re.I)
 _FINDINGS_PREFIX = re.compile(r"^\s*findings\s+(?:of\s+(?:the\s+)?)?", re.I)
 # A parenthesised acronym, as in DBLP stream titles: "AAAI Conference on AI (AAAI)".
 _PAREN_ACRONYM = re.compile(r"\(\s*([A-Za-z][A-Za-z0-9&+-]*[A-Z][A-Za-z0-9&+-]*)\s*\)")
@@ -188,8 +189,16 @@ class MatchSettings(BaseModel):
     )
     unknown_scope: str = "international"
     kind_levels: dict[str, str] = Field(default_factory=dict)
+    # The regexes classifying venues and papers (kinds, workshops, tracks, joint
+    # conferences), each by id; one missing takes its default (``ranking.detection``).
+    detection_rules: list[DetectionRule] = Field(default_factory=default_detection_rules)
     # CORE rank of a paper: the edition in force when it was published, or the latest.
     core_edition: Literal["publication", "latest"] = "publication"
+
+    @field_validator("detection_rules")
+    @classmethod
+    def _every_detection_rule(cls, rules: list[DetectionRule]) -> list[DetectionRule]:
+        return detection.completed(rules)
 
     def source_on(self, source: str) -> bool:
         # manual / archival are always on
@@ -230,6 +239,7 @@ class RankingService:
     def invalidate(self, *, data: bool = False, clear_cache: bool = False) -> None:
         """Drop in-memory state after a settings change (optionally the badge cache)."""
         self._settings = None
+        detection.reset()
         if data:
             self._matcher = self._predatory = None
         if clear_cache:
@@ -389,7 +399,7 @@ class RankingService:
         venue = corrected if corrected is not None else self.clean(raw, source)
         norm_venue = normalize(venue)
         raw_s = raw or ""
-        findings = corrected is None and bool(_FINDINGS_RE.search(raw_s))
+        findings = corrected is None and bool(FINDINGS_RE.search(raw_s))
         host_raw = raw_s
         if findings:
             colon = raw_s.rfind(":")
@@ -540,3 +550,4 @@ class RankingService:
 
 
 service = RankingService()
+detection.use(lambda: service.settings.detection_rules)
