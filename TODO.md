@@ -39,6 +39,9 @@ longer matches them.
 When adding an excerpt from text already highlighted with PDF.js, remove that PDF.js
 highlight so that the two don't conflict (overlapping marks).
 
+Remove the "tune" button of the PDF toolbar (hide / show the editing tools' options
+panel): it does not work (no effect, no tooltip).
+
 If the bundled PDF.js supports it, enable its "note" (comment) annotation tool along with
 highlighting (check the PDF.js version and its editor modes / `annotationEditorMode`).
 
