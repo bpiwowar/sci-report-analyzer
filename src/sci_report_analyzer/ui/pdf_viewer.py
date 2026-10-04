@@ -17,7 +17,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import Client, app, background_tasks, ui
 
-from .. import annotations, documents, livereload, pdfs
+from .. import annotations, documents, livereload, pdfs, pdftext
 from ..db.models import Publication
 from ..db.session import session_scope
 from ..i18n import N_, _, ngettext
@@ -360,19 +360,27 @@ window.vrPdf = {
     this.drawArea(pv);
     this.actions();
   },
-  // Copying (⌘C, Ctrl+C) without a text selection (but in a field): the areas' text. (The
-  // copy event, and the clipboard from the key: a browser may fire no copy event then.)
+  // Copying (⌘C, Ctrl+C) the text selected in the PDF: cleaned (see pdftext.py: its lines
+  // joined, hyphens and ligatures undone…); without a text selection (but in a field): the
+  // areas' text, cleaned too. (The copy event, and the clipboard from the key: a browser may
+  // fire no copy event then.)
   copyArea(ev) {
-    const text = this.areas.length ? this.areaText() : '';
-    if (!text) return false;
-    const t = ev.target, w = t && t.ownerDocument ? t.ownerDocument.defaultView : window;
+    const t = ev.target, doc = t && (t.ownerDocument || t);
+    const w = (doc && doc.defaultView) || window;
     if (t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select')))) {
       return false;
     }
-    for (const win of [window, this.win()]) {
-      const sel = win && win.getSelection();
-      if (sel && !sel.isCollapsed && sel.toString().trim()) return false;
+    let text = '';
+    const pdf = this.win(), sel = pdf && pdf.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString().trim()) {
+      if (ev.type !== 'copy' || w !== pdf) return false;  // (copied in the PDF, at its event)
+      text = vrCleanPdfText(sel.toString());
+    } else {
+      const own = window.getSelection();
+      if (own && !own.isCollapsed && own.toString().trim()) return false;
+      text = this.areas.length ? vrCleanPdfText(this.areaText()) : '';
     }
+    if (!text) return false;
     if (ev.type === 'copy') {
       ev.clipboardData.setData('text/plain', text);
       ev.preventDefault(); ev.stopImmediatePropagation();
@@ -959,6 +967,7 @@ def viewer_frame(
     }
     ui.add_css(MARKDOWN_CSS)
     ui.add_head_html(_SPLITTER % {"min": SIDE_MIN})
+    ui.add_head_html(pdftext.SCRIPT)
     ui.add_head_html(_SCRIPT % {"url": json.dumps(file_url), "texts": json.dumps(texts)} + script)
     with ui.row().classes("w-full items-center no-wrap gap-2 px-3 py-1 bg-primary text-white"):
         ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
