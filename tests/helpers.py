@@ -28,12 +28,13 @@ def thesis(tid: str, role: str, title: str) -> FetchedThesis:
     return FetchedThesis(thesis_id=tid, role=role, title=title, student="A Student")
 
 
-async def note_saved(user, mark: str) -> None:
-    """Wait until a note editor has saved what was typed (once typing pauses)."""
+async def note_status(user, mark: str, text: str = "Saved") -> None:
+    """Wait until a note editor's status is ``text`` (by default: saved what was typed, once
+    typing pauses)."""
     import asyncio
 
     for _ in range(40):
-        if user.find(marker=f"{mark}-status").elements.pop().text == "Saved":
+        if user.find(marker=f"{mark}-status").elements.pop().text == text:
             return
         await asyncio.sleep(0.1)
-    raise AssertionError(f"{mark}: not saved")
+    raise AssertionError(f"{mark}: not {text!r}")

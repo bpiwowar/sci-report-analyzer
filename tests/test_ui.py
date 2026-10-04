@@ -4,7 +4,7 @@ import asyncio
 import json
 
 import pytest
-from helpers import add_source, make_person, note_saved, pub, thesis
+from helpers import add_source, make_person, note_status, pub, thesis
 from nicegui import ui
 from nicegui.testing import User
 
@@ -725,7 +725,7 @@ async def test_folder_notes_without_a_document(user: User) -> None:
     await user.should_see(marker="folder-note")
     await user.should_see(marker="notes-person", content="Jane Doe")
     user.find(marker="folder-note").elements.pop().value = "Strong **candidate**"
-    await note_saved(user, "folder-note")
+    await note_status(user, "folder-note")
     assert folders.notes_of(period) == "Strong **candidate**"
     await user.should_not_see(marker="note-quote")  # (no PDF to quote from)
     # Their excerpts, by category.
@@ -908,7 +908,7 @@ async def test_paper_corrections_and_rank_note(user: User) -> None:
     user.find("tab-notes").click()
     await user.should_see("paper-note")
     user.find("paper-note").elements.pop().value = "checked on the **PDF**"
-    await note_saved(user, "paper-note")
+    await note_status(user, "paper-note")
     with session_scope() as s:
         assert s.get(Publication, pub_id).note == "checked on the **PDF**"
     user.find("override-year").elements.pop().value = 2018
@@ -2309,7 +2309,7 @@ async def test_paper_tags_and_notes(user: User) -> None:
     # A note within the period.
     await user.should_see("period-note")
     user.find("period-note").elements.pop().value = "good *fit*"
-    await note_saved(user, "period-note")
+    await note_status(user, "period-note")
     with session_scope() as s:
         assert s.get(PeriodNote, (period, pub_id)).text == "good *fit*"
     await user.should_see(f"has-note-{pub_id}")
