@@ -47,6 +47,17 @@ ignored.
 |-------|------|---------|-|
 | `sources` | object: source → bool | `scimago`, `core`, `jcr`, `predatory`: true; `openalex`: false | ranking sources on / off |
 | `min_score` | float | `0.8` | fuzzy-match threshold |
+| `conference_alt_score` | float | `0.75` | score of a CORE conference over a journal for a conference-like text |
+| `predatory_min_score` | float | `0.9` | score at which a predatory list's entry flags the venue |
+| `openalex_score` | float | `0.8` | score given to an OpenAlex answer |
+| `merge_title_jaccard` | float | `0.9` | title similarity for two records to be the same paper |
+| `merge_year_slack` | int | `1` | years apart two records of the same paper may be |
+| `unreliable_venue_sources` | list of string | `["orcid"]` | sources whose venue is used only as a last resort |
+| `reflist_match` | float | `0.85` | title overlap linking a list's entry to a paper |
+| `reflist_suggest` | float | `0.5` | title overlap proposing a paper (or a HAL document) for an entry |
+| `venue_merge_score` | float | `0.5` | similarity proposing to merge two venues |
+| `venue_similar_score` | float | `0.3` | similarity listing a venue as similar |
+| `former_student_after` | int | `2` | years after a thesis when its author counts as a former student |
 | `norm_rules` | list of [NormRule](#normrule) | the built-in rules | applied in order |
 | `national_keywords` | list of string | built-in list | words making a venue national |
 | `international_keywords` | list of string | built-in list | words making it international |

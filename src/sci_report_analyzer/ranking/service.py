@@ -14,7 +14,8 @@ import httpx
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, func, select
 
-from ..db.models import AppSetting, JcrRecord, VenueCache, utcnow
+from ..db.app_settings import get_setting, set_setting
+from ..db.models import JcrRecord, VenueCache, utcnow
 from ..db.session import session_scope
 from ..sources.base import SourceError, user_agent
 from ..sources.openalex import params as openalex_params
@@ -233,14 +234,12 @@ class MatchSettings(BaseModel):
 
 
 def load_settings() -> MatchSettings:
-    with session_scope() as s:
-        row = s.get(AppSetting, MATCHING_KEY)
-        return MatchSettings.model_validate(row.value) if row else MatchSettings()
+    value = get_setting(MATCHING_KEY)
+    return MatchSettings.model_validate(value) if value is not None else MatchSettings()
 
 
 def save_settings(settings: MatchSettings) -> None:
-    with session_scope() as s:
-        s.merge(AppSetting(key=MATCHING_KEY, value=settings.model_dump()))
+    set_setting(MATCHING_KEY, settings.model_dump())
     service.invalidate(clear_cache=True)
 
 
