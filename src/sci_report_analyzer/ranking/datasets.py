@@ -10,7 +10,8 @@ imported in the app (scimagojr.com blocks scripts: the user downloads them), kep
 data directory (one file, each journal once) and merged on load. The predatory list is
 downloaded into the data directory from its source, and refreshed when older than
 ``PREDATORY_MAX_AGE``.
-See ``data/README.md`` for the sources and their terms.
+See ``data/README.md`` for the sources and their terms, ``docs/json-formats.md`` for the
+records' fields.
 """
 
 from __future__ import annotations

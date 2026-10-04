@@ -1,0 +1,302 @@
+# JSON formats
+
+The JSON files SciReport Analyzer reads or writes outside its database. The database
+(`sci-report-analyzer.sqlite`) and its backups (`backups/*.sqlite`) are SQLite, not JSON.
+
+| File | Written by | Read by |
+|------|-----------|---------|
+| [Settings file](#settings-file) (`sci-report-analyzer-settings.json`) | Settings → Import / export → *Export settings* | Settings → Import / export → *Import* |
+| [Ranking records](#ranking-records): `datasets/journals.json` | `scripts/build_datasets.py` | the app (downloaded from GitHub) |
+| [Ranking records](#ranking-records): `data/conferences.json`, `data/conferences.past.json` | `scripts/build_core.py` | the app (shipped) |
+| [Data directory files](#data-directory-files): `datasets/journals.json`, `datasets/scimago.json`, `datasets/predatory.json` | the app | the app |
+| [`location.json`](#locationjson) | Settings → Data | the app, at startup |
+
+Code: `settings_io.py` (settings file), `ranking/datasets.py` (datasets), `config.py`
+(`location.json`).
+
+## Settings file
+
+Shareable matching settings: the matching settings, the venues with manual decisions, the
+flag definitions and, optionally, the imported JCR rows. People, publications and their
+annotations are never in it. Pydantic models: `settings_io.SettingsFile` and the classes it
+uses.
+
+### Versioning
+
+`format` must be `"sci-report-analyzer-settings"`, or the file is rejected. `version` (now
+`3`) is written but not checked on import. Every other field is optional: a missing one takes
+its default, an unknown one is ignored. Older files therefore import as long as their fields
+kept their meaning.
+
+### Top level
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `format` | `"sci-report-analyzer-settings"` | that | required in effect (the only accepted value) |
+| `version` | int | `3` | informative |
+| `exported_at` | string \| null | null | ISO 8601, UTC, seconds (`2026-10-04T09:00:00+00:00`) |
+| `matching` | [Matching](#matching) | defaults | |
+| `venues` | list of [Venue](#venue) | `[]` | only venues with a manual decision or a manual variant are exported |
+| `flags` | list of [Flag](#flag) | `[]` | |
+| `jcr` | list of [ranking records](#ranking-records) \| null | null | JCR rows, when *Include imported JCR rows* is checked |
+
+### Matching
+
+`ranking.service.MatchSettings`, as stored in the database (`app_setting` row `matching`).
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `sources` | object: source → bool | `scimago`, `core`, `jcr`, `predatory`: true; `openalex`: false | ranking sources on / off |
+| `min_score` | float | `0.8` | fuzzy-match threshold |
+| `norm_rules` | list of [NormRule](#normrule) | the built-in rules | applied in order |
+| `national_keywords` | list of string | built-in list | words making a venue national |
+| `international_keywords` | list of string | built-in list | words making it international |
+| `unknown_scope` | `"international"` \| `"national"` | `"international"` | scope of a venue without a clue |
+| `kind_levels` | object: kind → level | `{}` | default level per [kind](#venue-kinds), e.g. `{"natl_conference": "C"}`; levels `A*`, `A`, `B`, `C`, `Q1`…`Q4` or any typed text |
+| `core_edition` | `"publication"` \| `"latest"` | `"publication"` | CORE edition giving a paper its rank |
+
+#### NormRule
+
+A regex substitution cleaning the venue texts (`ranking.normalize.NormRule`). Python syntax,
+compiled with `re.ASCII`; `\1` back-references; `{ordinals:en}` / `{ordinals:fr}` stand for
+the spelled ordinals.
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `id` | string | required | identity: a merge import compares rules by id |
+| `name` | string | required | |
+| `description` | string | `""` | |
+| `pattern` | string | required | |
+| `replacement` | string | `" "` | |
+| `ignore_case` | bool | false | |
+| `enabled` | bool | true | |
+| `sources` | list of string | `[]` | sources it applies to (empty: all) |
+| `language` | string \| null | null | language whose words it removes (`en`, `fr`); null: a general rule |
+| `example` | string \| null | null | a venue text it changes |
+
+### Venue
+
+`settings_io.VenueIO`. On import a venue is found by its variants' keys (computed with the
+local rules), else by the key of its name; none found: it is created. Null fields are not
+imported.
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `name` | string | required | |
+| `variants` | list of [Variant](#variant) | `[]` | |
+| `short_name` | string \| null | null | e.g. `"ICLR"` |
+| `url` | string \| null | null | website |
+| `kind` | string \| null | null | a manual [kind](#venue-kinds) only (an automatic one is not exported) |
+| `level_type` | `"conference"` \| `"journal"` \| null | null | null with a `level_rank`: conference |
+| `level_rank` | string \| null | null | manual level: `A*`…`C` (CORE) or `Q1`…`Q4` |
+| `record_key` | string \| null | null | ranking record picked by hand: `source:type:id`, `id` being the record's `sourceId` or its normalized name (`scimago:journal:21100497291`, `core:conference:acm international conference on research and development in information retrieval`) |
+| `match_text` | string \| null | null | "Search rankings as" text |
+| `patterns` | list of [VenuePattern](#venuepattern) \| null | null | venue rules |
+| `identifiers` | object \| null | null | `{"issn": ["1234-5678", …]}` |
+| `hosts` | list of [Host](#host) \| null | null | a workshop's main conferences |
+| `joint` | [Joint](#joint) \| null | null | a joint venue's parts |
+
+#### Variant
+
+A raw venue text of the venue (`VariantIO`).
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `raw` | string | required | the raw text; its key is computed on import |
+| `source` | string \| null | null | its source (`dblp`, `hal`, `orcid`, `openalex`, `semanticscholar`, `scholar`, `doi`, `thesesfr`): that source's rules apply |
+| `manual` | bool | true | assigned by hand (never re-assigned automatically) |
+| `track` | string \| null | null | `findings`, `tutorial`, `demo`, `short` |
+
+A variant already in another local venue moves only with *Replace*, or when its conflict is
+taken in a merge.
+
+#### VenuePattern
+
+A regex: the source venue texts it matches (`re.search`) belong to the venue
+(`ranking.service.VenuePattern`).
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `pattern` | string | required | |
+| `ignore_case` | bool | true | |
+| `sources` | list of string | `[]` | sources it applies to (empty: all) |
+| `track` | string \| null | null | track of the matching papers |
+| `note` | string \| null | null | |
+
+#### Host
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `venue` | string | required | the main conference, by name (matched by name, else by its key) |
+| `start` | int \| null | null | first year (included; null: open) |
+| `end` | int \| null | null | last year (included; null: open) |
+
+#### Joint
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `parts` | list of string \| null | null | its venues, by name; null: found automatically; `[]`: not joint |
+| `use` | string \| null | null | the part whose level it takes |
+
+`hosts` and `joint` name other venues: they are resolved once every venue of the file is
+imported; an unknown name is dropped.
+
+#### Venue kinds
+
+Keys of `ranking.kinds.KINDS`: `intl_conference`, `intl_workshop`, `intl_journal`,
+`natl_conference`, `natl_workshop`, `natl_journal`, `preprint`, `book`, `chapter`,
+`proceedings`, `software`, `dataset`, `thesis`, `other`. `proceedings` and `thesis` are
+publication kinds only: valid in `kind_levels`, not as a venue's `kind`. Coming:
+`shared_task` (Shared task / evaluation campaign).
+
+### Flag
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `name` | string | required | identity |
+| `colour` | string | `"#57606a"` | CSS colour |
+| `track` | string \| null | null | set: the flag acts as a satellite track (`short`, `demo`…) |
+
+### Import modes
+
+- **Replace**: erases every venue decision (kind, level, record, search text, short name,
+  URL, rules, identifiers, hosts, manual joint; variants and paper links are kept), the JCR
+  rows when the file has `jcr`, then applies the file; the matching settings are replaced
+  as a whole. When the file has flags, local flags absent from it are deleted unless papers
+  carry them.
+- **Merge**: keeps local values and adds the imported ones. A value set on both sides and
+  different is a conflict (matching field, rule by `id`, venue field, variant, flag); the
+  local value stays unless the imported one is taken. JCR rows whose `name` is already there
+  are skipped.
+
+### Example
+
+```json
+{
+  "format": "sci-report-analyzer-settings",
+  "version": 3,
+  "exported_at": "2026-10-04T09:00:00+00:00",
+  "matching": {
+    "sources": {"scimago": true, "core": true, "jcr": true, "openalex": false, "predatory": true},
+    "min_score": 0.8,
+    "norm_rules": [
+      {
+        "id": "ordinalsEn",
+        "name": "Ordinals",
+        "description": "Remove ordinals: 1st, 35th…",
+        "pattern": "\\b(?:\\d+(?:st|nd|rd|th)|{ordinals:en})\\b",
+        "replacement": " ",
+        "ignore_case": true,
+        "enabled": true,
+        "sources": [],
+        "language": "en",
+        "example": "Fourteenth ACM Conference on Recommender Systems"
+      }
+    ],
+    "national_keywords": ["conférence", "colloque", "CORIA"],
+    "international_keywords": ["international", "ACM", "IEEE"],
+    "unknown_scope": "international",
+    "kind_levels": {"natl_conference": "C"},
+    "core_edition": "publication"
+  },
+  "venues": [
+    {
+      "name": "Small Workshop",
+      "variants": [{"raw": "Small Workshop @ Big Conference", "source": "dblp", "manual": true, "track": null}],
+      "kind": "intl_workshop",
+      "patterns": [{"pattern": "^Small Workshop", "ignore_case": true, "sources": [], "track": null, "note": null}],
+      "hosts": [{"venue": "Big Conference", "start": 2018, "end": null}]
+    },
+    {
+      "name": "Journal of Imaginary Results",
+      "variants": [{"raw": "J. Imag. Res.", "source": "hal", "manual": true, "track": null}],
+      "level_type": "journal",
+      "level_rank": "Q1",
+      "identifiers": {"issn": ["1234-5678"]}
+    }
+  ],
+  "flags": [{"name": "short paper", "colour": "#57606a", "track": "short"}],
+  "jcr": null
+}
+```
+
+## Ranking records
+
+The datasets are JSON arrays of records (`ranking.matcher.Record`, a plain object), one per
+line in the built files so that a rebuild gives small diffs. No version field: the app reads
+the fields below and ignores others.
+
+Common fields:
+
+| Field | Type | |
+|-------|------|-|
+| `name` | string | required |
+| `source` | `"scimago"` \| `"core"` \| `"jcr"` \| `"predatory"` | required |
+| `type` | `"journal"` \| `"conference"` | default `"journal"` |
+| `aliases` | list of string | other names matched (acronyms) |
+| `issn` | list of string (or one string) | an ISSN match is exact; Scimago writes `["-"]` when it has none |
+
+A record's identity (`record_key`) is `source:type:` + its `sourceId`, or its normalized name.
+
+### Scimago journals (`datasets/journals.json`)
+
+Built by `scripts/build_datasets.py --scimago=…` from Scimago's CSV exports, merged with the
+file already there.
+
+| Field | Type | |
+|-------|------|-|
+| `sjr` | float \| null | SJR of `sjrYear` |
+| `quartile` | string \| null | best quartile of `sjrYear` (`Q1`…`Q4`, `-`: none) |
+| `hindex` | int \| null | |
+| `sourceId` | string | Scimago id: identity when merging years |
+| `sjrYear` | int | the latest year listed; the other fields are of that year |
+| `sjrHistory` | object: year (string) → quartile | quartile each year; a paper takes the one of its year |
+
+```json
+{"name":"Journal of Imaginary Results","source":"scimago","type":"journal","sjr":18.5,"quartile":"Q1","hindex":120,"issn":["12345678"],"sourceId":"1","sjrYear":2024,"sjrHistory":{"2021":"Q2","2024":"Q1"}}
+```
+
+### CORE conferences (`data/conferences.json`, `data/conferences.past.json`)
+
+Built by `scripts/build_core.py`: `conferences.json` holds the conferences of the latest
+edition, `conferences.past.json` those only listed in earlier ones.
+
+| Field | Type | |
+|-------|------|-|
+| `coreRank` | string | rank in `coreEdition` (`A*`, `A`, `B`, `C`, …) |
+| `coreEdition` | string | the latest edition listing it (`CORE2008` … `ICORE2026`) |
+| `coreId` | string | CORE id, linking editions |
+| `coreHistory` | object: edition → rank | rank in each edition |
+
+```json
+{"name":"AAAI Conference on Human Computation and Crowdsourcing","source":"core","type":"conference","coreRank":"B","coreEdition":"ICORE2026","aliases":["HCOMP"],"coreId":"2264","coreHistory":{"CORE2021":"B","CORE2023":"B","ICORE2026":"B"}}
+```
+
+### JCR rows
+
+Parsed from the user's JCR CSV export (`jcr_rows_from_csv`), stored in the database and in
+the settings file's `jcr`: `name`, `source: "jcr"`, `type: "journal"`, `impactFactor` (float
+\| null), `quartile` (`Q1`…`Q4` \| null), `issn` (list).
+
+### Predatory list
+
+From the stop-predatory-journals CSVs: `name`, `source: "predatory"`, `type: "journal"`,
+`predatory: true`, optional `url` and `aliases` (its abbreviation).
+
+## Data directory files
+
+In `<data dir>/datasets/`, written by the app (atomically, through a `.tmp` file):
+
+- `journals.json`: the Scimago journals downloaded from the repository, merged into the
+  previous copy (a journal dropped since keeps its years); `journals.etag` next to it. Not
+  used when the app runs from the source tree (the repository's file is read instead).
+- `scimago.json`: the Scimago years imported in the app,
+  `{"years": [2021, …], "journals": [records]}`, each journal once; merged into the
+  journals on load.
+- `predatory.json`: an array of predatory records, refreshed weekly.
+
+## `location.json`
+
+`$XDG_CONFIG_HOME/sci-report-analyzer/location.json` (default `~/.config/…`): the data
+directory chosen in Settings → Data, `{"data_dir": "/path/to/dir"}`. Ignored when
+`--data-dir` or `SCI_REPORT_ANALYZER_DATA` is given; removed when back to the default.
