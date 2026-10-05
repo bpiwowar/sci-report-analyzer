@@ -450,11 +450,11 @@ def tags_section(on_change: Callable[[], None] | None = None) -> None:
         lambda name, colour, per_period: annotations.save_tag(name, colour, per_period),
         mark="tag",
         delete=lambda t: annotations.delete_tag(t.id),
-        delete_message=lambda t: _("Delete the tag “{name}”, from every paper?").format(
+        delete_message=lambda t: _("Delete the tag “{name}”, from every paper and excerpt?").format(
             name=t.name
         ),
         can_delete=lambda t: t.key is None,
-        delete_tip=_("Delete the tag (from every paper)"),
+        delete_tip=_("Delete the tag (from every paper and excerpt)"),
         note=lambda t: _("within a period") if t.per_period else _("global"),
         new_label=_("New tag"),
         new_option=_("within a period"),

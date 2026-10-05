@@ -658,7 +658,7 @@ async def test_deleting_a_folder_or_a_tag_is_confirmed(user: User) -> None:
     tid = annotations.save_tag("To discuss", None)
     await user.open("/settings?tab=tags")
     user.find(marker=f"tag-delete-{tid}").click()
-    await user.should_see("Delete the tag “To discuss”, from every paper?")
+    await user.should_see("Delete the tag “To discuss”, from every paper and excerpt?")
     assert any(t.id == tid for t in annotations.all_tags())
     user.find(marker="tag-delete-ok").click()
     await user.should_not_see(marker=f"tag-delete-{tid}")

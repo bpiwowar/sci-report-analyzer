@@ -53,7 +53,7 @@ def save_tag(
 
 
 def delete_tag(tag_id: int) -> None:
-    """Delete a tag (from every paper); the built-in ones are kept."""
+    """Delete a tag (from every paper and excerpt); the built-in ones are kept."""
     with session_scope() as s:
         if (t := s.get(Tag, tag_id)) and t.key is None:
             s.delete(t)

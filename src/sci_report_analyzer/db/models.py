@@ -403,6 +403,10 @@ class Excerpt(Base):
     group_text: Mapped[str | None] = mapped_column(Text)
     original: Mapped[str | None] = mapped_column(Text)  # (its text as selected, if edited since)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    # Its tags (those of the group it leads; the others of a group: none).
+    tags: Mapped[list[Tag]] = relationship(
+        secondary="excerpt_tag", lazy="selectin", order_by="Tag.name"
+    )
 
 
 class SectionText(Base):
@@ -425,7 +429,8 @@ STARRED = "starred"  # Tag.key of the built-in period tag behind the ★ button
 
 class Tag(Base):
     """A tag of papers, created on the fly: global (on the paper) or set per period (on the
-    paper within a period, e.g. "starred" — the ★ button)."""
+    paper within a period, e.g. "starred" — the ★ button); excerpts take tags too (by name,
+    whatever their kind)."""
 
     __tablename__ = "tag"
 
@@ -448,6 +453,19 @@ class PublicationTag(Base):
     tag_id: Mapped[int] = mapped_column(ForeignKey("tag.id", ondelete="CASCADE"), primary_key=True)
     # The paper's number in the list it was tagged from (e.g. "3" in a report's list).
     number: Mapped[int | None]
+
+
+class ExcerptTag(Base):
+    """A tag on an excerpt (written as an Obsidian #tag before it in the Markdown)."""
+
+    __tablename__ = "excerpt_tag"
+
+    excerpt_id: Mapped[int] = mapped_column(
+        ForeignKey("excerpt.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[int] = mapped_column(
+        ForeignKey("tag.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
 
 
 class PeriodTag(Base):

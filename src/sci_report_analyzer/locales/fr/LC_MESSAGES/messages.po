@@ -1177,12 +1177,12 @@ msgstr ""
 msgid "Delete the rule"
 msgstr "Supprimer la règle"
 
-msgid "Delete the tag (from every paper)"
-msgstr "Supprimer l'étiquette (de tous les articles)"
+msgid "Delete the tag (from every paper and excerpt)"
+msgstr "Supprimer l'étiquette (de tous les articles et extraits)"
 
 #, python-brace-format
-msgid "Delete the tag “{name}”, from every paper?"
-msgstr "Supprimer l'étiquette « {name} », de tous les articles ?"
+msgid "Delete the tag “{name}”, from every paper and excerpt?"
+msgstr "Supprimer l'étiquette « {name} », de tous les articles et extraits ?"
 
 msgid "Delete the track"
 msgstr "Supprimer la session"
@@ -1360,8 +1360,8 @@ msgstr ""
 msgid "Edit"
 msgstr "Édition"
 
-msgid "Edit (text, years, influence…)"
-msgstr "Modifier (texte, années, rayonnement…)"
+msgid "Edit (text, years, influence, tags…)"
+msgstr "Modifier (texte, années, rayonnement, étiquettes…)"
 
 msgid "Edit folder"
 msgstr "Modifier le dossier"
@@ -4752,6 +4752,13 @@ msgstr "Ateliers"
 
 msgid "Workshops whose main conference this is (set in the workshop's dialog)."
 msgstr "Ateliers dont c'est la conférence principale (à définir dans la fenêtre de l'atelier)."
+
+msgid ""
+"Written as #tags before the excerpt in the Markdown (type a new one, "
+"Enter)"
+msgstr ""
+"Écrites en #étiquettes devant l'extrait dans le Markdown (en taper une "
+"nouvelle, Entrée)"
 
 msgid "Wrongly found here: forget it"
 msgstr "Trouvé ici à tort : l'oublier"

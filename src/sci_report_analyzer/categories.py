@@ -1,7 +1,7 @@
 """Categories of a folder (an ordered tree, e.g. a committee's grid: "Research", under it
 "Projects"…): those of its settings (shared, see folders.settings_id), and the excerpts of
-its people's PDFs filed in them (with a text per category and person, e.g. a summary):
-listed by category, as Markdown for a report."""
+its people's PDFs filed in them (with their tags, and a text per category and person, e.g. a
+summary): listed by category, as Markdown for a report."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 
 from . import folders
-from .db.models import Category, Excerpt, PeriodDocument, Publication, SectionText
+from .db.models import Category, Excerpt, PeriodDocument, Publication, SectionText, Tag
 from .db.session import session_scope
 from .i18n import _
 
@@ -525,6 +525,11 @@ class ExcerptView:
     ref_only: bool = False  # (merged as a reference only: its place cited, not its text)
     group_text: str | None = None  # (leading a group: its text, as edited)
     original: str | None = None  # (its text as selected)
+    tags: list[tuple[str, str]] = field(default_factory=list)  # (name, colour; the group's)
+
+    @property
+    def tag_names(self) -> list[str]:
+        return [name for name, _colour in self.tags]
 
     @property
     def years(self) -> str:
@@ -574,7 +579,13 @@ def similar_excerpts(
         if any(flat and flat in " ".join(x.text.lower().split()) for x in e.parts):
             score = max(score, 1.0)
         if q:
-            hay = " ".join([e.group_text or "", *(f"{x.text} {x.source}" for x in e.parts)])
+            hay = " ".join(
+                [
+                    e.group_text or "",
+                    *(f"{x.text} {x.source}" for x in e.parts),
+                    *(f"#{t}" for t in e.tag_names),
+                ]
+            )
             if all(w in hay.lower() for w in q):
                 scored.append((score, e))
         elif score >= threshold and mine:
@@ -595,9 +606,10 @@ def add_excerpt(
     start: int | None = None,
     end: int | None = None,
     influence: bool = False,
+    tags: list[str] | None = None,
 ) -> int:
-    """File a passage (its years and influence flag: see update_excerpt); one filed there
-    already is kept."""
+    """File a passage (its years, influence flag and tags: see update_excerpt); one filed
+    there already is kept."""
     text = " ".join(text.split())
     with session_scope() as s:
         same = s.scalar(  # (filed there already)
@@ -631,8 +643,26 @@ def add_excerpt(
             influence=influence,
         )
         s.add(e)
+        _set_tags(s, e, tags or [])
         s.flush()
         return e.id
+
+
+def _set_tags(s, e: Excerpt, names: list[str]) -> None:
+    """The tags of an excerpt, by name (a new name: a new tag, on the papers too)."""
+    names = list(dict.fromkeys(n.strip() for n in names if n and n.strip()))
+    found = {t.name: t for t in s.scalars(select(Tag).where(Tag.name.in_(names)))}
+    for n in names:
+        if n not in found:
+            found[n] = Tag(name=n)
+            s.add(found[n])
+    e.tags = [found[n] for n in names]
+
+
+def tag_names() -> list[str]:
+    """The names of the tags (to put on excerpts), by name."""
+    with session_scope() as s:
+        return list(s.scalars(select(Tag.name).order_by(Tag.name)))
 
 
 def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
@@ -667,6 +697,7 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
                 ref_only=e.ref_only,
                 group_text=e.group_text,
                 original=e.original or e.text,
+                tags=[(t.name, t.colour) for t in e.tags],
             )
             for e, doc, title, colour in rows
         ]
@@ -755,6 +786,7 @@ def remove_excerpt(excerpt_id: int) -> None:
                 lead.start_year, lead.end_year = e.start_year, e.end_year
                 lead.influence = e.influence
                 lead.group_text = e.group_text
+                lead.tags = list(e.tags)
                 for x in others[1:]:
                     x.group_id = lead.id
             s.delete(e)
@@ -767,19 +799,24 @@ def update_excerpt(
     start: int | None = None,
     end: int | None = None,
     influence: bool = False,
+    tags: list[str] | None = None,
 ) -> None:
-    """Its text (unless None or blank), years and "influence" flag."""
+    """Its text (unless None or blank), years, "influence" flag and tags (by name; None:
+    unchanged)."""
     with session_scope() as s:
         if e := s.get(Excerpt, excerpt_id):
             if text is not None and text.strip():
                 e.text = " ".join(text.split())
             e.start_year, e.end_year, e.influence = start, end, influence
+            if tags is not None:
+                _set_tags(s, e, tags)
 
 
 def merge_excerpts(source_id: int, target_id: int, *, ref_only: bool = False) -> str | None:
     """Group an excerpt (with its group, if any) with another one: each keeps its text and
     place (``ref_only``: only its place is cited); the group takes the target group's
-    category, years, influence and text. Returns why it cannot be done, if so."""
+    category, years, influence and text, and the tags of both. Returns why it cannot be
+    done, if so."""
     with session_scope() as s:
         a, b = s.get(Excerpt, source_id), s.get(Excerpt, target_id)
         if a is None or b is None:
@@ -789,9 +826,11 @@ def merge_excerpts(source_id: int, target_id: int, *, ref_only: bool = False) ->
         if source.id == lead.id:
             return _("Already together")
         source.group_text = None
+        lead.tags = sorted({*lead.tags, *source.tags}, key=lambda t: t.name)
         for x in [source, *_members(s, source.id)]:
             x.group_id, x.category_id = lead.id, lead.category_id
             x.ref_only = x.ref_only or ref_only
+            x.tags = []
     return None
 
 
@@ -845,9 +884,12 @@ def cited_documents(period_id: int) -> list[tuple[int, str]]:
 
 
 def _markdown_item(e: ExcerptView) -> str:
-    """An excerpt as Markdown: its quotes (a group: on one item, as one text if edited; those
-    merged as references only: their places), each with its places between Obsidian comments
-    (``%% Application, p. 4; p. 12 %%``), then its years."""
+    """An excerpt as Markdown: its tags (Obsidian #tags, first), its quotes (a group: on one
+    item, as one text if edited; those merged as references only: their places), each with
+    its places between Obsidian comments (``%% Application, p. 4; p. 12 %%``), then its
+    years."""
+    from .pubview import hashtag
+
     chunks: list[tuple[str | None, list[str]]] = []  # (a quote, its places)
     pending: list[str] = []  # (places cited only, before any quote)
     last = None
@@ -866,21 +908,23 @@ def _markdown_item(e: ExcerptView) -> str:
     elif pending:
         chunks = [(None, pending)]
     quotes = [(f"{t} " if t else "") + f"%% {'; '.join(places)} %%" for t, places in chunks]
-    return " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
+    tags = "".join(f"{hashtag(t)} " for t in e.tag_names)
+    return tags + " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
 
 
 def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | None = None) -> str:
     """The excerpts by category (headings; a category's years in its heading), as Markdown
     (unquoted, their places between Obsidian comments: ``%% Application, p. 4; p. 12 %%``),
-    with their years. The excerpts with the "influence" flag (left in their categories too)
-    are also listed, one item per category (its path in bold, them nested below), in the
-    folder's "rayonnement" category (after its own excerpts; see set_influence), else in a
-    "Rayonnement" section at the end. ``nested`` (None: the folder's choice, see
-    reports.nested_influence): them only there instead, under subsections named after their
-    categories (as nested as these, one level below), taken out of their categories. The
-    categories with no excerpt (nor below) are left out. A section's text (see
-    section_texts) follows its heading; nested, that of a section left out (all its excerpts
-    taken out) follows the heading of its subsection in the Rayonnement section."""
+    their tags first (Obsidian #tags), with their years. The excerpts with the "influence"
+    flag (left in their categories too) are also listed, one item per category (its path in
+    bold, them nested below), in the folder's "rayonnement" category (after its own
+    excerpts; see set_influence), else in a "Rayonnement" section at the end. ``nested``
+    (None: the folder's choice, see reports.nested_influence): them only there instead, under
+    subsections named after their categories (as nested as these, one level below), taken
+    out of their categories. The categories with no excerpt (nor below) are left out. A
+    section's text (see section_texts) follows its heading; nested, that of a section left
+    out (all its excerpts taken out) follows the heading of its subsection in the
+    Rayonnement section."""
     if nested is None:
         from . import reports
 

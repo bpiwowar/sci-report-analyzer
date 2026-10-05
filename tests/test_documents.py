@@ -668,6 +668,82 @@ def test_categories_and_markdown():
     assert (lead.years, lead.members) == ("2019–2020", [])
 
 
+def test_excerpt_tags():
+    """An excerpt's tags (by name; new ones made, shared with the papers): Obsidian #tags
+    leading its Markdown item; a group's are those of its lead (merged: of both)."""
+    from sci_report_analyzer import annotations, categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    teaching = categories.add(folder, "Teaching")
+    doc = documents.add(period, "Application.pdf", PDF)
+    shared = annotations.save_tag("To discuss")
+    a = categories.add_excerpt(
+        teaching, period, "Taught IR.", 1, [], document_id=doc, tags=["strong point", "To discuss"]
+    )
+    b = categories.add_excerpt(teaching, period, "Gave a course.", 2, [], document_id=doc)
+    [ea, eb] = categories.excerpts(period)
+    assert (ea.tag_names, eb.tags) == (["To discuss", "strong point"], [])
+    assert {"To discuss", "strong point"} <= set(categories.tag_names())
+    assert [t.id for t in annotations.all_tags() if t.name == "To discuss"] == [shared]
+    assert categories.markdown(folder, period) == (
+        "## Teaching\n\n- #To-discuss #strong-point Taught IR. %% Application, p. 1 %%\n"
+        "- Gave a course. %% Application, p. 2 %%\n"
+    )
+    assert [v.id for v in categories.similar_excerpts(period, "x", "#strong")] == [a]
+    # Edited (None: kept); merged, the group has both's tags.
+    categories.update_excerpt(a, influence=True)
+    assert categories.excerpts(period)[0].tag_names == ["To discuss", "strong point"]
+    categories.update_excerpt(a, tags=["strong point"])
+    categories.update_excerpt(b, tags=["2024"])
+    assert categories.merge_excerpts(a, b) is None
+    [g] = categories.excerpts(period, grouped=True)
+    assert (g.id, g.tag_names, g.members[0].tags) == (b, ["2024", "strong point"], [])
+    assert categories.markdown(folder, period).startswith(
+        "## Teaching\n\n- #tag-2024 #strong-point Taught IR."
+    )
+    # The lead removed: the next one has the group's tags; a tag deleted: off the excerpts.
+    categories.remove_excerpt(b)
+    [e] = categories.excerpts(period)
+    assert e.tag_names == ["2024", "strong point"]
+    annotations.delete_tag(next(t.id for t in annotations.all_tags() if t.name == "2024"))
+    assert categories.excerpts(period)[0].tag_names == ["strong point"]
+
+
+async def test_excerpt_tags_in_the_viewer(user: User, fake_viewer):
+    """Tags given when filing an excerpt (an existing one, or typed), shown on its row, and
+    edited."""
+    from sci_report_analyzer import annotations, categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    annotations.save_tag("To discuss")
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "Led the Quokka project", "p": 1, "rects": []}
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker=f"pick-category-{research}")
+    tags = user.find(marker="excerpt-tags").elements.pop()
+    assert "To discuss" in tags.options
+    tags.value = ["To discuss", "Quokka"]
+    user.find(marker=f"pick-category-{research}").click()
+    await user.should_see("Added to Research")
+    [e] = categories.excerpts(period)
+    assert e.tag_names == ["Quokka", "To discuss"]
+    await user.should_see(marker=f"excerpt-tags-{e.id}")
+    user.find(marker=f"excerpt-edit-{e.id}").click()
+    await user.should_see(marker="excerpt-edit-save")
+    tags = user.find(marker="excerpt-tags").elements.pop()
+    assert tags.value == ["Quokka", "To discuss"]
+    tags.value = ["Quokka"]
+    user.find(marker="excerpt-edit-save").click()
+    await user.should_not_see(marker="excerpt-edit-save")
+    assert categories.excerpts(period)[0].tag_names == ["Quokka"]
+
+
 def test_nested_influence():
     """Optionally, the "rayonnement" excerpts only in its section, under their categories."""
     from sci_report_analyzer import categories, reports

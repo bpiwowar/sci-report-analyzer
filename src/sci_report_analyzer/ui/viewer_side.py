@@ -22,7 +22,7 @@ from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
 from .pub_details import show_details
 from .reflist import tag_from_list
-from .theme import int_or_none
+from .theme import chip_html, int_or_none, span
 
 ui.add_css(
     ".vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
@@ -231,7 +231,7 @@ class Side:
     def file_excerpt(
         self, category_id: int, text: str, page: int | None, rects: list, **props
     ) -> None:
-        """``props``: its years and influence flag (see categories.add_excerpt)."""
+        """``props``: its years, influence flag and tags (see categories.add_excerpt)."""
         kind, key = self.source
         categories.add_excerpt(
             category_id,
@@ -747,12 +747,13 @@ def excerpt_properties(
     start: int | None = None,
     end: int | None = None,
     influence: bool = False,
+    tags: list[str] | None = None,
     *,
     cleared: Callable[[], None] | None = None,
 ) -> Callable[[], dict]:
-    """The fields of an excerpt's years (a button clears them, then calls ``cleared``) and
-    influence flag; returns their values (the keywords of categories.add_excerpt /
-    update_excerpt)."""
+    """The fields of an excerpt's years (a button clears them, then calls ``cleared``),
+    influence flag and tags (those of papers and excerpts, or new ones typed); returns their
+    values (the keywords of categories.add_excerpt / update_excerpt)."""
 
     def clear() -> None:
         start_in.set_value(None)
@@ -771,11 +772,26 @@ def excerpt_properties(
         flag = ui.checkbox(_("Influence"), value=influence).mark("excerpt-influence")
         flag.tooltip(_("Shows the person's influence (“rayonnement”: invited talks, prizes…)"))
         ui.icon("public", size="xs", color="teal").classes("-ml-2")
+    tags_in = (
+        ui.select(
+            sorted(set(categories.tag_names()) | set(tags or []), key=str.lower),
+            label=_("Tags"),
+            value=list(tags or []),
+            multiple=True,
+            new_value_mode="add-unique",
+            with_input=True,
+        )
+        .props("dense outlined use-chips hide-dropdown-icon")
+        .classes("w-full")
+        .tooltip(_("Written as #tags before the excerpt in the Markdown (type a new one, Enter)"))
+        .mark("excerpt-tags")
+    )
 
     return lambda: {
         "start": int_or_none(start_in.value),
         "end": int_or_none(end_in.value),
         "influence": bool(flag.value),
+        "tags": list(tags_in.value or []),
     }
 
 
@@ -860,8 +876,8 @@ def category_picker(
     find it (Enter: the first one), or name a new one. ``title``, ``done`` (its
     ``{category}`` named): marked with ``N_``, translated here. ``current``: its category, shown;
     ``properties``: also its years (those found in the text, then taken out of it if leading
-    or ending it: see categories.split_years; cleared, the text as it was) and influence flag
-    (passed to ``chosen`` as keywords, with ``text``, so taken out or not);
+    or ending it: see categories.split_years; cleared, the text as it was), influence flag
+    and tags (passed to ``chosen`` as keywords, with ``text``, so taken out or not);
     ``merge``: or merge it with an excerpt (called with it, and whether only its place is
     cited), the similar ones shown with a warning."""
     folder_id, folder_name = side.folder
@@ -1163,6 +1179,14 @@ class _ExcerptsSection:
                         ui.icon("public", size="xs", color="teal").classes("shrink-0").tooltip(
                             _("Influence")
                         ).mark(f"excerpt-influence-{x.id}")
+                    if not member and lead.tags:
+                        with (
+                            ui.row()
+                            .classes("gap-1 shrink-0 items-center")
+                            .mark(f"excerpt-tags-{x.id}")
+                        ):
+                            for name, colour in lead.tags:
+                                span(chip_html(name, colour, title=_("tag")))
                     cite = (  # (in a group, its text not edited: quote it, or only cite it)
                         [
                             (
@@ -1191,7 +1215,7 @@ class _ExcerptsSection:
                             (
                                 "edit",
                                 "edit",
-                                _("Edit (text, years, influence…)"),
+                                _("Edit (text, years, influence, tags…)"),
                                 self.edit_excerpt,
                             ),
                             *cite,
@@ -1377,8 +1401,8 @@ class _ExcerptsSection:
                     ).mark(f"excerpt-original-use-{x.id}")
 
     def edit_excerpt(self, e: categories.ExcerptView) -> None:
-        """Its text (that of a group), years and "influence" flag; the passages as selected
-        shown."""
+        """Its text (that of a group), years, "influence" flag and tags; the passages as
+        selected shown."""
         with (
             self.side.host.dialogs,
             transient_dialog(
@@ -1399,7 +1423,7 @@ class _ExcerptsSection:
                     )
                 ).classes("text-xs text-grey")
             self.originals(e, text)
-            props = excerpt_properties(e.start_year, e.end_year, e.influence)
+            props = excerpt_properties(e.start_year, e.end_year, e.influence, e.tag_names)
 
             def save() -> None:
                 if e.members:
