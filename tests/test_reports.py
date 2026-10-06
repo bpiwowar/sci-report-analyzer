@@ -297,27 +297,44 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     reports.save_numbering(fid, reports.Numbering(star, "#{index}", "#{index}"))
     pdfs.save(a, PDF, None)
     await user.open(f"/pdf/{a}?period={period}")
-    await user.should_see(marker="citation-status")
-    await user.should_see("0 of the 1 papers to discuss cited")
-    [box] = user.find(marker="citation-status").elements
-    [icon] = [e for e in box.descendants() if e.tag == "q-icon"]
-    assert icon.props["color"] == "negative"
+    # The hint on the editor's "Papers": coloured by whether the papers to discuss are cited.
+    await user.should_see(marker="folder-note-mode")
+    [mode] = user.find(marker="folder-note-mode").elements
+
+    def side() -> dict:
+        return dict(zip(mode._values, mode.props["options"], strict=True))["side"]
+
+    async def hinted(colour: str, text: str) -> None:  # (once the papers are loaded)
+        for _i in range(50):
+            if side().get("textColor") == colour:
+                break
+            await asyncio.sleep(0.05)
+        assert side()["textColor"] == colour and text in side()["attrs"]["title"]
+
+    await hinted("negative", "0 of the 1 papers to discuss cited")
     user.find(marker="folder-note").elements.pop().value = f"Good: [@{keys[a]}]."
-    await user.should_see("1 of the 1 papers to discuss cited")
-    assert icon.props["color"] == "positive"
     await user.should_see("Good: #1.")  # (the preview)
-    # A click: the folder's numbering and templates.
-    user.find(marker="citation-status").click()
-    await user.should_see(marker="folder-number-tag")
+    await hinted("positive", "1 of the 1 papers to discuss cited")
+    # The folder's numbering and templates: in its settings (their own tab).
+    await user.open(f"/?folder={fid}")
+    user.find(marker="folder-edit").click()
+    await user.should_see(marker="folder-tab-notes")
+    user.find(marker="folder-nested-influence").click()  # (the folder's tab: not its notes')
+    user.find(marker="folder-tab-notes").click()
     await user.should_see(marker="folder-same-formats")  # (both "#{index}")
     user.find(marker="folder-number-format").clear().type("[{index}]")
     user.find(marker="folder-listed-format").clear().type("§{index}")
     await user.should_not_see(marker="folder-same-formats")
-    user.find(marker="folder-nested-influence").click()
-    user.find(marker="folder-citations-save").click()
-    await user.should_see("Good: §1.")
+    user.find(marker="folder-save").click()
+    await user.should_not_see(marker="folder-save")
+    await asyncio.sleep(0.3)  # (then back to the folder: before leaving it)
     assert reports.numbering(fid) == reports.Numbering(star, "[{index}]", "§{index}")
     assert reports.nested_influence(fid)
+    await user.open(f"/pdf/{a}?period={period}")
+    await user.should_see(marker="folder-note-mode")
+    await asyncio.sleep(0.5)  # (the papers loaded)
+    user.find(marker="folder-note").elements.pop().value = f"Good: [@{keys[a]}]."
+    await user.should_see("Good: §1.")  # (the new format)
     # Beside the papers (in place of the preview): those to discuss, whether cited.
     user.find(marker="folder-note-mode").elements.pop().value = "side"
     await user.should_see("1 of the 1 papers to discuss cited", marker="folder-papers-count")

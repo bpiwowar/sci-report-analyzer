@@ -320,22 +320,18 @@ class Side:
         in it), if the PDF is in a folder: in their own tab, and where quotes go by default."""
         if self.folder is None or self.period_id is None:
             return
-        from .citations import CitationStatus, folder_citations_dialog
+        from .citations import citation_hint
         from .folder_notes import folder_notes_editor
         from .papers_pane import PapersPane
 
         folder_id, name = self.folder
         tip = _("Notes of the folder {folder} on this person (all their documents and papers)")
-        status: list[CitationStatus] = []
-
-        def tools() -> None:
-            self.folder_tools()
-            status.append(CitationStatus(lambda: folder_citations_dialog(folder_id, refresh)))
 
         def render(text: str) -> str:
             ctx = reports.folder_context(self.stats, self.period_id)
             out = reports.render(text, ctx)
-            status[0].update(ctx, out)
+            if (editor := getattr(self, "folder_editor", None)) is not None:
+                citation_hint(editor, ctx, out)
             return out.text
 
         pane: list[PapersPane] = []
@@ -374,8 +370,9 @@ class Side:
 
         with self.section("folder-notes", "folder_open", tip.format(folder=name), fill=True):
             self.folder_editor = folder_notes_editor(
-                self.period_id, render, toolbar=tools, side=papers
+                self.period_id, render, toolbar=self.folder_tools, side=papers
             )
+            render(self.folder_editor.value)  # (the hint on its papers)
             self.folder_editor.editor.on_value_change(typed)
             pane[0].track(self.folder_editor)
             self.folder_editor.on_mode.append(

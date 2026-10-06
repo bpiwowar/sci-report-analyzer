@@ -1,5 +1,5 @@
 """How papers are cited in the notes: the templates (general, or a folder's), a folder's
-numbering, and whether its notes cite its papers (the icon next to the quote tool)."""
+numbering, and whether its notes cite its papers (the hint on the editor's "Papers")."""
 
 from __future__ import annotations
 
@@ -7,11 +7,11 @@ from collections.abc import Callable
 
 from nicegui import ui
 
-from .. import annotations, folders, reports
+from .. import annotations, reports
 from ..i18n import N_, _
 from . import unsaved
 from .categories_editor import shared_note
-from .dialogs import ok_handler, transient_dialog
+from .mdedit import MarkdownEditor
 
 TEMPLATES_HELP = N_(
     "How a paper is cited: `[@key]` followed by the template. `{.notes}`, `{.tags}`, "
@@ -126,17 +126,15 @@ def templates_section() -> None:
 # ---- A folder's citations ---------------------------------------------------------------------
 
 
-def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None = None) -> None:
-    """A folder's numbering (the tag whose papers are numbered, the number's format) and
-    its own templates (over the general ones, by name)."""
-    name = next((f.name for f in folders.folders() if f.id == folder_id), "")
+def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
+    """A folder's settings of its notes (in its dialog): the numbering (the tag whose papers
+    are numbered, the number's format), its own templates (over the general ones, by name),
+    the notes it starts with. Returns its save (False: refused, said)."""
     n = reports.numbering(folder_id)
     own = reports.folder_templates(folder_id)
     general = reports.load_templates().names
     tags = {t.id: ("⏱ " if t.per_period else "") + t.name for t in annotations.all_tags()}
-    with transient_dialog(
-        _("Citations in the notes of {folder}").format(folder=name), width="w-full max-w-4xl"
-    ) as (dlg, _card):
+    with ui.column().classes("w-full gap-2"):
         shared_note(folder_id)
         with ui.row().classes("w-full items-start gap-3"):
             tag = (
@@ -259,21 +257,6 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
             )
             .mark("folder-skeleton")
         )
-        nested = (
-            ui.checkbox(
-                _("Rayonnement excerpts only in the Rayonnement section, by category"),
-                value=reports.nested_influence(folder_id),
-            )
-            .tooltip(
-                _(
-                    "In []{.excerpts} (and the copied excerpts): the excerpts flagged "
-                    "“rayonnement” taken out of their categories, listed under subsections "
-                    "named after them; one block: []{.excerpts .nested-influence} or "
-                    "[]{.excerpts .flat-influence}"
-                )
-            )
-            .mark("folder-nested-influence")
-        )
 
         def add() -> None:
             own.append(reports.Template("", "{.index (.short-venue .year)}", ""))
@@ -290,20 +273,12 @@ def folder_citations_dialog(folder_id: int, on_saved: Callable[[], None] | None 
                 reports.Numbering(tag.value or None, fmt.value or "", listed.value or ""),
             )
             reports.save_skeleton(folder_id, skeleton.value or "")
-            reports.save_nested_influence(folder_id, bool(nested.value))
-            ui.notify(_("Saved"), type="positive")
-            if on_saved:
-                on_saved()
+            return None
 
-        with ui.row().classes("w-full items-center"):
-            ui.button(_("Add a template"), icon="add", on_click=add).props("flat").mark(
-                "folder-template-add"
-            )
-            ui.space()
-            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Save"), icon="save", on_click=ok_handler(dlg, save)).mark(
-                "folder-citations-save"
-            )
+        ui.button(_("Add a template"), icon="add", on_click=add).props("flat").mark(
+            "folder-template-add"
+        )
+    return save
 
 
 # ---- Whether the notes cite the papers --------------------------------------------------------
@@ -317,45 +292,15 @@ def _paper(p: reports.Paper, ctx: reports.Context) -> str:
     return f"{number}{p.stat.title or _('(untitled)')}{year}"
 
 
-class CitationStatus:
-    """An icon coloured by whether the notes cite the papers to discuss (all of them, some
-    not of the period's years, some not), the details on hover."""
-
-    def __init__(self, on_click: Callable[[], None] | None = None) -> None:
-        self.state: reports.Status | None = None
-        with ui.element("span").mark("citation-status") as self.box:
-            self.icon = ui.icon("fact_check", size="sm", color="grey")
-            with ui.tooltip().classes("text-sm"):
-                self.details = ui.column().classes("gap-0")
-        if on_click:
-            self.box.classes("cursor-pointer").on("click", on_click)
-
-    def update(self, ctx: reports.Context, rendered: reports.Rendered) -> None:
-        st = reports.citation_status(ctx, rendered.cited)
-        self.state = st
-        self.icon.props(f"color={st.colour}")
-        self.details.clear()
-        cited = len(st.discuss) - len(st.missing)
-        with self.details:
-            ui.label(
-                _("{cited} of the {n} papers to discuss cited").format(
-                    cited=cited, n=len(st.discuss)
-                )
-                if st.discuss
-                else _("No paper to discuss (set the folder's numbered tag)")
-            ).classes("font-medium")
-            for title, papers in (
-                (_("Not cited:"), st.missing),
-                (_("Cited, but not of the period's years:"), st.off),
-            ):
-                if papers:
-                    ui.label(title).classes("mt-1")
-                    for p in papers[:12]:
-                        ui.label(f"· {_paper(p, ctx)}").classes("pl-2")
-                    if len(papers) > 12:
-                        ui.label(_("… and {n} more").format(n=len(papers) - 12))
-            for err in rendered.errors:
-                ui.label(err).classes("mt-1 text-negative")
-            ui.label(_("Click: the folder's numbering and templates")).classes(
-                "mt-1 text-grey-5 text-xs"
-            )
+def citation_hint(editor: MarkdownEditor, ctx: reports.Context, rendered: reports.Rendered) -> None:
+    """On the editor's "Papers" (the papers to discuss, beside it): coloured by whether the
+    notes cite them (all of them, some not of the period's years, some not), how many on
+    hover (and the notes' errors, e.g. a template cycle)."""
+    st = reports.citation_status(ctx, rendered.cited)
+    cited = len(st.discuss) - len(st.missing)
+    text = (
+        _("{cited} of the {n} papers to discuss cited").format(cited=cited, n=len(st.discuss))
+        if st.discuss
+        else _("No paper to discuss (set the folder's numbered tag)")
+    )
+    editor.mode.hint("side", st.colour, " · ".join([text, *rendered.errors]))

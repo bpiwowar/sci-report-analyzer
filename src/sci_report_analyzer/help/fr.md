@@ -214,13 +214,13 @@ deux), et des modèles : `[@key]{.short-venue (.year)}` donne `EMNLP (2026)` (ch
 `.number` le numéro tel que le dossier l'écrit, `.index` le numéro seul comme dans
 `{**#.index**}`, `.title`, `.venue`, `.short-venue` l'acronyme, `.year`, `.tags`, `.notes` ;
 un crochet sans valeur est supprimé). Les modèles nommés (Paramètres → Modèles de citation,
-ou ceux du dossier) s'utilisent comme `.nom`. Les réglages du dossier (l'icône ✓ de ses notes,
-ou sa fenêtre) fixent l'étiquette dont les articles sont numérotés (dans l'ordre de la liste,
+ou ceux du dossier) s'utilisent comme `.nom`. Les réglages du dossier (l'onglet
+« Notes et citations » de sa fenêtre) fixent l'étiquette dont les articles sont numérotés (dans l'ordre de la liste,
 sinon par année ; les autres dans l'ordre de citation) et l'écriture des numéros : un format
 pour les articles de la liste (`**#{index}**`), un pour les autres (`[{index}]`). Les articles
-à discuter sont ceux de la liste (sinon ceux des années de la période) ; l'icône ✓ est rouge
-tant que chacun n'est pas cité, orange si un article cité n'est pas des années de la période.
-Le mode « Articles » de l'éditeur montre, à la place de l'aperçu, les articles à discuter avec
+à discuter sont ceux de la liste (sinon ceux des années de la période) ; le mode
+« Articles » de l'éditeur (son icône rouge tant que chacun n'est pas cité, orange si un article cité
+n'est pas des années de la période, verte une fois tous cités ; combien au survol) montre, à la place de l'aperçu, les articles à discuter avec
 leurs numéros (rouge tant qu'ils ne sont pas cités, orange : hors des années de la période ;
 un clic le cite, le menu ⋮ avec un modèle), celui sous le curseur mis en évidence, une
 recherche (Entrée cite le premier ; les autres articles de la personne aussi), et « Les citer »

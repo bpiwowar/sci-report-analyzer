@@ -213,12 +213,12 @@ without brackets: `@a, @b{.notes}`), `@key` its title, venue, year and category,
 folder writes it, `.index` the bare number as in `{**#.index**}`, `.title`, `.venue`,
 `.short-venue` the acronym, `.year`, `.tags`, `.notes`; a bracket without a value is dropped).
 Named templates (Settings → Citation templates, or the folder's own) are used as `.name`.
-The folder's settings (the ✓ icon of its notes, or its dialog) set the tag whose papers are
+The folder's settings (its dialog's “Notes and citations” tab) set the tag whose papers are
 numbered (as listed, else by year; the others as first cited) and how numbers are written:
 one format for the listed papers (`**#{index}**`), one for the others (`[{index}]`). The
-papers to discuss are the listed ones (else those of the period's years); the ✓ icon is red
-until each is cited, orange if one cited is not of the period's years. The editor's
-"Papers" mode shows, instead of the preview, the papers to discuss with their numbers (red
+papers to discuss are the listed ones (else those of the period's years); the editor's
+"Papers" mode (its icon red until each is cited, orange if one cited is not of the
+period's years, green once all are; how many on hover) shows, instead of the preview, the papers to discuss with their numbers (red
 until cited, orange: not of the period's years; a click cites it, the ⋮ menu with a
 template), the one at the cursor highlighted, a search (Enter cites the first match; the
 person's other papers too), and "Cite them" (those not cited yet); the papers of the

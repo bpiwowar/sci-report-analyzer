@@ -8,7 +8,7 @@ from html import escape
 
 from nicegui import background_tasks, ui
 
-from .. import annotations, folders, manual, persons, pubview, source_settings
+from .. import annotations, folders, manual, persons, pubview, reports, source_settings
 from ..db.models import Person
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
@@ -538,71 +538,103 @@ def _tags_editor(member: folders.Member, options: list[str]) -> None:
 
 # ---- folders -------------------------------------------------------------------------------
 
+NESTED_TIP = N_(
+    "In []{.excerpts} (and the copied excerpts): the excerpts flagged "
+    "“rayonnement” taken out of their categories, listed under subsections "
+    "named after them; one block: []{.excerpts .nested-influence} or "
+    "[]{.excerpts .flat-influence}"
+)
+
 
 def folder_dialog(f: folders.FolderView | None) -> None:
-    with transient_dialog(_("New folder") if f is None else _("Edit folder"), width="w-96") as (
-        dlg,
-        _card,
-    ):
-        name = ui.input(_("Name"), value=f.name if f else "").classes("w-full").mark("folder-name")
-        with ui.input(_("Date"), value=f.date.isoformat() if f and f.date else "").classes(
-            "w-full"
-        ) as day:
-            with ui.menu().props("no-parent-event") as menu, ui.date().bind_value(day):
-                ui.button(_("Close"), on_click=menu.close).props("flat")
-            with day.add_slot("append"):
-                ui.icon("edit_calendar").on("click", menu.open).classes("cursor-pointer")
-        edited = {"notes": f is None}  # (saved only if edited: the copy shown may be stale)
-        notes = (
-            ui.textarea(
-                _("Notes"),
-                value=f.notes if f else "",
-                on_change=lambda: edited.update(notes=True),
-            )
-            .classes("w-full")
-            .mark("folder-own-notes")
-        )
-        default = source_settings.default_primary()
-        primary = (
-            ui.select(
-                {
-                    None: _("Default ({source})").format(
-                        source=ADAPTERS[default].label if default in ADAPTERS else _("none")
-                    ),
-                    source_settings.NO_PRIMARY: _("None"),
-                    **{
-                        n: a.label
-                        for n, a in ADAPTERS.items()
-                        if a.linkable and a.provides_publications
-                    },
-                },
-                value=f.primary_source if f else None,
-                label=_("Primary source"),
-            )
-            .classes("w-full")
-            .tooltip(_("Papers this source doesn't list for a person are not counted"))
-            .mark("folder-primary")
-        )
-        hidden = ui.checkbox(_("Hidden"), value=f.hidden if f else False)
-        if f is not None:
-            from .citations import folder_citations_dialog
+    """A folder's settings: its name, date, notes…; and (an existing one) those of the notes on
+    its people (the papers numbered, the templates…), in another tab."""
+    with transient_dialog(
+        _("New folder") if f is None else _("Edit folder"),
+        width="w-96" if f is None else "w-full max-w-4xl",
+    ) as (dlg, _card):
+        with ui.tabs().props("dense align=left").classes("w-full") as tabs:
+            general_tab = ui.tab("general", _("Folder")).mark("folder-tab-general")
+            if f is not None:
+                ui.tab("notes", _("Notes and citations")).mark("folder-tab-notes")
+        citations_save = None
+        with ui.tab_panels(tabs, value=general_tab).classes("w-full"):
+            with ui.tab_panel("general").classes("p-0 gap-2"):
+                name = (
+                    ui.input(_("Name"), value=f.name if f else "")
+                    .classes("w-full")
+                    .mark("folder-name")
+                )
+                with ui.input(_("Date"), value=f.date.isoformat() if f and f.date else "").classes(
+                    "w-full"
+                ) as day:
+                    with ui.menu().props("no-parent-event") as menu, ui.date().bind_value(day):
+                        ui.button(_("Close"), on_click=menu.close).props("flat")
+                    with day.add_slot("append"):
+                        ui.icon("edit_calendar").on("click", menu.open).classes("cursor-pointer")
+                edited = {"notes": f is None}  # (saved only if edited: the copy shown may be stale)
+                notes = (
+                    ui.textarea(
+                        _("Notes"),
+                        value=f.notes if f else "",
+                        on_change=lambda: edited.update(notes=True),
+                    )
+                    .classes("w-full")
+                    .mark("folder-own-notes")
+                )
+                default = source_settings.default_primary()
+                primary = (
+                    ui.select(
+                        {
+                            None: _("Default ({source})").format(
+                                source=ADAPTERS[default].label if default in ADAPTERS else _("none")
+                            ),
+                            source_settings.NO_PRIMARY: _("None"),
+                            **{
+                                n: a.label
+                                for n, a in ADAPTERS.items()
+                                if a.linkable and a.provides_publications
+                            },
+                        },
+                        value=f.primary_source if f else None,
+                        label=_("Primary source"),
+                    )
+                    .classes("w-full")
+                    .tooltip(_("Papers this source doesn't list for a person are not counted"))
+                    .mark("folder-primary")
+                )
+                hidden = ui.checkbox(_("Hidden"), value=f.hidden if f else False)
+                nested = None
+                if f is not None:
+                    nested = (
+                        ui.checkbox(
+                            _("Rayonnement excerpts only in the Rayonnement section, by category"),
+                            value=reports.nested_influence(f.id),
+                        )
+                        .tooltip(_(NESTED_TIP))
+                        .mark("folder-nested-influence")
+                    )
+            if f is not None:
+                with ui.tab_panel("notes").classes("p-0"):
+                    from .citations import folder_citations_section
 
-            ui.button(
-                _("Citations in the notes"),
-                icon="format_list_numbered",
-                on_click=lambda: folder_citations_dialog(f.id),
-            ).props("flat no-caps").tooltip(
-                _("The numbered papers (a tag), the number's format, the folder's templates")
-            ).mark("folder-citations")
+                    citations_save = folder_citations_section(f.id)
 
         def save() -> bool | None:
             if not name.value.strip():
+                tabs.value = "general"
                 return False
             try:
                 d = date.fromisoformat(day.value) if day.value else None
             except ValueError:
                 ui.notify(_("Invalid date (YYYY-MM-DD)"), type="warning")
+                tabs.value = "general"
                 return False
+            if citations_save is not None and citations_save() is False:
+                tabs.value = "notes"
+                return False
+            if nested is not None:
+                reports.save_nested_influence(f.id, bool(nested.value))
             fid = folders.save_folder(
                 f.id if f else None,
                 name.value.strip(),

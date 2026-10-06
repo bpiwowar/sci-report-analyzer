@@ -1579,6 +1579,9 @@ msgstr "D'abord, {names} sont fusionnés dans « {name} »."
 msgid "Flagged “influence” in {category} (copied here too)"
 msgstr "Marqué « rayonnement » dans {category} (copié ici aussi)"
 
+msgid "Folder"
+msgstr "Dossier"
+
 msgid "Folders"
 msgstr "Dossiers"
 
@@ -2752,6 +2755,9 @@ msgstr "Note dans {period}"
 
 msgid "Notes"
 msgstr "Notes"
+
+msgid "Notes and citations"
+msgstr "Notes et citations"
 
 msgid "Notes and excerpts"
 msgstr "Notes et extraits"

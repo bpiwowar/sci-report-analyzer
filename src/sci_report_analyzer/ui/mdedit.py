@@ -43,8 +43,22 @@ class _ModeToggle(ui.toggle):
 
     def _update_options(self) -> None:
         super()._update_options()
+        hints = getattr(self, "hints", {})
         for option, key in zip(self._props["options"], self._values, strict=True):
-            option.update(icon=MODE_ICONS[key], label="", attrs={"title": _(MODES[key])})
+            colour, more = hints.get(key, (None, ""))
+            title = _(MODES[key]) + (f" · {more}" if more else "")
+            option.update(icon=MODE_ICONS[key], label="", attrs={"title": title})
+            if colour:
+                option.update(textColor=colour, toggleTextColor=colour)
+
+    def hint(self, key: str, colour: str, text: str) -> None:
+        """A mode's icon coloured (e.g. the papers: whether the notes cite them), ``text``
+        on hover."""
+        if getattr(self, "hints", {}).get(key) == (colour, text):
+            return
+        self.hints = {**getattr(self, "hints", {}), key: (colour, text)}
+        self._update_options()
+        self.update()
 
 
 def quote(text: str, where: str = "") -> str:
