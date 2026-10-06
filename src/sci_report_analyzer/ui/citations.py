@@ -18,9 +18,10 @@ TEMPLATES_HELP = N_(
     "`{.full}` (title, venue…) give its entry; otherwise the fields `.number` (the number, "
     "formatted), `.index` (the bare number), `.title`, `.venue`, `.short-venue` (its "
     "acronym), `.year`, `.tags`, `.notes` are replaced and the rest kept, a parenthesis "
-    "without a value dropped: `{**#.index** (.short-venue .year)}` gives **#2** (EMNLP "
-    "2026). Empty: the number. A template with a name is used as `.name`, alone "
-    "(`[@key]{.starred}`) or within another one (`{.starred: .notes}`)."
+    "without a value dropped: `{.number (.short-venue .year)}` gives **#2** (EMNLP "
+    "2026). A citation without a template (`[@key]`, as inserted) is written as the folder "
+    "says (its settings: Notes and citations). A template with a name is used as `.name`, "
+    "alone (`[@key]{.starred}`) or within another one (`{.starred: .notes}`)."
 )
 
 
@@ -28,24 +29,15 @@ def template_rows(
     items: list[reports.Template],
     *,
     mark: str,
-    default: dict | None = None,
     labels: bool = True,
 ) -> Callable[[], None]:
-    """The templates to edit (``default``: {"attrs": the default's}, to choose it;
-    ``labels``: with their labels); returns the refresh of the rows."""
+    """The templates to edit (``labels``: with their labels); returns the refresh of the
+    rows."""
 
     @ui.refreshable
     def rows() -> None:
         for i, t in enumerate(items):
             with ui.row().classes("items-center gap-2 no-wrap").mark(f"{mark}-{i}"):
-                if default is not None:
-                    on = default["attrs"] == t.attrs
-                    ui.button(
-                        icon="star" if on else "star_border",
-                        on_click=lambda t=t: (default.update(attrs=t.attrs), rows.refresh()),
-                    ).props("flat round dense color=amber-8").tooltip(
-                        _("The default") if on else _("Make it the default")
-                    ).mark(f"{mark}-default-{i}")
                 if labels:
                     ui.input(
                         _("Label"),
@@ -71,8 +63,6 @@ def template_rows(
                 ).mark(f"{mark}-delete-{i}")
 
     def set_attrs(t: reports.Template, attrs: str) -> None:
-        if default is not None and default["attrs"] == t.attrs:
-            default["attrs"] = attrs
         t.attrs = attrs
 
     def remove(i: int) -> None:
@@ -86,34 +76,29 @@ def template_rows(
 def templates_section() -> None:
     """Settings → Citation templates: the general ones."""
     cfg = reports.load_templates()
-    default = {"attrs": cfg.default}
     ui.markdown(_(TEMPLATES_HELP)).classes("text-sm text-grey")
     with ui.column().classes("gap-1"):
-        refresh = template_rows(cfg.items, mark="report-template", default=default)
+        refresh = template_rows(cfg.items, mark="report-template")
 
     def add() -> None:
         cfg.items.append(reports.Template(_("New template"), "{.short-venue .year}"))
         refresh()
 
     def reset() -> None:
-        d = reports.default_templates()
-        cfg.items[:] = d.items
-        default["attrs"] = d.default
+        cfg.items[:] = reports.default_templates().items
         refresh()
 
     def save() -> bool:
-        cfg.default = default["attrs"]
         try:
             reports.save_templates(cfg)
         except ValueError as e:
             ui.notify(str(e), type="negative")
             return False
-        default["attrs"] = cfg.default
         refresh()
         ui.notify(_("Saved"), type="positive")
         return True
 
-    save = unsaved.track(lambda: (cfg.items, default["attrs"]), save)
+    save = unsaved.track(lambda: cfg.items, save)
     with ui.row().classes("mt-2"):
         ui.button(_("Add a template"), icon="add", on_click=add).props("flat").mark(
             "report-template-add"
@@ -127,96 +112,183 @@ def templates_section() -> None:
 
 
 def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
-    """A folder's settings of its notes (in its dialog): the numbering (the tag whose papers
-    are numbered, the number's format), its own templates (over the general ones, by name),
-    the notes it starts with. Returns its save (False: refused, said)."""
+    """A folder's settings of its notes (in its dialog): its star lists (their papers
+    numbered there, as each says; to cite or not), how the other papers cited are numbered,
+    the template of ``[@key]``, with examples; its own templates (over the general ones, by
+    name), the notes it starts with. Returns its save (False: refused, said)."""
+    from .. import folders
+
+    settings = folders.settings_of(folder_id)
     n = reports.numbering(folder_id)
     own = reports.folder_templates(folder_id)
     general = reports.load_templates().names
-    tags = {t.id: ("⏱ " if t.per_period else "") + t.name for t in annotations.all_tags()}
+    lists = [
+        {
+            "id": t.id,
+            "name": t.name,
+            "format": t.number_format or reports.NUMBER_FORMAT,
+            "cite": t.must_cite,
+            "builtin": t.key is not None,
+            "colour": t.colour,
+        }
+        for t in annotations.star_lists(settings_id=settings)
+    ]
+    removed: list[int] = []
     with ui.column().classes("w-full gap-2"):
         shared_note(folder_id)
-        with ui.row().classes("w-full items-start gap-3"):
-            tag = (
-                ui.select(
-                    {0: _("None: as first cited"), **tags},
-                    value=n.tag_id if n.tag_id in tags else 0,
-                    label=_("Numbered papers: with the tag"),
-                )
-                .props("dense outlined")
-                .classes("w-64")
-                .tooltip(
-                    _(
-                        "Their numbers (.index, .number, [@key]): their numbers within the tag "
-                        "(put from a list, or set by hand: Alt-click a #number, or order the "
-                        "tag's papers), else by year; the other papers apart, from 1, as first "
-                        "cited. They are the papers to discuss (without: those of the period's "
-                        "years)."
-                    )
-                )
-                .mark("folder-number-tag")
+        ui.label(_("Star lists")).classes("font-medium")
+        ui.label(
+            _(
+                "The papers starred within a person's period (★: the first list), in order: "
+                "numbered in the first list they are in, written as it says ({index}: the "
+                "number). Those of the lists to cite are the papers to discuss, each to be "
+                "cited in the notes (without: those of the period's years)."
             )
+        ).classes("text-sm text-grey")
+
+        @ui.refreshable
+        def list_rows() -> None:
+            for i, x in enumerate(lists):
+                with ui.row().classes("items-center gap-2 no-wrap").mark(f"folder-list-{i}"):
+                    ui.icon("star", color="amber-8" if i == 0 else "grey").tooltip(
+                        _("The ★ button's") if i == 0 else ""
+                    )
+                    ui.input(
+                        _("Name"),
+                        value=x["name"],
+                        on_change=lambda e, x=x: (x.update(name=e.value or ""), shown.refresh()),
+                    ).props("dense outlined").classes("w-40").mark(f"folder-list-name-{i}")
+                    ui.input(
+                        _("Number"),
+                        value=x["format"],
+                        on_change=lambda e, x=x: (
+                            x.update(format=e.value or ""),
+                            shown.refresh(),
+                        ),
+                    ).props("dense outlined").classes("w-36").tooltip(
+                        _("How the number of its papers is written ({index}: the number)")
+                    ).mark(f"folder-list-format-{i}")
+                    ui.checkbox(
+                        _("to cite"),
+                        value=x["cite"],
+                        on_change=lambda e, x=x: x.update(cite=bool(e.value)),
+                    ).tooltip(_("Its papers are to discuss: each cited in the notes")).mark(
+                        f"folder-list-cite-{i}"
+                    )
+                    up = ui.button(icon="arrow_upward", on_click=lambda i=i: move(i, -1))
+                    up.props("flat round dense size=sm").mark(f"folder-list-up-{i}")
+                    if i == 0:
+                        up.disable()
+                    remove_button = ui.button(icon="delete", on_click=lambda i=i: remove(i))
+                    remove_button.props("flat round dense size=sm color=negative").mark(
+                        f"folder-list-delete-{i}"
+                    )
+                    if x["builtin"]:
+                        remove_button.disable()
+                        remove_button.tooltip(_("Built in: it can be renamed, not removed"))
+                    else:
+                        remove_button.tooltip(_("Remove the list (and its papers' stars)"))
+
+        def move(i: int, delta: int) -> None:
+            lists[i + delta], lists[i] = lists[i], lists[i + delta]
+            list_rows.refresh()
+            shown.refresh()
+
+        def remove(i: int) -> None:
+            x = lists.pop(i)
+            if x["id"] is not None:
+                removed.append(x["id"])
+            list_rows.refresh()
+            shown.refresh()
+
+        def add_list() -> None:
+            lists.append(
+                {
+                    "id": None,
+                    "name": "",
+                    "format": reports.NUMBER_FORMAT,
+                    "cite": False,
+                    "builtin": False,
+                    "colour": None,
+                }
+            )
+            list_rows.refresh()
+            shown.refresh()
+
+        with ui.column().classes("gap-1"):
+            list_rows()
+        with ui.row().classes("items-center gap-2"):
+            ui.button(_("Add a list"), icon="add", on_click=add_list).props("flat").mark(
+                "folder-list-add"
+            )
+        with ui.row().classes("w-full items-start gap-3 mt-2"):
             fmt = (
                 ui.input(
-                    _("Number format"),
+                    _("Number of the papers cited only"),
                     value=n.format,
                     placeholder=reports.REFERENCE_FORMAT,
+                    on_change=lambda: shown.refresh(),
                 )
                 .props("dense outlined")
-                .classes("w-48")
+                .classes("w-56")
                 .tooltip(
                     _(
-                        "How a number is written ({index}: the number; default: {default}): "
-                        "[@key], and .number in the templates"
+                        "The papers in no list: numbered apart, from 1, as first cited "
+                        "({index}: the number; default: {default})"
                     ).format(index="{index}", default=reports.REFERENCE_FORMAT)
                 )
                 .mark("folder-number-format")
             )
-            listed = (
+            cite = (
                 ui.input(
-                    _("Number of a listed paper"),
-                    value=n.listed_format,
-                    placeholder=reports.NUMBER_FORMAT,
+                    _("Citation ([@key])"),
+                    value=n.cite,
+                    placeholder=_("the number"),
+                    on_change=lambda: shown.refresh(),
+                    validation=lambda v: reports.check_template(v or ""),
                 )
                 .props("dense outlined")
-                .classes("w-48")
+                .classes("w-80")
                 .tooltip(
                     _(
-                        "How the number of a paper with the tag is written ({index}: the "
-                        "number; default: {default}): [@key], and .number in the templates; "
-                        "the others: the number format"
-                    ).format(index="{index}", default=reports.NUMBER_FORMAT)
+                        "The template of a citation without one: [@key], as inserted (e.g. "
+                        "{.number (.short-venue .year)}; empty: the number)"
+                    )
                 )
-                .mark("folder-listed-format")
-            )
-            ui.button(
-                icon="restart_alt",
-                on_click=lambda: (
-                    fmt.set_value(reports.REFERENCE_FORMAT),
-                    listed.set_value(reports.NUMBER_FORMAT),
-                ),
-            ).props("flat round dense").tooltip(_("The default formats"))
-        same = (
-            ui.label(
-                _(
-                    "Both formats are the same: the papers with the tag and the others, each "
-                    "numbered from 1, cannot be told apart."
-                )
-            )
-            .classes("text-sm text-warning")
-            .mark("folder-same-formats")
-        )
-
-        def check_formats() -> None:
-            same.visible = (
-                bool(tag.value)
-                and (fmt.value or reports.REFERENCE_FORMAT).strip()
-                == (listed.value or reports.NUMBER_FORMAT).strip()
+                .mark("folder-cite")
             )
 
-        for el in (tag, fmt, listed):
-            el.on_value_change(check_formats)
-        check_formats()
+        @ui.refreshable
+        def shown() -> None:
+            numbering = reports.Numbering(fmt.value or "", cite.value or "")
+            star = [
+                reports.StarList(0, x["name"] or "…", x["format"] or reports.NUMBER_FORMAT)
+                for x in lists
+            ]
+            names = {**general, **{t.name: t.attrs for t in own if t.name}}
+            with (
+                ui.grid(columns="auto auto 1fr")
+                .classes("w-full gap-x-4 gap-y-1 text-sm items-baseline")
+                .mark("folder-examples")
+            ):
+                for h in (_("A paper"), "[@doe2026neural]", _("In the references")):
+                    ui.label(h).classes("text-xs text-grey uppercase")
+                for name, cited, entry in reports.examples(numbering, star, names):
+                    ui.label(_("in “{list}”").format(list=name) if name else _("cited only"))
+                    ui.markdown(cited).classes("vr-note")
+                    ui.markdown(entry).classes("vr-note text-grey-8")
+
+            formats = [(x["format"] or reports.NUMBER_FORMAT).strip() for x in lists]
+            formats.append((fmt.value or reports.REFERENCE_FORMAT).strip())
+            if len(set(formats)) < len(formats):
+                ui.label(
+                    _(
+                        "Some formats are the same: their papers, each numbered from 1, "
+                        "cannot be told apart."
+                    )
+                ).classes("text-sm text-warning").mark("folder-same-formats")
+
+        shown()
         ui.label(_("Templates of the folder")).classes("font-medium mt-2")
         ui.markdown(
             _(
@@ -225,7 +297,7 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
             )
             + " "
             + _(
-                "`.number`: the number written as set above (e.g. `{(.number .short-venue "
+                "`.number`: the number written as its list says (e.g. `{(.number .short-venue "
                 ".year)}`), `.index`: the bare number (e.g. `{**#.index**}`)."
             )
             + (
@@ -259,7 +331,7 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
         )
 
         def add() -> None:
-            own.append(reports.Template("", "{.index (.short-venue .year)}", ""))
+            own.append(reports.Template("", "{.number (.short-venue .year)}", ""))
             refresh()
 
         def save() -> bool | None:
@@ -268,10 +340,41 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
             except ValueError as e:
                 ui.notify(str(e), type="negative")
                 return False
-            reports.save_numbering(
-                folder_id,
-                reports.Numbering(tag.value or None, fmt.value or "", listed.value or ""),
-            )
+            if any(not x["name"].strip() for x in lists):
+                ui.notify(_("A star list needs a name"), type="negative")
+                return False
+            names = [x["name"].strip() for x in lists]
+            if len(set(names)) < len(names):
+                ui.notify(_("Two star lists have the same name"), type="negative")
+                return False
+            if (err := reports.check_template((cite.value or "").strip())) is not None:
+                ui.notify(err, type="negative")
+                return False
+            ids = []
+            for x in lists:
+                try:
+                    ids.append(
+                        annotations.save_list(
+                            settings,
+                            x["name"],
+                            colour=x["colour"],
+                            number_format=x["format"],
+                            must_cite=x["cite"],
+                            list_id=x["id"],
+                        )
+                    )
+                except ValueError:
+                    ui.notify(
+                        _("“{name}” is already a tag, or another folder's list").format(
+                            name=x["name"]
+                        ),
+                        type="negative",
+                    )
+                    return False
+            for list_id in removed:
+                annotations.delete_tag(list_id)
+            annotations.order_lists(ids)
+            reports.save_numbering(folder_id, reports.Numbering(fmt.value or "", cite.value or ""))
             reports.save_skeleton(folder_id, skeleton.value or "")
             return None
 
@@ -301,6 +404,6 @@ def citation_hint(editor: MarkdownEditor, ctx: reports.Context, rendered: report
     text = (
         _("{cited} of the {n} papers to discuss cited").format(cited=cited, n=len(st.discuss))
         if st.discuss
-        else _("No paper to discuss (set the folder's numbered tag)")
+        else _("No paper to discuss (a star list to cite: the folder's settings)")
     )
     editor.mode.hint("side", st.colour, " · ".join([text, *rendered.errors]))

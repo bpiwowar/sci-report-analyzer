@@ -177,9 +177,11 @@ cliquez dessus pour ouvrir la page.
 Les **périodes** sont des intervalles d'années nommés (par exemple une période d'évaluation). Au sein d'une période, vous pouvez
 **étoiler** des articles. La période choisie est mémorisée.
 
-**Étiquettes et notes** (détails d'un article, onglet « Étiquettes et notes ») : saisissez un nom pour créer une étiquette. Une étiquette
-**globale** reste attachée à l'article ; une étiquette **propre à une période** (⏱) est posée séparément dans chaque
-période / dossier. « étoilé » (le bouton ★) est une telle étiquette. Renommez et recolorez les étiquettes avec le
+**Étiquettes et notes** (détails d'un article, onglet « Étiquettes et notes ») : saisissez un nom pour créer une étiquette ; elle
+reste attachée à l'article. Les **listes étoilées** (★, par ex. « starred ») sont les listes ordonnées d'articles du
+dossier, posées dans la période de chaque personne : le bouton ★ met un article dans la première, les puces ★ des
+détails dans n'importe laquelle. Ce sont des réglages du dossier (l'onglet « Notes et citations » de sa fenêtre : leurs
+noms, le format de leurs numéros, si leurs articles sont à citer, leur ordre). Renommez et recolorez les étiquettes avec le
 bouton 🏷 ou dans Paramètres → Étiquettes et catégories. Chaque article a une **note** (Markdown),
 plus une note propre à la période sélectionnée. Le filtre « étiquettes » affiche les articles ayant l'une
 des étiquettes choisies ; pour écrire à leur sujet, utilisez l'éditeur de rapport (ci-dessous).
@@ -187,15 +189,15 @@ des étiquettes choisies ; pour écrire à leur sujet, utilisez l'éditeur de r
 **Étiqueter à partir d'une liste** (le bouton liste du panneau) : collez une liste de publications, par exemple la liste
 numérotée d'un rapport copiée depuis un PDF. Chaque élément est apparié à un article par son identifiant HAL ou son DOI, sinon
 par son titre (les auteurs et le canal qui l'entourent n'importent pas) ; vérifiez les correspondances, ajoutez les
-articles qui manquent aux sources (par l'identifiant HAL / DOI de l'élément, ou trouvés sur HAL), puis posez une étiquette (par exemple
-étoilé, propre à la période) sur ceux-ci avec leurs **numéros** dans la liste. Filtrer sur cette étiquette
-affiche les articles dans l'ordre de la liste (#3 sur leur étiquette), et la liste 🗒 les numérote et
+articles qui manquent aux sources (par l'identifiant HAL / DOI de l'élément, ou trouvés sur HAL), puis posez une étiquette sur ceux-ci, ou mettez-les
+dans une liste étoilée (★, dans la période) avec leurs **numéros** dans la liste. Filtrer sur cette liste
+affiche les articles dans son ordre (#3 sur leur puce), et la liste 🗒 les numérote et
 se termine par les éléments non trouvés.
 
-**Numéros au sein d'une étiquette** (le rang d'un article dans la liste de l'étiquette) : Alt-cliquez
-sur un numéro (`#3` à côté d'une étiquette sur la ligne d'un article ; dans ses détails, où `#`
+**Numéros dans une liste étoilée** (la place d'un article dans celle-ci) : Alt-cliquez
+sur un numéro (`#3` à côté de la liste sur la ligne d'un article ; dans ses détails, où `#`
 s'affiche quand il n'en a pas, un simple clic aussi) pour le saisir (Entrée ou quitter le champ enregistre, Échap annule, vide
-le retire). Pour ordonner tous les articles d'une étiquette, filtrez sur celle-ci et cliquez sur
+le retire). Pour ordonner tous les articles d'une liste, filtrez sur celle-ci et cliquez sur
 le bouton liste numérotée à côté du filtre « étiquettes » : faites glisser les articles ou
 utilisez leurs flèches ↑ / ↓ (ils sont alors tous numérotés 1, 2… dans le nouvel ordre), saisissez
 un numéro, « Numéroter dans cet ordre » ou « Effacer les numéros ». Les articles sans numéro
@@ -206,25 +208,27 @@ Un saut de ligne est conservé (comme dans Obsidian). Elles sont éditées avec 
 ⌘B / ⌘I, un aperçu à côté ou à la place).
 
 **Citations dans les notes du dossier** (l'onglet du dossier à côté d'un PDF) : les notes
-de la personne dans le dossier citent ses articles avec la syntaxe de Pandoc : `[@key]` le
-numéro de l'article, `[@a; @b]` ou `[@a, @b]` plusieurs (chacun avec le modèle, comme dans
+de la personne dans le dossier citent ses articles avec la syntaxe de Pandoc : `[@key]` comme
+le dossier cite (son modèle de citation ; sans : le numéro de l'article), `[@a; @b]` ou `[@a, @b]` plusieurs (chacun avec le modèle, comme dans
 `[@a, @b]{.notes}`, aussi écrit sans crochets : `@a, @b{.notes}`), `@key` ses titre, canal, année et catégorie,
 `[@key]{.notes}` avec ses notes, `[@key]{.tags}` avec ses étiquettes (`{.notes .tags}` les
 deux), et des modèles : `[@key]{.short-venue (.year)}` donne `EMNLP (2026)` (champs :
-`.number` le numéro tel que le dossier l'écrit, `.index` le numéro seul comme dans
+`.number` le numéro tel que sa liste étoilée l'écrit, `.index` le numéro seul comme dans
 `{**#.index**}`, `.title`, `.venue`, `.short-venue` l'acronyme, `.year`, `.tags`, `.notes` ;
 un crochet sans valeur est supprimé). Les modèles nommés (Paramètres → Modèles de citation,
 ou ceux du dossier) s'utilisent comme `.nom`. Les réglages du dossier (l'onglet
-« Notes et citations » de sa fenêtre) fixent l'étiquette dont les articles sont numérotés (dans l'ordre de la liste,
-sinon par année ; les autres dans l'ordre de citation) et l'écriture des numéros : un format
-pour les articles de la liste (`**#{index}**`), un pour les autres (`[{index}]`). Les articles
-à discuter sont ceux de la liste (sinon ceux des années de la période) ; le mode
+« Notes et citations » de sa fenêtre) fixent ses listes étoilées : un article est numéroté dans la
+première où il est (dans son ordre, sinon par année), écrit comme la liste le dit (par ex. `**#{index}**`) ; les articles
+d'aucune liste sont numérotés à part, dans l'ordre de citation, avec leur propre format (par ex. `[{index}]`). Ils fixent
+aussi le modèle de citation de `[@key]` (par ex. `{.number (.short-venue .year)}` ; les citations insérées sont de simples
+`[@key]`), avec des exemples d'une citation et de sa référence pour chacun. Les articles à discuter sont ceux des listes
+à citer (sinon ceux des années de la période) ; le mode
 « Articles » de l'éditeur (son icône rouge tant que chacun n'est pas cité, orange si un article cité
 n'est pas des années de la période, verte une fois tous cités ; combien au survol) montre, à la place de l'aperçu, les articles à discuter avec
 leurs numéros (rouge tant qu'ils ne sont pas cités, orange : hors des années de la période ;
 un clic le cite, le menu ⋮ avec un modèle), celui sous le curseur mis en évidence, une
 recherche (Entrée cite le premier ; les autres articles de la personne aussi), et « Les citer »
-(ceux pas encore cités) ; les articles de l'étiquette numérotée s'y réordonnent aussi (glissés,
+(ceux pas encore cités) ; les articles de chaque liste s'y réordonnent aussi (glissés,
 leurs flèches ↑ / ↓, ou leur numéro Alt-cliqué et saisi), les citations renumérotées. Un ⌘/Ctrl-clic sur une citation (ou le
 bouton ↗ de la barre d'outils, le curseur dessus) affiche les détails de son article dans une
 nouvelle fenêtre. Copier remplace les citations, suivies des références, numérotées
@@ -328,8 +332,8 @@ Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les mon
 contient), « Toutes les personnes (nettoyage) » chaque personne. Glissez un dossier sur un autre pour le mettre
 dedans (sur son haut ou son bas : à côté), ou sur « Déposer ici » pour le premier niveau. Le menu ⋮ de chaque
 dossier le renomme, ajoute un dossier dedans, le déplace (« Déplacer vers… ») et choisit ses réglages. Un dossier
-utilise les **réglages** du dossier où il est, ou les siens (une icône dans l'arbre) : tous, ses catégories et les
-citations dans ses notes (l'étiquette numérotée, les formats des numéros, ses modèles, les notes de départ).
+utilise les **réglages** du dossier où il est, ou les siens (une icône dans l'arbre) : tous, ses catégories, ses listes
+étoilées et les citations dans ses notes (les formats des numéros, ses modèles, les notes de départ).
 Choisir ses propres réglages part d'une copie de ceux de son parent ; revenir à ceux de son parent supprime les
 siens (sauf si d'autres dossiers les utilisent), les extraits de ses personnes allant dans les catégories de mêmes
 noms (ajoutées si elles manquent), comme quand un dossier utilisant les réglages de son parent est déplacé.

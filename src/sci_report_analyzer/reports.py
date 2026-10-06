@@ -1,9 +1,10 @@
 """Citing a person's papers in Markdown (the notes of a folder, of a document…) with Pandoc's
 syntax, substituted when shown or copied.
 
-- ``[@key]`` (or ``[@a; @b]``, ``[@a, @b]``, ``[see @a, p. 3]``): the paper's number
-  (``**#6**``, see ``number_format``; a listed paper's, ``listed_format``); several keys
-  with a template (below) each cited with it, also without brackets: ``@a, @b{.notes}``;
+- ``[@key]`` (or ``[@a; @b]``, ``[@a, @b]``, ``[see @a, p. 3]``): with the folder's
+  citation template (``Numbering.cite``; none: the paper's number, ``**#6**``, written as its
+  star list says, else as ``number_format``); several keys with a template (below) each
+  cited with it, also without brackets: ``@a, @b{.notes}``;
 - ``@key``, or ``[@key]{.full}``: its number, title, venue, year and category;
 - ``[@key]{.notes}``: that, then its notes; ``[@key]{.tags}``: with its tags (#tags), and
   ``[@key]{.notes .tags}`` both;
@@ -23,10 +24,11 @@ syntax, substituted when shown or copied.
   section, under subsections of their categories (``.flat-influence``: also in their
   categories, as by default; the default: the folder's, see ``nested_influence``).
 
-Within a folder, the papers with its numbered tag (see ``Numbering``) are numbered as listed
-(else by year), and the other papers cited apart, each from 1, as first cited: the former
-are the papers to discuss, each to be cited at least once (without a numbered tag, those of
-the period's years, every paper numbered as first cited).
+Within a folder, the papers of its star lists (see annotations.star_lists) are numbered in
+the first one they are in (in its order, else by year), each list's numbers written as it
+says, and the other papers cited apart, from 1, as first cited (see ``Numbering``); those of
+the lists to cite are the papers to discuss, each to be cited at least once (without such
+a list: those of the period's years, every paper numbered as first cited).
 """
 
 from __future__ import annotations
@@ -111,13 +113,66 @@ class Paper:
     stat: PubStat
     key: str
     number: int
-    in_report: bool = True  # (else cited, but not among the papers to discuss)
-    off_period: bool = False  # (with the tags, but its year outside the period's)
+    in_report: bool = True  # (else cited only: in no star list, nor to discuss)
+    off_period: bool = False  # (in a star list, but its year outside the period's)
+    list_id: int | None = None  # (the star list it is numbered in)
+    number_format: str | None = None  # (that list's)
+
+
+@dataclass(frozen=True)
+class StarList:
+    """A star list of a folder (see annotations.star_lists): its papers numbered in it."""
+
+    id: int
+    name: str
+    number_format: str = NUMBER_FORMAT
+    must_cite: bool = False
 
 
 def in_years(s: PubStat, years: tuple[int | None, int | None]) -> bool:
     start, end = years
     return (start is None or (s.year or 0) >= start) and (end is None or (s.year or 9999) <= end)
+
+
+def listed_papers(
+    stats: list[PubStat],
+    keys: dict[int, str],
+    lists: list[StarList],
+    period_id: int | None,
+    years: tuple[int | None, int | None] = (None, None),
+) -> list[Paper]:
+    """The papers of the star lists within the period, each numbered in the first list it
+    is in (in their order): its number there, else after them (by year, latest first, then
+    title); those of other years ``off_period``."""
+    out: list[Paper] = []
+    seen: set[int] = set()
+    for lst in lists:
+        rows = [r for r in tagged(stats, [lst.id], period_id) if r.id not in seen]
+        numbers = {r.id: n for r in rows if (n := r.number_of(lst.id, period_id)) is not None}
+        rows.sort(
+            key=lambda r: (
+                r.id not in numbers,
+                numbers.get(r.id, 0),
+                -(r.year or 0),
+                (r.title or "").lower(),
+            )
+        )
+        nxt = max(numbers.values(), default=0) + 1
+        for r in rows:
+            if r.id not in numbers:
+                numbers[r.id], nxt = nxt, nxt + 1
+            seen.add(r.id)
+            out.append(
+                Paper(
+                    r,
+                    keys[r.id],
+                    numbers[r.id],
+                    off_period=not in_years(r, years),
+                    list_id=lst.id,
+                    number_format=lst.number_format,
+                )
+            )
+    return out
 
 
 def papers_to_discuss(
@@ -174,27 +229,28 @@ class TemplateCycle(ValueError):
 class Context:
     """What citations are resolved against."""
 
-    papers: list[Paper]  # the numbered ones (e.g. a folder's papers to discuss)
+    papers: list[Paper]  # the numbered ones (a folder's star lists')
     stats: list[PubStat]  # every paper of the person
     keys: dict[int, str]
     tags: dict[int, str]  # tag names (id -> name)
     hide_tags: set[int] = field(default_factory=set)  # (the numbered tag: not repeated)
     period_id: int | None = None
-    number_format: str = NUMBER_FORMAT
-    # That of the numbered papers, the others numbered apart (none: after them, as number_format).
-    listed_format: str | None = None
+    number_format: str = NUMBER_FORMAT  # (that of the papers cited only; a list's: its own)
     templates: dict[str, str] = field(default_factory=dict)  # named ones: name -> {attrs}
     # The papers each to be cited (by default, the numbered ones; see citation_status).
     discuss: list[Paper] | None = None
     # The blocks ([]{.name .option…} on its line): name -> its Markdown, given the level of
     # its headings (that below the heading the block is under) and its options (classes).
     blocks: dict[str, Callable[[int, set[str]], str]] = field(default_factory=dict)
-    numbered_tag: int | None = None  # (the tag whose numbers the papers have, if any)
+    lists: list[StarList] = field(default_factory=list)  # (the folder's star lists)
+    cite_default: str = ""  # (the template of [@key], without one: e.g. "{.number (.year)}")
 
     def __post_init__(self) -> None:
         self.by_key = {p.key: p for p in self.papers}
         self._stat_by_key = {self.keys[s.id]: s for s in self.stats if s.id in self.keys}
-        apart = self.listed_format is not None
+        # (the papers cited only: numbered apart, from 1, as first cited, when written
+        # otherwise than a list's; else after them)
+        apart = any(p.number_format not in (None, self.number_format) for p in self.papers)
         self._next = 1 if apart else max((p.number for p in self.papers), default=0) + 1
         if self.discuss is None:
             self.discuss = list(self.papers)
@@ -207,10 +263,11 @@ class Context:
         return p
 
     def number(self, p: Paper) -> str:
-        """Its number, formatted (``{index}``, or ``{n}``: the number): as a listed paper
-        (one of the numbered ones), or as the others."""
-        listed = p.in_report and self.listed_format
-        fmt = (self.listed_format if listed else self.number_format) or NUMBER_FORMAT
+        """Its number, formatted (``{index}``, or ``{n}``: the number): as its star list
+        says, else as the papers cited only."""
+        fmt = (p.number_format if p.in_report and p.number_format else self.number_format) or (
+            NUMBER_FORMAT
+        )
         return fmt.replace("{index}", str(p.number)).replace("{n}", str(p.number))
 
     def hashtags(self, p: Paper) -> str:
@@ -405,7 +462,7 @@ def render(text: str, ctx: Context) -> Rendered:
     def bracket(src: str, m: re.Match) -> str:
         bare = m.group("body") is None  # (@a, @b{.notes})
         body, attrs = m.group("bare_body", "bare_attrs") if bare else m.group("body", "attrs")
-        attrs = parse_attrs(attrs or "")
+        attrs = parse_attrs(attrs or _inner(ctx.cite_default))
         if attrs is None:
             return _INTEXT.sub(intext, m.group(0)) if bare else m.group(0)
         parts = []
@@ -495,14 +552,13 @@ def with_references(text: str, ctx: Context) -> str:
 
 @dataclass
 class Numbering:
-    """How a folder's notes number papers: those with ``tag_id`` (within the person's
-    period), as listed (else by year), and the others apart (from 1) as first cited;
-    ``format``: how a number is written (``{index}``: the number), ``listed_format``: that
-    of the papers with the tag. No tag: every paper as first cited."""
+    """How a folder's notes cite papers (those of its star lists numbered there, as their
+    list says): ``format``, how the number of a paper in no list is written (``{index}``:
+    the number; numbered apart, from 1, as first cited); ``cite``, the template of a
+    citation without one (``[@key]``; empty: the number)."""
 
-    tag_id: int | None = None
     format: str = REFERENCE_FORMAT
-    listed_format: str = NUMBER_FORMAT
+    cite: str = ""
 
 
 def _citations(folder_id: int | None) -> dict:
@@ -528,20 +584,21 @@ def _save_citations(folder_id: int, **values) -> None:
 
 def numbering(folder_id: int | None) -> Numbering:
     c = _citations(folder_id)
-    return Numbering(
-        c.get("tag_id"),
-        c.get("format") or REFERENCE_FORMAT,
-        c.get("listed_format") or NUMBER_FORMAT,
-    )
+    return Numbering(c.get("format") or REFERENCE_FORMAT, c.get("cite") or "")
 
 
 def save_numbering(folder_id: int, n: Numbering) -> None:
-    _save_citations(
-        folder_id,
-        tag_id=n.tag_id,
-        format=n.format.strip() or REFERENCE_FORMAT,
-        listed_format=n.listed_format.strip() or NUMBER_FORMAT,
-    )
+    _save_citations(folder_id, format=n.format.strip() or REFERENCE_FORMAT, cite=n.cite.strip())
+
+
+def star_lists(period_id: int | None = None, *, settings_id: int | None = None) -> list[StarList]:
+    """The star lists of a period's folder (see annotations.star_lists)."""
+    from . import annotations
+
+    return [
+        StarList(t.id, t.name, t.number_format or NUMBER_FORMAT, t.must_cite)
+        for t in annotations.star_lists(period_id, settings_id=settings_id)
+    ]
 
 
 def skeleton(folder_id: int | None) -> str:
@@ -565,9 +622,9 @@ def save_nested_influence(folder_id: int, nested: bool) -> None:
 
 
 def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
-    """For the notes of the folder of a period (the person's in it): its numbering and its
-    templates; the papers to discuss, those with its numbered tag (else those of the
-    period's years)."""
+    """For the notes of the folder of a period (the person's in it): its star lists (their
+    papers numbered there), its numbering and its templates; the papers to discuss, those
+    of the lists to cite (none: those of the period's years)."""
     from . import annotations, source_settings
 
     keys = citation_keys(stats)
@@ -595,24 +652,79 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
 
     n = numbering(folder_id)
     names = {t.id: t.name for t in annotations.all_tags()}
-    tag = n.tag_id if n.tag_id in names else None
-    primary = source_settings.primary_for(person_id, period_id)
-    papers = papers_to_discuss(stats, keys, [tag], period_id, years) if tag else []
-    discuss = papers if tag else papers_to_discuss(stats, keys, [], period_id, years, primary)
+    lists = star_lists(period_id)
+    papers = listed_papers(stats, keys, lists, period_id, years)
+    cite = {lst.id for lst in lists if lst.must_cite}
+    if cite:
+        discuss = [p for p in papers if p.list_id in cite]
+    else:
+        primary = source_settings.primary_for(person_id, period_id)
+        discuss = papers_to_discuss(stats, keys, [], period_id, years, primary)
     return Context(
         papers,
         stats,
         keys,
         names,
-        hide_tags={tag} if tag else set(),
+        hide_tags={lst.id for lst in lists},
         period_id=period_id,
         number_format=n.format,
-        listed_format=n.listed_format if tag else None,
         templates=load_templates(folder_id).names,
         discuss=discuss,
         blocks={"publications": publications, "excerpts": excerpts},
-        numbered_tag=tag,
+        lists=lists,
+        cite_default=n.cite,
     )
+
+
+@dataclass
+class _Sample:
+    """A paper to show how citations look (see examples)."""
+
+    id: int = 0
+    title: str = "Neural ranking at scale"
+    venue: str = "Empirical Methods in Natural Language Processing"
+    venue_short: str = "EMNLP"
+    year: int = 2026
+    note: str = ""
+    period_notes: dict = field(default_factory=dict)
+    category: object = None
+
+    def tags_in(self, _period_id) -> set[int]:
+        return set()
+
+
+def examples(
+    numbering: Numbering, lists: list[StarList], templates: dict[str, str]
+) -> list[tuple[str, str, str]]:
+    """How a paper is cited by ``[@key]`` and listed in the references: in each star list
+    (as its 2nd paper), and cited only (as the first): (list name, or "", citation, entry)."""
+    from types import SimpleNamespace
+
+    sample = _Sample(category=SimpleNamespace(label=_("Conference")))
+    out = []
+    for lst in [*lists, None]:
+        p = Paper(
+            sample,  # type: ignore[arg-type]
+            "doe2026neural",
+            2 if lst else 1,
+            in_report=lst is not None,
+            number_format=lst.number_format if lst else None,
+        )
+        ctx = Context(
+            [p],
+            [],
+            {},
+            {},
+            number_format=numbering.format,
+            templates=templates,
+            cite_default=numbering.cite,
+        )
+        try:
+            cited = render("[@doe2026neural]", ctx).text
+        except TemplateCycle as e:
+            cited = str(e)
+        out.append((lst.name if lst else "", cited, ctx.entry(p)))
+    return out
 
 
 @dataclass
@@ -661,10 +773,10 @@ class Template:
 @dataclass
 class Templates:
     items: list[Template]
-    default: str  # the attrs of the one a paper is cited with when inserted
 
     def cite(self, key: str, attrs: str | None = None) -> str:
-        return f"[@{key}]{self.default if attrs is None else attrs}"
+        """A citation, with a template (none: as the folder cites, see Numbering.cite)."""
+        return f"[@{key}]{attrs or ''}"
 
     @property
     def names(self) -> dict[str, str]:
@@ -675,15 +787,14 @@ class Templates:
 def default_templates() -> Templates:
     return Templates(
         [
-            Template("Number, venue (year)", "{**#.index** (.short-venue .year)}"),
-            Template("… and notes", "{**#.index** (.short-venue .year): .notes}"),
-            Template("Number", ""),
+            Template("Number, venue (year)", "{.number (.short-venue .year)}"),
+            Template("… and notes", "{.number (.short-venue .year): .notes}"),
+            Template("Number", "{.number}"),
             Template("Title, venue…", "{.full}"),
             Template("Title, venue… and notes", "{.notes}"),
             Template("… and tags", "{.tags}"),
             Template("… notes and tags", "{.notes .tags}"),
-        ],
-        "{**#.index** (.short-venue .year)}",
+        ]
     )
 
 
@@ -751,10 +862,7 @@ def _general() -> Templates:
         Template(t.get("label", ""), t.get("attrs", ""), t.get("name") or "")
         for t in saved["items"]
     ]
-    default = saved.get("default", "")
-    if all(t.attrs != default for t in items):
-        default = items[0].attrs
-    return Templates(items, default)
+    return Templates(items)
 
 
 def folder_templates(folder_id: int | None) -> list[Template]:
@@ -771,8 +879,6 @@ def load_templates(folder_id: int | None = None) -> Templates:
     for own in folder_templates(folder_id):
         same = next((x for x in t.items if x.name and x.name == own.name), None)
         if same is not None:
-            if t.default == same.attrs:
-                t.default = own.attrs
             same.attrs = own.attrs
         else:
             t.items.append(Template(own.label or f".{own.name}", own.attrs, own.name))
@@ -784,8 +890,6 @@ def save_templates(t: Templates) -> None:
         x.name = x.name.strip().removeprefix(".")
     if err := check_templates(t.items):
         raise ValueError(err)
-    if all(x.attrs != t.default for x in t.items):
-        t.default = t.items[0].attrs if t.items else ""
     set_setting(TEMPLATES_KEY, asdict(t))
 
 

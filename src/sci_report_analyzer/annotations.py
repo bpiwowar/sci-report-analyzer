@@ -1,4 +1,5 @@
-"""User annotations on publications: tags (global or per period, stars included), notes,
+"""User annotations on publications: tags, star lists (the papers of a person's period in a
+folder, in order: the per-period tags, the ★ button's the first), notes,
 forced venue matches, kinds and tracks set by hand."""
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from .db.app_settings import get_setting, set_setting
 from .db.models import (
     STARRED,
     AppSetting,
+    Period,
     PeriodNote,
     PeriodTag,
     Publication,
@@ -41,7 +43,11 @@ def save_tag(
     reused."""
     name = name.strip()
     with session_scope() as s:
-        t = s.get(Tag, tag_id) if tag_id else s.scalar(select(Tag).where(Tag.name == name))
+        t = (
+            s.get(Tag, tag_id)
+            if tag_id
+            else s.scalar(select(Tag).where(Tag.name == name, Tag.settings_id.is_(None)))
+        )
         if t is None:
             t = Tag(name=name, per_period=per_period, colour=colour or "#0969da")
             s.add(t)
@@ -77,43 +83,172 @@ def toggle_tag(pub_id: int, tag_id: int, period_id: int | None = None) -> bool:
         return True
 
 
-def tag_numbered(tag_id: int, numbers: dict[int, int | None], period_id: int | None = None) -> None:
-    """Put a tag on papers (pub id -> their number in a list), keeping the tag where it is
-    and setting its number."""
+def put_tag(tag_id: int, pub_ids: list[int]) -> None:
+    """Put a tag on papers (kept where it is)."""
     with session_scope() as s:
-        per_period = s.get(Tag, tag_id).per_period
-        if per_period and period_id is None:
-            raise ValueError("a per-period tag needs a period")
+        for pub_id in pub_ids:
+            if s.get(PublicationTag, (pub_id, tag_id)) is None:
+                s.add(PublicationTag(publication_id=pub_id, tag_id=tag_id))
+
+
+def tag_numbered(tag_id: int, numbers: dict[int, int | None], period_id: int) -> None:
+    """Put papers in a star list (pub id -> their number in it, None: none), keeping those
+    there and setting their number."""
+    with session_scope() as s:
+        if not s.get(Tag, tag_id).per_period:
+            raise ValueError("only a star list numbers its papers")
         for pub_id, number in numbers.items():
-            if per_period:
-                key = (period_id, pub_id, tag_id)
-                row = s.get(PeriodTag, key) or PeriodTag(
-                    period_id=period_id, publication_id=pub_id, tag_id=tag_id
-                )
-            else:
-                row = s.get(PublicationTag, (pub_id, tag_id)) or PublicationTag(
-                    publication_id=pub_id, tag_id=tag_id
-                )
+            key = (period_id, pub_id, tag_id)
+            row = s.get(PeriodTag, key) or PeriodTag(
+                period_id=period_id, publication_id=pub_id, tag_id=tag_id
+            )
             row.number = number
             s.add(row)
 
 
-def set_tag_number(
-    pub_id: int, tag_id: int, number: int | None, period_id: int | None = None
-) -> None:
-    """The paper's number within a tag (its rank in the tag's list; None: none), the tag put
-    on it if needed (a per-period tag: within ``period_id``)."""
+def set_tag_number(pub_id: int, tag_id: int, number: int | None, period_id: int) -> None:
+    """The paper's number in a star list (its place; None: none), put in it if needed."""
     tag_numbered(tag_id, {pub_id: number}, period_id)
 
 
-def number_in_order(tag_id: int, pub_ids: list[int], period_id: int | None = None) -> None:
-    """Number papers having a tag 1, 2… in this order."""
+def number_in_order(tag_id: int, pub_ids: list[int], period_id: int) -> None:
+    """Number papers of a star list 1, 2… in this order."""
     tag_numbered(tag_id, {p: i for i, p in enumerate(pub_ids, 1)}, period_id)
 
 
-def clear_tag_numbers(tag_id: int, pub_ids: list[int], period_id: int | None = None) -> None:
-    """The papers' numbers within a tag removed (the tag kept)."""
+def clear_tag_numbers(tag_id: int, pub_ids: list[int], period_id: int) -> None:
+    """The papers' numbers in a star list removed (left in it)."""
     tag_numbered(tag_id, dict.fromkeys(pub_ids), period_id)
+
+
+# ---- star lists: the per-period tags, of the folders' settings ------------------------------
+
+
+def star_lists(period_id: int | None = None, *, settings_id: int | None = None) -> list[Tag]:
+    """The star lists, in order: those of a folder's settings (``settings_id``, else those
+    of the period's folder), and those of every folder."""
+    from .folders import settings_id as used
+
+    with session_scope() as s:
+        if settings_id is None and period_id is not None:
+            period = s.get(Period, period_id)
+            if period is not None and period.folder_id is not None:
+                settings_id = used(s, period.folder_id)
+        q = select(Tag).where(Tag.per_period)
+        q = q.where(
+            Tag.settings_id.is_(None)
+            if settings_id is None
+            else (Tag.settings_id.is_(None) | (Tag.settings_id == settings_id))
+        )
+        return list(s.scalars(q.order_by(Tag.position, Tag.id)))
+
+
+def first_list(period_id: int | None) -> Tag | None:
+    """The list of the ★ button: the period's folder's first."""
+    return next(iter(star_lists(period_id)), None)
+
+
+def save_list(
+    settings_id: int | None,
+    name: str,
+    *,
+    colour: str | None = None,
+    number_format: str = "",
+    must_cite: bool = False,
+    list_id: int | None = None,
+) -> int:
+    """Create a star list of a folder's settings (last), or change one; a name already
+    taken (by a tag, a list of every folder, or another of the settings') is refused
+    (``ValueError``)."""
+    name = name.strip()
+    if not name:
+        raise ValueError("a list needs a name")
+    with session_scope() as s:
+        if list_id is not None:
+            settings_id = s.get(Tag, list_id).settings_id
+        same = s.scalars(
+            select(Tag.id).where(
+                Tag.name == name,
+                Tag.settings_id.is_(None) | (Tag.settings_id == settings_id),
+            )
+        )
+        if any(i != list_id for i in same):
+            raise ValueError(name)
+        if list_id is None:
+            last = s.scalar(
+                select(Tag.position)
+                .where(Tag.per_period, Tag.settings_id == settings_id)
+                .order_by(Tag.position.desc())
+            )
+            t = Tag(per_period=True, settings_id=settings_id, position=(last or 0) + 1)
+            s.add(t)
+        else:
+            t = s.get(Tag, list_id)
+        t.name = name
+        t.colour = colour or t.colour or "#e3b341"
+        t.number_format = number_format.strip() or None
+        t.must_cite = must_cite
+        s.flush()
+        return t.id
+
+
+def copy_lists(s, source_id: int, settings_id: int) -> dict[int, int]:
+    """The star lists of some settings copied to others (those of the same name there:
+    kept); returns the lists' copies (id -> id)."""
+    there = {
+        t.name: t.id
+        for t in s.scalars(select(Tag).where(Tag.per_period, Tag.settings_id == settings_id))
+    }
+    out = {}
+    for t in s.scalars(select(Tag).where(Tag.per_period, Tag.settings_id == source_id)):
+        if t.name not in there:
+            copy = Tag(
+                name=t.name,
+                colour=t.colour,
+                per_period=True,
+                settings_id=settings_id,
+                number_format=t.number_format,
+                must_cite=t.must_cite,
+                position=t.position,
+            )
+            s.add(copy)
+            s.flush()
+            there[t.name] = copy.id
+        out[t.id] = there[t.name]
+    return out
+
+
+def remap_lists(s, period_ids: list[int], source_id: int, settings_id: int) -> None:
+    """The papers starred within some periods in the lists of some settings, put in the
+    lists of the same names of others (copied there if missing), with their numbers."""
+    if not period_ids or source_id == settings_id:
+        return
+    stars = list(
+        s.scalars(
+            select(PeriodTag)
+            .join(Tag, Tag.id == PeriodTag.tag_id)
+            .where(PeriodTag.period_id.in_(period_ids), Tag.settings_id == source_id)
+        )
+    )
+    if not stars:
+        return
+    copies = copy_lists(s, source_id, settings_id)
+    for st in stars:
+        key = (st.period_id, st.publication_id, copies[st.tag_id])
+        if s.get(PeriodTag, key) is None:
+            s.add(
+                PeriodTag(period_id=key[0], publication_id=key[1], tag_id=key[2], number=st.number)
+            )
+        s.delete(st)
+    s.flush()
+
+
+def order_lists(list_ids: list[int]) -> None:
+    """The star lists in this order (e.g. the first: the ★ button's)."""
+    with session_scope() as s:
+        for i, list_id in enumerate(list_ids):
+            if (t := s.get(Tag, list_id)) is not None:
+                t.position = i
 
 
 def set_note(pub_id: int, text: str | None, period_id: int | None = None) -> None:

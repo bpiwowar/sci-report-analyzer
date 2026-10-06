@@ -21,7 +21,6 @@ from .db.models import (
     Period,
     Person,
     Publication,
-    PublicationTag,
     SourceLink,
     SourcePub,
     Thesis,
@@ -142,11 +141,9 @@ class PubStat:
     track_override: str | None = None
     auto_track: str | None = None
     tags: set[int] = field(default_factory=set)  # global tags (ids)
-    period_tags: dict[int, set[int]] = field(default_factory=dict)  # period id -> tag ids
+    period_tags: dict[int, set[int]] = field(default_factory=dict)  # period id -> star lists
     period_notes: dict[int, str] = field(default_factory=dict)  # period id -> note
-    # The paper's number in the list a tag was put from: global tag id -> number, and
-    # period id -> per-period tag id -> number.
-    numbers: dict[int, int] = field(default_factory=dict)
+    # Its number (its place) in the star lists: period id -> list id -> number.
     period_numbers: dict[int, dict[int, int]] = field(default_factory=dict)
     publisher_url: str | None = None  # the publisher's page (a link from a source, or the DOI)
     venue_short: str | None = None  # acronym of the venue (e.g. "ICLR")
@@ -167,8 +164,7 @@ class PubStat:
         return self.tags | self.period_tags.get(period_id, set()) if period_id else set(self.tags)
 
     def number_of(self, tag_id: int, period_id: int | None) -> int | None:
-        if tag_id in self.numbers:
-            return self.numbers[tag_id]
+        """Its number in a star list, within the period."""
         return self.period_numbers.get(period_id, {}).get(tag_id) if period_id else None
 
     def has_notes(self, period_id: int | None) -> bool:
@@ -745,10 +741,9 @@ class PeopleIndex:
 
 @dataclass
 class _PaperMaps:
-    """A person's papers' tag numbers, and their tags, numbers and notes within periods
-    (by paper, then period)."""
+    """A person's papers' star lists, numbers and notes within periods (by paper, then
+    period)."""
 
-    numbers: dict[int, dict[int, int]] = field(default_factory=dict)
     tags: dict[int, dict[int, set[int]]] = field(default_factory=dict)
     period_numbers: dict[int, dict[int, dict[int, int]]] = field(default_factory=dict)
     notes: dict[int, dict[int, str]] = field(default_factory=dict)
@@ -756,12 +751,6 @@ class _PaperMaps:
 
 def _period_maps(s, person_id: int) -> _PaperMaps:
     out = _PaperMaps()
-    for pt in s.scalars(
-        select(PublicationTag)
-        .join(Publication)
-        .where(Publication.person_id == person_id, PublicationTag.number.is_not(None))
-    ):
-        out.numbers.setdefault(pt.publication_id, {})[pt.tag_id] = pt.number
     for period in s.scalars(
         select(Period)
         .where(Period.person_id == person_id)
@@ -957,7 +946,6 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     tags={tg.id for tg in pub.tags},
                     period_tags=maps.tags.get(pub.id, {}),
                     period_notes=maps.notes.get(pub.id, {}),
-                    numbers=maps.numbers.get(pub.id, {}),
                     pdf=None
                     if pub.id not in stored_pdfs
                     else "edited"

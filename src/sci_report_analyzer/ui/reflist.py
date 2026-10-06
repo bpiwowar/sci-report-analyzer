@@ -24,11 +24,7 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
     ``show_tagged``: the panel shows the tagged papers afterwards (filtered by the tag)."""
     period = panel.period
     pid = period.id if period else None
-    tags = {
-        t.id: ("⏱ " if t.per_period else "") + t.name
-        for t in panel.tags
-        if pid is not None or not t.per_period
-    }
+    tags = {t.id: ("★ " if t.per_period else "") + t.name for t in panel.usable_tags()}
     state: dict = {"matches": [], "chosen": {}, "found": {}}
 
     with panel.dialogs, transient_dialog(width="w-full max-w-5xl") as (dlg, _card):
@@ -39,7 +35,8 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
             _(
                 "Paste a list of publications (e.g. numbered, copied from a PDF): each item is "
                 "matched with the papers by its HAL id or DOI, else by its title. Check the "
-                "matches, then put a tag on the papers, with their numbers in the list."
+                "matches, then put a tag on the papers, or put them in a star list (★), with "
+                "their numbers in the list."
             )
         ).classes("text-sm text-grey")
         text_box = (
@@ -197,8 +194,8 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
             ui.notify(_("Find the papers first"), type="warning")
             return
         value = tag.value
-        if isinstance(value, str):  # a new tag: within the period when there is one
-            value = annotations.save_tag(value, None, per_period=pid is not None)
+        if isinstance(value, str):  # a new tag
+            value = annotations.save_tag(value, None)
             panel.tags = annotations.all_tags()
         chosen = next((t for t in panel.tags if t.id == value), None)
         if chosen is None:
@@ -209,8 +206,10 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
             pub = state["chosen"].get(i, NONE)
             if pub != NONE:
                 numbers.setdefault(pub, m.item.number)
-        where = pid if chosen.per_period else None
-        annotations.tag_numbered(chosen.id, numbers, where)
+        if chosen.per_period:
+            annotations.tag_numbered(chosen.id, numbers, pid)
+        else:
+            annotations.put_tag(chosen.id, list(numbers))
         dlg.close()
         if show_tagged:
             panel.tag_filter = [chosen.id]

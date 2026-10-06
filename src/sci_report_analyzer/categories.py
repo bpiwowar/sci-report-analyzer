@@ -651,7 +651,10 @@ def add_excerpt(
 def _set_tags(s, e: Excerpt, names: list[str]) -> None:
     """The tags of an excerpt, by name (a new name: a new tag, on the papers too)."""
     names = list(dict.fromkeys(n.strip() for n in names if n and n.strip()))
-    found = {t.name: t for t in s.scalars(select(Tag).where(Tag.name.in_(names)))}
+    found = {
+        t.name: t
+        for t in s.scalars(select(Tag).where(Tag.name.in_(names), Tag.settings_id.is_(None)))
+    }
     for n in names:
         if n not in found:
             found[n] = Tag(name=n)
@@ -662,7 +665,7 @@ def _set_tags(s, e: Excerpt, names: list[str]) -> None:
 def tag_names() -> list[str]:
     """The names of the tags (to put on excerpts), by name."""
     with session_scope() as s:
-        return list(s.scalars(select(Tag.name).order_by(Tag.name)))
+        return list(s.scalars(select(Tag.name).distinct().order_by(Tag.name)))
 
 
 def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:

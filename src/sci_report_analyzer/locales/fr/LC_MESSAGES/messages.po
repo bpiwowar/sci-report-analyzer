@@ -201,6 +201,9 @@ msgstr "Un nouveau canal de publication : « {text} »"
 msgid "A number, please"
 msgstr "Un nombre, s’il vous plaît"
 
+msgid "A paper"
+msgstr "Un article"
+
 msgid ""
 "A paper takes the quartile of its year (else of the closest year before);"
 " years missing: Settings › Data & cache, “Scimago, past years”"
@@ -250,6 +253,12 @@ msgstr "Une règle ajoutée à la main"
 
 msgid "A single conference: its texts name others too"
 msgstr "Une seule conférence : ses textes en nomment d'autres aussi"
+
+msgid "A star list needs a name"
+msgstr "Une liste étoilée doit avoir un nom"
+
+msgid "A star list of another folder"
+msgstr "Une liste étoilée d'un autre dossier"
 
 msgid "A sync is already running"
 msgstr "Une synchronisation est déjà en cours"
@@ -392,6 +401,9 @@ msgstr "Ajouter une conférence"
 
 msgid "Add a folder within it"
 msgstr "Ajouter un dossier dans celui-ci"
+
+msgid "Add a list"
+msgstr "Ajouter une liste"
 
 msgid "Add a main conference"
 msgstr "Ajouter une conférence principale"
@@ -731,6 +743,9 @@ msgstr ""
 "Les deux formats sont identiques : les articles avec l'étiquette et les "
 "autres, numérotés chacun à partir de 1, ne se distinguent pas."
 
+msgid "Built in: it can be renamed, not removed"
+msgstr "Prédéfinie : elle peut être renommée, pas supprimée"
+
 msgid "By kind of venue"
 msgstr "Par type de canal de publication"
 
@@ -824,6 +839,9 @@ msgstr "Choisissez le canal de publication auquel ces textes appartiennent."
 
 msgid "Choose where to move them"
 msgstr "Choisissez où les déplacer"
+
+msgid "Citation ([@key])"
+msgstr "Citation ([@key])"
 
 msgid "Citation templates"
 msgstr "Modèles de citation"
@@ -1748,6 +1766,9 @@ msgstr ""
 " numéro. Un modèle qui a un nom s'utilise comme `.nom`, seul "
 "(`[@clé]{.starred}`) ou dans un autre (`{.starred: .notes}`)."
 
+msgid "How a paper is cited: `[@key]` followed by the template. `{.notes}`, `{.tags}`, `{.full}` (title, venue…) give its entry; otherwise the fields `.number` (the number, formatted), `.index` (the bare number), `.title`, `.venue`, `.short-venue` (its acronym), `.year`, `.tags`, `.notes` are replaced and the rest kept, a parenthesis without a value dropped: `{.number (.short-venue .year)}` gives **#2** (EMNLP 2026). A citation without a template (`[@key]`, as inserted) is written as the folder says (its settings: Notes and citations). A template with a name is used as `.name`, alone (`[@key]{.starred}`) or within another one (`{.starred: .notes}`)."
+msgstr "Comment un article est cité : `[@clé]` suivi du modèle. `{.notes}`, `{.tags}`, `{.full}` (titre, lieu…) donnent son entrée ; sinon les champs `.number` (le numéro, mis en forme), `.index` (le numéro seul), `.title`, `.venue`, `.short-venue` (son acronyme), `.year`, `.tags`, `.notes` sont remplacés et le reste gardé, une parenthèse sans valeur supprimée : `{.number (.short-venue .year)}` donne **#2** (EMNLP 2026). Une citation sans modèle (`[@clé]`, telle qu'insérée) s'écrit comme le dit le dossier (ses réglages : Notes et citations). Un modèle nommé s'utilise comme `.nom`, seul (`[@clé]{.starred}`) ou dans un autre (`{.starred: .notes}`)."
+
 #, python-brace-format
 msgid ""
 "How the number of a paper with the tag is written ({index}: the number; "
@@ -1757,6 +1778,9 @@ msgstr ""
 "Comment s'écrit le numéro d'un article avec l'étiquette ({index} : le "
 "numéro ; par défaut : {default}) : [@key], et .number dans les modèles ; "
 "les autres : le format du numéro"
+
+msgid "How the number of its papers is written ({index}: the number)"
+msgstr "L'écriture du numéro de ses articles ({index} : le numéro)"
 
 #, python-brace-format
 msgid "IF {value}"
@@ -1812,6 +1836,9 @@ msgstr "Dans les dossiers"
 
 msgid "In the order of the list"
 msgstr "Dans l'ordre de la liste"
+
+msgid "In the references"
+msgstr "Dans les références"
 
 msgid "In their order on the chart (e.g. from doing the work to supervising it)."
 msgstr ""
@@ -1950,6 +1977,9 @@ msgstr "Ses propres réglages"
 
 msgid "Its own settings: a copy of its parent's"
 msgstr "Ses propres réglages : une copie de ceux de son parent"
+
+msgid "Its papers are to discuss: each cited in the notes"
+msgstr "Ses articles sont à discuter : chacun cité dans les notes"
 
 msgid ""
 "Its quotes, joined; edited, it is the text of the group (its excerpts: "
@@ -2186,6 +2216,9 @@ msgstr ""
 
 msgid "Manage tags (names, colours)"
 msgstr "Gérer les étiquettes (noms, couleurs)"
+
+msgid "Manage tags (names, colours; the star lists: in the folder's settings)"
+msgstr "Gérer les étiquettes (noms, couleurs ; les listes étoilées : dans les réglages du dossier)"
 
 msgid "Manual"
 msgstr "Manuel"
@@ -2567,6 +2600,9 @@ msgstr "Aucun article cité comme @{key}"
 msgid "No paper matches"
 msgstr "Aucun article ne correspond"
 
+msgid "No paper to discuss (a star list to cite: the folder's settings)"
+msgstr "Aucun article à discuter (une liste étoilée à citer : les réglages du dossier)"
+
 msgid "No paper to discuss (set the folder's numbered tag)"
 msgstr "Aucun article à discuter (choisir l'étiquette numérotée du dossier)"
 
@@ -2789,6 +2825,9 @@ msgstr "Rien trouvé sur HAL"
 msgid "Nothing to merge"
 msgstr "Rien à fusionner"
 
+msgid "Number"
+msgstr "Numéro"
+
 msgid "Number format"
 msgstr "Format du numéro"
 
@@ -2797,6 +2836,9 @@ msgstr "Numéroter dans cet ordre"
 
 msgid "Number of a listed paper"
 msgstr "Numéro d'un article de la liste"
+
+msgid "Number of the papers cited only"
+msgstr "Numéro des articles seulement cités"
 
 msgid "Number them 1, 2… as listed"
 msgstr "Les numéroter 1, 2… dans l’ordre affiché"
@@ -2891,8 +2933,14 @@ msgstr "Appariement OpenAlex"
 msgid "Or upload it (a PDF file):"
 msgstr "Ou envoyez-le (un fichier PDF) :"
 
+msgid "Order the papers of this star list (their numbers)"
+msgstr "Ordonner les articles de cette liste étoilée (leurs numéros)"
+
 msgid "Order the papers of this tag (their numbers)"
 msgstr "Ordonner les articles de cette étiquette (leurs numéros)"
+
+msgid "Order the papers of “{tag}” within {period}"
+msgstr "Ordonner les articles de « {tag} » dans {period}"
 
 #, python-brace-format
 msgid "Order the papers tagged “{tag}”"
@@ -3005,6 +3053,9 @@ msgstr ""
 msgid "Papers with one of these tags (⏱: within the period)"
 msgstr "Articles ayant l'une de ces étiquettes (⏱ : dans la période)"
 
+msgid "Papers with one of these tags (★: in a star list, within the period)"
+msgstr "Articles ayant l'une de ces étiquettes (★ : dans une liste étoilée, dans la période)"
+
 #, python-brace-format
 msgid ""
 "Papers: {papers} paper(s) with a venue, validated source, rank, kind, "
@@ -3013,6 +3064,9 @@ msgstr ""
 "Articles : {papers} article(s) avec un canal de publication, une source "
 "validée, un rang, un type, une année, une position d’auteur ou une note "
 "définis à la main"
+
+msgid "Paste a list of publications (e.g. numbered, copied from a PDF): each item is matched with the papers by its HAL id or DOI, else by its title. Check the matches, then put a tag on the papers, or put them in a star list (★), with their numbers in the list."
+msgstr "Collez une liste de publications (par ex. numérotée, copiée d'un PDF) : chaque élément est apparié aux articles par son identifiant HAL ou son DOI, sinon par son titre. Vérifiez les appariements, puis mettez une étiquette sur les articles, ou mettez-les dans une liste étoilée (★), avec leurs numéros dans la liste."
 
 msgid ""
 "Paste a list of publications (e.g. numbered, copied from a PDF): each "
@@ -3342,6 +3396,9 @@ msgstr "Retirer de ce dossier"
 #, python-brace-format
 msgid "Remove the excerpt “{text}”?"
 msgstr "Supprimer l'extrait « {text} » ?"
+
+msgid "Remove the list (and its papers' stars)"
+msgstr "Supprimer la liste (et les étoiles de ses articles)"
 
 msgid "Remove the stored PDF"
 msgstr "Supprimer le PDF stocké"
@@ -3782,6 +3839,9 @@ msgstr "Logiciel"
 msgid "Solutions"
 msgstr "Solutions"
 
+msgid "Some formats are the same: their papers, each numbered from 1, cannot be told apart."
+msgstr "Certains formats sont identiques : leurs articles, chacun numéroté à partir de 1, ne se distinguent pas."
+
 #, python-brace-format
 msgid "Some sources are not up to date: {names}"
 msgstr "Certaines sources ne sont pas à jour : {names}"
@@ -3844,6 +3904,9 @@ msgstr "Séparer en un canal d'atelier dont ce canal est la conférence principa
 
 msgid "Split into its own venue"
 msgstr "Séparer en un canal distinct"
+
+msgid "Star lists"
+msgstr "Listes étoilées"
 
 msgid "Start"
 msgstr "Début"
@@ -3932,6 +3995,9 @@ msgstr "Étiquettes et notes"
 
 msgid "Tags and notes"
 msgstr "Étiquettes et notes"
+
+msgid "Tags are put on papers from their details, and stick to the paper. The star lists (★, e.g. “starred”: ordered, within a person's period in a folder) are set in the folders' settings (Notes and citations)."
+msgstr "Les étiquettes se mettent sur les articles depuis leurs détails, et restent sur l'article. Les listes étoilées (★, par ex. « starred » : ordonnées, dans la période d'une personne dans un dossier) se règlent dans les réglages des dossiers (Notes et citations)."
 
 msgid ""
 "Tags are put on papers from their details. A global tag sticks to the "
@@ -4130,6 +4196,12 @@ msgstr ""
 "répartition ; automatique : d'après les variantes, les règles de canal et"
 " les textes de canal"
 
+msgid "The papers in no list: numbered apart, from 1, as first cited ({index}: the number; default: {default})"
+msgstr "Les articles d'aucune liste : numérotés à part, à partir de 1, dans l'ordre de première citation ({index} : le numéro ; par défaut : {default})"
+
+msgid "The papers starred within a person's period (★: the first list), in order: numbered in the first list they are in, written as it says ({index}: the number). Those of the lists to cite are the papers to discuss, each to be cited in the notes (without: those of the period's years)."
+msgstr "Les articles étoilés dans la période d'une personne (★ : la première liste), dans l'ordre : numérotés dans la première liste où ils sont, écrits comme elle le dit ({index} : le numéro). Ceux des listes à citer sont les articles à discuter, chacun à citer dans les notes (sans : ceux des années de la période)."
+
 msgid "The period whose tags and notes are shown (e.g. a folder's)"
 msgstr ""
 "La période dont les étiquettes et notes sont affichées (p. ex. celle d'un"
@@ -4233,6 +4305,9 @@ msgstr ""
 "Les textes des sources portant ce nom lui appartiennent ; ajoutez des "
 "variantes ou des règles au canal pour reconnaître d'autres textes."
 
+msgid "The template of a citation without one: [@key], as inserted (e.g. {.number (.short-venue .year)}; empty: the number)"
+msgstr "Le modèle d'une citation sans modèle : [@clé], telle qu'insérée (par ex. {.number (.short-venue .year)} ; vide : le numéro)"
+
 #, python-brace-format
 msgid ""
 "The text a person's notes start with, while empty (e.g. headings and the "
@@ -4275,6 +4350,9 @@ msgid "The “rayonnement” category: it also lists the influence excerpts"
 msgstr ""
 "La catégorie « rayonnement » : elle liste aussi les extraits de "
 "rayonnement"
+
+msgid "The ★ button's"
+msgstr "Celle du bouton ★"
 
 msgid ""
 "Their numbers (#) order them: in the publications, and in the citations "
@@ -4459,6 +4537,9 @@ msgstr ""
 
 msgid "Two roles have the same name"
 msgstr "Deux rôles ont le même nom"
+
+msgid "Two star lists have the same name"
+msgstr "Deux listes étoilées ont le même nom"
 
 #, python-brace-format
 msgid "Two templates named .{name}"
@@ -4835,6 +4916,9 @@ msgstr "[sans tenir compte de la casse]"
 msgid "[only {sources}]"
 msgstr "[seulement {sources}]"
 
+msgid "`.number`: the number written as its list says (e.g. `{(.number .short-venue .year)}`), `.index`: the bare number (e.g. `{**#.index**}`)."
+msgstr "`.number` : le numéro écrit comme le dit sa liste (par ex. `{(.number .short-venue .year)}`), `.index` : le numéro seul (par ex. `{**#.index**}`)."
+
 #, python-brace-format
 msgid ""
 "`.number`: the number written as set above (e.g. `{(.number .short-venue "
@@ -4914,6 +4998,9 @@ msgstr "vérifier sur {site}"
 
 msgid "cited by its place only"
 msgstr "cité par son emplacement seulement"
+
+msgid "cited only"
+msgstr "seulement cité"
 
 #, python-brace-format
 msgid "cited {n}×"
@@ -5066,6 +5153,10 @@ msgstr "seulement hors de tout dossier"
 
 msgid "in progress"
 msgstr "en cours"
+
+#, python-brace-format
+msgid "in “{list}”"
+msgstr "dans « {list} »"
 
 #, python-brace-format
 msgid "in “{venue}”"
@@ -5488,6 +5579,13 @@ msgstr ""
 "les sources donnent des canaux de publication différents — choisissez-en "
 "un dans les détails"
 
+msgid "star list, within the period"
+msgstr "liste étoilée, dans la période"
+
+#, python-brace-format
+msgid "star list, within {period}"
+msgstr "liste étoilée, dans {period}"
+
 msgid "syncing…"
 msgstr "synchronisation…"
 
@@ -5514,6 +5612,9 @@ msgstr "le niveau commun à ses conférences"
 
 msgid "the level of the conference chosen in the venue"
 msgstr "le niveau de la conférence choisie dans le canal de publication"
+
+msgid "the number"
+msgstr "le numéro"
 
 msgid "the person's ORCID"
 msgstr "l'ORCID de la personne"
@@ -5544,6 +5645,9 @@ msgstr "cette personne"
 
 msgid "to"
 msgstr "à"
+
+msgid "to cite"
+msgstr "à citer"
 
 #, python-brace-format
 msgid "track: {track}"
@@ -5963,6 +6067,10 @@ msgstr[0] "« {name} » a un extrait (avec ses sous-catégories) : déplacez-le 
 msgstr[1] ""
 "« {name} » a {n} extraits (avec ses sous-catégories) : déplacez-les "
 "d'abord."
+
+#, python-brace-format
+msgid "“{name}” is already a tag, or another folder's list"
+msgstr "« {name} » est déjà une étiquette, ou une liste d'un autre dossier"
 
 #, python-brace-format
 msgid "“{other}” is merged into “{name}”."

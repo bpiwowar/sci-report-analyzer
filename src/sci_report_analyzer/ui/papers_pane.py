@@ -71,8 +71,9 @@ class PapersPane:
         (dragged, moved up / down, typed), the pane then rebuilt by it."""
         self._editor = editor
         self._on_numbers = on_numbers
-        self._tag = None  # (the numbered tag, when its papers can be ordered here)
-        self._order: list[int] = []  # (its papers, in their order)
+        # (the star lists whose papers can be ordered here, and their papers in order)
+        self._lists: dict[int, annotations.Tag] = {}
+        self._orders: dict[int, list[int]] = {}
         self._context = context
         self._templates = templates
         self.period_id = period_id
@@ -130,16 +131,18 @@ class PapersPane:
             return all(w in hay.lower() for w in words)
 
         off = [p for p in ctx.discuss if p.off_period]
-        tid = ctx.numbered_tag if self._on_numbers and not words else None
-        self._tag = next((t for t in annotations.all_tags() if t.id == tid), None)
-        self._order = [s.id for s in tag_order(ctx.stats, tid, self.period_id)] if tid else []
+        lists = {lst.id for lst in ctx.lists} if self._on_numbers and not words else set()
+        self._lists = {t.id: t for t in annotations.all_tags() if t.id in lists}
+        self._orders = {
+            t: [s.id for s in tag_order(ctx.stats, t, self.period_id)] for t in self._lists
+        }
         with ui.row().classes("w-full items-center gap-2"):
             ui.label(
                 _("{cited} of the {n} papers to discuss cited").format(
                     cited=len(st.discuss) - len(st.missing), n=len(st.discuss)
                 )
                 if st.discuss
-                else _("No paper to discuss (set the folder's numbered tag)")
+                else _("No paper to discuss (a star list to cite: the folder's settings)")
             ).classes("text-sm " + ("text-negative" if st.missing else "text-positive")).mark(
                 f"{self.mark}-count"
             )
@@ -164,9 +167,17 @@ class PapersPane:
         for err in result.errors:
             ui.label(err).classes("text-sm text-negative")
 
-        shown = [p for p in st.discuss if matches(p)]
+        shown = [p for p in st.discuss if matches(p) and not p.off_period]
+        cited_lists = [lst for lst in ctx.lists if any(p.list_id == lst.id for p in shown)]
         groups = [
-            (None, shown),
+            *(
+                (
+                    lst.name if len(cited_lists) > 1 else None,
+                    [p for p in shown if p.list_id == lst.id],
+                )
+                for lst in cited_lists
+            ),
+            (None, [p for p in shown if p.list_id is None]),
             (_("Not of the period's years"), [p for p in off if matches(p)]),
             (_("Cited, but not to discuss"), [p for p in st.outside if matches(p)]),
         ]
@@ -208,9 +219,11 @@ class PapersPane:
             .props(f'data-paper-key="{p.key}"')
             .mark(f"{self.mark}-row-{p.key}")
         ) as row:
-            ordered = self._tag is not None and s.id in self._order
+            tag = self._lists.get(p.list_id) if p.list_id is not None else None
+            order = self._orders.get(p.list_id, []) if tag is not None else []
+            ordered = s.id in order
             if ordered:
-                self._orderable(row, s, ctx)
+                self._orderable(row, s, ctx, tag)
             tip = " · ".join(
                 [_("cited {n}×").format(n=times) if times else _("not cited yet")]
                 + ([] if to_discuss else [_("not to discuss")])
@@ -221,7 +234,7 @@ class PapersPane:
                 )
                 + [_("click: cite it")]
                 + (
-                    [_("Alt-click: set its number within “{tag}”").format(tag=self._tag.name)]
+                    [_("Alt-click: set its number within “{tag}”").format(tag=tag.name)]
                     if ordered
                     else []
                 )
@@ -236,7 +249,6 @@ class PapersPane:
                 )
 
             if ordered:
-                tag = self._tag
                 number_edit(
                     s.number_of(tag.id, self.period_id),
                     lambda n: (save_number(s, tag, self.period_id, n), self._numbers_changed()),
@@ -273,32 +285,31 @@ class PapersPane:
                     ).mark(f"{self.mark}-note-{p.key}")
             if ordered:
                 with ui.column().classes("gap-0 shrink-0"):
-                    i = self._order.index(s.id)
+                    i = order.index(s.id)
                     up = ui.button(
-                        icon="keyboard_arrow_up", on_click=lambda: self._step(ctx, s, -1)
+                        icon="keyboard_arrow_up", on_click=lambda: self._step(ctx, s, -1, tag)
                     )
                     up.props("flat dense round size=xs").tooltip(_("Up")).mark(
                         f"{self.mark}-up-{p.key}"
                     )
                     down = ui.button(
-                        icon="keyboard_arrow_down", on_click=lambda: self._step(ctx, s, 1)
+                        icon="keyboard_arrow_down", on_click=lambda: self._step(ctx, s, 1, tag)
                     )
                     down.props("flat dense round size=xs").tooltip(_("Down")).mark(
                         f"{self.mark}-down-{p.key}"
                     )
                     if i == 0:
                         up.disable()
-                    if i == len(self._order) - 1:
+                    if i == len(order) - 1:
                         down.disable()
             with ui.button(icon="more_vert").props("flat dense round size=sm"), ui.menu():
                 for t in self._templates().items:
                     ui.menu_item(t.label, on_click=lambda a=t.attrs: self.cite(p.key, a))
 
-    # ---- ordering the papers of the numbered tag (their numbers) ----------------------
+    # ---- ordering the papers of a star list (their numbers) ---------------------------
 
-    def _orderable(self, row: ui.element, s, ctx: reports.Context) -> None:
-        """Its row dragged onto another one (its handle)."""
-        tag = self._tag
+    def _orderable(self, row: ui.element, s, ctx: reports.Context, tag) -> None:
+        """Its row dragged onto another one of its list (its handle)."""
 
         def dropped(src: int, where: str) -> None:
             if reorder(ctx.stats, tag, self.period_id, src, s.id, where):
@@ -313,8 +324,8 @@ class PapersPane:
                 ).format(tag=tag.name)
             )
 
-    def _step(self, ctx: reports.Context, s, delta: int) -> None:
-        if step(ctx.stats, self._tag, self.period_id, s.id, delta):
+    def _step(self, ctx: reports.Context, s, delta: int, tag) -> None:
+        if step(ctx.stats, tag, self.period_id, s.id, delta):
             self._numbers_changed()
 
     def _numbers_changed(self) -> None:

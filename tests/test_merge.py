@@ -343,5 +343,4 @@ def test_annotations_follow_a_paper_merged_by_a_sync():
         assert len(pubs) == 1, [(p.id, p.title, p.missing) for p in pubs]
         [p] = pubs
         assert p.note == "keep this"
-    [star] = annotations.periods(pid)[0].stars
-    assert star.publication_id == p.id
+    assert annotations.periods(pid)[0].stars == [p.id]

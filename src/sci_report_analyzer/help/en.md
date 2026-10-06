@@ -177,24 +177,27 @@ click it to open the page.
 **Periods** are named year ranges (e.g. an evaluation period). Within a period you can
 **star** papers. The chosen period is remembered.
 
-**Tags & notes** (a paper's details, "Tags & notes" tab): type a name to create a tag. A
-**global** tag sticks to the paper; a tag **within a period** (⏱) is set separately in each
-period / folder. "starred" (the ★ button) is such a tag. Rename and recolour tags with the
-🏷 button or in Settings → Tags & categories. Each paper has a **note** (Markdown),
+**Tags & notes** (a paper's details, "Tags & notes" tab): type a name to create a tag; it
+sticks to the paper. The **star lists** (★, e.g. "starred") are the folder's ordered lists of
+papers, set within each person's period in it: the ★ button puts a paper in the first one,
+the details' ★ chips in any. They are the folder's settings (its dialog's “Notes and
+citations” tab: their names, their numbers' format, whether their papers are to be cited,
+their order). Rename and recolour tags with the 🏷 button or in Settings → Tags &
+categories. Each paper has a **note** (Markdown),
 plus a note within the selected period. The "tags" filter shows the papers having one of
 the chosen tags; to write about them, use the report editor (below).
 
 **Tag from a list** (the panel's list button): paste a list of publications, e.g. a report's
 numbered list copied from a PDF. Each item is matched with a paper by its HAL id or DOI, else
 by its title (the authors and venue around it do not matter); check the matches, add the
-papers the sources miss (by the item's HAL id / DOI, or found on HAL), then put a tag (e.g.
-starred, within the period) on them with their **numbers** in the list. Filtering on that tag
-shows the papers in the list's order (#3 on their tag), and the 🗒 listing numbers them and
-ends with the items not found.
+papers the sources miss (by the item's HAL id / DOI, or found on HAL), then put a tag on
+them, or put them in a star list (★, within the period) with their **numbers** in the list.
+Filtering on that list shows the papers in its order (#3 on their chip), and the 🗒 listing
+numbers them and ends with the items not found.
 
-**Numbers within a tag** (a paper's rank in the tag's list): Alt-click a number (`#3` next
-to a tag on a paper's row; in its details, where `#` is shown when it has none, a plain click
-too) to type it (Enter or leaving it saves, Escape cancels, empty removes it). To order all the papers of a tag, filter on it
+**Numbers in a star list** (a paper's place in it): Alt-click a number (`#3` next to the
+list on a paper's row; in its details, where `#` is shown when it has none, a plain click
+too) to type it (Enter or leaving it saves, Escape cancels, empty removes it). To order all the papers of a list, filter on it
 and click the numbered-list button next to the tags filter: drag the papers or use their ↑ / ↓
 arrows (they are then all numbered 1, 2… in the new order), type a number, “Number in this
 order” or “Clear the numbers”. Papers without a number come after the numbered ones (latest
@@ -205,24 +208,28 @@ A line break is kept (as in Obsidian). They are edited with a Markdown editor (t
 ⌘B / ⌘I, a preview beside or instead).
 
 **Citations in the folder notes** (the folder tab next to a PDF): the person's notes within
-the folder cite their papers with Pandoc's syntax: `[@key]` the paper's number, `[@a; @b]`
+the folder cite their papers with Pandoc's syntax: `[@key]` as the folder cites (its
+citation template; none: the paper's number), `[@a; @b]`
 or `[@a, @b]` several (each with the template, as in `[@a, @b]{.notes}`, also written
 without brackets: `@a, @b{.notes}`), `@key` its title, venue, year and category, `[@key]{.notes}` with its notes,
 `[@key]{.tags}` with its tags (`{.notes .tags}` both), and templates:
-`[@key]{.short-venue (.year)}` gives `EMNLP (2026)` (fields: `.number` the number as the
-folder writes it, `.index` the bare number as in `{**#.index**}`, `.title`, `.venue`,
+`[@key]{.short-venue (.year)}` gives `EMNLP (2026)` (fields: `.number` the number as its
+star list writes it, `.index` the bare number as in `{**#.index**}`, `.title`, `.venue`,
 `.short-venue` the acronym, `.year`, `.tags`, `.notes`; a bracket without a value is dropped).
 Named templates (Settings → Citation templates, or the folder's own) are used as `.name`.
-The folder's settings (its dialog's “Notes and citations” tab) set the tag whose papers are
-numbered (as listed, else by year; the others as first cited) and how numbers are written:
-one format for the listed papers (`**#{index}**`), one for the others (`[{index}]`). The
-papers to discuss are the listed ones (else those of the period's years); the editor's
+The folder's settings (its dialog's “Notes and citations” tab) set its star lists: a paper
+is numbered in the first one it is in (in its order, else by year), written as the list says
+(e.g. `**#{index}**`); the papers in no list are numbered apart, as first cited, with their
+own format (e.g. `[{index}]`). They also set the citation template of `[@key]` (e.g.
+`{.number (.short-venue .year)}`; inserted citations are plain `[@key]`), with examples of a
+citation and its reference for each. The papers to discuss are those of the lists to cite
+(else those of the period's years); the editor's
 "Papers" mode (its icon red until each is cited, orange if one cited is not of the
 period's years, green once all are; how many on hover) shows, instead of the preview, the papers to discuss with their numbers (red
 until cited, orange: not of the period's years; a click cites it, the ⋮ menu with a
 template), the one at the cursor highlighted, a search (Enter cites the first match; the
-person's other papers too), and "Cite them" (those not cited yet); the papers of the
-numbered tag are reordered there too (dragged, their ↑ / ↓ arrows, or their number
+person's other papers too), and "Cite them" (those not cited yet); the papers of each
+list are reordered there too (dragged, their ↑ / ↓ arrows, or their number
 Alt-clicked and typed), the citations renumbered. ⌘/Ctrl-click on a citation (or the
 toolbar's ↗ button, the cursor on it) shows its paper's details in a new window. Copy
 substitutes the citations, followed by the references, numbered as cited (or where
@@ -328,7 +335,7 @@ folders within it), "All people (cleanup)" every person. Drag a folder onto anot
 put it within it (onto its top or bottom: next to it), or onto "Drop here" for the top level.
 Each folder's ⋮ menu renames it, adds a folder within it, moves it ("Move to…") and chooses
 its settings. A folder uses the **settings** of the folder it is in, or its own ones (an icon in
-the tree): all of them, its categories and the citations in its notes (the numbered tag, the
+the tree): all of them, its categories, its star lists and the citations in its notes (the
 number formats, its templates, the starting notes). Choosing its own settings starts from a
 copy of its parent's; going back to its parent's drops its own (unless other folders use
 them), its people's excerpts going to the categories of the same names there (added if

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import Any, ClassVar
 
-from sqlalchemy import JSON, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import JSON, ForeignKey, Index, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from ..i18n import N_
@@ -269,9 +269,9 @@ class Period(Base):
     )
 
     @property
-    def stars(self) -> list[PeriodTag]:
-        """The papers starred in the period (tagged with the built-in "starred" tag)."""
-        return [t for t in self.paper_tags if t.tag.key == STARRED]
+    def stars(self) -> list[int]:
+        """The papers starred in the period (in a star list)."""
+        return sorted({t.publication_id for t in self.paper_tags})
 
 
 class AuthorCategory(Base):
@@ -320,9 +320,9 @@ class FolderSettings(Base):
     __tablename__ = "folder_settings"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # How the notes cite papers: {"tag_id": the tag whose papers are numbered, "format": the
-    # number's, "templates": [{"name", "attrs"}] (over the general ones), "skeleton": the
-    # starting notes}; see reports.py.
+    # How the notes cite papers: {"cite": the template of [@key], "format": the number of a
+    # paper in no star list (see Tag), "templates": [{"name", "attrs"}] (over the general
+    # ones), "skeleton": the starting notes, "nested_influence"}; see reports.py.
     citations: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
 
 
@@ -428,18 +428,38 @@ STARRED = "starred"  # Tag.key of the built-in period tag behind the ★ button
 
 
 class Tag(Base):
-    """A tag of papers, created on the fly: global (on the paper) or set per period (on the
-    paper within a period, e.g. "starred" — the ★ button); excerpts take tags too (by name,
-    whatever their kind)."""
+    """A tag of papers (created on the fly, on the paper), or a star list (``per_period``): a
+    list of the folders' settings (``settings_id``; none: of every folder), its papers within
+    a person's period in the folder, in order (numbered), e.g. "starred" (the ★ button: the
+    first list). Excerpts take tags too (by name, whatever their kind)."""
 
     __tablename__ = "tag"
+    # (a list's name: unique within its settings; a tag's, or a list's of every folder: among
+    # them)
+    __table_args__ = (
+        UniqueConstraint("name", "settings_id", name="uq_tag_name_settings"),
+        Index(
+            "uq_tag_global_name",
+            "name",
+            unique=True,
+            sqlite_where=text("settings_id IS NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str]
     colour: Mapped[str] = mapped_column(String(16), default="#0969da")
     per_period: Mapped[bool] = mapped_column(default=False)
     # A built-in tag (STARRED): it can be renamed and recoloured, not deleted.
     key: Mapped[str | None] = mapped_column(String(16), unique=True)
+    # A star list's: the folders' settings it is of, how its papers' numbers are written
+    # ("{index}": the number), whether the notes are to cite its papers, its place.
+    settings_id: Mapped[int | None] = mapped_column(
+        ForeignKey("folder_settings.id", ondelete="CASCADE")
+    )
+    number_format: Mapped[str | None]
+    must_cite: Mapped[bool] = mapped_column(default=False)
+    position: Mapped[int] = mapped_column(default=0)
 
 
 class PublicationTag(Base):
@@ -451,8 +471,6 @@ class PublicationTag(Base):
         ForeignKey("publication.id", ondelete="CASCADE"), primary_key=True
     )
     tag_id: Mapped[int] = mapped_column(ForeignKey("tag.id", ondelete="CASCADE"), primary_key=True)
-    # The paper's number in the list it was tagged from (e.g. "3" in a report's list).
-    number: Mapped[int | None]
 
 
 class ExcerptTag(Base):
@@ -469,7 +487,7 @@ class ExcerptTag(Base):
 
 
 class PeriodTag(Base):
-    """A per-period tag on a paper, within one period."""
+    """A paper in a star list (a per-period tag), within one period."""
 
     __tablename__ = "period_tag"
 
@@ -480,7 +498,7 @@ class PeriodTag(Base):
         ForeignKey("publication.id", ondelete="CASCADE"), primary_key=True
     )
     tag_id: Mapped[int] = mapped_column(ForeignKey("tag.id", ondelete="CASCADE"), primary_key=True)
-    # The paper's number in the list it was tagged from (e.g. "3" in a report's list).
+    # Its number in the list (its place; none: after the numbered ones).
     number: Mapped[int | None]
 
     tag: Mapped[Tag] = relationship(lazy="selectin")

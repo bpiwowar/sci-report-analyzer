@@ -231,9 +231,10 @@ def _effective_of(parent: dict[int, int | None], own: dict[int, int]) -> dict[in
 
 def _resettle(s, before: dict[int, int | None]) -> int:
     """After the settings of folders changed (``before``: those they used), file their
-    people's excerpts in the categories of the new ones (see categories.remap); then drops
+    people's excerpts in the categories of the new ones (see categories.remap), their
+    starred papers in its star lists (see annotations.remap_lists); then drops
     the settings no folder uses any more. Returns how many categories were added."""
-    from . import categories
+    from . import annotations, categories
 
     s.flush()
     added = 0
@@ -241,6 +242,7 @@ def _resettle(s, before: dict[int, int | None]) -> int:
         if (was := before.get(f)) is not None and now is not None and was != now:
             periods = list(s.scalars(select(Period.id).where(Period.folder_id == f)))
             added += categories.remap(s, periods, was, now)
+            annotations.remap_lists(s, periods, was, now)
     _drop_unused(s)
     return added
 
@@ -280,14 +282,15 @@ def set_parent(folder_id: int, parent_id: int | None) -> int:
 
 def use_own_settings(folder_id: int) -> None:
     """A folder gets settings of its own: a copy of those it used (its people's excerpts
-    filed in the copies of their categories)."""
-    from . import categories
+    filed in the copies of their categories, their stars in those of the star lists)."""
+    from . import annotations, categories
 
     with session_scope() as s:
         before = _effective(s)
         was = settings_id(s, folder_id)
         new = _own_new(s, folder_id, dict(s.get(FolderSettings, was).citations or {}) or None)
         categories.copy_settings(s, was, new)
+        annotations.copy_lists(s, was, new)
         _resettle(s, before)
 
 
@@ -373,10 +376,10 @@ def move_settings(folder_id: int, target_id: int) -> int:
 
 def copy_settings_to(folder_id: int, target_id: int) -> int:
     """Another folder (``target_id``) gets its own copy of the settings a folder uses (their
-    citations and categories); its people's excerpts, and those of the folders using its
-    settings, are filed in the copy (see categories.remap: the missing categories added).
-    Returns how many were added. Refused (``ValueError``): to itself."""
-    from . import categories
+    citations, star lists and categories); its people's excerpts, and those of the folders
+    using its settings, are filed in the copy (see categories.remap: the missing categories
+    added). Returns how many were added. Refused (``ValueError``): to itself."""
+    from . import annotations, categories
 
     with session_scope() as s:
         parent, own = _uses(s)
@@ -384,7 +387,9 @@ def copy_settings_to(folder_id: int, target_id: int) -> int:
         before = _effective_of(parent, own)
         source = settings_id(s, folder_id)
         citations = dict(s.get(FolderSettings, source).citations or {}) or None
-        categories.copy_settings(s, source, _own_new(s, target_id, citations))
+        new = _own_new(s, target_id, citations)
+        categories.copy_settings(s, source, new)
+        annotations.copy_lists(s, source, new)
         return _resettle(s, before)
 
 

@@ -1,4 +1,5 @@
-"""The papers' numbers within a tag (their rank in its list): set, cleared, reordered."""
+"""The papers' numbers in a star list (their place in it, within a period): set, cleared,
+reordered; the tags have none."""
 
 import asyncio
 
@@ -8,7 +9,7 @@ from nicegui.testing import User
 from sqlalchemy import select
 
 from sci_report_analyzer import annotations, folders, pubview, reports
-from sci_report_analyzer.db.models import PeriodTag, Publication, PublicationTag, Tag
+from sci_report_analyzer.db.models import PeriodTag, Publication
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.ui.tags import moved
 
@@ -37,42 +38,94 @@ def _setup():
 
 
 def _numbers(_pid: int, tag: int, period: int | None) -> dict[int, int | None]:
-    """The papers having the tag (global, else within the period), and their numbers."""
+    """The papers of the star list within the period, and their numbers."""
     with session_scope() as s:
-        if s.get(Tag, tag).per_period:
-            rows = s.scalars(
-                select(PeriodTag).where(PeriodTag.tag_id == tag, PeriodTag.period_id == period)
-            )
-        else:
-            rows = s.scalars(select(PublicationTag).where(PublicationTag.tag_id == tag))
+        rows = s.scalars(
+            select(PeriodTag).where(PeriodTag.tag_id == tag, PeriodTag.period_id == period)
+        )
         return {r.publication_id: r.number for r in rows}
 
 
 def test_set_clear_and_renumber():
-    pid, _period, (a, b, c) = _setup()
-    tag = annotations.save_tag("discuss")
-    annotations.toggle_tag(a, tag)
-    annotations.toggle_tag(b, tag)
-    annotations.set_tag_number(a, tag, 4)
-    annotations.set_tag_number(c, tag, 2)  # (the tag put on it too)
-    assert _numbers(pid, tag, None) == {a: 4, b: None, c: 2}
+    pid, period, (a, b, c) = _setup()
+    tag = annotations.save_list(None, "discuss")
+    annotations.toggle_tag(a, tag, period)
+    annotations.toggle_tag(b, tag, period)
+    annotations.set_tag_number(a, tag, 4, period)
+    annotations.set_tag_number(c, tag, 2, period)  # (put in the list too)
+    assert _numbers(pid, tag, period) == {a: 4, b: None, c: 2}
     # Their order: by number, then those without one (latest first).
     stats = asyncio.run(pubview.load_stats(pid))
-    assert [s.id for s in pubview.tag_order(stats, tag, None)] == [c, a, b]
-    annotations.set_tag_number(a, tag, None)
-    assert _numbers(pid, tag, None) == {a: None, b: None, c: 2}
-    annotations.number_in_order(tag, [b, a, c])
-    assert _numbers(pid, tag, None) == {b: 1, a: 2, c: 3}
-    annotations.clear_tag_numbers(tag, [a, b, c])
-    assert _numbers(pid, tag, None) == {a: None, b: None, c: None}  # (still tagged)
+    assert [s.id for s in pubview.tag_order(stats, tag, period)] == [c, a, b]
+    annotations.set_tag_number(a, tag, None, period)
+    assert _numbers(pid, tag, period) == {a: None, b: None, c: 2}
+    annotations.number_in_order(tag, [b, a, c], period)
+    assert _numbers(pid, tag, period) == {b: 1, a: 2, c: 3}
+    annotations.clear_tag_numbers(tag, [a, b, c], period)
+    assert _numbers(pid, tag, period) == {a: None, b: None, c: None}  # (still in it)
+    # A tag: no number.
+    with pytest.raises(ValueError, match="star list"):
+        annotations.set_tag_number(a, annotations.save_tag("plain"), 1, period)
+
+
+def test_star_lists_of_a_folder():
+    """A folder's lists (its settings'), after those of every folder; the ★ button's the
+    first; a name taken refused."""
+    _pid, period, _ids = _setup()
+    fid = folders.folder_of_period(period)[0]
+    settings = folders.settings_of(fid)
+    star = annotations.starred_tag_id()
+    mine = annotations.save_list(settings, "shortlist", number_format="[{index}]", must_cite=True)
+    other = folders.save_folder(None, "Other")
+    theirs = annotations.save_list(folders.settings_of(other), "theirs")
+    assert [t.id for t in annotations.star_lists(period)] == [star, mine]
+    assert annotations.first_list(period).id == star
+    annotations.order_lists([mine, star])
+    assert [t.id for t in annotations.star_lists(period)] == [mine, star]
+    assert theirs not in {t.id for t in annotations.star_lists(period)}
+    assert [x.name for x in reports.star_lists(period)] == ["shortlist", "starred"]
+    # A name: unique among the settings' lists, those of every folder and the tags.
+    annotations.save_list(settings, "theirs")  # (another folder's: fine)
+    for taken in ("shortlist", "starred"):
+        with pytest.raises(ValueError):
+            annotations.save_list(settings, taken)
+    with pytest.raises(ValueError):
+        annotations.save_tag("plain") and annotations.save_list(None, "plain")
+
+
+def test_star_lists_follow_the_settings():
+    """A folder getting its own settings: copies of its lists, its stars in them (numbers
+    kept); back to its parent's: in its lists of the same names (copied there if missing)."""
+    _pid, period, (a, b, _c) = _setup()
+    fid = folders.folder_of_period(period)[0]
+    top = folders.settings_of(fid)
+    short = annotations.save_list(top, "shortlist", number_format="[{index}]")
+    annotations.number_in_order(short, [b, a], period)
+    sub = folders.save_folder(None, "Sub")
+    folders.set_parent(sub, fid)
+    folders.use_parent_settings(sub)
+    inner = folders.add_person(sub, _pid)
+    assert [t.name for t in annotations.star_lists(inner)] == ["starred", "shortlist"]
+    annotations.toggle_tag(a, short, inner)
+    folders.use_own_settings(sub)
+    own = folders.settings_of(sub)
+    lists = {t.name: t for t in annotations.star_lists(inner)}
+    assert lists["shortlist"].id != short and lists["shortlist"].settings_id == own
+    assert lists["shortlist"].number_format == "[{index}]"
+    assert _numbers(_pid, lists["shortlist"].id, inner) == {a: None}
+    assert _numbers(_pid, short, period) == {b: 1, a: 2}  # (the parent's: as they were)
+    mine = annotations.save_list(own, "mine")
+    annotations.toggle_tag(b, mine, inner)
+    folders.use_parent_settings(sub)
+    back = {t.name: t.id for t in annotations.star_lists(inner)}
+    assert back["shortlist"] == short and _numbers(_pid, short, inner) == {a: None}
+    assert _numbers(_pid, back["mine"], inner) == {b: None}  # (copied to the parent's)
 
 
 def test_numbers_within_a_period():
     pid, period, (a, b, _c) = _setup()
     other = annotations.save_period(pid, "Other", 2018, 2024)
     star = annotations.starred_tag_id()
-    with pytest.raises(ValueError, match="period"):
-        annotations.set_tag_number(a, star, 1)
     annotations.number_in_order(star, [b, a], period)
     annotations.set_tag_number(a, star, 5, other)
     assert _numbers(pid, star, period) == {b: 1, a: 2}
@@ -124,9 +177,9 @@ async def test_order_dialog_from_the_panel(user: User) -> None:
 
 async def test_number_typed_on_a_paper(user: User) -> None:
     pid, period, (a, b, _c) = _setup()
-    tag = annotations.save_tag("discuss")
-    annotations.toggle_tag(a, tag)
-    annotations.set_tag_number(b, tag, 3)
+    tag = annotations.save_list(None, "discuss")
+    annotations.toggle_tag(a, tag, period)
+    annotations.set_tag_number(b, tag, 3, period)
     await user.open(f"/person/{pid}/{period}")
     await user.should_see(TITLES[0])
     # On the panel's row: its chip's number, Alt-clicked (a click: the row's, its details).
@@ -134,14 +187,14 @@ async def test_number_typed_on_a_paper(user: User) -> None:
     await user.should_not_see(marker=f"pub-tag-number-{b}-{tag}-input")
     user.find(f"pub-tag-number-{b}-{tag}").trigger("click", {"altKey": True})
     user.find(f"pub-tag-number-{b}-{tag}-input").clear().type("2").trigger("keydown.enter")
-    assert _numbers(pid, tag, None)[b] == 2
+    assert _numbers(pid, tag, period)[b] == 2
     # In the paper's details: next to its tag.
     user.find(f"pub-{a}").click()
     user.find("tab-notes").click()
     await user.should_see(marker="tag-number-discuss")
     user.find("tag-number-discuss").trigger("click", {"altKey": True})
     user.find("tag-number-discuss-input").clear().type("#5").trigger("keydown.enter")
-    assert _numbers(pid, tag, None) == {a: 5, b: 2}
+    assert _numbers(pid, tag, period) == {a: 5, b: 2}
     await user.should_see("#5", marker="tag-number-discuss")
 
 
@@ -158,8 +211,7 @@ async def test_reordered_beside_the_folder_notes(user: User, monkeypatch, tmp_pa
     keys = reports.citation_keys(stats)
     star = annotations.starred_tag_id()
     annotations.number_in_order(star, [a, b], period)
-    fid = folders.folder_of_period(period)[0]
-    reports.save_numbering(fid, reports.Numbering(star, "#{index}", "#{index}"))
+    annotations.save_list(None, "starred", number_format="#{index}", must_cite=True, list_id=star)
     pdfs.save(a, b"%PDF-1.4\n%%EOF\n", None)
     cited: list[str] = []
     monkeypatch.setattr(PapersPane, "cite", lambda _self, key, _attrs=None: cited.append(key))

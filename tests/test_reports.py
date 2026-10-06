@@ -51,12 +51,13 @@ def test_keys_numbers_and_substitution():
     )
     assert keys[b] == "smith2022neural"
     assert {keys[a], keys[c]} == {"doe2021deep", "doe2021deepa"}
-    tag = annotations.save_tag("discuss")
-    annotations.toggle_tag(a, tag)
-    annotations.toggle_tag(b, tag)
+    tag = annotations.save_list(None, "discuss")
+    annotations.toggle_tag(a, tag, period)
+    annotations.toggle_tag(b, tag, period)
     annotations.set_note(a, "Strong *results*.\n\nSecond paragraph.")
     stats = asyncio.run(pubview.load_stats(pid))
-    papers = reports.papers_to_discuss(stats, keys, [tag], period)
+    lists = [reports.StarList(tag, "discuss")]
+    papers = reports.listed_papers(stats, keys, lists, period)
     assert [(p.key, p.number) for p in papers] == [("smith2022neural", 1), (keys[a], 2)]
     ctx = reports.Context(papers, stats, keys, {tag: "discuss"}, {tag}, period)
     text = (
@@ -72,7 +73,7 @@ def test_keys_numbers_and_substitution():
     assert "x@smith2022neural.org `[@smith2022neural]`" in lines[1]  # (mail, code: kept)
     assert lines[2].startswith("- **#2** **Deep ranking for search**")
     assert lines[4] == "  Strong *results*." and lines[6] == "  Second paragraph."
-    assert lines[-1] == "Other: **#3** and [@nobody]."  # a paper without the tag: next number
+    assert lines[-1] == "Other: **#3** and [@nobody]."  # (in no list, the same format: next)
     assert r.unknown == ["nobody"]
     assert r.cited["smith2022neural"] == 3
     assert uncited(ctx, r.cited) == []
@@ -91,35 +92,50 @@ def test_keys_numbers_and_substitution():
     other = annotations.save_tag("strong")
     annotations.toggle_tag(a, other)
     stats = asyncio.run(pubview.load_stats(pid))
-    papers = reports.papers_to_discuss(stats, keys, [tag], period)
+    lists = [reports.StarList(tag, "discuss", "[{n}]")]
+    papers = reports.listed_papers(stats, keys, lists, period)
     names = {tag: "discuss", other: "strong"}
-    ctx = reports.Context(papers, stats, keys, names, {tag}, period, number_format="[{n}]")
+    ctx = reports.Context(papers, stats, keys, names, {tag}, period, number_format="({n})")
     out = reports.render(f"[@{keys[a]}]{{.tags}}", ctx).text
     assert out.startswith("[2] **Deep ranking for search**") and out.endswith("#strong")
     assert "#discuss" not in out
     assert uncited(ctx, reports.render("", ctx).cited) == papers
     assert reports.bibliography(ctx).splitlines()[0].startswith("- [1] **The neural")
+    # In no list, written otherwise: numbered apart, from 1, as first cited.
+    assert reports.render(f"[@{keys[c]}]", ctx).text == "(1)"
+    # The template of [@key] (the folder's), and without it.
+    ctx = reports.Context(papers, stats, keys, names, {tag}, period, cite_default="{.number .year}")
+    assert reports.render("[@smith2022neural]", ctx).text == "[1] 2022"
+    assert reports.render("[@smith2022neural]{.year}", ctx).text == "2022"
     # Without tags: the papers of the period's years.
     assert len(reports.papers_to_discuss(stats, keys, [], period, (2022, None))) == 1
-    # Numbers of a tag put from a list.
-    annotations.tag_numbered(tag, {a: 3, b: 7})
+    # Their numbers in the list (e.g. put from a pasted one); in the first list they are in.
+    annotations.tag_numbered(tag, {a: 3, b: 7}, period)
     stats = asyncio.run(pubview.load_stats(pid))
-    papers = reports.papers_to_discuss(stats, keys, [tag], period)
+    papers = reports.listed_papers(stats, keys, lists, period)
     assert [p.number for p in papers] == [3, 7]
-    # With tags: the papers of other years are off-period.
-    papers = reports.papers_to_discuss(stats, keys, [tag], period, (2022, None))
+    first = annotations.save_list(None, "first")
+    annotations.toggle_tag(b, first, period)
+    stats = asyncio.run(pubview.load_stats(pid))
+    two = [reports.StarList(first, "first", "F{index}"), *lists]
+    papers = reports.listed_papers(stats, keys, two, period)
+    assert [(p.key, p.number, p.list_id) for p in papers] == [
+        ("smith2022neural", 1, first),
+        (keys[a], 3, tag),
+    ]
+    # The papers of other years are off-period.
+    papers = reports.listed_papers(stats, keys, lists, period, (2022, None))
     assert [(p.key, p.off_period) for p in papers] == [(keys[a], True), ("smith2022neural", False)]
 
 
 def test_report_templates():
     t = reports.load_templates()
-    assert t.cite("k") == "[@k]{**#.index** (.short-venue .year)}"
-    assert t.cite("k", "") == "[@k]"
+    assert t.cite("k") == "[@k]"  # (as the folder cites)
+    assert t.cite("k", "{.year}") == "[@k]{.year}"
     assert reports.check_template("{.year (}") and reports.check_template(".year")
     t.items.append(reports.Template("Year", "{.year}"))
-    t.default = "{.year}"
     reports.save_templates(t)
-    assert reports.load_templates().cite("k") == "[@k]{.year}"
+    assert reports.load_templates().items[-1].attrs == "{.year}"
     t.items.append(reports.Template("Bad", "{(.year}"))
     with pytest.raises(ValueError):
         reports.save_templates(t)
@@ -131,10 +147,8 @@ async def test_report_templates_settings(user: User):
     user.find(marker="report-template-add").click()
     await user.should_see(marker="report-template-attrs-7")
     user.find(marker="report-template-attrs-7").elements.pop().value = "{.title}"
-    user.find(marker="report-template-default-7").click()
     user.find(marker="report-templates-save").click()
-    t = reports.load_templates()
-    assert t.items[-1].attrs == "{.title}" and t.default == "{.title}"
+    assert reports.load_templates().items[-1].attrs == "{.title}"
 
 
 def test_notes_keep_line_breaks():
@@ -233,19 +247,22 @@ def test_folder_numbering_templates_and_status():
     assert r.text == "[1] [2]"
     st = reports.citation_status(ctx, r.cited)
     assert len(st.discuss) == 3 and len(st.missing) == 1 and st.colour == "negative"
-    # A numbered tag (within the period) and a format: its papers first, as listed.
+    # A star list to cite (its papers, numbered in it, are to discuss), with a format.
     star = annotations.starred_tag_id()
     annotations.tag_numbered(star, {a: 1, b: 2}, period)
-    reports.save_numbering(fid, reports.Numbering(star, "**#{index}**"))
+    annotations.save_list(
+        None, "starred", number_format="**#{index}**", must_cite=True, list_id=star
+    )
+    reports.save_numbering(fid, reports.Numbering("**#{index}**"))
     stats = asyncio.run(pubview.load_stats(pid))
     ctx = reports.folder_context(stats, period)
     r = reports.render(f"[@{keys[b]}] [@{keys[c]}]", ctx)
-    assert r.text == "**#2** **#1**"  # (the others numbered apart, here in the same format)
+    assert r.text == "**#2** **#3**"  # (the others: the same format, numbered after them)
     st = reports.citation_status(ctx, r.cited)
     assert [p.key for p in st.missing] == [keys[a]] and [p.key for p in st.outside] == [keys[c]]
     assert st.colour == "negative"
     # Copied: the listed papers, then the others (from 1, as first cited), each in its format.
-    reports.save_numbering(fid, reports.Numbering(star, "[{index}]", "**#{index}**"))
+    reports.save_numbering(fid, reports.Numbering("[{index}]"))
     ctx = reports.folder_context(stats, period)
     out = reports.with_references(f"[@{keys[c]}] [@{keys[b]}]", ctx)
     assert out.startswith("[1] **#2**\n")
@@ -254,10 +271,20 @@ def test_folder_numbering_templates_and_status():
     assert refs[1].startswith("- **#2** **The neural retrieval**")
     assert refs[2].startswith("- [1] **Deep ranking again**")
     assert reports.render(f"[@{keys[c]}]{{.index}}", ctx).text == "1"
-    reports.save_numbering(fid, reports.Numbering(star, "**#{index}**"))
+    # The folder's template of [@key].
+    reports.save_numbering(fid, reports.Numbering("[{index}]", "{.number (.year)}"))
     ctx = reports.folder_context(stats, period)
     r = reports.render(f"[@{keys[a]}; @{keys[b]}]", ctx)
+    assert r.text == "**#1** (2021), **#2** (2022)"
     assert reports.citation_status(ctx, r.cited).colour == "positive"
+    # A list not to cite: its papers numbered, not to discuss (none: the period's years).
+    annotations.save_list(None, "starred", number_format="**#{index}**", list_id=star)
+    ctx = reports.folder_context(stats, period)
+    assert reports.render(f"[@{keys[b]}]", ctx).text == "**#2** (2022)"
+    assert len(reports.citation_status(ctx, r.cited).discuss) == 3
+    annotations.save_list(
+        None, "starred", number_format="**#{index}**", must_cite=True, list_id=star
+    )
     # The period's years: a paper with the tag of another year, cited, is out of the range.
     folders.set_period(period, 2022, None)
     ctx = reports.folder_context(stats, period)
@@ -294,7 +321,8 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     star = annotations.starred_tag_id()
     annotations.toggle_tag(a, star, period)
     fid = folders.folder_of_period(period)[0]
-    reports.save_numbering(fid, reports.Numbering(star, "#{index}", "#{index}"))
+    annotations.save_list(None, "starred", number_format="#{index}", must_cite=True, list_id=star)
+    reports.save_numbering(fid, reports.Numbering("#{index}"))
     pdfs.save(a, PDF, None)
     await user.open(f"/pdf/{a}?period={period}")
     # The hint on the editor's "Papers": coloured by whether the papers to discuss are cited.
@@ -323,18 +351,31 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     user.find(marker="folder-tab-notes").click()
     await user.should_see(marker="folder-same-formats")  # (both "#{index}")
     user.find(marker="folder-number-format").clear().type("[{index}]")
-    user.find(marker="folder-listed-format").clear().type("§{index}")
+    user.find(marker="folder-list-format-0").clear().type("§{index}")
     await user.should_not_see(marker="folder-same-formats")
+    await user.should_see("§2")  # (the examples: a list's 2nd paper, cited and listed)
+    user.find(marker="folder-cite").clear().type("{.number (.year)}")
+    await user.should_see("§2 (2026)")
+    # Another list (not to cite), first: the ★ button's.
+    user.find(marker="folder-list-add").click()
+    await user.should_see(marker="folder-list-name-1")
+    user.find(marker="folder-list-name-1").type("maybe")
+    user.find(marker="folder-list-up-1").click()
     user.find(marker="folder-save").click()
     await user.should_not_see(marker="folder-save")
     await asyncio.sleep(0.3)  # (then back to the folder: before leaving it)
-    assert reports.numbering(fid) == reports.Numbering(star, "[{index}]", "§{index}")
+    assert reports.numbering(fid) == reports.Numbering("[{index}]", "{.number (.year)}")
+    assert [(x.name, x.number_format, x.must_cite) for x in reports.star_lists(period)] == [
+        ("maybe", "**#{index}**", False),
+        ("starred", "§{index}", True),
+    ]
+    assert annotations.first_list(period).name == "maybe"
     assert reports.nested_influence(fid)
     await user.open(f"/pdf/{a}?period={period}")
     await user.should_see(marker="folder-note-mode")
     await asyncio.sleep(0.5)  # (the papers loaded)
     user.find(marker="folder-note").elements.pop().value = f"Good: [@{keys[a]}]."
-    await user.should_see("Good: §1.")  # (the new format)
+    await user.should_see("Good: §1 (2021).")  # (the new formats)
     # Beside the papers (in place of the preview): those to discuss, whether cited.
     user.find(marker="folder-note-mode").elements.pop().value = "side"
     await user.should_see("1 of the 1 papers to discuss cited", marker="folder-papers-count")

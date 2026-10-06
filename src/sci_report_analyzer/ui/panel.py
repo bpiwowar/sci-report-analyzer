@@ -149,7 +149,7 @@ class PublicationsPanel:
         # Called on each render (e.g. the Theses tab, which follows the period).
         self.on_render: list[Callable[[], None]] = []
         self.tags = annotations.all_tags()
-        self.starred_id = annotations.starred_tag_id()
+        self._lists: tuple[int | None, list[int]] = (None, [])  # (period, its star lists)
         self.categories = annotations.author_categories()
         self.cat_colours = {f"cat:{c.id}": c.colour for c in self.categories}
         # The chosen period (and its tag filter) stick across visits; a period given in the
@@ -174,9 +174,26 @@ class PublicationsPanel:
     def _saved_tags(self, state: dict) -> list[int]:
         return self._known_tags(state.get("tag_filter", []))
 
+    def star_lists(self) -> list[int]:
+        """The star lists of the period's folder (none without a period), in order."""
+        if self._lists[0] != self.period_id or not self.period_id:
+            ids = [t.id for t in annotations.star_lists(self.period_id)] if self.period_id else []
+            self._lists = (self.period_id, ids)
+        return self._lists[1]
+
+    @property
+    def starred_id(self) -> int | None:
+        """The star list of the ★ button: the folder's first."""
+        return next(iter(self.star_lists()), None)
+
+    def usable_tags(self) -> list:
+        """The tags, and the star lists of the period's folder."""
+        lists = set(self.star_lists())
+        return [t for t in self.tags if not t.per_period or t.id in lists]
+
     def _known_tags(self, ids) -> list[int]:
-        """The tags that can filter: global ones, and per-period ones with a period."""
-        usable = {t.id for t in self.tags if self.period_id or not t.per_period}
+        """The tags that can filter: the tags, and the star lists of the period's folder."""
+        usable = {t.id for t in self.usable_tags()}
         return [i for i in ids if i in usable]
 
     # ---- URL state ----------------------------------------------------------------------
@@ -508,9 +525,7 @@ class PublicationsPanel:
                     on_change=lambda e: set_year("hi", e.value),
                 ).props("dense outlined debounce=600").classes("w-24")
             tag_options = {
-                t.id: ("⏱ " if t.per_period else "") + t.name
-                for t in self.tags
-                if self.period_id or not t.per_period
+                t.id: ("★ " if t.per_period else "") + t.name for t in self.usable_tags()
             }
             if tag_options:
 
@@ -527,12 +542,14 @@ class PublicationsPanel:
                     label=_("tags"),
                     on_change=set_tags,
                 ).props("dense outlined use-chips clearable").classes("min-w-32").tooltip(
-                    _("Papers with one of these tags (⏱: within the period)")
+                    _("Papers with one of these tags (★: in a star list, within the period)")
                 ).mark("tag-filter")
-                if len(self.tag_filter) == 1:
+                if len(self.tag_filter) == 1 and self.tag_filter[0] in self.star_lists():
                     ui.button(icon="format_list_numbered", on_click=self.order_tag).props(
                         "flat round dense"
-                    ).tooltip(_("Order the papers of this tag (their numbers)")).mark("tag-order")
+                    ).tooltip(_("Order the papers of this star list (their numbers)")).mark(
+                        "tag-order"
+                    )
             ui.button(icon="sell", on_click=self.manage_tags).props("flat round dense").tooltip(
                 _("Manage tags (names, colours)")
             ).mark("manage-tags-panel")
@@ -1268,13 +1285,15 @@ class PublicationsPanel:
                         .mark(f"problems-{s.id}")
                     ):
                         ui.tooltip("\n".join(problems)).style("white-space:pre-line")
-            if period:
-                starred = self.starred_id in s.period_tags.get(period.id, set())
+            if period and (star_id := self.starred_id) is not None:
+                starred = star_id in s.period_tags.get(period.id, set())
 
-                def star(pub=s, p=period) -> None:
-                    on = annotations.toggle_tag(pub.id, self.starred_id, p.id)
+                def star(pub=s, p=period, star_id=star_id) -> None:
+                    on = annotations.toggle_tag(pub.id, star_id, p.id)
                     tags = pub.period_tags.setdefault(p.id, set())
-                    (tags.add if on else tags.discard)(self.starred_id)
+                    (tags.add if on else tags.discard)(star_id)
+                    if not on:
+                        pub.period_numbers.get(p.id, {}).pop(star_id, None)
                     self.render()
 
                 ui.button(icon="star" if starred else "star_border", on_click=star).props(
@@ -1350,13 +1369,15 @@ class PublicationsPanel:
                         track_chip(s.track, f"pub-track-{s.id}")
                     pid = period.id if period else None
                     mine = s.tags_in(pid)
-                    for tag in self.tags:
+                    for tag in self.usable_tags():
                         number = s.number_of(tag.id, pid)
                         if tag.id in mine and (tag.id != self.starred_id or number is not None):
                             tag_chip(
                                 tag,
                                 number,
-                                lambda n, s=s, tag=tag: self.set_number(s, tag, n),
+                                (lambda n, s=s, tag=tag: self.set_number(s, tag, n))
+                                if tag.per_period
+                                else None,
                                 mark=f"pub-tag-number-{s.id}-{tag.id}",
                             )
 

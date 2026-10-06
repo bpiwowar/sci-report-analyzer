@@ -58,8 +58,8 @@ def tag_chip(
     """A tag, with the paper's number in the list it was put from (``on_number``: that
     number edited by Alt-clicking it; a plain click goes on, e.g. to the paper's row)."""
     n = f" #{number}" if number is not None and on_number is None else ""
-    kind = _("tag within the period") if t.per_period else _("tag")
-    span(chip_html(f"{'⏱ ' if t.per_period else ''}{t.name}{n}", t.colour)).tooltip(
+    kind = _("star list, within the period") if t.per_period else _("tag")
+    span(chip_html(f"{'★ ' if t.per_period else ''}{t.name}{n}", t.colour)).tooltip(
         _("{tag}, number {number} in its list").format(tag=kind, number=number) if n else kind
     )
     if on_number is not None and number is not None:
@@ -160,38 +160,31 @@ def number_edit(
     display()
 
 
-def _store(s: PubStat, tag: Tag, period_id: int | None, number: int | None) -> None:
-    """The paper's number within the tag, as loaded (the tag on it)."""
-    if tag.per_period:
-        s.period_tags.setdefault(period_id, set()).add(tag.id)
-        numbers = s.period_numbers.setdefault(period_id, {})
-    else:
-        s.tags.add(tag.id)
-        numbers = s.numbers
+def _store(s: PubStat, tag: Tag, period_id: int, number: int | None) -> None:
+    """The paper's number in the star list, as loaded (it in the list)."""
+    s.period_tags.setdefault(period_id, set()).add(tag.id)
+    numbers = s.period_numbers.setdefault(period_id, {})
     if number is None:
         numbers.pop(tag.id, None)
     else:
         numbers[tag.id] = number
 
 
-def save_number(s: PubStat, tag: Tag, period_id: int | None, number: int | None) -> None:
-    """Set (None: remove) a paper's number within a tag, within the period for a per-period
-    tag."""
-    annotations.set_tag_number(s.id, tag.id, number, period_id if tag.per_period else None)
+def save_number(s: PubStat, tag: Tag, period_id: int, number: int | None) -> None:
+    """Set (None: remove) a paper's number in a star list, within the period."""
+    annotations.set_tag_number(s.id, tag.id, number, period_id)
     _store(s, tag, period_id, number)
 
 
-def save_order(rows: list[PubStat], tag: Tag, period_id: int | None) -> None:
-    """Number the papers of a tag 1, 2… in this order."""
-    where = period_id if tag.per_period else None
-    annotations.number_in_order(tag.id, [r.id for r in rows], where)
+def save_order(rows: list[PubStat], tag: Tag, period_id: int) -> None:
+    """Number the papers of a star list 1, 2… in this order."""
+    annotations.number_in_order(tag.id, [r.id for r in rows], period_id)
     for i, r in enumerate(rows, 1):
         _store(r, tag, period_id, i)
 
 
-def clear_numbers(rows: list[PubStat], tag: Tag, period_id: int | None) -> None:
-    where = period_id if tag.per_period else None
-    annotations.clear_tag_numbers(tag.id, [r.id for r in rows], where)
+def clear_numbers(rows: list[PubStat], tag: Tag, period_id: int) -> None:
+    annotations.clear_tag_numbers(tag.id, [r.id for r in rows], period_id)
     for r in rows:
         _store(r, tag, period_id, None)
 
@@ -252,11 +245,11 @@ def draggable(row: ui.element, pub_id: int, dropped: Callable[[int, str], None])
 def tag_order_dialog(
     tag: Tag, stats: list[PubStat], period: Period | None, on_change: Callable[[], None]
 ) -> None:
-    """The papers of a tag (of the person; within the period for a per-period tag), in
-    their order: dragged or moved up / down (numbering them all 1, 2… in the new order),
-    a number typed (click it), numbered in the order shown, or their numbers removed."""
+    """The papers of a star list within the period, in their order: dragged or moved up /
+    down (numbering them all 1, 2… in the new order), a number typed (click it), numbered in
+    the order shown, or their numbers removed."""
     pid = period.id if period else None
-    if tag.per_period and pid is None:
+    if pid is None:
         ui.notify(_("Choose a period first"), type="warning")
         return
 
@@ -267,11 +260,9 @@ def tag_order_dialog(
     with ui.dialog() as dlg, ui.card().classes("w-full max-w-3xl"):
         with ui.row().classes("w-full items-center no-wrap"):
             ui.label(
-                _("Order the papers tagged “{tag}” within {period}").format(
+                _("Order the papers of “{tag}” within {period}").format(
                     tag=tag.name, period=period.name
                 )
-                if tag.per_period
-                else _("Order the papers tagged “{tag}”").format(tag=tag.name)
             ).classes("text-lg font-medium grow")
             ui.button(icon="close", on_click=dlg.close).props("flat round dense")
         ui.label(
@@ -437,17 +428,18 @@ def colour_list_editor(
 
 
 def tags_section(on_change: Callable[[], None] | None = None) -> None:
-    """Every tag: rename, recolour, delete (the built-in "starred" is kept)."""
+    """Every tag: rename, recolour, delete (the star lists: in the folders' settings)."""
     ui.label(
         _(
-            "Tags are put on papers from their details. A global tag sticks to the paper; a tag "
-            "within a period (⏱, e.g. “starred”) is set separately in each period / folder."
+            "Tags are put on papers from their details, and stick to the paper. The star "
+            "lists (★, e.g. “starred”: ordered, within a person's period in a folder) are set "
+            "in the folders' settings (Notes and citations)."
         )
     ).classes("text-grey")
     colour_list_editor(
-        annotations.all_tags,
+        lambda: [t for t in annotations.all_tags() if not t.per_period],
         lambda t, name, colour: annotations.save_tag(name, colour, tag_id=t.id),
-        lambda name, colour, per_period: annotations.save_tag(name, colour, per_period),
+        lambda name, colour, _per_period: annotations.save_tag(name, colour),
         mark="tag",
         delete=lambda t: annotations.delete_tag(t.id),
         delete_message=lambda t: _("Delete the tag “{name}”, from every paper and excerpt?").format(
@@ -455,9 +447,7 @@ def tags_section(on_change: Callable[[], None] | None = None) -> None:
         ),
         can_delete=lambda t: t.key is None,
         delete_tip=_("Delete the tag (from every paper and excerpt)"),
-        note=lambda t: _("within a period") if t.per_period else _("global"),
         new_label=_("New tag"),
-        new_option=_("within a period"),
         on_change=on_change,
     )
 
@@ -558,9 +548,9 @@ def paper_tags_and_notes(
     *,
     quote_tool: Callable[[Callable[[], MarkdownEditor | None]], None] | None = None,
 ) -> None:
-    """A paper's tags (global, and within ``period``) and its notes (its own, and within
-    the period), in its details; ``quote_tool``: a button of the notes' toolbars, given their
-    editor (next to the PDF: quoting the selected text)."""
+    """A paper's tags, the star lists of ``period``'s folder it is in (numbered there), and
+    its notes (its own, and within the period), in its details; ``quote_tool``: a button of
+    the notes' toolbars, given their editor (next to the PDF: quoting the selected text)."""
     editors: dict[str, MarkdownEditor] = {}
 
     def tools(name: str) -> Callable[[], None] | None:
@@ -568,13 +558,14 @@ def paper_tags_and_notes(
 
     ui.label(_("Tags")).classes("font-medium")
     pid = period.id if period else None
+    lists = {t.id for t in annotations.star_lists(pid)} if pid else set()
 
     @ui.refreshable
     def chips() -> None:
         current = s.tags_in(pid)
         with ui.row().classes("items-center gap-1"):
             for t in tags:
-                if t.per_period and period is None:
+                if t.per_period and t.id not in lists:  # (another folder's)
                     continue
                 on = t.id in current
 
@@ -582,9 +573,8 @@ def paper_tags_and_notes(
                     added = annotations.toggle_tag(s.id, tid, pid)
                     target = s.period_tags.setdefault(pid, set()) if per else s.tags
                     (target.add if added else target.discard)(tid)
-                    if not added:  # (its number goes with it)
-                        numbers = s.period_numbers.get(pid, {}) if per else s.numbers
-                        numbers.pop(tid, None)
+                    if per and not added:  # (its number goes with it)
+                        s.period_numbers.get(pid, {}).pop(tid, None)
                     chips.refresh()
                     reload()
 
@@ -593,18 +583,18 @@ def paper_tags_and_notes(
                     reload()
 
                 ui.chip(
-                    ("⏱ " if t.per_period else "") + t.name,
+                    ("★ " if t.per_period else "") + t.name,
                     selectable=True,
                     selected=on,
                     on_click=toggle,
                 ).style(chip_style(t.colour, on)).props(
                     "dense " + ("color=primary" if on else "")
                 ).mark(f"tag-{t.name}").tooltip(
-                    _("within {period}").format(period=period.name)
+                    _("star list, within {period}").format(period=period.name)
                     if t.per_period
                     else _("on the paper (every period)")
                 )
-                if on:
+                if on and t.per_period:
                     number_edit(s.number_of(t.id, pid), renumber, mark=f"tag-number-{t.name}")
             new = (
                 ui.input(placeholder=_("+ new tag"))
@@ -612,27 +602,18 @@ def paper_tags_and_notes(
                 .classes("w-32")
                 .mark("paper-new-tag")
             )
-            per = (
-                ui.checkbox("⏱", value=False)
-                .props("dense")
-                .tooltip(_("Within the period only"))
-                .mark("paper-new-tag-period")
-            )
-            if period is None:
-                per.disable()
-                per.tooltip(_("Choose a period to make a tag within the period"))
 
             def create() -> None:
                 name = (new.value or "").strip()
                 if not name:
                     return
                 existing = next((t for t in tags if t.name == name), None)
-                tid = existing.id if existing else annotations.save_tag(name, None, per.value)
+                tid = existing.id if existing else annotations.save_tag(name, None)
                 if existing is None:
                     tags[:] = annotations.all_tags()
                 tag = next(t for t in tags if t.id == tid)
-                if tag.per_period and period is None:
-                    ui.notify(_("Choose a period first"), type="warning")
+                if tag.per_period and tid not in lists:
+                    ui.notify(_("A star list of another folder"), type="warning")
                     return
                 if tid not in s.tags_in(pid):
                     annotations.toggle_tag(s.id, tid, pid)
@@ -643,7 +624,7 @@ def paper_tags_and_notes(
 
             new.on("keydown.enter", create)
             ui.button(icon="settings", on_click=manage).props("flat round dense size=sm").tooltip(
-                _("Manage tags (names, colours)")
+                _("Manage tags (names, colours; the star lists: in the folder's settings)")
             ).mark("manage-tags")
 
     chips()
