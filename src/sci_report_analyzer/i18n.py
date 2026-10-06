@@ -54,8 +54,12 @@ def set_language(lang: str | None) -> None:
 
 
 @contextmanager
-def using(lang: str) -> Iterator[None]:
-    """Translate into ``lang`` within the block (e.g. a text in a language of its own)."""
+def using(lang: str | None) -> Iterator[None]:
+    """Translate into ``lang`` within the block (e.g. a text in a language of its own; none:
+    that of the moment)."""
+    if lang is None:
+        yield
+        return
     saved = _lang
     set_language(lang)
     try:

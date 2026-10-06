@@ -10,7 +10,6 @@ from nicegui import ui
 from .. import annotations, reports
 from ..i18n import N_, _
 from . import unsaved
-from .categories_editor import shared_note
 from .mdedit import MarkdownEditor
 
 TEMPLATES_HELP = N_(
@@ -136,7 +135,6 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
     ]
     removed: list[int] = []
     with ui.column().classes("w-full gap-2"):
-        shared_note(folder_id)
         ui.label(_("Star lists")).classes("font-medium")
         ui.label(
             _(

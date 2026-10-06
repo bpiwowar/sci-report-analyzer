@@ -422,7 +422,7 @@ def report_view(person_id: int, period_id: int | None = None) -> None:
                         on_change=lambda e: show(next(q for q in periods if q.id == e.value)),
                     ).props("dense options-dense borderless").classes("w-64").mark("report-period")
                 if p.folder and p.folder.hidden:
-                    ui.badge(_("hidden"), color="grey")
+                    ui.badge(_("archived"), color="grey")
                 _documents(p, open_doc)
             if p.folder is None:
                 ui.label(_("Notes and excerpts: only within a folder.")).classes(

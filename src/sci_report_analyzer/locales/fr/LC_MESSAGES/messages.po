@@ -609,6 +609,12 @@ msgstr "Appliquer"
 msgid "Archival"
 msgstr "Archive"
 
+msgid "Archive"
+msgstr "Archiver"
+
+msgid "Archived"
+msgstr "Archivé"
+
 #, python-format
 msgid "As cited in the copied excerpts: %% Application, p. 4 %%"
 msgstr "Tels que cités dans les extraits copiés : %% Candidature, p. 4 %%"
@@ -1698,6 +1704,9 @@ msgstr ""
 "Google Scholar a bloqué l'accès automatisé — enregistrez la page du "
 "profil (après avoir cliqué sur « Show more » jusqu'au bout) et "
 "téléversez-la à la place."
+
+msgid "Greyed in the folders, its periods no longer offered when choosing a person's period"
+msgstr "Grisé dans les dossiers, ses périodes ne sont plus proposées au choix de la période d'une personne"
 
 msgid ""
 "Groups of co-authors (e.g. “Intl. collaborators”), highlighted in author "
@@ -2877,6 +2886,9 @@ msgstr "OK"
 #, python-brace-format
 msgid "ORCID {orcid} set: candidates with it are shown in green"
 msgstr "ORCID {orcid} défini : les candidats qui l'ont sont affichés en vert"
+
+msgid "Of what is generated: references, excerpts, summary…"
+msgstr "De ce qui est généré : références, extraits, résumé…"
 
 msgid "Off"
 msgstr "Masqué"
@@ -4083,6 +4095,9 @@ msgstr ""
 " la place des textes du canal (cela ne change pas les textes qui "
 "appartiennent au canal)"
 
+msgid "That of the interface"
+msgstr "Celle de l'interface"
+
 msgid ""
 "The DOI of this paper, if the sources miss it or give a wrong one: its "
 "record (from the publisher) becomes the paper's main source"
@@ -4310,6 +4325,9 @@ msgstr "Le score donné à un canal trouvé par OpenAlex"
 
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
+
+msgid "The settings of the reports (can be shared with other folders)"
+msgstr "Les paramètres des rapports (partageables avec d’autres dossiers)"
 
 #, python-brace-format
 msgid "The settings of these folders change: {folders}"
@@ -4604,6 +4622,9 @@ msgstr "Tapez pour trouver un extrait"
 #, python-brace-format
 msgid "Type: {kind}"
 msgstr "Type : {kind}"
+
+msgid "Unarchive"
+msgstr "Désarchiver"
 
 msgid "Undo"
 msgstr "Annuler"
@@ -5007,6 +5028,9 @@ msgstr "toute source"
 
 msgid "archival"
 msgstr "archive"
+
+msgid "archived"
+msgstr "archivé"
 
 msgid "auto-detect"
 msgstr "détection automatique"

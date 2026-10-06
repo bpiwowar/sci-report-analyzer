@@ -8,7 +8,7 @@ from html import escape
 
 from nicegui import background_tasks, ui
 
-from .. import annotations, folders, manual, persons, pubview, reports, source_settings
+from .. import annotations, folders, i18n, manual, persons, pubview, reports, source_settings
 from ..db.models import Person
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
@@ -108,7 +108,7 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
         if current and current.date:
             ui.label(current.date.isoformat()).classes("text-grey")
         if current and current.hidden:
-            ui.badge(_("hidden"), color="grey")
+            ui.badge(_("archived"), color="grey").tooltip(_(ARCHIVED_TIP))
         if current:
             refresh = ui.navigate.reload
             ui.button(icon="edit", on_click=lambda: folder_dialog(current)).props(
@@ -122,9 +122,9 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
             ui.button(
                 icon="visibility" if current.hidden else "visibility_off",
                 on_click=lambda: (folders.set_hidden(current.id, not current.hidden), refresh()),
-            ).props("flat round dense").tooltip(_("Show") if current.hidden else _("Hide")).mark(
-                f"hide-folder-{current.id}"
-            )
+            ).props("flat round dense").tooltip(
+                _("Unarchive") if current.hidden else _("Archive")
+            ).mark(f"hide-folder-{current.id}")
             ui.button(
                 icon="delete_sweep",
                 on_click=lambda: purge_dialog(
@@ -546,17 +546,33 @@ NESTED_TIP = N_(
 )
 
 
+ARCHIVED_TIP = N_(
+    "Greyed in the folders, its periods no longer offered when choosing a person's period"
+)
+
+
 def folder_dialog(f: folders.FolderView | None) -> None:
-    """A folder's settings: its name, date, notes…; and (an existing one) those of the notes on
-    its people (the papers numbered, the templates…), in another tab."""
+    """A folder's own settings: its name, date, notes…; and (an existing one) those of its
+    reports, possibly shared with other folders (marked: an icon on their tab), in another tab:
+    their language, the papers numbered, the templates…"""
     with transient_dialog(
         _("New folder") if f is None else _("Edit folder"),
         width="w-96" if f is None else "w-full max-w-4xl",
     ) as (dlg, _card):
-        with ui.tabs().props("dense align=left").classes("w-full") as tabs:
-            general_tab = ui.tab("general", _("Folder")).mark("folder-tab-general")
+        with ui.tabs().props("dense inline-label align=left").classes("w-full") as tabs:
+            general_tab = ui.tab("general", _("Folder"), icon="folder").mark("folder-tab-general")
             if f is not None:
-                ui.tab("notes", _("Notes and citations")).mark("folder-tab-notes")
+                others = folders.sharing(f.id)
+                notes_tab = ui.tab(
+                    "notes", _("Reports"), icon="share" if others else "description"
+                ).mark("folder-tab-notes")
+                notes_tab.tooltip(
+                    _("Shared with {folders}: changed for them too").format(
+                        folders=", ".join(others)
+                    )
+                    if others
+                    else _("The settings of the reports (can be shared with other folders)")
+                )
         citations_save = None
         with ui.tab_panels(tabs, value=general_tab).classes("w-full"):
             with ui.tab_panel("general").classes("p-0 gap-2"):
@@ -603,9 +619,24 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                     .tooltip(_("Papers this source doesn't list for a person are not counted"))
                     .mark("folder-primary")
                 )
-                hidden = ui.checkbox(_("Hidden"), value=f.hidden if f else False)
-                nested = None
-                if f is not None:
+                hidden = ui.checkbox(_("Archived"), value=f.hidden if f else False).tooltip(
+                    _(ARCHIVED_TIP)
+                )
+            nested = lang = None
+            if f is not None:
+                with ui.tab_panel("notes").classes("p-0 gap-2"):
+                    from .citations import folder_citations_section
+
+                    lang = (
+                        ui.select(
+                            {"": _("That of the interface"), **i18n.LANGUAGES},
+                            value=reports.language(f.id) or "",
+                            label=_("Language"),
+                        )
+                        .classes("w-64")
+                        .tooltip(_("Of what is generated: references, excerpts, summary…"))
+                        .mark("folder-language")
+                    )
                     nested = (
                         ui.checkbox(
                             _("Rayonnement excerpts only in the Rayonnement section, by category"),
@@ -614,10 +645,6 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                         .tooltip(_(NESTED_TIP))
                         .mark("folder-nested-influence")
                     )
-            if f is not None:
-                with ui.tab_panel("notes").classes("p-0"):
-                    from .citations import folder_citations_section
-
                     citations_save = folder_citations_section(f.id)
 
         def save() -> bool | None:
@@ -635,6 +662,8 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 return False
             if nested is not None:
                 reports.save_nested_influence(f.id, bool(nested.value))
+            if lang is not None:
+                reports.save_language(f.id, lang.value or None)
             fid = folders.save_folder(
                 f.id if f else None,
                 name.value.strip(),

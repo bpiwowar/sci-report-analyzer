@@ -12,7 +12,7 @@ from datetime import datetime
 
 from sqlalchemy import func, select
 
-from . import folders
+from . import folders, i18n
 from .db.models import Category, Excerpt, PeriodDocument, Publication, SectionText, Tag
 from .db.session import session_scope
 from .i18n import _
@@ -927,11 +927,16 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | N
     out of their categories. The categories with no excerpt (nor below) are left out. A
     section's text (see section_texts) follows its heading; nested, that of a section left
     out (all its excerpts taken out) follows the heading of its subsection in the
-    Rayonnement section."""
-    if nested is None:
-        from . import reports
+    Rayonnement section. In the language of the folder's reports."""
+    from . import reports
 
+    if nested is None:
         nested = reports.nested_influence(folder_id)
+    with i18n.using(reports.language(folder_id)):
+        return _markdown(folder_id, period_id, level, nested)
+
+
+def _markdown(folder_id: int, period_id: int, level: int, nested: bool) -> str:
     nodes = tree(folder_id)
     texts = section_texts(period_id)
     by_cat: dict[int, list[ExcerptView]] = {}

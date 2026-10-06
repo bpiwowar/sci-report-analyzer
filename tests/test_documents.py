@@ -813,6 +813,26 @@ async def test_excerpt_tags_in_the_viewer(user: User, fake_viewer):
     assert categories.excerpts(period)[0].tag_names == ["Quokka"]
 
 
+def test_language_of_the_reports():
+    """A folder's reports generated in its language (none: the interface's), whatever that
+    of the interface."""
+    from sci_report_analyzer import categories, i18n, reports
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Recherche")
+    x = categories.add_excerpt(research, period, "Projet Comète.", 1, [])
+    categories.update_excerpt(x, start=2021)
+    assert reports.language(folder) is None
+    assert "since 2021" in categories.markdown(folder, period)
+    reports.save_language(folder, "fr")
+    assert reports.language(folder) == "fr" and i18n.language() == "en"
+    assert "depuis 2021" in categories.markdown(folder, period)
+    ctx = reports.folder_context([], period)
+    assert "depuis 2021" in reports.render("[]{.excerpts}", ctx).text
+    assert i18n.language() == "en"  # (the interface's, as it was)
+
+
 def test_nested_influence():
     """Optionally, the "rayonnement" excerpts only in its section, under their categories."""
     from sci_report_analyzer import categories, reports

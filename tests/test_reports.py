@@ -178,6 +178,9 @@ def test_note_with_references():
     assert out[4].startswith("- [1] **The neural retrieval** · *ECIR* · 2022")
     assert out[5].startswith("- [2] **Deep ranking for search**")
     assert len(out) == 6
+    ctx = reports.note_context(stats, keys)
+    ctx.lang = "fr"  # (a folder's language, see reports.language)
+    assert reports.with_references(text, ctx).splitlines()[2] == "## Références"
     assert reports.with_references("No citation.", reports.note_context(stats, keys)) == (
         "No citation.\n"
     )
@@ -367,8 +370,9 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     await user.open(f"/?folder={fid}")
     user.find(marker="folder-edit").click()
     await user.should_see(marker="folder-tab-notes")
-    user.find(marker="folder-nested-influence").click()  # (the folder's tab: not its notes')
-    user.find(marker="folder-tab-notes").click()
+    user.find(marker="folder-tab-notes").click()  # (shared settings: language, numbering…)
+    user.find(marker="folder-nested-influence").click()
+    user.find(marker="folder-language").elements.pop().value = "fr"
     await user.should_see(marker="folder-same-formats")  # (both "#{index}")
     user.find(marker="folder-number-format").clear().type("[{index}]")
     user.find(marker="folder-list-format-0").clear().type("§{index}")
@@ -393,6 +397,7 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     ]
     assert annotations.first_list(period).name == "maybe"
     assert reports.nested_influence(fid)
+    assert reports.language(fid) == "fr"
     await user.open(f"/pdf/{a}?period={period}")
     await user.should_see(marker="folder-note-mode")
     await asyncio.sleep(0.5)  # (the papers loaded)

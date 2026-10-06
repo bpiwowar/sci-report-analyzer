@@ -1239,9 +1239,10 @@ def _summary_lines(
     return lines
 
 
-def saved_summary(rows: list[PubStat]) -> list[str]:
+def saved_summary(rows: list[PubStat], lang: str | None = None) -> list[str]:
     """The summary of ``rows`` with the summary dialog's last settings (its kinds, details,
-    short names, language), as a Markdown list."""
+    short names, language: else ``lang``, e.g. that of a folder's reports), as a Markdown
+    list."""
     saved = summary_settings()
     off_kinds = set(saved.get("off_kinds", []))
     details = {k: "off" for k in saved.get("off_categories", [])}
@@ -1255,7 +1256,7 @@ def saved_summary(rows: list[PubStat]) -> list[str]:
         by_kind=saved.get("by_kind", True),
         years=saved.get("years", True),
         details=details,
-        lang=saved.get("lang", "en"),
+        lang=lang or saved.get("lang", "en"),
         markdown=True,
     )
 

@@ -43,6 +43,7 @@ from functools import lru_cache
 from lark import Lark, Transformer
 from lark.exceptions import LarkError
 
+from . import i18n
 from .authors import surname
 from .db.app_settings import get_setting, set_setting
 from .db.models import Folder, FolderSettings, Period
@@ -248,6 +249,7 @@ class Context:
     blocks: dict[str, Callable[[int, set[str]], str]] = field(default_factory=dict)
     lists: list[StarList] = field(default_factory=list)  # (the folder's star lists)
     cite_default: str = ""  # (the template of [@key], without one: e.g. "{.number (.year)}")
+    lang: str | None = None  # (that of the text generated: the folder's; none: the interface's)
 
     def __post_init__(self) -> None:
         self.by_key = {p.key: p for p in self.papers}
@@ -452,7 +454,13 @@ def _inner(attrs: str) -> str:
 
 def render(text: str, ctx: Context) -> Rendered:
     """The text with its citations substituted (unknown keys left as they are; a citation
-    with a template cycle too, followed by the error)."""
+    with a template cycle too, followed by the error); what is generated, in the language of
+    the context."""
+    with i18n.using(ctx.lang):
+        return _render(text, ctx)
+
+
+def _render(text: str, ctx: Context) -> Rendered:
     out = Rendered("")
     unknown: dict[str, None] = {}
 
@@ -555,7 +563,8 @@ def with_references(text: str, ctx: Context) -> str:
     r = render(text, ctx)
     out = r.text.rstrip()
     if ctx.by_key and not r.references:
-        out += "\n\n## " + _("References") + "\n\n" + bibliography(ctx)
+        with i18n.using(ctx.lang):
+            out += "\n\n## " + _("References") + "\n\n" + bibliography(ctx)
     return out + "\n"
 
 
@@ -623,6 +632,16 @@ def save_skeleton(folder_id: int, text: str) -> None:
     _save_citations(folder_id, skeleton=text.strip() and text.rstrip() + "\n")
 
 
+def language(folder_id: int | None) -> str | None:
+    """The language of what is generated in the reports of a folder (references, excerpts,
+    summary…); none: the interface's."""
+    return _citations(folder_id).get("lang") or None
+
+
+def save_language(folder_id: int, lang: str | None) -> None:
+    _save_citations(folder_id, lang=lang or None)
+
+
 def nested_influence(folder_id: int | None) -> bool:
     """Whether the folder's excerpts flagged "influence" are by default only in its
     Rayonnement section, under subsections of their categories (see categories.markdown)."""
@@ -650,9 +669,11 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
     if found is None:
         return note_context(stats, keys)
     person_id, folder_id, years = found
+    lang = language(folder_id)
 
     def publications(_level: int, _options: set[str]) -> str:
-        return "\n".join(saved_summary([s for s in stats if not s.hidden and in_years(s, years)]))
+        rows = [s for s in stats if not s.hidden and in_years(s, years)]
+        return "\n".join(saved_summary(rows, lang))
 
     def excerpts(level: int, options: set[str]) -> str:
         from . import categories
@@ -685,6 +706,7 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
         blocks={"publications": publications, "excerpts": excerpts},
         lists=lists,
         cite_default=n.cite,
+        lang=lang,
     )
 
 
