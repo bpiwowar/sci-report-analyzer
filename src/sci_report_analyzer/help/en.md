@@ -257,8 +257,10 @@ tasks, tags and the lines tagged #question or #to-check are left out, tables too
 ✎ once annotated). A grey icon means an open-access link (or a DOI) is known: click it to
 download the PDF (after confirmation, unless turned off) and open it. The viewer (PDF.js,
 installed once) has highlight, text, drawing and image tools; annotations are saved into the
-stored PDF (every few seconds, with Save or ⌘S/Ctrl+S). ← / → go back and forth after
-following a link inside the PDF. The side panel button shows the paper's tags and notes
+stored PDF (every few seconds, with Save or ⌘S/Ctrl+S); the viewer's menu (») saves,
+downloads a copy, prints and adds images. ← / → go back and forth after following a link
+inside the PDF. Above it, the menu bar and the person's header (their tabs) stay; the
+full-screen button hides them (for every PDF, until shown again). The side panel button shows the paper's tags and notes
 (also those of a period), its details (as in the publications panel) and its bookmarks next
 to it; 🔖+ bookmarks the selection (else the place shown), and 🔍 finds the paper of the
 selected text (among the person's papers, else on HAL, to add); the actions needing a
@@ -280,7 +282,8 @@ keeps the paper.
 
 **Documents** (person's Documents tab): PDFs of the person within a folder or a period (an
 application, a CV…), uploaded there and read in the same viewer (annotations, bookmarks, a
-note). The person's papers mentioned in a document are found (by title, a few typos
+note). One opened from the Report tab stays open there: back to that tab, it is shown again,
+until closed (✕). The person's papers mentioned in a document are found (by title, a few typos
 allowed, or DOI / HAL id) and become links (a light dotted underline; red when the paper's
 PDF is stored). Numbered
 references (“[11]”, “11.”, “[C3]”) make their citations (“[11]”, “[3, 11]”, “[3-5]”) point

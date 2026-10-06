@@ -30,8 +30,9 @@ def install_interrupt_handler() -> None:
     Server.handle_exit = announce
 
 
-def quit_button() -> None:
-    """A header button that stops the server (after confirmation when a sync is running)."""
+def quit_button(compact: bool = False) -> None:
+    """A header button that stops the server (after confirmation when a sync is running);
+    ``compact``: smaller."""
     from .sync import any_running
 
     def ask() -> None:
@@ -48,7 +49,7 @@ def quit_button() -> None:
         dialog.open()
 
     ui.button(icon="power_settings_new", on_click=ask).mark("quit").props(
-        "flat round color=white dense"
+        "flat round color=white dense" + (" size=sm" if compact else "")
     ).tooltip(_("Quit SciReport Analyzer"))
 
 

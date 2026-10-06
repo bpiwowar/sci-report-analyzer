@@ -257,8 +257,10 @@ l'emplacement des citations), encadrés, tâches, étiquettes et lignes étiquet
 ✎ une fois annoté). Une icône grise signifie qu'un lien en accès ouvert (ou un DOI) est connu : cliquez dessus pour
 télécharger le PDF (après confirmation, sauf si elle est désactivée) et l'ouvrir. La visionneuse (PDF.js,
 installée une seule fois) dispose d'outils de surlignage, de texte, de dessin et d'image ; les annotations sont enregistrées dans le
-PDF stocké (toutes les quelques secondes, avec Enregistrer ou ⌘S/Ctrl+S). ← / → permettent d'aller et venir après
-avoir suivi un lien dans le PDF. Le bouton du panneau latéral affiche à côté les étiquettes et les notes de l'article
+PDF stocké (toutes les quelques secondes, avec Enregistrer ou ⌘S/Ctrl+S) ; le menu de la visionneuse (») enregistre,
+télécharge une copie, imprime et ajoute des images. ← / → permettent d'aller et venir après
+avoir suivi un lien dans le PDF. Au-dessus, la barre de menu et l'en-tête de la personne (ses onglets) restent ; le
+bouton plein écran les masque (pour tous les PDF, jusqu'à les afficher à nouveau). Le bouton du panneau latéral affiche à côté les étiquettes et les notes de l'article
 (y compris celles d'une période), ses détails (comme dans le panneau des publications) et ses signets ; 🔖+ crée un signet sur la sélection (sinon sur l'endroit affiché), et 🔍 trouve l'article du
 texte sélectionné (parmi les articles de la personne, sinon sur HAL, pour l'ajouter) ; les actions nécessitant une
 sélection sont grisées en l'absence de sélection. Une zone d'une page sert aussi de sélection (une figure, un tableau, un
@@ -278,7 +280,8 @@ conserve l'article.
 
 **Documents** (onglet Documents de la personne) : PDF concernant la personne au sein d'un dossier ou d'une période (un
 dossier de candidature, un CV…), téléversés là et lus dans la même visionneuse (annotations, signets, une
-note). Les articles de la personne mentionnés dans un document sont retrouvés (par le titre, quelques coquilles
+note). Un document ouvert depuis l'onglet Rapport y reste ouvert : de retour dans cet onglet, il est de nouveau
+affiché, jusqu'à sa fermeture (✕). Les articles de la personne mentionnés dans un document sont retrouvés (par le titre, quelques coquilles
 tolérées, ou par DOI / identifiant HAL) et deviennent des liens (un léger soulignement pointillé ; rouge lorsque le PDF de
 l'article est stocké). Les références
 numérotées (« [11] », « 11. », « [C3] ») font aussi pointer leurs citations (« [11] », « [3, 11] », « [3-5] »)

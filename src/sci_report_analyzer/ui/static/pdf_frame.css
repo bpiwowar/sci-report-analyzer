@@ -1,0 +1,20 @@
+/* In the frame of PDF.js (pdf_viewer.js links it: its policy forbids inline styles). */
+
+/* The viewer's actions not wanted here: files (the app's actions have them), signatures…; the
+   button adding images (in the menu, see vrPdf.tools). */
+#secondaryOpenFile, #printButton, #downloadButton, #secondaryDownload, #viewBookmark,
+#viewBookmarkSeparator, #editorSignature, #imageAltTextSettings,
+#imageAltTextSettingsSeparator, #documentProperties, #editorStamp {
+  display: none !important;
+}
+.vr-area-mode .page, .vr-area-mode .page * { cursor: crosshair !important; }
+
+/* The app's items of the menu (vrPdf.tools): their Material icons in place of the viewer's
+   masks. */
+.vrTool::before { display: none !important; }
+.vrTool .material-icons {
+  font-size: 18px;
+  color: var(--toolbar-icon-bg-color);
+  opacity: var(--doorhanger-icon-opacity);
+}
+.vrTool.toggled .material-icons { color: var(--toggled-btn-color); }

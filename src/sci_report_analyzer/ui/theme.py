@@ -51,6 +51,10 @@ DEFAULT_COLOUR = "#0969da"  # (a new tag's, co-author category's…)
 # Opacity of the items not selected in a chart: faint, not to be confused with the selection.
 DIM_OPACITY = 0.12
 
+# The height (px) of the menu bar atop the pages without the frame (e.g. a PDF window).
+BAR_HEIGHT = 32
+
+
 CSS = """
 .vr-chip { display:inline-block; padding:0 6px; border-radius:9px; font-size:11px;
            line-height:18px; color:#fff; white-space:nowrap; margin-right:3px; }
@@ -109,26 +113,40 @@ MARKDOWN_CSS = """
 """
 CSS += MARKDOWN_CSS
 CSS += f".vr-dim {{ opacity:{DIM_OPACITY}; }}\n"
+# The menu bar of a page without the frame (see bare_page), and a person's header there:
+# hidden in full screen (a PDF's, see pdf_viewer.full_screen_button).
+CSS += "body.vr-full :is(.vr-menu-bar, .vr-person-header) { display: none !important; }\n"
 ui.add_css(CSS, shared=True)  # (every page: also the PDF windows)
+
+
+def _menu(compact: bool = False) -> None:
+    """The menu bar's links and buttons; ``compact``: smaller (atop a PDF window)."""
+    text = " text-sm" if compact else ""
+    size = " size=sm" if compact else ""
+    with ui.row().classes("items-center no-wrap " + ("gap-3" if compact else "gap-4")):
+        ui.link(APP_NAME, "/").classes(
+            "text-white font-bold no-underline " + ("text-sm" if compact else "text-lg")
+        )
+        ui.link(_("Reports"), "/").classes("text-white no-underline" + text)
+        ui.link(_("Venues"), "/venues").classes("text-white no-underline" + text)
+        ui.link(_("Settings"), "/settings").classes("text-white no-underline" + text)
+        ui.link(_("Help"), "/help").classes("text-white no-underline" + text)
+    with ui.row().classes("items-center no-wrap gap-1"):
+        language_menu(compact)
+        dark = ui.dark_mode()
+        ui.button(icon="dark_mode", on_click=dark.toggle).props(
+            "flat round color=white dense" + size
+        )
+        from ..stop import quit_button
+
+        quit_button(compact)
 
 
 @contextmanager
 def frame(title: str) -> Iterator[None]:
     ui.page_title(f"{title} · {APP_NAME}")
     with ui.header().classes("items-center justify-between py-1"):
-        with ui.row().classes("items-center gap-4"):
-            ui.link(APP_NAME, "/").classes("text-white text-lg font-bold no-underline")
-            ui.link(_("Reports"), "/").classes("text-white no-underline")
-            ui.link(_("Venues"), "/venues").classes("text-white no-underline")
-            ui.link(_("Settings"), "/settings").classes("text-white no-underline")
-            ui.link(_("Help"), "/help").classes("text-white no-underline")
-        with ui.row().classes("items-center gap-1"):
-            language_menu()
-            dark = ui.dark_mode()
-            ui.button(icon="dark_mode", on_click=dark.toggle).props("flat round color=white dense")
-            from ..stop import quit_button
-
-            quit_button()
+        _menu()
     ui.query(".nicegui-content").style("padding-top: 0")  # (close to the menu bar)
     with ui.column().classes("w-full max-w-screen-xl mx-auto px-4 pb-4 pt-1 gap-3"):
         from .. import livereload
@@ -149,12 +167,21 @@ def frame(title: str) -> Iterator[None]:
 
 
 def bare_page(title: str) -> None:
-    """A page without the frame (e.g. a PDF window): its title, no padding."""
+    """A page without the frame (e.g. a PDF window): its title, no padding, and the menu
+    bar, compact (``BAR_HEIGHT`` high; there from the start: while the PDF is fetched…)."""
     ui.page_title(f"{title} · {APP_NAME}")
     ui.query(".nicegui-content").classes("p-0 gap-0")
+    with (
+        ui.row()
+        .classes("w-full items-center justify-between no-wrap shrink-0 px-3 bg-primary text-white")
+        .classes("vr-menu-bar")
+        .style(f"height:{BAR_HEIGHT}px; border-bottom:1px solid rgba(255,255,255,.3)")
+        .mark("menu-bar")
+    ):
+        _menu(compact=True)
 
 
-def language_menu() -> None:
+def language_menu(compact: bool = False) -> None:
     """The header's language button: the whole app switches (the page reloads)."""
 
     def choose(lang: str) -> None:
@@ -163,7 +190,7 @@ def language_menu() -> None:
 
     with (
         ui.button(i18n.language().upper())
-        .props("flat color=white dense")
+        .props("flat color=white dense" + (" size=sm" if compact else ""))
         .tooltip(_("Language"))
         .mark("language"),
         ui.menu(),

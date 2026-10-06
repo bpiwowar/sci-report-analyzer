@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sci_report_analyzer import copy_filters, documents, folders, pdfs, pubview, reports
 from sci_report_analyzer.db.models import Publication, SectionText
 from sci_report_analyzer.db.session import session_scope
-from sci_report_analyzer.ui import copying
+from sci_report_analyzer.ui import copying, documents_page
 from sci_report_analyzer.ui.mdedit import MarkdownEditor, inline_quote, quote
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
@@ -177,9 +177,14 @@ async def test_document_page(user: User, monkeypatch, fake_viewer):
     user.find(marker=f"documents-{period}").click()
     user.find(marker=f"document-open-{doc}").click()
     await user.should_see(marker="document-close")
-    user.find(marker="document-close").click()
+    # (its person's header there: back to their tabs)
     await user.should_see(marker="tab-report")
+    # Left open there: the Report tab goes back to it, until it is closed.
+    assert documents_page.open_document(period) == doc
+    user.find(marker="document-close").click()
+    await user.should_see(marker="notes-side")
     await user.should_see(marker="folder-note")
+    assert documents_page.open_document(period) is None
     await user.open(f"/doc/{doc}")
     await user.should_see("Looking for the papers…")  # (until the viewer sent the text)
     documents.set_lines(doc, LINES)
@@ -1679,7 +1684,11 @@ async def test_excerpt_selected(user: User, monkeypatch, fake_viewer):
     await user.open(f"/doc/{doc}")
     await user.should_see(marker=f"excerpt-part-{first}")
     assert {t["id"] for t in categories.tints(period, doc, {})} == {first, second}
-    [tabs] = [e for e in user.client.elements.values() if isinstance(e, ui.tabs)]
+    [tabs] = [  # (the side column's: not those of the person's header)
+        e
+        for e in user.client.elements.values()
+        if isinstance(e, ui.tabs) and "inline-label" not in e.props
+    ]
     tabs.value = "notes"
 
     def on() -> list[int]:

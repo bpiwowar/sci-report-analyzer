@@ -92,6 +92,27 @@ def page_url_of(doc_id: int) -> str:
     return f"/doc/{doc_id}"
 
 
+def _open_key(period_id: int) -> str:
+    # AppSetting: the document left open in the person's Report tab (within the period)
+    return f"ui.report.doc.{period_id}"
+
+
+def open_document(period_id: int | None) -> int | None:
+    """The document left open in the person's Report tab within ``period_id``, if any
+    (opened from there, not closed back to it)."""
+    if not period_id:
+        return None
+    doc_id = annotations.ui_state(_open_key(period_id))
+    d = documents.info(doc_id) if isinstance(doc_id, int) else None
+    if d is None or d.period_id != period_id or documents.file_of(d.id) is None:
+        return None
+    return d.id
+
+
+def _set_open(period_id: int, doc_id: int | None) -> None:
+    annotations.save_ui_state(_open_key(period_id), doc_id)
+
+
 def register() -> None:
     @app.get("/doc-file/{doc_id}")
     def doc_file(doc_id: int, download: bool = False) -> FileResponse:
@@ -166,9 +187,12 @@ class DocumentPage:
         self.side = Side(d.person_id, d.period_id, ("doc", d.id))
         self.side.on_render.append(self.update)
         self.side.link = self.link
+        if report and not pane:  # (left open there: back to it from the Report tab)
+            _set_open(d.period_id, d.id)
         box = viewer_frame(
             d.name,
             (d.person, f"/person/{d.person_id}/{d.period_id}"),
+            (d.person_id, d.period_id, "report" if report else "publications"),
             f"/doc-file/{d.id}",
             int(file.stat().st_mtime) if file else 0,
             self.side,
@@ -187,6 +211,7 @@ class DocumentPage:
             page=page,
             pane=pane,
             closed=f"/person/{d.person_id}/{d.period_id}?tab=report" if report else None,
+            on_close=lambda: _set_open(d.period_id, None),
         )
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
@@ -541,12 +566,22 @@ def _notes(person_id: int, period_id: int) -> Side:
     """The person's notes in the folder and their excerpts by category (as next to their
     PDFs)."""
     side = Side(person_id, period_id, ("notes", 0))
-    box = (
-        ui.column()
-        .classes("w-full gap-2")
-        .style("height:calc(100vh - 9rem); min-height:24rem")
-        .mark("notes-side")
-    )
+    box = ui.column().classes("w-full gap-2").style("height:24rem").mark("notes-side")
+    # (as high as the room left in the window, the page not scrolled: at least 24rem)
+    fit = f"""
+    window.vrFitNotes = () => {{
+      const e = document.getElementById('c{box.id}');
+      if (!e || !e.offsetParent) return;
+      const top = e.getBoundingClientRect().top + scrollY;
+      e.style.height = Math.max(384, innerHeight - top - 36) + 'px';
+    }};
+    if (!window.vrFitNotesOn) {{
+      window.vrFitNotesOn = true;
+      addEventListener('resize', () => window.vrFitNotes());
+    }}
+    window.vrFitNotes();
+    """
+    ui.timer(0.05, lambda: ui.run_javascript(fit), once=True)  # (once connected, laid out)
     side.attach(box)
     side.folder_notes()
     with side.section("categories", "category", _("Excerpts, by category")):

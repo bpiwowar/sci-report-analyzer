@@ -28,7 +28,7 @@ from ..sync import (
     sync_link,
 )
 from .dialogs import actions, confirm, ok_handler, transient_dialog
-from .documents_page import report_view
+from .documents_page import open_document, page_url_of, report_view
 from .folder_notes import NOTES_TIP
 from .panel import PublicationsPanel, period_label
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
@@ -76,16 +76,20 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
         stale_banner(person_id)
 
         def report() -> None:  # (built once shown: its notes, excerpts and documents)
+            # (that of the folder seen from, else of the period)
+            shown = next(
+                (
+                    p.id
+                    for p in annotations.periods(person_id, include_hidden_folders=True)
+                    if folder and p.folder_id == folder[0]
+                ),
+                state_period,
+            )
+            if (doc := open_document(shown)) is not None:  # (left open: back to it)
+                url = json.dumps(f"{page_url_of(doc)}?report=1")
+                ui.run_javascript(f"location.replace({url})")
+                return
             if not report_box.default_slot.children:
-                # (that of the folder seen from, else of the period)
-                shown = next(
-                    (
-                        p.id
-                        for p in annotations.periods(person_id, include_hidden_folders=True)
-                        if folder and p.folder_id == folder[0]
-                    ),
-                    state_period,
-                )
                 with report_box:
                     report_view(person_id, shown)
 
@@ -94,6 +98,7 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
             panel.push_url()
             if e.value == "report":
                 report()
+                ui.run_javascript("window.vrFitNotes?.()")  # (resized meanwhile)
 
         tabs.on_value_change(tab_changed)
         with ui.tab_panels(tabs, value=tab).classes("w-full"):
@@ -114,6 +119,21 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
                 report_box = ui.column().classes("w-full")
         if tab == "report":
             report()
+
+
+def page_header(person_id: int, period_id: int | None, tab: str) -> None:
+    """A person's header (name, tabs…) atop another page (e.g. a PDF's, within ``period_id``),
+    ``tab`` selected: the others open their page there."""
+    person = persons.load(person_id)
+    if person is None:
+        return
+    tabs = _header(person, tab, folders.folder_of_period(period_id))
+
+    def go(e) -> None:
+        url = f"/person/{person_id}" + (f"/{period_id}" if period_id else "")
+        ui.navigate.to(url if e.value == "publications" else f"{url}?tab={e.value}")
+
+    tabs.on_value_change(go)
 
 
 def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> ui.tabs:

@@ -1,5 +1,5 @@
 // The PDF window (pdf_viewer.py): PDF.js's viewer in a frame, the side panel next to it.
-// Its configuration: window.vrConfig (url, texts, sideMin), set by the page.
+// Its configuration: window.vrConfig (url, texts, sideMin, frameCss, fontsCss), set by the page.
 
 // Dragging the splitter between the PDF and the side column resizes the latter (the iframe
 // is covered meanwhile, else it swallows the mouse events); its width is sent on release.
@@ -346,6 +346,69 @@ window.vrPdf = {
       if (b) { b.disabled = !ok; b.classList.toggle('disabled', !ok); }
     }
   },
+  // Saving and downloading (the header's, hidden there) in the menu of PDF.js, with its
+  // printing and adding images (their buttons hidden): each a copy, clicking the original.
+  // Else (no such menu) they are shown in the header.
+  toolsDone: false,
+  tools(w) {
+    if (this.toolsDone) return;
+    this.toolsDone = true;
+    const src = document.getElementById('vr-pdf-menu-actions');
+    const menu = w && w.document.getElementById('secondaryToolbarButtonContainer');
+    if (!src) return;
+    if (!menu) { src.style.display = ''; return; }
+    const d = w.document;
+    const item = (icon, tip, label, click) => {
+      const b = d.createElement('button');
+      b.type = 'button';
+      b.className = 'toolbarButton labeled vrTool';
+      b.title = tip;
+      const i = d.createElement('i');
+      i.className = 'material-icons';
+      i.textContent = icon;
+      const span = d.createElement('span');
+      span.textContent = label;
+      b.append(i, span);
+      b.addEventListener('click', () => {
+        w.PDFViewerApplication.secondaryToolbar?.close();
+        click();
+      });
+      return b;
+    };
+    const items = d.createElement('div');
+    items.id = 'vrMenu';
+    for (const el of src.querySelectorAll('[data-vr-menu]')) {
+      items.appendChild(item(el.querySelector('.q-icon')?.textContent.trim() || '',
+                             el.dataset.vrTip, el.dataset.vrMenu, () => el.click()));
+    }
+    const print = d.getElementById('secondaryPrint');
+    if (print) items.appendChild(print);
+    // Adding an image: in the image mode, a file to choose.
+    const stamp = d.getElementById('editorStampButton');
+    if (stamp) {
+      const add = item('add_photo_alternate', '', ' ', () => {
+        if (this.app()?.pdfViewer?.annotationEditorMode !== 13) {
+          this.mode(13);
+          d.getElementById('editorStampAddImage')?.click();
+        }
+      });
+      add.id = 'vrAddImage';
+      // (named as the viewer's button: once translated)
+      const named = () => {
+        add.title = stamp.title;
+        add.querySelector('span').textContent = stamp.title;
+      };
+      named();
+      new MutationObserver(named).observe(stamp, {attributes: true, attributeFilter: ['title']});
+      items.appendChild(add);
+      this.app()?.eventBus.on('annotationeditormodechanged',
+        (ev) => add.classList.toggle('toggled', ev.mode === 13));
+    }
+    const sep = d.createElement('div');
+    sep.className = 'horizontalToolbarSeparator';
+    items.appendChild(sep);
+    menu.insertBefore(items, d.getElementById('secondaryOpenFile')?.nextSibling || null);
+  },
   // Toggle an editing mode of the viewer (highlight, text, drawing, image, comments).
   mode(m) {
     const a = this.app();
@@ -612,14 +675,14 @@ document.addEventListener('webviewerloaded', (e) => {
   w.addEventListener('mouseup', (ev) => vrPdf.areaUp(ev), true);
   w.addEventListener('click', (ev) => vrDoc.clicked(ev));
   vrPdf.nav();
-  // The viewer's actions not wanted here: files (the app's header has them), signatures…
-  const style = w.document.createElement('style');
-  style.textContent = `#secondaryOpenFile, #secondaryPrint, #printButton, #downloadButton,
-    #secondaryDownload, #viewBookmark, #viewBookmarkSeparator, #editorSignature,
-    #imageAltTextSettings, #imageAltTextSettingsSeparator, #documentProperties
-    { display: none !important; }
-    .vr-area-mode .page, .vr-area-mode .page * { cursor: crosshair !important; }`;
-  w.document.head.appendChild(style);
+  // Its style here (the viewer's actions not wanted…), and the icons' font (Material Icons,
+  // the app's): linked (its policy forbids inline styles).
+  for (const href of [vrConfig.frameCss, vrConfig.fontsCss]) {
+    const link = w.document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    w.document.head.appendChild(link);
+  }
   w.PDFViewerApplication.initializedPromise.then(() => {
     const a = w.PDFViewerApplication;
     // (the shortcuts in the editing buttons' tooltips)
@@ -631,6 +694,7 @@ document.addEventListener('webviewerloaded', (e) => {
         if (b.title && !b.title.endsWith(`(${k})`)) b.title += ` (${k})`;
       });
     }
+    vrPdf.tools(w);
     a.save = () => vrPdf.save(true);
     // Changes: those not saved yet (the viewer counts every annotation of the document).
     a._hasChanges = () => vrPdf.dirty();
@@ -651,6 +715,8 @@ document.addEventListener('webviewerloaded', (e) => {
   });
 });
 setInterval(() => vrPdf.save(false), 4000);
+// (the viewer not loaded, after a while: the actions in the header)
+setTimeout(() => vrPdf.app() || vrPdf.tools(null), 15000);
 window.addEventListener('beforeunload', (e) => {
   vrPdf.keepAt();
   if (vrPdf.dirty()) {

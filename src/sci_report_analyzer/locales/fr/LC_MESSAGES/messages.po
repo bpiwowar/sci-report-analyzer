@@ -1689,6 +1689,11 @@ msgstr "Au prochain démarrage : {path}"
 msgid "Full name"
 msgstr "Nom complet"
 
+msgid "Full screen: the menu bar and the person’s header hidden (again: shown)"
+msgstr ""
+"Plein écran : la barre de menu et l'en-tête de la personne masqués (à nouveau :"
+" affichés)"
+
 msgid ""
 "Fuzzy matches below this score fall back to OpenAlex (if enabled) or are "
 "reported as not ranked."

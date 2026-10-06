@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 from weakref import WeakSet
 
+import nicegui
 from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import Client, app, background_tasks, ui
@@ -30,7 +31,9 @@ if TYPE_CHECKING:
 
 NO_CONFIRM = "ui.pdf.no_confirm"  # AppSetting: download without asking first
 SIDE_WIDTH = "ui.pdf.side_width"  # AppSetting: the width (px) of the side column
+FULL_SCREEN = "ui.pdf.full_screen"  # AppSetting: PDF windows without the menu bar
 SIDE_DEFAULT, SIDE_MIN = 384, 240
+HEADER_HEIGHT = 36  # (px: the header of a PDF)
 PANE_TOKEN = re.compile(r"[a-z0-9]{1,40}")  # (of a PDF window, its side panel elsewhere)
 _no_confirm: bool | None = None  # (cached NO_CONFIRM)
 TAG_LIST_TIP = N_(
@@ -156,6 +159,7 @@ def register() -> None:
         box = viewer_frame(
             title,
             (APP_NAME, f"/person/{person_id}"),
+            (person_id, period, "publications"),
             f"/pdf-file/{pub_id}",
             int(file.stat().st_mtime) if file else 0,
             side,
@@ -194,6 +198,7 @@ def file_response(file, download: bool) -> FileResponse:
 def viewer_frame(
     title: str,
     home: tuple[str, str],
+    person: tuple[int, int | None, str],
     file_url: str,
     version: int,
     side: Side,
@@ -202,30 +207,60 @@ def viewer_frame(
     page: int | None = None,
     pane: str | None = None,
     closed: str | None = None,
+    on_close: Callable[[], None] | None = None,
 ) -> ui.column:
-    """The page of a stored PDF: a header (back to ``home``, saving, bookmarks, finding the
-    paper of a selection), PDF.js (opened at ``page``, else where it was last read), and the
-    side column (returned). With ``pane`` (the token of a PDF window): only the side column,
-    in its own window, kept in sync with that one. ``closed`` (a URL): opened from there (the
-    person's Report tab), closed back to it in place of going ``home``."""
+    """The page of a stored PDF, under the menu bar (see theme.bare_page) and the header of
+    its ``person``'s page (id, period, tab; both hidden in full screen): a header (its
+    title, the way back to ``home``, whether it is saved, the actions on the PDF: bookmarks,
+    finding the paper of a selection…, full screen), PDF.js (opened at ``page``, else where
+    it was last read; saving and downloading in its menu), and the side column (returned).
+    With ``pane`` (the token of a PDF window): only the side column, in its own window, kept
+    in sync with that one. ``closed`` (a URL): opened from there (the person’s Report tab),
+    closed back to it in place of going ``home`` (after ``on_close``)."""
     if pane and PANE_TOKEN.fullmatch(pane):
         return _pane_frame(title, home, side, bookmarked, pane)
+    _fill_window()
+    from .person import page_header
+
+    with ui.element("div").classes("w-full px-3 shrink-0 vr-person-header"):
+        page_header(*person)
     texts = {
         "saving": _("Saving…"),
         "saved": _("Saved at {time}"),
         "failed": _("Not saved: {error}"),
     }
     ui.add_head_html(pdftext.SCRIPT)
-    _scripts({"url": file_url, "texts": texts, "sideMin": SIDE_MIN}, "pdf_viewer.js")
+    css = f"{STATIC_URL}/pdf_frame.css?v={int((STATIC / 'pdf_frame.css').stat().st_mtime)}"
+    config = {
+        "url": file_url,
+        "texts": texts,
+        "sideMin": SIDE_MIN,
+        "frameCss": css,
+        "fontsCss": f"/_nicegui/{nicegui.__version__}/static/fonts.css",
+    }
+    _scripts(config, "pdf_viewer.js")
     if script:
         ui.add_head_html(script)
-    with ui.row().classes("w-full items-center no-wrap gap-2 px-3 py-1 bg-primary text-white"):
+    with (
+        ui.row()
+        .classes("w-full items-center no-wrap gap-2 px-3 bg-primary text-white shrink-0")
+        .style(f"height:{HEADER_HEIGHT}px")
+    ):
         if closed:
-            ui.button(icon="close", on_click=lambda: ui.navigate.to(closed)).props(
-                "flat dense round color=white"
-            ).tooltip(_("Close")).mark("document-close")
+
+            def close() -> None:
+                if on_close:
+                    on_close()
+                ui.navigate.to(closed)
+
+            ui.button(icon="close", on_click=close).props("flat dense round color=white").tooltip(
+                _("Close")
+            ).mark("document-close")
         else:
             ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
+        ui.label(title).classes("ellipsis grow min-w-0 font-medium")
+        ui.label("").classes("text-sm opacity-80").props("id=vr-pdf-status").mark("pdf-status")
+        livereload.banner(dense=True)  # (--live-reload: a new version, to restart)
         for icon, step, tip in (
             ("arrow_back", "back", _("Back (after following a link; also ⌥← or ⌘[)")),
             ("arrow_forward", "forward", _("Forward (also ⌥→ or ⌘])")),
@@ -234,17 +269,24 @@ def viewer_frame(
                 ui.button(icon=icon).props(f"flat dense round color=white id=vr-pdf-{step}").on(
                     "click", js_handler=f"() => vrPdf.app()?.pdfHistory?.{step}()"
                 ).mark(f"pdf-{step}")
-        ui.label(title).classes("ellipsis grow min-w-0 font-medium")
-        ui.label("").classes("text-sm opacity-80").props("id=vr-pdf-status").mark("pdf-status")
-        livereload.banner(dense=True)  # (--live-reload: a new version, to restart)
         _selection_actions(side, bookmarked, here=True)
-        ui.button(_("Save"), icon="save").props("flat dense color=white").on(
-            "click", js_handler="() => vrPdf.save(true)"
-        ).tooltip(_("Save the annotations into the stored PDF (also every few seconds)"))
-        with ui.link(target=f"{file_url}?download=1"):
-            ui.button(icon="download").props("flat dense round color=white").tooltip(
-                _("Download a copy")
-            )
+        # Saving, downloading: in the menu of PDF.js (copies clicking these), shown here only
+        # if that can't be done (see vrPdf.tools).
+        with (
+            ui.row()
+            .classes("items-center no-wrap gap-2 shrink-0")
+            .props("id=vr-pdf-menu-actions")
+            .style("display:none")
+        ):
+            tip = _("Save the annotations into the stored PDF (also every few seconds)")
+            _in_menu(ui.button(icon="save"), tip, _("Save")).props(
+                "flat dense round color=white"
+            ).on("click", js_handler="() => vrPdf.save(true)").tooltip(tip)
+            with ui.link(target=f"{file_url}?download=1"):
+                tip = _("Download a copy")
+                _in_menu(ui.button(icon="download"), tip, tip).props(
+                    "flat dense round color=white"
+                ).tooltip(tip)
         ui.button(icon="open_in_new").props("flat dense round color=white").on(
             "click", js_handler="() => vrPane.toggle()"
         ).tooltip(
@@ -263,23 +305,25 @@ def viewer_frame(
         ui.button(icon="view_sidebar", on_click=toggle_side).props(
             "flat dense round color=white"
         ).tooltip(_("Side panel (notes, bookmarks, papers)")).mark("pdf-toggle-notes")
+        full_screen_button()
     src = f"/pdfjs/web/viewer.html?file={file_url}%3Fv%3D{version}"
     # (at a page asked for, else where it was last read)
     src += f"#page={page}" if page else documents.place_hash(documents.last_place(*bookmarked))
     ui.on("vr-pdf-at", lambda e: documents.save_last_place(*bookmarked, e.args or {}))
-    with ui.row().classes("w-full no-wrap gap-0"):
+    # (the room left in the window)
+    with ui.row().classes("w-full no-wrap gap-0 grow min-h-0").style("align-items:stretch"):
         ui.element("iframe").props(f'id=vr-pdf-frame src="{src}"').classes("grow").style(
-            "height:calc(100vh - 40px); border:0"
+            "border:0"
         ).mark("pdf-frame")
         splitter = ui.element("div").props("id=vr-pdf-splitter")
         splitter.classes("shrink-0 bg-grey-4 hover:bg-primary").style(
-            "width:5px; cursor:col-resize; height:calc(100vh - 40px)"
+            "width:5px; cursor:col-resize"
         ).tooltip(_("Drag to resize the side panel")).mark("pdf-splitter")
         width = max(SIDE_MIN, int(annotations.ui_state(SIDE_WIDTH, SIDE_DEFAULT) or SIDE_DEFAULT))
         box = (
             ui.column()
-            .classes("shrink-0 p-3 gap-2 overflow-auto")
-            .style(f"width:{width}px;height:calc(100vh - 40px)")
+            .classes("shrink-0 p-3 gap-2 overflow-auto no-wrap")
+            .style(f"width:{width}px")
             .props("id=vr-pdf-side")
             .mark("pdf-side")
         )
@@ -298,6 +342,43 @@ def viewer_frame(
     ui.on("vr-pane", detached)
     ui.timer(0, lambda: ui.run_javascript("vrPane.start()"), once=True)  # (once connected)
     return box
+
+
+def _fill_window() -> None:
+    """The page as high as the window (its last row taking the room left: ``grow min-h-0``),
+    without scrolling."""
+    ui.query(".nicegui-content").classes("no-wrap").style("height:100vh; overflow:hidden")
+
+
+def full_screen_button() -> None:
+    """In a PDF's header: full screen (the menu bar and the person's header hidden, as in
+    every PDF window from then on), or back."""
+    state = {"on": bool(annotations.ui_state(FULL_SCREEN, False))}
+    body = ui.query("body")
+
+    def show() -> None:
+        body.classes(add="vr-full") if state["on"] else body.classes(remove="vr-full")
+        button.props(f"icon={'fullscreen_exit' if state['on'] else 'fullscreen'}")
+
+    def toggle() -> None:
+        state["on"] = not state["on"]
+        annotations.save_ui_state(FULL_SCREEN, state["on"])
+        show()
+
+    with ui.element("span").tooltip(
+        _("Full screen: the menu bar and the person’s header hidden (again: shown)")
+    ):
+        button = ui.button(on_click=toggle).props("flat dense round color=white")
+        button.mark("pdf-full-screen")
+    show()
+
+
+def _in_menu(button: ui.button, tip: str, label: str) -> ui.button:
+    """An action on the PDF, copied into the menu of PDF.js (its ``label`` there, its
+    ``tip``)."""
+    button.props["data-vr-tip"] = tip
+    button.props["data-vr-menu"] = label
+    return button
 
 
 def _selection_actions(side: Side, bookmarked: tuple[str, int], *, here: bool) -> None:
@@ -383,19 +464,24 @@ def _pane_frame(
         "back": _("The side panel is back in the PDF window: this one can be closed"),
     }
     _scripts({"token": token, "texts": texts}, "pane.js")
-    with ui.row().classes("w-full items-center no-wrap gap-2 px-3 py-1 bg-primary text-white"):
+    _fill_window()
+    with (
+        ui.row()
+        .classes("w-full items-center no-wrap gap-2 px-3 bg-primary text-white shrink-0")
+        .style(f"height:{HEADER_HEIGHT}px")
+    ):
         ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
         ui.label(title).classes("ellipsis grow min-w-0 font-medium")
         ui.label("").classes("text-sm opacity-80").props("id=vr-pane-status").mark("pane-status")
         livereload.banner(dense=True)
+        full_screen_button()
         _selection_actions(side, bookmarked, here=False)
         ui.button(icon="close_fullscreen").props("flat dense round color=white").on(
             "click", js_handler="() => vrPane.back()"
         ).tooltip(_("Back into the PDF window (closes this one)")).mark("pane-back")
     box = (
         ui.column()
-        .classes("w-full p-3 gap-2 overflow-auto")
-        .style("height:calc(100vh - 40px)")
+        .classes("w-full p-3 gap-2 overflow-auto no-wrap grow min-h-0")
         .props("id=vr-pdf-side")
         .mark("pdf-side")
     )
