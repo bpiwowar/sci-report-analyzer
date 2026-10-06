@@ -201,11 +201,13 @@ def viewer_frame(
     script: str = "",
     page: int | None = None,
     pane: str | None = None,
+    closed: str | None = None,
 ) -> ui.column:
     """The page of a stored PDF: a header (back to ``home``, saving, bookmarks, finding the
     paper of a selection), PDF.js (opened at ``page``, else where it was last read), and the
     side column (returned). With ``pane`` (the token of a PDF window): only the side column,
-    in its own window, kept in sync with that one."""
+    in its own window, kept in sync with that one. ``closed`` (a URL): opened from there (the
+    person's Report tab), closed back to it in place of going ``home``."""
     if pane and PANE_TOKEN.fullmatch(pane):
         return _pane_frame(title, home, side, bookmarked, pane)
     texts = {
@@ -218,7 +220,12 @@ def viewer_frame(
     if script:
         ui.add_head_html(script)
     with ui.row().classes("w-full items-center no-wrap gap-2 px-3 py-1 bg-primary text-white"):
-        ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
+        if closed:
+            ui.button(icon="close", on_click=lambda: ui.navigate.to(closed)).props(
+                "flat dense round color=white"
+            ).tooltip(_("Close")).mark("document-close")
+        else:
+            ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
         for icon, step, tip in (
             ("arrow_back", "back", _("Back (after following a link; also ⌥← or ⌘[)")),
             ("arrow_forward", "forward", _("Forward (also ⌥→ or ⌘])")),

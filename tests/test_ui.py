@@ -774,7 +774,7 @@ async def test_folder_notes_without_a_document(user: User) -> None:
     await user.open(f"/?folder={fid}")
     user.find(marker=f"notes-{period}").click()
     await user.should_see(marker="folder-note")
-    await user.should_see(marker="notes-person", content="Jane Doe")
+    await user.should_see(marker="tab-report")  # (the person's Report tab)
     user.find(marker="folder-note").elements.pop().value = "Strong **candidate**"
     await note_status(user, "folder-note")
     assert folders.notes_of(period) == "Strong **candidate**"
@@ -782,13 +782,12 @@ async def test_folder_notes_without_a_document(user: User) -> None:
     # Their excerpts, by category.
     user.find(marker="side-tab-categories").click()
     await user.should_see("Led a project.")
-    # From the person's page, and their Documents tab (no document).
+    # From the person's page, and their Report tab (no document).
     await user.open(f"/person/{pid}/{period}")
     user.find(marker="person-folder-notes").click()
     await user.should_see(marker="folder-note")
-    await user.open(f"/person/{pid}?tab=documents")
+    await user.open(f"/person/{pid}?tab=report")
     await user.should_see("No document")
-    user.find(marker=f"documents-notes-{period}").click()
     await user.should_see(marker="folder-note")
     # Not a person within a folder.
     await user.open("/notes/999")

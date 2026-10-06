@@ -105,9 +105,11 @@ class Side:
         with box:
             self.overview = ui.column().classes("w-full gap-1 no-wrap grow min-h-0")
             with self.overview:
-                self.tab_bar = (
-                    ui.tabs(on_change=self._fit).props("dense align=left").classes("w-full")
-                )
+                # (the tabs, then what the page adds on their row)
+                with ui.row().classes("w-full items-center no-wrap gap-2") as self.bar:
+                    self.tab_bar = (
+                        ui.tabs(on_change=self._fit).props("dense align=left").classes("grow")
+                    )
                 self.panels = ui.tab_panels(self.tab_bar).classes("w-full grow min-h-0")
             self.details = ui.column().classes("w-full gap-2 vr-details").mark("pdf-details")
             self.details.visible = False

@@ -133,8 +133,9 @@ def test_store_and_cleanup():
 
 async def test_documents_tab(user: User):
     pid, period, _ = _person()
-    await user.open(f"/person/{pid}?tab=documents")
-    await user.should_see(marker=f"documents-{period}")
+    await user.open(f"/person/{pid}?tab=report")
+    await user.should_see(marker="folder-note")  # (the report, the documents in a menu)
+    user.find(marker=f"documents-{period}").click()
     await user.should_see("No document")
     upload = user.find(marker=f"documents-upload-{period}").elements.pop()
     files = [
@@ -145,11 +146,14 @@ async def test_documents_tab(user: User):
         await upload.handle_uploads([f])
     await user.should_see("Application")
     await user.should_see("notes.txt: not a PDF file")
+    await user.should_see("Documents (1)")
     [doc] = documents.of_person(pid)[period]
+    user.find(marker=f"document-more-{doc.id}").click()  # (its ⋮: rename, delete…)
     user.find(marker=f"document-rename-{doc.id}").click()
     user.find(marker="document-name").clear().type("CV")
     user.find(marker="document-rename-ok").click()
     await user.should_see("CV")
+    user.find(marker=f"document-more-{doc.id}").click()
     user.find(marker=f"document-delete-{doc.id}").click()
     user.find(marker="document-delete-ok").click()
     await user.should_see("No document")
@@ -158,7 +162,7 @@ async def test_documents_tab(user: User):
 
 async def test_documents_tab_without_period(user: User):
     pid = make_person("John Roe")
-    await user.open(f"/person/{pid}?tab=documents")
+    await user.open(f"/person/{pid}?tab=report")
     await user.should_see(marker="documents-no-period")
 
 
@@ -167,6 +171,16 @@ async def test_document_page(user: User, monkeypatch, fake_viewer):
     doc = documents.add(period, "Application.pdf", PDF)
     await user.open(f"/doc/{doc}")
     await user.should_see(marker="pdf-frame")
+    await user.should_not_see(marker="document-close")
+    # Opened from the person's Report tab: closed back to it.
+    await user.open(f"/person/{pid}?tab=report")
+    user.find(marker=f"documents-{period}").click()
+    user.find(marker=f"document-open-{doc}").click()
+    await user.should_see(marker="document-close")
+    user.find(marker="document-close").click()
+    await user.should_see(marker="tab-report")
+    await user.should_see(marker="folder-note")
+    await user.open(f"/doc/{doc}")
     await user.should_see("Looking for the papers…")  # (until the viewer sent the text)
     documents.set_lines(doc, LINES)
     await user.open(f"/doc/{doc}")

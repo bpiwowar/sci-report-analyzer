@@ -1,6 +1,7 @@
-"""Documents of a person within a period / folder (their application, a CV…): the Documents
-tab of the person's page, and a document's page (read and annotated with PDF.js, the
-person's papers it mentions found and linked)."""
+"""Documents of a person within a period / folder (their application, a CV…): the person's
+Report tab (with their notes and excerpts in the folder; the documents open there), and a
+document's page (read and annotated with PDF.js, the person's papers it mentions found and
+linked)."""
 
 from __future__ import annotations
 
@@ -14,7 +15,6 @@ from nicegui import app, ui
 from .. import annotations, documents, pdfs, reports
 from ..i18n import N_, Labels, _
 from .dialogs import actions, confirm, ok_handler, transient_dialog
-from .folder_notes import NOTES_TIP, notes_url
 from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
 from .theme import DEFAULT_COLOUR, bare_page
@@ -118,7 +118,9 @@ def register() -> None:
         return PlainTextResponse("ok")
 
     @ui.page("/doc/{doc_id}")
-    def doc_page(doc_id: int, page: int | None = None, pane: str | None = None) -> None:
+    def doc_page(
+        doc_id: int, page: int | None = None, pane: str | None = None, report: bool = False
+    ) -> None:
         d = documents.info(doc_id)
         bare_page(d.name if d else _("Document"))
         if d is None or documents.file_of(doc_id) is None:
@@ -127,7 +129,7 @@ def register() -> None:
         if not pdfs.has_viewer():
             _install()
             return
-        DocumentPage(d, page, pane)
+        DocumentPage(d, page, pane, report)
 
 
 def _install() -> None:
@@ -150,9 +152,14 @@ class DocumentPage:
     """A document, its papers (found, or linked by hand), bookmarks and note."""
 
     def __init__(
-        self, d: documents.DocInfo, page: int | None = None, pane: str | None = None
+        self,
+        d: documents.DocInfo,
+        page: int | None = None,
+        pane: str | None = None,
+        report: bool = False,
     ) -> None:
-        """``pane``: only the side column, in its own window (see viewer_frame)."""
+        """``pane``: only the side column, in its own window; ``report``: opened from the
+        person's Report tab, closed back to it (see viewer_frame)."""
         self.d = d
         self.mentions: list[documents.Mention] = []
         file = documents.file_of(d.id)
@@ -179,6 +186,7 @@ class DocumentPage:
             },
             page=page,
             pane=pane,
+            closed=f"/person/{d.person_id}/{d.period_id}?tab=report" if report else None,
         )
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
@@ -379,104 +387,174 @@ class DocumentPage:
         ui.notify(_("Linked"))
 
 
-# ---- The Documents tab of a person ----------------------------------------------------------
+# ---- The Report tab of a person -------------------------------------------------------------
 
 
-def documents_view(person_id: int) -> None:
-    """The person's documents, by period / folder: open, upload, rename, delete."""
-    ui.label(
-        _(
-            "Documents of the person within a folder or a period (an application, a CV…): "
-            "read and annotated like the papers' PDFs, the papers they mention found and linked."
-        )
-    ).classes("text-sm text-grey")
+def report_view(person_id: int, period_id: int | None = None) -> None:
+    """The person's report within a folder (or a period; chosen when several, ``period_id``
+    first): its documents (added here; opened in their page, closed back here) and the notes
+    and excerpts in the folder."""
+    periods = sorted(
+        annotations.periods(person_id, include_hidden_folders=True),
+        key=lambda p: p.folder_id is None,
+    )
+    if not periods:
+        ui.label(
+            _("Put the person in a folder, or add a period (Periods tab), to write a report.")
+        ).classes("text-grey").mark("documents-no-period")
+        return
+    full = ui.column().classes("w-full gap-2")
+
+    def open_doc(d: documents.DocView) -> None:  # (its page, closed back here)
+        ui.navigate.to(f"{page_url_of(d.id)}?report=1")
+
+    def show(p) -> None:
+        full.clear()
+        with full:
+            # (on the row of the notes' tabs: the folder and its documents; the folder is named
+            # above, chosen here when several)
+            bar = _notes(person_id, p.id).bar if p.folder else ui.row().classes("items-center")
+            with bar:
+                if len(periods) > 1:
+                    ui.select(
+                        {q.id: q.name for q in periods},
+                        value=p.id,
+                        on_change=lambda e: show(next(q for q in periods if q.id == e.value)),
+                    ).props("dense options-dense borderless").classes("w-64").mark("report-period")
+                if p.folder and p.folder.hidden:
+                    ui.badge(_("hidden"), color="grey")
+                _documents(p, open_doc)
+            if p.folder is None:
+                ui.label(_("Notes and excerpts: only within a folder.")).classes(
+                    "text-sm text-grey"
+                )
+
+    show(next((p for p in periods if p.id == period_id), periods[0]))
+
+
+def _documents(p, open_doc) -> None:
+    """A menu of the documents of the person within a period / folder (an application, a
+    CV…): open (or rename, delete…: their ⋮), and the last item to add some."""
+    button = (
+        ui.button(icon="description")
+        .props("flat dense no-caps icon-right=arrow_drop_down")
+        .mark(f"documents-{p.id}")
+    )
 
     @ui.refreshable
     def listing() -> None:
-        periods = annotations.periods(person_id, include_hidden_folders=True)
-        docs = documents.of_person(person_id)
-        if not periods:
-            ui.label(
-                _("Put the person in a folder, or add a period (Periods tab), to add documents.")
-            ).classes("text-grey").mark("documents-no-period")
+        docs = documents.of_person(p.person_id).get(p.id, [])
+        button.text = _("Documents ({n})").format(n=len(docs))
+        for d in docs:
+            _doc_item(d, listing.refresh, open_doc)
+        if not docs:
+            ui.label(_("No document")).classes("text-sm text-grey px-4 py-2")
+
+    async def upload(e) -> None:
+        try:
+            documents.add(p.id, e.file.name, await e.file.read())
+        except pdfs.PdfError as err:
+            ui.notify(f"{e.file.name}: {err}", type="warning")
             return
-        for p in sorted(periods, key=lambda p: p.folder_id is None):
-            with ui.card().classes("w-full").mark(f"documents-{p.id}"):
-                with ui.row().classes("items-center gap-2"):
-                    ui.icon("folder" if p.folder else "date_range", color="amber-8")
-                    ui.label(p.name).classes("font-medium")
-                    if p.folder and p.folder.hidden:
-                        ui.badge(_("hidden"), color="grey")
-                    if p.folder:
-                        ui.button(
-                            _("Notes and excerpts"),
-                            icon="edit_note",
-                            on_click=lambda pid=p.id: ui.navigate.to(notes_url(pid)),
-                        ).props("flat dense no-caps").tooltip(_(NOTES_TIP)).mark(
-                            f"documents-notes-{p.id}"
-                        )
-                for d in docs.get(p.id, []):
-                    _doc_row(d, listing.refresh)
-                if not docs.get(p.id):
-                    ui.label(_("No document")).classes("text-sm text-grey")
+        listing.refresh()
 
-                async def upload(e, pid=p.id) -> None:
-                    try:
-                        documents.add(pid, e.file.name, await e.file.read())
-                    except pdfs.PdfError as err:
-                        ui.notify(f"{e.file.name}: {err}", type="warning")
-                        return
-                    listing.refresh()
-
-                ui.upload(
-                    label=_("Add PDFs"), multiple=True, auto_upload=True, on_upload=upload
-                ).props('accept=".pdf,application/pdf" flat bordered').classes("w-80").mark(
-                    f"documents-upload-{p.id}"
-                )
-
-    listing()
-
-
-def _doc_row(d: documents.DocView, refresh) -> None:
-    with ui.row().classes("w-full items-center no-wrap gap-2").mark(f"document-{d.id}"):
-        icon = "edit_document" if d.edited else "description"
-        with ui.link(target=page_url_of(d.id), new_tab=True).classes(
-            "flex items-center gap-1 grow min-w-0"
+    # (the file picker of the Add… item)
+    picker = (
+        ui.upload(multiple=True, auto_upload=True, on_upload=upload)
+        .props('accept=".pdf,application/pdf"')
+        .classes("hidden")
+        .mark(f"documents-upload-{p.id}")
+    )
+    with (
+        button,
+        ui.menu().props("anchor='bottom left' self='top left'").mark(f"documents-menu-{p.id}"),
+    ):
+        listing()
+        ui.separator()
+        with (
+            ui.menu_item(on_click=lambda: picker.run_method("pickFiles")).mark(
+                f"documents-add-{p.id}"
+            ),
+            ui.row().classes("items-center gap-2 no-wrap"),
         ):
-            ui.icon(icon, color="red-8")
-            ui.label(d.name).classes("ellipsis")
+            ui.icon("add", color="primary")
+            ui.label(_("Add…"))
+
+
+def _doc_item(d: documents.DocView, refresh, open_doc) -> None:
+    """A document in the menu: opened when clicked; its ⋮ to open it in a new tab, download,
+    rename or delete it."""
+
+    def rename() -> None:
+        with transient_dialog(width="w-96") as (dlg, _card):
+            name = ui.input(_("Name"), value=d.name).classes("w-full").mark("document-name")
+
+            def ok() -> None:
+                documents.rename(d.id, name.value)
+                refresh()
+
+            name.on("keydown.enter", ok_handler(dlg, ok))
+            actions(dlg, _("Rename"), ok, mark="document-rename-ok")
+
+    def delete() -> None:
+        def ok() -> None:
+            documents.remove(d.id)
+            refresh()
+
+        confirm(
+            _("Delete “{name}”, with its annotations and notes?").format(name=d.name),
+            _("Delete"),
+            ok,
+            mark="document-delete-ok",
+        )
+
+    with (
+        ui.menu_item(on_click=lambda: open_doc(d)).mark(f"document-open-{d.id}"),
+        ui.row().classes("w-full items-center gap-2 no-wrap").mark(f"document-{d.id}"),
+    ):
+        ui.icon("edit_document" if d.edited else "description", color="red-8")
+        ui.label(d.name).classes("ellipsis grow min-w-0 max-w-80")
         if d.note:
             ui.icon("sticky_note_2", size="xs", color="amber-9").tooltip(d.note)
         ui.label(f"{d.added_at:%Y-%m-%d}").classes("text-xs text-grey")
-        with ui.link(target=f"/doc-file/{d.id}?download=1"):
-            ui.button(icon="download").props("flat dense round size=sm").tooltip(_("Download"))
-
-        def rename() -> None:
-            with transient_dialog(width="w-96") as (dlg, _card):
-                name = ui.input(_("Name"), value=d.name).classes("w-full").mark("document-name")
-
-                def ok() -> None:
-                    documents.rename(d.id, name.value)
-                    refresh()
-
-                name.on("keydown.enter", ok_handler(dlg, ok))
-                actions(dlg, _("Rename"), ok, mark="document-rename-ok")
-
-        def delete() -> None:
-            def ok() -> None:
-                documents.remove(d.id)
-                refresh()
-
-            confirm(
-                _("Delete “{name}”, with its annotations and notes?").format(name=d.name),
-                _("Delete"),
-                ok,
-                mark="document-delete-ok",
+        with (
+            ui.button(icon="more_vert")
+            .props("flat dense round size=sm")
+            .on("click.stop", lambda: None)
+            .mark(f"document-more-{d.id}"),
+            ui.menu().props("anchor='top end' self='top start'").classes("min-w-48"),
+        ):
+            ui.menu_item(
+                _("Open in a new tab"),
+                on_click=lambda: ui.navigate.to(page_url_of(d.id), new_tab=True),
+            )
+            ui.menu_item(
+                _("Download"), on_click=lambda: ui.navigate.to(f"/doc-file/{d.id}?download=1")
+            )
+            ui.menu_item(_("Rename…"), on_click=rename).mark(f"document-rename-{d.id}")
+            ui.menu_item(_("Delete"), on_click=delete).classes("text-negative").mark(
+                f"document-delete-{d.id}"
             )
 
-        ui.button(icon="edit", on_click=rename).props("flat dense round size=sm").mark(
-            f"document-rename-{d.id}"
-        )
-        ui.button(icon="delete", on_click=delete).props(
-            "flat dense round size=sm color=negative"
-        ).mark(f"document-delete-{d.id}")
+
+def _notes(person_id: int, period_id: int) -> Side:
+    """The person's notes in the folder and their excerpts by category (as next to their
+    PDFs)."""
+    side = Side(person_id, period_id, ("notes", 0))
+    box = (
+        ui.column()
+        .classes("w-full gap-2")
+        .style("height:calc(100vh - 9rem); min-height:24rem")
+        .mark("notes-side")
+    )
+    side.attach(box)
+    side.folder_notes()
+    with side.section("categories", "category", _("Excerpts, by category")):
+        side.categories = categories_section(side)
+
+    async def load() -> None:
+        await side.load()
+        side.refresh_excerpts()
+
+    ui.timer(0.05, load, once=True)
+    return side

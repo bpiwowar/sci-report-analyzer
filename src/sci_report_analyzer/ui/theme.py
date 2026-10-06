@@ -129,7 +129,8 @@ def frame(title: str) -> Iterator[None]:
             from ..stop import quit_button
 
             quit_button()
-    with ui.column().classes("w-full max-w-screen-xl mx-auto p-4 gap-3"):
+    ui.query(".nicegui-content").style("padding-top: 0")  # (close to the menu bar)
+    with ui.column().classes("w-full max-w-screen-xl mx-auto px-4 pb-4 pt-1 gap-3"):
         from .. import livereload
 
         livereload.banner()

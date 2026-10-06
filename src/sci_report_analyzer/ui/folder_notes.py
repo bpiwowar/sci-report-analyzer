@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from weakref import WeakSet
 
+from fastapi.responses import RedirectResponse
 from nicegui import app, ui
 
 from .. import folders, reports
@@ -142,7 +143,7 @@ def folder_notes_editor(
     return editor
 
 
-# ---- Without a PDF: the page of a person's notes and excerpts in a folder -------------------
+# ---- Without a PDF: the person's Report tab ---------------------------------------------------
 
 
 NOTES_TIP = N_(
@@ -157,48 +158,14 @@ def notes_url(period_id: int) -> str:
 
 def register() -> None:
     @ui.page("/notes/{period_id}")
-    def notes_page(period_id: int) -> None:
-        """A person's notes within a folder and their excerpts by category, as next to their
-        PDFs (e.g. when they have no document)."""
+    def notes_page(period_id: int) -> RedirectResponse | None:
+        """A person's notes within a folder: their Report tab."""
         from .. import persons
         from .theme import frame
-        from .viewer_side import Side, categories_section
 
         found = persons.of_period(period_id)
-        folder = folders.folder_of_period(period_id)
-        if found is None or folder is None:
+        if found is None or folders.folder_of_period(period_id) is None:
             with frame(_("Not found")):
                 ui.label(_("Not a person within a folder")).mark("notes-not-found")
-            return
-        person_id, name = found
-        with frame(_("{person} · {folder}").format(person=name, folder=folder[1])):
-            with ui.row().classes("w-full items-center gap-2"):
-                with (
-                    ui.link(target=f"/?folder={folder[0]}")
-                    .classes("flex items-center gap-1 no-underline")
-                    .mark("notes-folder")
-                ):
-                    ui.icon("folder", color="amber-8")
-                    ui.label(folder[1])
-                ui.icon("chevron_right", color="grey")
-                ui.link(name, f"/person/{person_id}/{period_id}").classes(
-                    "text-xl no-underline"
-                ).mark("notes-person")
-                ui.label(_("notes and excerpts in the folder")).classes("text-grey")
-            side = Side(person_id, period_id, ("notes", 0))
-            box = (
-                ui.column()
-                .classes("w-full gap-2")
-                .style("height:calc(100vh - 11rem); min-height:24rem")
-                .mark("notes-side")
-            )
-            side.attach(box)
-            side.folder_notes()
-            with side.section("categories", "category", _("Excerpts, by category")):
-                side.categories = categories_section(side)
-
-            async def load() -> None:
-                await side.load()
-                side.refresh_excerpts()
-
-            ui.timer(0.05, load, once=True)
+            return None
+        return RedirectResponse(f"/person/{found[0]}/{period_id}?tab=report")

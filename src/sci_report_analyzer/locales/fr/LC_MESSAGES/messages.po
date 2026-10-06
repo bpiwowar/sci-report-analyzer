@@ -396,6 +396,9 @@ msgstr "Ajouter et chercher les sources"
 msgid "Add PDFs"
 msgstr "Ajouter des PDF"
 
+msgid "Add…"
+msgstr "Ajouter…"
+
 msgid "Add a conference"
 msgstr "Ajouter une conférence"
 
@@ -1274,6 +1277,10 @@ msgstr "Document"
 
 msgid "Documents"
 msgstr "Documents"
+
+#, python-brace-format
+msgid "Documents ({n})"
+msgstr "Documents ({n})"
 
 msgid ""
 "Documents of the person within a folder or a period (an application, a "
@@ -2817,6 +2824,9 @@ msgstr ""
 "Notes et extraits dans le dossier : les notes sur la personne, ses "
 "extraits par catégorie (aussi à côté de ses PDF)"
 
+msgid "Notes and excerpts: only within a folder."
+msgstr "Notes et extraits : seulement dans un dossier."
+
 msgid "Notes of the folder"
 msgstr "Notes du dossier"
 
@@ -2911,6 +2921,9 @@ msgstr "Seulement les textes de {source}"
 
 msgid "Open"
 msgstr "Ouvrir"
+
+msgid "Open in a new tab"
+msgstr "Ouvrir dans un nouvel onglet"
 
 msgid ""
 "Open the profile, click **Show more** until every paper is listed, then "
@@ -3237,6 +3250,9 @@ msgstr ""
 "Placez la personne dans un dossier, ou ajoutez une période (onglet "
 "Périodes), pour ajouter des documents."
 
+msgid "Put the person in a folder, or add a period (Periods tab), to write a report."
+msgstr "Mettez la personne dans un dossier, ou ajoutez une période (onglet Périodes), pour rédiger un rapport."
+
 msgid "Put the tag"
 msgstr "Poser l'étiquette"
 
@@ -3462,6 +3478,9 @@ msgid ""
 msgstr ""
 "Remplacer efface tous les paramètres d’appariement actuels ; fusionner "
 "les conserve et vous laisse résoudre chaque conflit."
+
+msgid "Report"
+msgstr "Rapport"
 
 msgid "Reports"
 msgstr "Rapports"

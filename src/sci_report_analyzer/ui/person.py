@@ -28,8 +28,8 @@ from ..sync import (
     sync_link,
 )
 from .dialogs import actions, confirm, ok_handler, transient_dialog
-from .documents_page import documents_view
-from .folder_notes import NOTES_TIP, notes_url
+from .documents_page import report_view
+from .folder_notes import NOTES_TIP
 from .panel import PublicationsPanel, period_label
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
@@ -69,13 +69,31 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
             for p in annotations.periods(person_id, include_hidden_folders=True)
         ):
             folder = None
+    if tab == "documents":  # (its former name)
+        tab = "report"
     with frame(person.name):
         tabs = _header(person, tab, folder)
         stale_banner(person_id)
 
+        def report() -> None:  # (built once shown: its notes, excerpts and documents)
+            if not report_box.default_slot.children:
+                # (that of the folder seen from, else of the period)
+                shown = next(
+                    (
+                        p.id
+                        for p in annotations.periods(person_id, include_hidden_folders=True)
+                        if folder and p.folder_id == folder[0]
+                    ),
+                    state_period,
+                )
+                with report_box:
+                    report_view(person_id, shown)
+
         def tab_changed(e) -> None:
             panel.url_extra = {} if e.value == "publications" else {"tab": e.value}
             panel.push_url()
+            if e.value == "report":
+                report()
 
         tabs.on_value_change(tab_changed)
         with ui.tab_panels(tabs, value=tab).classes("w-full"):
@@ -92,14 +110,16 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
                 periods_view(person_id, on_change=panel.reload_periods)
             with ui.tab_panel("theses"):
                 ThesesView(person_id, panel)
-            with ui.tab_panel("documents"):
-                documents_view(person_id)
+            with ui.tab_panel("report").classes("px-0 py-1"):
+                report_box = ui.column().classes("w-full")
+        if tab == "report":
+            report()
 
 
 def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> ui.tabs:
     """Name, tabs and edit / delete buttons on one row (wrapping on narrow screens)."""
     with ui.row().classes("w-full items-center justify-between gap-2"):
-        with ui.column().classes("gap-0"):
+        with ui.column().classes("gap-0"):  # (small: the space below for the content)
             if folder:
                 with ui.row().classes("items-center gap-1 no-wrap"):
                     with (
@@ -109,33 +129,25 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
                     ):
                         ui.icon("folder", color="amber-8")
                         ui.label(folder[1])
-                    if period_id := next(
-                        (
-                            p.id
-                            for p in annotations.periods(person.id, include_hidden_folders=True)
-                            if p.folder_id == folder[0]
-                        ),
-                        None,
+                    if any(
+                        p.folder_id == folder[0]
+                        for p in annotations.periods(person.id, include_hidden_folders=True)
                     ):
                         ui.button(
-                            icon="edit_note",
-                            on_click=lambda: ui.navigate.to(notes_url(period_id)),
+                            icon="edit_note", on_click=lambda: tabs.set_value("report")
                         ).props("flat dense round size=sm").tooltip(_(NOTES_TIP)).mark(
                             "person-folder-notes"
                         )
-            ui.label(person.name).classes("text-2xl")
-            if person.affiliation:
-                ui.label(person.affiliation).classes("text-grey")
-            if person.orcid:
-                ui.link(
-                    f"ORCID {person.orcid}", f"https://orcid.org/{person.orcid}", new_tab=True
-                ).classes("text-xs").mark("person-orcid")
+            with ui.row().classes("items-baseline gap-x-2 gap-y-0"):
+                ui.label(person.name).classes("text-xl font-medium")
+                if person.affiliation:
+                    ui.label(person.affiliation).classes("text-sm text-grey")
         with ui.tabs(value=tab).props("inline-label dense").classes("grow") as tabs:
             ui.tab("publications", _("Publications"), icon="article")
             ui.tab("sources", _("Sources"), icon="hub")
             ui.tab("periods", _("Periods"), icon="date_range")
             ui.tab("theses", _("Theses"), icon="school")
-            ui.tab("documents", _("Documents"), icon="description").mark("tab-documents")
+            ui.tab("report", _("Report"), icon="description").mark("tab-report")
         with ui.row():
             ui.button(
                 icon="delete_sweep",
