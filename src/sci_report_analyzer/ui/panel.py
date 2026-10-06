@@ -1014,7 +1014,12 @@ class PublicationsPanel:
                         ),
                         "textStyle": {"fontSize": 13},
                     },
-                    "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+                    "tooltip": {
+                        "trigger": "axis",
+                        "axisPointer": {"type": "shadow"},
+                        ":formatter": "(ps) => ps[0].axisValue + ps.filter(p => p.value > 0)"
+                        ".map(p => `<br>${p.marker}${p.seriesName}: <b>${p.value}</b>`).join('')",
+                    },
                     "grid": {"left": 30, "right": 10, "top": 35, "bottom": 25},
                     "xAxis": {"type": "category", "data": [b[0] for b in bins]},
                     "yAxis": {"type": "value", "minInterval": 1},
