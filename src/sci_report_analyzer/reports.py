@@ -1,10 +1,11 @@
 """Citing a person's papers in Markdown (the notes of a folder, of a document…) with Pandoc's
 syntax, substituted when shown or copied.
 
-- ``[@key]`` (or ``[@a; @b]``, ``[@a, @b]``, ``[see @a, p. 3]``): with the folder's
-  citation template (``Numbering.cite``; none: the paper's number, ``**#6**``, written as its
-  star list says, else as ``number_format``); several keys with a template (below) each
-  cited with it, also without brackets: ``@a, @b{.notes}``;
+- ``[@key]`` (or ``[@a; @b]``, ``[@a, @b]``, ``[see @a, p. 3]``): with the citation
+  template of its star list (``StarList.cite``), else that of the papers cited only
+  (``Numbering.cite``); none: the paper's number, ``**#6**``, written as its list says, else
+  as ``number_format``; several keys with a template (below) each cited with it, also
+  without brackets: ``@a, @b{.notes}``;
 - ``@key``, or ``[@key]{.full}``: its number, title, venue, year and category;
 - ``[@key]{.notes}``: that, then its notes; ``[@key]{.tags}``: with its tags (#tags), and
   ``[@key]{.notes .tags}`` both;
@@ -12,8 +13,8 @@ syntax, substituted when shown or copied.
   bare number, ``.title``, ``.venue``, ``.short-venue``: the acronym, else the venue,
   ``.year``, ``.tags``, ``.notes``) replaced and the rest kept: ``EMNLP (2026)``,
   ``{#.index}``: ``#2``, ``{**#.index** (.short-venue .year): .notes}``;
-- ``[@key]{.starred}``: a named template (Settings → Citation templates, or the folder's),
-  also usable within another one (``{.starred: .notes}``);
+- ``[@key]{.long}``: a named template (Settings → Citation templates, or the folder's), also
+  usable within another one (``{.long: .notes}``);
 - ``[]{.references}`` (alone on its line): the papers cited, listed there rather than at
   the end when copied (``.notes``, ``.tags``: with their notes, their tags);
 - ``[]{.publications}``, ``[]{.excerpts}`` (alone on their line): a block (see
@@ -117,6 +118,7 @@ class Paper:
     off_period: bool = False  # (in a star list, but its year outside the period's)
     list_id: int | None = None  # (the star list it is numbered in)
     number_format: str | None = None  # (that list's)
+    cite: str | None = None  # (that list's template, of [@key]: see StarList)
 
 
 @dataclass(frozen=True)
@@ -127,6 +129,7 @@ class StarList:
     name: str
     number_format: str = NUMBER_FORMAT
     must_cite: bool = False
+    cite: str = ""  # (the template of [@key] for its papers: "" the number)
 
 
 def in_years(s: PubStat, years: tuple[int | None, int | None]) -> bool:
@@ -170,6 +173,7 @@ def listed_papers(
                     off_period=not in_years(r, years),
                     list_id=lst.id,
                     number_format=lst.number_format,
+                    cite=lst.cite,
                 )
             )
     return out
@@ -269,6 +273,11 @@ class Context:
             NUMBER_FORMAT
         )
         return fmt.replace("{index}", str(p.number)).replace("{n}", str(p.number))
+
+    def cite_of(self, p: Paper) -> str:
+        """The template a paper is cited with by ``[@key]``: its star list's, else the
+        folder's (``cite_default``; none: the number)."""
+        return p.cite if p.in_report and p.list_id is not None else self.cite_default
 
     def hashtags(self, p: Paper) -> str:
         """Its tags (but the hidden ones)."""
@@ -461,8 +470,8 @@ def render(text: str, ctx: Context) -> Rendered:
 
     def bracket(src: str, m: re.Match) -> str:
         bare = m.group("body") is None  # (@a, @b{.notes})
-        body, attrs = m.group("bare_body", "bare_attrs") if bare else m.group("body", "attrs")
-        attrs = parse_attrs(attrs or _inner(ctx.cite_default))
+        body, given = m.group("bare_body", "bare_attrs") if bare else m.group("body", "attrs")
+        attrs = parse_attrs(given or "")
         if attrs is None:
             return _INTEXT.sub(intext, m.group(0)) if bare else m.group(0)
         parts = []
@@ -474,8 +483,11 @@ def render(text: str, ctx: Context) -> Rendered:
             p = resolve(im.group("key"))
             if p is None:
                 return m.group(0)
+            # (without a template: its star list's, else the folder's for the papers cited
+            # only)
+            mine = attrs if given else parse_attrs(_inner(ctx.cite_of(p))) or attrs
             try:
-                cited = ctx.cite(p, attrs, indent_at(src, m.start()))
+                cited = ctx.cite(p, mine, indent_at(src, m.start()))
             except TemplateCycle as e:
                 out.errors.append(str(e))
                 return f"{m.group(0)} (⚠ {e})"
@@ -552,9 +564,9 @@ def with_references(text: str, ctx: Context) -> str:
 
 @dataclass
 class Numbering:
-    """How a folder's notes cite papers (those of its star lists numbered there, as their
-    list says): ``format``, how the number of a paper in no list is written (``{index}``:
-    the number; numbered apart, from 1, as first cited); ``cite``, the template of a
+    """How a folder's notes cite the papers in no star list (those of a list: as it says):
+    ``format``, how their number is written (``{index}``: the number; numbered apart, from
+    1, as first cited, when written otherwise than a list's); ``cite``, the template of their
     citation without one (``[@key]``; empty: the number)."""
 
     format: str = REFERENCE_FORMAT
@@ -596,7 +608,7 @@ def star_lists(period_id: int | None = None, *, settings_id: int | None = None) 
     from . import annotations
 
     return [
-        StarList(t.id, t.name, t.number_format or NUMBER_FORMAT, t.must_cite)
+        StarList(t.id, t.name, t.number_format or NUMBER_FORMAT, t.must_cite, t.cite_template or "")
         for t in annotations.star_lists(period_id, settings_id=settings_id)
     ]
 
@@ -696,8 +708,9 @@ class _Sample:
 def examples(
     numbering: Numbering, lists: list[StarList], templates: dict[str, str]
 ) -> list[tuple[str, str, str]]:
-    """How a paper is cited by ``[@key]`` and listed in the references: in each star list
-    (as its 2nd paper), and cited only (as the first): (list name, or "", citation, entry)."""
+    """How a paper is cited by ``[@key]`` (its list's template) and listed in the references
+    (its list's number): in each star list (as its 2nd paper), and cited only (as the first):
+    (list name, or "", citation, entry)."""
     from types import SimpleNamespace
 
     sample = _Sample(category=SimpleNamespace(label=_("Conference")))
@@ -708,7 +721,9 @@ def examples(
             "doe2026neural",
             2 if lst else 1,
             in_report=lst is not None,
+            list_id=lst.id if lst else None,
             number_format=lst.number_format if lst else None,
+            cite=lst.cite if lst else None,
         )
         ctx = Context(
             [p],

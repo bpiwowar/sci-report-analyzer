@@ -127,6 +127,7 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
             "id": t.id,
             "name": t.name,
             "format": t.number_format or reports.NUMBER_FORMAT,
+            "template": t.cite_template or "",
             "cite": t.must_cite,
             "builtin": t.key is not None,
             "colour": t.colour,
@@ -141,8 +142,9 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
             _(
                 "The papers starred within a person's period (★: the first list), in order: "
                 "numbered in the first list they are in, written as it says ({index}: the "
-                "number). Those of the lists to cite are the papers to discuss, each to be "
-                "cited in the notes (without: those of the period's years)."
+                "number: its reference), and cited by [@key] (as inserted) as it says. Those "
+                "of the lists to cite are the papers to discuss, each to be cited in the notes "
+                "(without: those of the period's years)."
             )
         ).classes("text-sm text-grey")
 
@@ -159,15 +161,33 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
                         on_change=lambda e, x=x: (x.update(name=e.value or ""), shown.refresh()),
                     ).props("dense outlined").classes("w-40").mark(f"folder-list-name-{i}")
                     ui.input(
-                        _("Number"),
+                        _("Reference"),
                         value=x["format"],
                         on_change=lambda e, x=x: (
                             x.update(format=e.value or ""),
                             shown.refresh(),
                         ),
                     ).props("dense outlined").classes("w-36").tooltip(
-                        _("How the number of its papers is written ({index}: the number)")
+                        _(
+                            "How the number of its papers is written ({index}: the number), in "
+                            "the references and as .number"
+                        )
                     ).mark(f"folder-list-format-{i}")
+                    ui.input(
+                        _("Citation"),
+                        value=x["template"],
+                        placeholder=_("the number"),
+                        on_change=lambda e, x=x: (
+                            x.update(template=e.value or ""),
+                            shown.refresh(),
+                        ),
+                        validation=lambda v: reports.check_template(v or ""),
+                    ).props("dense outlined").classes("w-72").tooltip(
+                        _(
+                            "How its papers are cited by [@key] (e.g. {.number (.short-venue "
+                            ".year)}, .number: its reference; empty: the reference)"
+                        )
+                    ).mark(f"folder-list-template-{i}")
                     ui.checkbox(
                         _("to cite"),
                         value=x["cite"],
@@ -207,6 +227,7 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
                     "id": None,
                     "name": "",
                     "format": reports.NUMBER_FORMAT,
+                    "template": "",
                     "cite": False,
                     "builtin": False,
                     "colour": None,
@@ -221,16 +242,19 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
             ui.button(_("Add a list"), icon="add", on_click=add_list).props("flat").mark(
                 "folder-list-add"
             )
-        with ui.row().classes("w-full items-start gap-3 mt-2"):
+        with ui.row().classes("items-center gap-2 no-wrap mt-1"):
+            ui.label(_("Cited only")).classes("w-48 text-sm text-right").tooltip(
+                _("The papers in no list")
+            )
             fmt = (
                 ui.input(
-                    _("Number of the papers cited only"),
+                    _("Reference"),
                     value=n.format,
                     placeholder=reports.REFERENCE_FORMAT,
                     on_change=lambda: shown.refresh(),
                 )
                 .props("dense outlined")
-                .classes("w-56")
+                .classes("w-36")
                 .tooltip(
                     _(
                         "The papers in no list: numbered apart, from 1, as first cited "
@@ -241,18 +265,19 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
             )
             cite = (
                 ui.input(
-                    _("Citation ([@key])"),
+                    _("Citation"),
                     value=n.cite,
                     placeholder=_("the number"),
                     on_change=lambda: shown.refresh(),
                     validation=lambda v: reports.check_template(v or ""),
                 )
                 .props("dense outlined")
-                .classes("w-80")
+                .classes("w-72")
                 .tooltip(
                     _(
-                        "The template of a citation without one: [@key], as inserted (e.g. "
-                        "{.number (.short-venue .year)}; empty: the number)"
+                        "How the papers in no list are cited by [@key], as inserted (e.g. "
+                        "{.number (.short-venue .year)}, .number: their reference; empty: the "
+                        "reference)"
                     )
                 )
                 .mark("folder-cite")
@@ -262,8 +287,14 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
         def shown() -> None:
             numbering = reports.Numbering(fmt.value or "", cite.value or "")
             star = [
-                reports.StarList(0, x["name"] or "…", x["format"] or reports.NUMBER_FORMAT)
-                for x in lists
+                reports.StarList(
+                    i + 1,
+                    x["name"] or "…",
+                    x["format"] or reports.NUMBER_FORMAT,
+                    False,
+                    x["template"],
+                )
+                for i, x in enumerate(lists)
             ]
             names = {**general, **{t.name: t.attrs for t in own if t.name}}
             with (
@@ -347,9 +378,10 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
             if len(set(names)) < len(names):
                 ui.notify(_("Two star lists have the same name"), type="negative")
                 return False
-            if (err := reports.check_template((cite.value or "").strip())) is not None:
-                ui.notify(err, type="negative")
-                return False
+            for template in [cite.value, *(x["template"] for x in lists)]:
+                if (err := reports.check_template((template or "").strip())) is not None:
+                    ui.notify(err, type="negative")
+                    return False
             ids = []
             for x in lists:
                 try:
@@ -359,6 +391,7 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
                             x["name"],
                             colour=x["colour"],
                             number_format=x["format"],
+                            cite_template=x["template"],
                             must_cite=x["cite"],
                             list_id=x["id"],
                         )

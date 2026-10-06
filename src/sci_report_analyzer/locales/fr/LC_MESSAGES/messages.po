@@ -862,6 +862,9 @@ msgstr "Citer un article ([@clé], numéroté à la copie)"
 msgid "Cite them"
 msgstr "Les citer"
 
+msgid "Cited only"
+msgstr "Seulement cités"
+
 msgid "Cited, but not of the period's years:"
 msgstr "Cités, mais hors des années de la période :"
 
@@ -1769,6 +1772,9 @@ msgstr ""
 msgid "How a paper is cited: `[@key]` followed by the template. `{.notes}`, `{.tags}`, `{.full}` (title, venue…) give its entry; otherwise the fields `.number` (the number, formatted), `.index` (the bare number), `.title`, `.venue`, `.short-venue` (its acronym), `.year`, `.tags`, `.notes` are replaced and the rest kept, a parenthesis without a value dropped: `{.number (.short-venue .year)}` gives **#2** (EMNLP 2026). A citation without a template (`[@key]`, as inserted) is written as the folder says (its settings: Notes and citations). A template with a name is used as `.name`, alone (`[@key]{.starred}`) or within another one (`{.starred: .notes}`)."
 msgstr "Comment un article est cité : `[@clé]` suivi du modèle. `{.notes}`, `{.tags}`, `{.full}` (titre, lieu…) donnent son entrée ; sinon les champs `.number` (le numéro, mis en forme), `.index` (le numéro seul), `.title`, `.venue`, `.short-venue` (son acronyme), `.year`, `.tags`, `.notes` sont remplacés et le reste gardé, une parenthèse sans valeur supprimée : `{.number (.short-venue .year)}` donne **#2** (EMNLP 2026). Une citation sans modèle (`[@clé]`, telle qu'insérée) s'écrit comme le dit le dossier (ses réglages : Notes et citations). Un modèle nommé s'utilise comme `.nom`, seul (`[@clé]{.starred}`) ou dans un autre (`{.starred: .notes}`)."
 
+msgid "How its papers are cited by [@key] (e.g. {.number (.short-venue .year)}, .number: its reference; empty: the reference)"
+msgstr "Comment [@clé] cite ses articles (par ex. {.number (.short-venue .year)}, .number : sa référence ; vide : la référence)"
+
 #, python-brace-format
 msgid ""
 "How the number of a paper with the tag is written ({index}: the number; "
@@ -1781,6 +1787,12 @@ msgstr ""
 
 msgid "How the number of its papers is written ({index}: the number)"
 msgstr "L'écriture du numéro de ses articles ({index} : le numéro)"
+
+msgid "How the number of its papers is written ({index}: the number), in the references and as .number"
+msgstr "L'écriture du numéro de ses articles ({index} : le numéro), dans les références et comme .number"
+
+msgid "How the papers in no list are cited by [@key], as inserted (e.g. {.number (.short-venue .year)}, .number: their reference; empty: the reference)"
+msgstr "Comment [@clé], telle qu'insérée, cite les articles d'aucune liste (par ex. {.number (.short-venue .year)}, .number : leur référence ; vide : la référence)"
 
 #, python-brace-format
 msgid "IF {value}"
@@ -3349,6 +3361,9 @@ msgstr ""
 "Les notices ayant l'un de ces ISSN appartiennent à ce canal, quel que "
 "soit leur texte"
 
+msgid "Reference"
+msgstr "Référence"
+
 msgid "References"
 msgstr "Références"
 
@@ -4196,11 +4211,17 @@ msgstr ""
 "répartition ; automatique : d'après les variantes, les règles de canal et"
 " les textes de canal"
 
+msgid "The papers in no list"
+msgstr "Les articles d'aucune liste"
+
 msgid "The papers in no list: numbered apart, from 1, as first cited ({index}: the number; default: {default})"
 msgstr "Les articles d'aucune liste : numérotés à part, à partir de 1, dans l'ordre de première citation ({index} : le numéro ; par défaut : {default})"
 
 msgid "The papers starred within a person's period (★: the first list), in order: numbered in the first list they are in, written as it says ({index}: the number). Those of the lists to cite are the papers to discuss, each to be cited in the notes (without: those of the period's years)."
 msgstr "Les articles étoilés dans la période d'une personne (★ : la première liste), dans l'ordre : numérotés dans la première liste où ils sont, écrits comme elle le dit ({index} : le numéro). Ceux des listes à citer sont les articles à discuter, chacun à citer dans les notes (sans : ceux des années de la période)."
+
+msgid "The papers starred within a person's period (★: the first list), in order: numbered in the first list they are in, written as it says ({index}: the number: its reference), and cited by [@key] (as inserted) as it says. Those of the lists to cite are the papers to discuss, each to be cited in the notes (without: those of the period's years)."
+msgstr "Les articles étoilés dans la période d'une personne (★ : la première liste), dans l'ordre : numérotés dans la première liste où ils sont, écrits comme elle le dit ({index} : le numéro : sa référence), et cités par [@clé] (telle qu'insérée) comme elle le dit. Ceux des listes à citer sont les articles à discuter, chacun à citer dans les notes (sans : ceux des années de la période)."
 
 msgid "The period whose tags and notes are shown (e.g. a folder's)"
 msgstr ""

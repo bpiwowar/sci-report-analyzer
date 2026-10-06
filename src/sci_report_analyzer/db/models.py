@@ -458,6 +458,9 @@ class Tag(Base):
         ForeignKey("folder_settings.id", ondelete="CASCADE")
     )
     number_format: Mapped[str | None]
+    # The template its papers are cited with ([@key]; none: the number), also its name's
+    # (e.g. [@key]{.starred}).
+    cite_template: Mapped[str | None]
     must_cite: Mapped[bool] = mapped_column(default=False)
     position: Mapped[int] = mapped_column(default=0)
 

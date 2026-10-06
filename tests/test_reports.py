@@ -103,9 +103,14 @@ def test_keys_numbers_and_substitution():
     assert reports.bibliography(ctx).splitlines()[0].startswith("- [1] **The neural")
     # In no list, written otherwise: numbered apart, from 1, as first cited.
     assert reports.render(f"[@{keys[c]}]", ctx).text == "(1)"
-    # The template of [@key] (the folder's), and without it.
-    ctx = reports.Context(papers, stats, keys, names, {tag}, period, cite_default="{.number .year}")
-    assert reports.render("[@smith2022neural]", ctx).text == "[1] 2022"
+    # How [@key] cites: as its list says, else as the papers cited only; a template given
+    # instead.
+    lists = [reports.StarList(tag, "discuss", "[{n}]", cite="{.number .year}")]
+    papers = reports.listed_papers(stats, keys, lists, period)
+    ctx = reports.Context(papers, stats, keys, names, {tag}, period, cite_default="{.title}")
+    assert reports.render(f"[@smith2022neural; @{keys[c]}]", ctx).text == (
+        "[1] 2022, Deep ranking again"
+    )
     assert reports.render("[@smith2022neural]{.year}", ctx).text == "2022"
     # Without tags: the papers of the period's years.
     assert len(reports.papers_to_discuss(stats, keys, [], period, (2022, None))) == 1
@@ -271,14 +276,29 @@ def test_folder_numbering_templates_and_status():
     assert refs[1].startswith("- **#2** **The neural retrieval**")
     assert refs[2].startswith("- [1] **Deep ranking again**")
     assert reports.render(f"[@{keys[c]}]{{.index}}", ctx).text == "1"
-    # The folder's template of [@key].
-    reports.save_numbering(fid, reports.Numbering("[{index}]", "{.number (.year)}"))
+    # How [@key] cites: as its list says (its citing format), else as the folder says for the
+    # papers cited only.
+    annotations.save_list(
+        None,
+        "starred",
+        number_format="**#{index}**",
+        cite_template="{.number (.year)}",
+        must_cite=True,
+        list_id=star,
+    )
+    reports.save_numbering(fid, reports.Numbering("[{index}]", "{.number: .title}"))
     ctx = reports.folder_context(stats, period)
-    r = reports.render(f"[@{keys[a]}; @{keys[b]}]", ctx)
-    assert r.text == "**#1** (2021), **#2** (2022)"
+    r = reports.render(f"[@{keys[a]}; @{keys[b]}] [@{keys[c]}]", ctx)
+    assert r.text == "**#1** (2021), **#2** (2022) [1]: Deep ranking again"
     assert reports.citation_status(ctx, r.cited).colour == "positive"
     # A list not to cite: its papers numbered, not to discuss (none: the period's years).
-    annotations.save_list(None, "starred", number_format="**#{index}**", list_id=star)
+    annotations.save_list(
+        None,
+        "starred",
+        number_format="**#{index}**",
+        cite_template="{.number (.year)}",
+        list_id=star,
+    )
     ctx = reports.folder_context(stats, period)
     assert reports.render(f"[@{keys[b]}]", ctx).text == "**#2** (2022)"
     assert len(reports.citation_status(ctx, r.cited).discuss) == 3
@@ -354,8 +374,10 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     user.find(marker="folder-list-format-0").clear().type("§{index}")
     await user.should_not_see(marker="folder-same-formats")
     await user.should_see("§2")  # (the examples: a list's 2nd paper, cited and listed)
-    user.find(marker="folder-cite").clear().type("{.number (.year)}")
-    await user.should_see("§2 (2026)")
+    user.find(marker="folder-list-template-0").clear().type("{.number (.year)}")
+    await user.should_see("§2 (2026)")  # (its citing format)
+    user.find(marker="folder-cite").clear().type("{.number: .title}")
+    await user.should_see("[1]: Neural ranking at scale")  # (that of the papers cited only)
     # Another list (not to cite), first: the ★ button's.
     user.find(marker="folder-list-add").click()
     await user.should_see(marker="folder-list-name-1")
@@ -364,10 +386,10 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     user.find(marker="folder-save").click()
     await user.should_not_see(marker="folder-save")
     await asyncio.sleep(0.3)  # (then back to the folder: before leaving it)
-    assert reports.numbering(fid) == reports.Numbering("[{index}]", "{.number (.year)}")
-    assert [(x.name, x.number_format, x.must_cite) for x in reports.star_lists(period)] == [
-        ("maybe", "**#{index}**", False),
-        ("starred", "§{index}", True),
+    assert reports.numbering(fid) == reports.Numbering("[{index}]", "{.number: .title}")
+    assert [(x.name, x.number_format, x.cite, x.must_cite) for x in reports.star_lists(period)] == [
+        ("maybe", "**#{index}**", "", False),
+        ("starred", "§{index}", "{.number (.year)}", True),
     ]
     assert annotations.first_list(period).name == "maybe"
     assert reports.nested_influence(fid)

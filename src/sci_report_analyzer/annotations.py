@@ -154,6 +154,7 @@ def save_list(
     *,
     colour: str | None = None,
     number_format: str = "",
+    cite_template: str = "",
     must_cite: bool = False,
     list_id: int | None = None,
 ) -> int:
@@ -187,6 +188,7 @@ def save_list(
         t.name = name
         t.colour = colour or t.colour or "#e3b341"
         t.number_format = number_format.strip() or None
+        t.cite_template = cite_template.strip() or None
         t.must_cite = must_cite
         s.flush()
         return t.id
@@ -208,6 +210,7 @@ def copy_lists(s, source_id: int, settings_id: int) -> dict[int, int]:
                 per_period=True,
                 settings_id=settings_id,
                 number_format=t.number_format,
+                cite_template=t.cite_template,
                 must_cite=t.must_cite,
                 position=t.position,
             )

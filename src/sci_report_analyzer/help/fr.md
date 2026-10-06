@@ -208,8 +208,8 @@ Un saut de ligne est conservé (comme dans Obsidian). Elles sont éditées avec 
 ⌘B / ⌘I, un aperçu à côté ou à la place).
 
 **Citations dans les notes du dossier** (l'onglet du dossier à côté d'un PDF) : les notes
-de la personne dans le dossier citent ses articles avec la syntaxe de Pandoc : `[@key]` comme
-le dossier cite (son modèle de citation ; sans : le numéro de l'article), `[@a; @b]` ou `[@a, @b]` plusieurs (chacun avec le modèle, comme dans
+de la personne dans le dossier citent ses articles avec la syntaxe de Pandoc : `[@key]` avec son
+format de citation (celui de sa liste étoilée, sinon celui des articles seulement cités ; sans : sa référence), `[@a; @b]` ou `[@a, @b]` plusieurs (chacun avec le modèle, comme dans
 `[@a, @b]{.notes}`, aussi écrit sans crochets : `@a, @b{.notes}`), `@key` ses titre, canal, année et catégorie,
 `[@key]{.notes}` avec ses notes, `[@key]{.tags}` avec ses étiquettes (`{.notes .tags}` les
 deux), et des modèles : `[@key]{.short-venue (.year)}` donne `EMNLP (2026)` (champs :
@@ -218,10 +218,10 @@ deux), et des modèles : `[@key]{.short-venue (.year)}` donne `EMNLP (2026)` (ch
 un crochet sans valeur est supprimé). Les modèles nommés (Paramètres → Modèles de citation,
 ou ceux du dossier) s'utilisent comme `.nom`. Les réglages du dossier (l'onglet
 « Notes et citations » de sa fenêtre) fixent ses listes étoilées : un article est numéroté dans la
-première où il est (dans son ordre, sinon par année), écrit comme la liste le dit (par ex. `**#{index}**`) ; les articles
-d'aucune liste sont numérotés à part, dans l'ordre de citation, avec leur propre format (par ex. `[{index}]`). Ils fixent
-aussi le modèle de citation de `[@key]` (par ex. `{.number (.short-venue .year)}` ; les citations insérées sont de simples
-`[@key]`), avec des exemples d'une citation et de sa référence pour chacun. Les articles à discuter sont ceux des listes
+première où il est (dans son ordre, sinon par année). Chaque liste, et les articles seulement cités (d'aucune liste :
+numérotés à part, dans l'ordre de citation), a deux formats : sa **référence** (le numéro, par ex. `**#{index}**`, dans les
+références et comme `.number`) et sa **citation** (comment `[@key]` cite, par ex. `{(.number .short-venue, .year)}` ; vide :
+la référence), avec un exemple de chacun ; les citations insérées sont de simples `[@key]`. Les articles à discuter sont ceux des listes
 à citer (sinon ceux des années de la période) ; le mode
 « Articles » de l'éditeur (son icône rouge tant que chacun n'est pas cité, orange si un article cité
 n'est pas des années de la période, verte une fois tous cités ; combien au survol) montre, à la place de l'aperçu, les articles à discuter avec

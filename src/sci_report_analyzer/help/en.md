@@ -208,8 +208,8 @@ A line break is kept (as in Obsidian). They are edited with a Markdown editor (t
 ⌘B / ⌘I, a preview beside or instead).
 
 **Citations in the folder notes** (the folder tab next to a PDF): the person's notes within
-the folder cite their papers with Pandoc's syntax: `[@key]` as the folder cites (its
-citation template; none: the paper's number), `[@a; @b]`
+the folder cite their papers with Pandoc's syntax: `[@key]` with its citing format (that of
+its star list, else that of the papers cited only; none: its reference), `[@a; @b]`
 or `[@a, @b]` several (each with the template, as in `[@a, @b]{.notes}`, also written
 without brackets: `@a, @b{.notes}`), `@key` its title, venue, year and category, `[@key]{.notes}` with its notes,
 `[@key]{.tags}` with its tags (`{.notes .tags}` both), and templates:
@@ -218,11 +218,11 @@ star list writes it, `.index` the bare number as in `{**#.index**}`, `.title`, `
 `.short-venue` the acronym, `.year`, `.tags`, `.notes`; a bracket without a value is dropped).
 Named templates (Settings → Citation templates, or the folder's own) are used as `.name`.
 The folder's settings (its dialog's “Notes and citations” tab) set its star lists: a paper
-is numbered in the first one it is in (in its order, else by year), written as the list says
-(e.g. `**#{index}**`); the papers in no list are numbered apart, as first cited, with their
-own format (e.g. `[{index}]`). They also set the citation template of `[@key]` (e.g.
-`{.number (.short-venue .year)}`; inserted citations are plain `[@key]`), with examples of a
-citation and its reference for each. The papers to discuss are those of the lists to cite
+is numbered in the first one it is in (in its order, else by year). Each list, and the
+papers cited only (in no list: numbered apart, as first cited), has two formats: its
+**reference** (the number, e.g. `**#{index}**`, in the references and as `.number`) and its
+**citation** (how `[@key]` cites, e.g. `{(.number .short-venue, .year)}`; empty: the
+reference), with an example of each; inserted citations are plain `[@key]`. The papers to discuss are those of the lists to cite
 (else those of the period's years); the editor's
 "Papers" mode (its icon red until each is cited, orange if one cited is not of the
 period's years, green once all are; how many on hover) shows, instead of the preview, the papers to discuss with their numbers (red
