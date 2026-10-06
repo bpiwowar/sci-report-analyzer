@@ -205,7 +205,9 @@ viennent après ceux numérotés (les plus récents d'abord), dans la liste comm
 
 Les notes sont en Markdown, avec **LaTeX** : `$x^2$` en ligne, `$$\sum_i x_i$$` centré sur sa ligne.
 Un saut de ligne est conservé (comme dans Obsidian). Elles sont éditées avec un éditeur Markdown (barre d'outils,
-⌘B / ⌘I, un aperçu à côté ou à la place).
+⌘B / ⌘I, un aperçu à côté ou à la place). Un lien se suit d'un clic dans l'aperçu, ou d'un
+⌘/Ctrl-clic dans l'éditeur : `[Dossier CRCH, p. 15](/doc/2?page=15)` ouvre le document à
+cette page (dans la fenêtre du PDF qui l'affiche : là), les autres dans un nouvel onglet.
 
 **Citations dans les notes du dossier** (l'onglet du dossier à côté d'un PDF) : les notes
 de la personne dans le dossier citent ses articles avec la syntaxe de Pandoc : `[@key]` avec son

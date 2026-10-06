@@ -102,6 +102,35 @@ window.vrCite = {
     return this.keyAt(line.text, pos - line.from);
   },
 };
+// The link at a place of a line ([text](url), <url> or a bare URL), and following one: to
+// the PDF shown (e.g. a quote's, /doc/2?page=15), its page there; else in a new tab.
+window.vrLink = {
+  KINDS: [/\[[^\[\]]*\]\(\s*<?([^()\s<>]+)>?(?:\s+"[^"]*")?\s*\)/g,
+          /<(https?:\/\/[^\s<>]+)>/g, /https?:\/\/[^\s<>()\[\]]*[^\s<>()\[\].,;:!?'"]/g],
+  at(line, col) {
+    for (const kind of this.KINDS) {
+      for (const m of line.matchAll(kind)) {
+        if (col >= m.index && col <= m.index + m[0].length) return m[1] || m[0];
+      }
+    }
+    return null;
+  },
+  open(href) {
+    const u = new URL(href, location.href);
+    if (u.origin !== location.origin) { window.open(u.href, '_blank', 'noopener'); return; }
+    const page = parseInt(u.searchParams.get('page'));
+    if (u.pathname === location.pathname && page && window.vrPdf) vrPdf.go(page, null);
+    else window.open(u.href, '_blank');
+  },
+};
+// (a link in a rendered note, e.g. the preview: followed so, this page kept)
+document.addEventListener('click', (ev) => {
+  const a = ev.target.closest && ev.target.closest('.vr-note a[href]');
+  if (!a || ev.defaultPrevented || ev.button !== 0) return;
+  if (a.getAttribute('href').startsWith('#')) return;
+  ev.preventDefault();
+  vrLink.open(a.href);
+});
 </script>""",
     shared=True,
 )
@@ -229,8 +258,8 @@ class MarkdownEditor:
         )
 
     def _cite_clicks(self) -> None:
-        """⌘/Ctrl-click on a citation (``[@key]``): its paper shown (see ``open_cited``),
-        rather than another cursor."""
+        """⌘/Ctrl-click on a citation (``[@key]``): its paper shown (see ``open_cited``); on a
+        link: followed (see vrLink); rather than another cursor."""
         ui.on(
             "vr-cite-open",
             lambda e: (
@@ -245,8 +274,10 @@ class MarkdownEditor:
             " if (++n > 50) clearInterval(t); if (!v) return; clearInterval(t);"
             " v.dom.addEventListener('mousedown', (ev) => {"
             " if (!(ev.metaKey || ev.ctrlKey) || ev.button !== 0) return;"
-            " const pos = v.posAtCoords({x: ev.clientX, y: ev.clientY});"
-            " const key = pos == null ? null : vrCite.at(v, pos); if (!key) return;"
+            " const pos = v.posAtCoords({x: ev.clientX, y: ev.clientY}); if (pos == null) return;"
+            " const line = v.state.doc.lineAt(pos), href = vrLink.at(line.text, pos - line.from);"
+            " if (href) { ev.preventDefault(); ev.stopPropagation(); vrLink.open(href); return; }"
+            " const key = vrCite.at(v, pos); if (!key) return;"
             " ev.preventDefault(); ev.stopPropagation();"
             f" emitEvent('vr-cite-open', {{id: {self.editor.id}, key}});"
             " }, true); }, 100); })()"

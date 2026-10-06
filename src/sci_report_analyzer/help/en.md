@@ -205,7 +205,9 @@ first), in the list as in the citations.
 
 Notes are Markdown, with **LaTeX**: `$x^2$` inline, `$$\sum_i x_i$$` displayed.
 A line break is kept (as in Obsidian). They are edited with a Markdown editor (toolbar,
-⌘B / ⌘I, a preview beside or instead).
+⌘B / ⌘I, a preview beside or instead). A link is followed with a click in the preview, or a
+⌘/Ctrl-click in the editor: `[Dossier CRCH, p. 15](/doc/2?page=15)` opens the document at
+that page (in the PDF window showing it: there), others in a new tab.
 
 **Citations in the folder notes** (the folder tab next to a PDF): the person's notes within
 the folder cite their papers with Pandoc's syntax: `[@key]` with its citing format (that of
