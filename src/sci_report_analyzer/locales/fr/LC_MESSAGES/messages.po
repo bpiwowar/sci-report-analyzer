@@ -1525,6 +1525,9 @@ msgstr "Examinateur"
 msgid "Excerpt"
 msgstr "Extrait"
 
+msgid "Excerpts (not shown):"
+msgstr "Extraits (non affichés) :"
+
 msgid "Excerpts are filed in a folder's categories: open the PDF from a folder"
 msgstr ""
 "Les extraits sont classés dans les catégories d'un dossier : ouvrez le "
@@ -2923,6 +2926,9 @@ msgstr "Seul son emplacement est cité (fusionné comme référence)"
 msgid "Only people tagged"
 msgstr "Seulement les personnes étiquetées"
 
+msgid "Only this text, its excerpts not listed"
+msgstr "Ce texte seul, sans lister ses extraits"
+
 #, python-brace-format
 msgid "Only {lists} records are listed for a {kind}"
 msgstr "Seules les fiches {lists} sont listées pour le type « {kind} »"
@@ -3990,6 +3996,10 @@ msgstr "Étudiants"
 msgid "Suggestion"
 msgstr "Suggestion"
 
+#, python-brace-format
+msgid "Summarised by its text, its excerpts not listed ({count})"
+msgstr "Résumée par son texte, ses extraits non listés ({count})"
+
 msgid "Summary"
 msgstr "Résumé"
 
@@ -4323,6 +4333,14 @@ msgstr ""
 msgid "The score given to a venue found through OpenAlex"
 msgstr "Le score donné à un canal trouvé par OpenAlex"
 
+#, python-format
+msgid ""
+"The section summarised by its text: its excerpts hidden, kept in the text"
+" between %% … %% for reference (not shown)"
+msgstr ""
+"La section résumée par son texte : ses extraits masqués, conservés dans "
+"le texte entre %% … %% pour référence (non affichés)"
+
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
 
@@ -4488,6 +4506,12 @@ msgstr "Thèse"
 
 msgid "Thesis (PhD & other)"
 msgstr "Thèse (doctorat et autres)"
+
+#, python-format
+msgid "They are kept in a comment of the text (%% … %%); click to edit it"
+msgstr ""
+"Ils sont conservés dans un commentaire du texte (%% … %%) ; cliquez pour "
+"le modifier"
 
 msgid ""
 "They are on one item (in the order of their PDFs), with the second one's "

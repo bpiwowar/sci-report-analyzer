@@ -1082,6 +1082,7 @@ class _ExcerptsSection:
         for e in categories.excerpts(self.side.period_id, grouped=True):
             by_cat.setdefault(e.category_id, []).append(e)
         texts = categories.section_texts(self.side.period_id)
+        summarised = categories.summarised(self.side.period_id)
         merging = self.merging
         if merging:
             with ui.row().classes("w-full items-center no-wrap gap-1 bg-amber-1 p-1 rounded"):
@@ -1122,7 +1123,11 @@ class _ExcerptsSection:
                 if items:
                     ui.badge(str(len(items))).props("rounded color=amber-8")
                 section_text.edit_button(self.side, n)
-            section_text.show(self.side, n, texts.get(n.id, ""))
+            # (summarised by its text only: its excerpts not listed)
+            hidden = len(items) if n.id in summarised else None
+            section_text.show(self.side, n, texts.get(n.id, ""), hidden)
+            if hidden is not None:
+                items = []
             if n.influence:  # (after its own: those flagged elsewhere, as copied)
                 paths = {c.id: c.path for c in nodes}
                 flagged = [

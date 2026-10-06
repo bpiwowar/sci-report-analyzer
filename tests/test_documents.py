@@ -954,6 +954,67 @@ def test_section_texts():
         assert s.scalars(select(SectionText)).all() == []
 
 
+def test_section_summarised_by_its_text():
+    """A section summarised by its text only: its excerpts not listed, kept in the text in a
+    comment (not rendered); nested, a section left out: in the Rayonnement section too."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    teaching = categories.add(folder, "Enseignement")
+    research = categories.add(folder, "Recherche")
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    categories.add_excerpt(teaching, period, "Cours de Zorglub.", 1, [], document_id=doc)
+    categories.add_excerpt(teaching, period, "Cours d'IR.", 2, [], document_id=doc)
+    led = categories.add_excerpt(research, period, "Projet Nébuleuse.", 3, [], document_id=doc)
+    categories.update_excerpt(led, influence=True)
+    # The excerpts in a comment (their places in parentheses: comments do not nest), added
+    # once, after the text.
+    block = (
+        "%% Excerpts (not shown):\n- Cours de Zorglub. (Dossier, p. 1)\n"
+        "- Cours d'IR. (Dossier, p. 2)\n%%"
+    )
+    assert categories.excerpts_comment(period, teaching) == block
+    text = categories.with_excerpts_comment("Deux **cours**.", period, teaching)
+    assert text == f"Deux **cours**.\n\n{block}"
+    assert categories.with_excerpts_comment(text, period, teaching) == text
+    assert categories.with_excerpts_comment("", period, teaching) == block
+    assert categories.excerpts_comment(period, categories.add(folder, "Divers")) == ""
+    reports.save_language(folder, "fr")  # (in the language of the reports)
+    french = categories.with_excerpts_comment("", period, teaching)
+    assert french.startswith("%% Extraits (non affichés) :\n- Cours de Zorglub.")
+    assert categories.with_excerpts_comment(french, period, teaching) == french
+    reports.save_language(folder, None)
+    # Summarised: the text only (its comment kept, not rendered).
+    categories.set_section_text(period, teaching, text, summary_only=True)
+    assert categories.summarised(period) == {teaching}
+    categories.set_section_text(period, teaching, text)  # (unchanged)
+    assert categories.summarised(period) == {teaching}
+    out = categories.markdown(folder, period, nested=False)
+    assert out.startswith(f"## Enseignement\n\nDeux **cours**.\n\n{block}\n\n## Recherche\n")
+    assert "- Cours de Zorglub. %%" not in out  # (listed: with its places in a comment)
+    shown = copy_filters.strip_comments(
+        reports.render("[]{.excerpts}", reports.folder_context([], period)).text
+    )
+    assert "Deux **cours**." in shown and "Zorglub" not in shown
+    # Nested, a section left out: its text in the Rayonnement section, its excerpts not.
+    categories.set_section_text(period, research, "Un projet.", summary_only=True)
+    assert categories.markdown(folder, period, nested=True).endswith(
+        "## Rayonnement\n\n### Recherche\n\nUn projet.\n"
+    )
+    # Not summarised: listed again; moved with the text.
+    categories.set_section_text(period, teaching, text, summary_only=False)
+    assert "- Cours de Zorglub. %% Dossier, p. 1 %%" in categories.markdown(folder, period)
+    assert categories.move_excerpts(research, teaching) == 1
+    assert categories.summarised(period) == set()
+    other = categories.add(folder, "Autre")
+    assert categories.move_excerpts(teaching, other) == 3
+    categories.set_section_text(period, other, "Tout.", summary_only=True)
+    third = categories.add(folder, "Troisième")
+    categories.move_excerpts(other, third)
+    assert categories.summarised(period) == {third}
+
+
 def test_excerpt_filed_first_in_any_category():
     """Dropped onto a category's heading (another one, an empty sub-category, its own): the
     excerpt (with its group) moves there, first."""

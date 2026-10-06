@@ -463,18 +463,70 @@ def section_text(period_id: int, category_id: int) -> str:
         return row.text if row is not None else ""
 
 
-def set_section_text(period_id: int, category_id: int, text: str | None) -> None:
-    """Set the text of a category's section (blank: removed)."""
+def set_section_text(
+    period_id: int, category_id: int, text: str | None, *, summary_only: bool | None = None
+) -> None:
+    """Set the text of a category's section (blank: removed), and whether the section is
+    summarised by it only (see summarised; None: as it was)."""
     text = (text or "").strip()
     with session_scope() as s:
         row = s.get(SectionText, (period_id, category_id))
         if not text:
             if row is not None:
                 s.delete(row)
-        elif row is None:
-            s.add(SectionText(period_id=period_id, category_id=category_id, text=text))
-        else:
-            row.text = text
+            return
+        if row is None:
+            row = SectionText(period_id=period_id, category_id=category_id, text=text)
+            s.add(row)
+        row.text = text
+        if summary_only is not None:
+            row.summary_only = summary_only
+
+
+def summarised(period_id: int) -> set[int]:
+    """The categories whose sections (a person's, within a folder) are summarised by their
+    texts only: their excerpts not listed (kept in a comment of the text, see
+    with_excerpts_comment)."""
+    with session_scope() as s:
+        return set(
+            s.scalars(
+                select(SectionText.category_id).where(
+                    SectionText.period_id == period_id, SectionText.summary_only.is_(True)
+                )
+            )
+        )
+
+
+def _comment_header() -> str:
+    return _("Excerpts (not shown):")
+
+
+def excerpts_comment(period_id: int, category_id: int) -> str:
+    """The excerpts of a category's section in an Obsidian comment (``%% … %%``: not shown),
+    their places in parentheses (comments do not nest); "" without any. In the language of
+    the folder's reports."""
+    from . import reports
+
+    items = [e for e in excerpts(period_id, grouped=True) if e.category_id == category_id]
+    if not items:
+        return ""
+    found = folders.folder_of_period(period_id)
+    with i18n.using(reports.language(found[0] if found else None)):
+        lines = [f"- {_markdown_item(e, comments=False)}" for e in items]
+        return "\n".join([f"%% {_comment_header()}", *lines, "%%"])
+
+
+def with_excerpts_comment(text: str, period_id: int, category_id: int) -> str:
+    """A section's text followed by its excerpts in a comment (see excerpts_comment), unless
+    it already has them."""
+    from . import reports
+
+    found = folders.folder_of_period(period_id)
+    with i18n.using(reports.language(found[0] if found else None)):
+        header = re.compile(rf"(?m)^[ \t]*%%[ \t]*{re.escape(_comment_header())}")
+    if header.search(text) or not (block := excerpts_comment(period_id, category_id)):
+        return text
+    return f"{text.rstrip()}\n\n{block}" if text.strip() else block
 
 
 def delete_section_text(period_id: int, category_id: int) -> None:
@@ -498,7 +550,11 @@ def _move_texts(
         if (there := s.get(SectionText, (t.period_id, to))) is not None:
             there.text = f"{there.text}\n\n{t.text}"
         else:
-            s.add(SectionText(period_id=t.period_id, category_id=to, text=t.text))
+            s.add(
+                SectionText(
+                    period_id=t.period_id, category_id=to, text=t.text, summary_only=t.summary_only
+                )
+            )
         s.flush()
 
 
@@ -886,11 +942,11 @@ def cited_documents(period_id: int) -> list[tuple[int, str]]:
     return [(i, n) for i, n in rows]
 
 
-def _markdown_item(e: ExcerptView) -> str:
+def _markdown_item(e: ExcerptView, *, comments: bool = True) -> str:
     """An excerpt as Markdown: its tags (Obsidian #tags, first), its quotes (a group: on one
     item, as one text if edited; those merged as references only: their places), each with
-    its places between Obsidian comments (``%% Application, p. 4; p. 12 %%``), then its
-    years."""
+    its places between Obsidian comments (``%% Application, p. 4; p. 12 %%``; without
+    ``comments``: in parentheses), then its years."""
     from .pubview import hashtag
 
     chunks: list[tuple[str | None, list[str]]] = []  # (a quote, its places)
@@ -910,7 +966,8 @@ def _markdown_item(e: ExcerptView) -> str:
         chunks = [(e.group_text, pending)]
     elif pending:
         chunks = [(None, pending)]
-    quotes = [(f"{t} " if t else "") + f"%% {'; '.join(places)} %%" for t, places in chunks]
+    wrap = "%% {} %%" if comments else "({})"
+    quotes = [(f"{t} " if t else "") + wrap.format("; ".join(places)) for t, places in chunks]
     tags = "".join(f"{hashtag(t)} " for t in e.tag_names)
     return tags + " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
 
@@ -927,7 +984,8 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | N
     out of their categories. The categories with no excerpt (nor below) are left out. A
     section's text (see section_texts) follows its heading; nested, that of a section left
     out (all its excerpts taken out) follows the heading of its subsection in the
-    Rayonnement section. In the language of the folder's reports."""
+    Rayonnement section; a section summarised by its text only (see summarised): its
+    excerpts not listed there. In the language of the folder's reports."""
     from . import reports
 
     if nested is None:
@@ -938,7 +996,7 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | N
 
 def _markdown(folder_id: int, period_id: int, level: int, nested: bool) -> str:
     nodes = tree(folder_id)
-    texts = section_texts(period_id)
+    texts, summary_only = section_texts(period_id), summarised(period_id)
     by_cat: dict[int, list[ExcerptView]] = {}
     for e in excerpts(period_id, grouped=True):
         by_cat.setdefault(e.category_id, []).append(e)
@@ -990,6 +1048,8 @@ def _markdown(folder_id: int, period_id: int, level: int, nested: bool) -> str:
         out: list[str] = []
         for n in apart:
             items = [_markdown_item(e) for e in flagged.get(n.id, [])]
+            if nested and n.id in summary_only and left_out(n):  # (its text instead)
+                items = []
             if not nested:
                 if items:
                     out += [f"- **{n.path}**", *(f"  - {x}" for x in items)]
@@ -1010,9 +1070,10 @@ def _markdown(folder_id: int, period_id: int, level: int, nested: bool) -> str:
             continue
         out.append(heading(n, level + n.depth))
         out += text(n)
-        for e in shown.get(n.id, []):  # (a group: its quotes, on one item)
+        listed = [] if n.id in summary_only else shown.get(n.id, [])
+        for e in listed:  # (a group: its quotes, on one item)
             out.append("- " + _markdown_item(e))
-        if shown.get(n.id) and (n is not gather or nested or not gathered):
+        if listed and (n is not gather or nested or not gathered):
             out.append("")
         if n is gather:
             out += gathered + ([""] if gathered and not nested else [])

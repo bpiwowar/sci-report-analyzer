@@ -318,7 +318,10 @@ seulement dans la section Rayonnement ») pour ses notes et la copie, ou un seul
 Chaque catégorie peut avoir un texte propre à la personne (Markdown, par exemple un résumé de
 ses éléments ; son crayon, au survol, dans l'onglet des catégories, ou un clic sur le texte) :
 placé après son titre, avant ses éléments (en mode imbriqué, celui d'une catégorie restée
-vide va sous sa sous-section de la section Rayonnement).
+vide va sous sa sous-section de la section Rayonnement). Avec « Ce texte seul, sans lister
+ses extraits », la section est résumée par son texte : ses extraits ne sont plus listés (ni
+dans l'onglet des catégories), mais ajoutés au texte entre `%% … %%` (un commentaire, jamais
+affiché) pour référence.
 
 Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers

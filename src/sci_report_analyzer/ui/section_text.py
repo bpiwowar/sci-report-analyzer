@@ -1,6 +1,8 @@
 """The text of a category's section in a person's excerpts within a folder (Markdown, e.g. a
 summary of its items: after its heading in the notes' ``[]{.excerpts}``): shown under the
-category in the categories' tab, edited with its pencil (on hover) or a click on it."""
+category in the categories' tab, edited with its pencil (on hover) or a click on it. The
+section can be summarised by its text only: its excerpts not listed (in the tab either),
+kept in a comment of the text (``%% … %%``, not shown) for reference."""
 
 from __future__ import annotations
 
@@ -10,6 +12,7 @@ from weakref import WeakSet
 from nicegui import ui
 
 from .. import categories, reports
+from ..copy_filters import strip_comments
 from ..i18n import _
 from .dialogs import actions, transient_dialog
 from .mdedit import MarkdownEditor
@@ -41,16 +44,23 @@ def edit_button(side: Side, node: categories.Node) -> None:
     ).mark(f"section-text-edit-{node.id}")
 
 
-def show(side: Side, node: categories.Node, text: str) -> None:
-    """Under a category's header row: its section's text, rendered (nothing without one);
-    clicked: edited."""
-    if not text.strip():
-        return
-    ui.markdown(_rendered(side, text), extras=NOTE_EXTRAS).classes(
-        "w-full vr-note vr-section-text text-sm text-grey-9"
-    ).style(f"margin-left:{1.2 * node.depth + 0.6}rem; width:auto").tooltip(
-        _("The text of this section (click to edit it)")
-    ).on("click", lambda: edit(side, node)).mark(f"section-text-{node.id}")
+def show(side: Side, node: categories.Node, text: str, hidden: int | None = None) -> None:
+    """Under a category's header row: its section's text, rendered without its comments
+    (nothing without one), then, summarised by it only, how many excerpts are not listed
+    (``hidden``); clicked: edited."""
+    indent = f"margin-left:{1.2 * node.depth + 0.6}rem; width:auto"
+    if (shown := strip_comments(_rendered(side, text))).strip():
+        ui.markdown(shown, extras=NOTE_EXTRAS).classes(
+            "w-full vr-note vr-section-text text-sm text-grey-9"
+        ).style(indent).tooltip(_("The text of this section (click to edit it)")).on(
+            "click", lambda: edit(side, node)
+        ).mark(f"section-text-{node.id}")
+    if hidden is not None:
+        ui.label(
+            _("Summarised by its text, its excerpts not listed ({count})").format(count=hidden)
+        ).classes("vr-section-text text-xs text-grey italic").style(indent).tooltip(
+            _("They are kept in a comment of the text (%% … %%); click to edit it")
+        ).on("click", lambda: edit(side, node)).mark(f"section-summary-only-{node.id}")
 
 
 def _rendered(side: Side, text: str) -> str:
@@ -60,7 +70,8 @@ def _rendered(side: Side, text: str) -> str:
 
 def edit(side: Side, node: categories.Node) -> None:
     """A dialog: the section's text, in the notes' Markdown editor (with its preview; empty:
-    removed)."""
+    removed), and whether the section is summarised by it only (checked: its excerpts added
+    to the text in a comment, if not there yet)."""
     if side.period_id is None:
         return
     period_id = side.period_id
@@ -81,8 +92,29 @@ def edit(side: Side, node: categories.Node) -> None:
             )
         ).classes("text-xs text-grey")
 
+        def summarise(on: bool) -> None:
+            if on:
+                editor.value = categories.with_excerpts_comment(editor.value, period_id, node.id)
+
+        only = (
+            ui.checkbox(
+                _("Only this text, its excerpts not listed"),
+                value=node.id in categories.summarised(period_id),
+                on_change=lambda e: summarise(bool(e.value)),
+            )
+            .tooltip(
+                _(
+                    "The section summarised by its text: its excerpts hidden, kept in the text "
+                    "between %% … %% for reference (not shown)"
+                )
+            )
+            .mark("section-summary-only")
+        )
+
         def save() -> None:
-            categories.set_section_text(period_id, node.id, editor.value)
+            categories.set_section_text(
+                period_id, node.id, editor.value, summary_only=bool(only.value)
+            )
             side.refresh_excerpts()
             if side.folder_refresh is not None:  # (the notes' preview)
                 side.folder_refresh()

@@ -422,6 +422,8 @@ class SectionText(Base):
         ForeignKey("category.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     text: Mapped[str] = mapped_column(Text)
+    # The section summarised by its text only: its excerpts not listed (kept in a comment).
+    summary_only: Mapped[bool] = mapped_column(default=False, server_default="0")
 
 
 STARRED = "starred"  # Tag.key of the built-in period tag behind the ★ button
