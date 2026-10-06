@@ -304,9 +304,6 @@ class Folder(Base):
     date: Mapped[date | None]
     hidden: Mapped[bool] = mapped_column(default=False)
     notes: Mapped[str | None]
-    # The source a paper must be in to count ("none": no such source; None: the default
-    # one, see source_settings).
-    primary_source: Mapped[str | None] = mapped_column(String(32))
 
     periods: Mapped[list[Period]] = relationship(
         back_populates="folder", cascade="all, delete-orphan", passive_deletes=True
@@ -324,6 +321,9 @@ class FolderSettings(Base):
     # paper in no star list (see Tag), "templates": [{"name", "attrs"}] (over the general
     # ones), "skeleton": the starting notes, "nested_influence"}; see reports.py.
     citations: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+    # The source a paper must be in to count ("none": no such source; None: the default
+    # one, see source_settings).
+    primary_source: Mapped[str | None] = mapped_column(String(32))
 
 
 class FolderSettingsUse(Base):

@@ -43,7 +43,6 @@ class FolderView:
     hidden: bool
     notes: str | None
     members: list[Member] = field(default_factory=list)
-    primary_source: str | None = None  # (see source_settings.folder_primary)
     parent_id: int | None = None
     path: str = ""  # (with the folders it is in: "Hiring › 2026")
 
@@ -94,7 +93,6 @@ def folders(*, include_hidden: bool = True) -> list[FolderView]:
                     ),
                     key=lambda m: m.name.lower(),
                 ),
-                f.primary_source,
                 f.parent_id,
                 paths.get(f.id, f.name),
             )
@@ -113,7 +111,6 @@ def save_folder(
     day: date | None = None,
     hidden: bool = False,
     notes: str | EllipsisType | None = ...,
-    primary_source: str | None = None,
     *,
     parent_id: int | None = None,
 ) -> int:
@@ -131,7 +128,6 @@ def save_folder(
         f.name, f.date, f.hidden = name, day, hidden
         if notes is not ...:
             f.notes = notes or None
-        f.primary_source = primary_source
         for p in f.periods:
             p.name = name  # a folder period is named after its folder
         s.flush()
@@ -196,6 +192,31 @@ def settings_id(s, folder_id: int) -> int:
         if f.parent_id is None or f.parent_id in seen:
             return _own_new(s, f.id)
         f = s.get(Folder, f.parent_id)
+
+
+def used_settings(s, folder_id: int) -> FolderSettings | None:
+    """The settings a folder uses, if any (see settings_id; none made)."""
+    parent, own = _uses(s)
+    f, seen = folder_id, set()
+    while f is not None and f not in seen:
+        if f in own:
+            return s.get(FolderSettings, own[f])
+        seen.add(f)
+        f = parent.get(f)
+    return None
+
+
+def primary_source(folder_id: int) -> str | None:
+    """The primary source of a folder's settings (none: the default; see source_settings)."""
+    with session_scope() as s:
+        found = used_settings(s, folder_id)
+        return found.primary_source if found is not None else None
+
+
+def set_primary_source(folder_id: int, source: str | None) -> None:
+    """The primary source of a folder's settings (those sharing them too)."""
+    with session_scope() as s:
+        s.get(FolderSettings, settings_id(s, folder_id)).primary_source = source
 
 
 def settings_of(folder_id: int) -> int:
@@ -289,6 +310,7 @@ def use_own_settings(folder_id: int) -> None:
         before = _effective(s)
         was = settings_id(s, folder_id)
         new = _own_new(s, folder_id, dict(s.get(FolderSettings, was).citations or {}) or None)
+        s.get(FolderSettings, new).primary_source = s.get(FolderSettings, was).primary_source
         categories.copy_settings(s, was, new)
         annotations.copy_lists(s, was, new)
         _resettle(s, before)
@@ -388,6 +410,7 @@ def copy_settings_to(folder_id: int, target_id: int) -> int:
         source = settings_id(s, folder_id)
         citations = dict(s.get(FolderSettings, source).citations or {}) or None
         new = _own_new(s, target_id, citations)
+        s.get(FolderSettings, new).primary_source = s.get(FolderSettings, source).primary_source
         categories.copy_settings(s, source, new)
         annotations.copy_lists(s, source, new)
         return _resettle(s, before)

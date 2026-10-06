@@ -2596,7 +2596,8 @@ async def test_primary_source_filters_the_panel(user: User) -> None:
     await user.should_see("A workshop contribution")
     await user.should_not_see("Deep ranking for search")
     # A folder without a primary source counts everything.
-    fid = folders.save_folder(None, "Committee", primary_source=source_settings.NO_PRIMARY)
+    fid = folders.save_folder(None, "Committee")
+    folders.set_primary_source(fid, source_settings.NO_PRIMARY)
     period = folders.add_person(fid, pid)
     await user.open(f"/person/{pid}/{period}")
     await user.should_see("A workshop contribution")

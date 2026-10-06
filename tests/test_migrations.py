@@ -107,3 +107,35 @@ def test_cleanup_7c1e4a9b2d30(tmp_path):
         assert "report" not in tables
         assert "sync_started_at" not in {r[1] for r in c.execute("PRAGMA table_info(source_link)")}
         assert "discipline" not in {r[1] for r in c.execute("PRAGMA table_info(thesis)")}
+
+
+def test_shared_primary_source_4a8c1f3e7d52(tmp_path):
+    """A folder's primary source moves to the settings it uses: the one set wins over the
+    default among those sharing them; a folder without settings gets some (its top
+    folder's)."""
+    db = tmp_path / "db.sqlite"
+    _upgrade(db, "2b7d9e4f6a18")
+    with sqlite3.connect(db) as c:
+        for fid, parent, source in [
+            (5, None, None),  # their settings: shared by those within it
+            (1, 5, None),
+            (4, 5, "hal"),
+            (8, 5, "dblp"),  # (after the first one set, by id: lost)
+            (6, None, "none"),  # no settings yet
+            (7, 6, None),
+        ]:
+            c.execute(
+                "INSERT INTO folder (id, name, parent_id, hidden, primary_source)"
+                " VALUES (?, ?, ?, 0, ?)",
+                (fid, f"F{fid}", parent, source),
+            )
+        c.execute("INSERT INTO folder_settings (id, citations) VALUES (10, NULL)")
+        c.execute("INSERT INTO folder_settings_use (folder_id, settings_id) VALUES (5, 10)")
+    _upgrade(db, "head")
+    with sqlite3.connect(db) as c:
+        settings = dict(c.execute("SELECT id, primary_source FROM folder_settings"))
+        uses = dict(c.execute("SELECT folder_id, settings_id FROM folder_settings_use"))
+        columns = {r[1] for r in c.execute("PRAGMA table_info(folder)")}
+    assert settings[10] == "hal"
+    assert set(uses) == {5, 6} and settings[uses[6]] == "none"
+    assert "primary_source" not in columns

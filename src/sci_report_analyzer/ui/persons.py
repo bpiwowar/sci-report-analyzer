@@ -598,31 +598,10 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                     .classes("w-full")
                     .mark("folder-own-notes")
                 )
-                default = source_settings.default_primary()
-                primary = (
-                    ui.select(
-                        {
-                            None: _("Default ({source})").format(
-                                source=ADAPTERS[default].label if default in ADAPTERS else _("none")
-                            ),
-                            source_settings.NO_PRIMARY: _("None"),
-                            **{
-                                n: a.label
-                                for n, a in ADAPTERS.items()
-                                if a.linkable and a.provides_publications
-                            },
-                        },
-                        value=f.primary_source if f else None,
-                        label=_("Primary source"),
-                    )
-                    .classes("w-full")
-                    .tooltip(_("Papers this source doesn't list for a person are not counted"))
-                    .mark("folder-primary")
-                )
                 hidden = ui.checkbox(_("Archived"), value=f.hidden if f else False).tooltip(
                     _(ARCHIVED_TIP)
                 )
-            nested = lang = None
+            nested = lang = primary = None
             if f is not None:
                 with ui.tab_panel("notes").classes("p-0 gap-2"):
                     from .citations import folder_citations_section
@@ -645,6 +624,29 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                         .tooltip(_(NESTED_TIP))
                         .mark("folder-nested-influence")
                     )
+                    default = source_settings.default_primary()
+                    primary = (
+                        ui.select(
+                            {
+                                None: _("Default ({source})").format(
+                                    source=ADAPTERS[default].label
+                                    if default in ADAPTERS
+                                    else _("none")
+                                ),
+                                source_settings.NO_PRIMARY: _("None"),
+                                **{
+                                    n: a.label
+                                    for n, a in ADAPTERS.items()
+                                    if a.linkable and a.provides_publications
+                                },
+                            },
+                            value=folders.primary_source(f.id),
+                            label=_("Primary source"),
+                        )
+                        .classes("w-full")
+                        .tooltip(_("Papers this source doesn't list for a person are not counted"))
+                        .mark("folder-primary")
+                    )
                     citations_save = folder_citations_section(f.id)
 
         def save() -> bool | None:
@@ -664,13 +666,14 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 reports.save_nested_influence(f.id, bool(nested.value))
             if lang is not None:
                 reports.save_language(f.id, lang.value or None)
+            if primary is not None:
+                folders.set_primary_source(f.id, primary.value)
             fid = folders.save_folder(
                 f.id if f else None,
                 name.value.strip(),
                 d,
                 hidden.value,
                 notes.value if edited["notes"] else ...,
-                primary.value,
             )
             _goto(fid)
 

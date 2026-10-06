@@ -141,11 +141,17 @@ def test_primary_source_default_and_folder_override():
     fid = folders.save_folder(None, "Committee")
     period = folders.add_person(fid, pid, 2020, 2024)
     assert source_settings.primary_for(pid, period) == "hal"
-    folders.save_folder(fid, "Committee", primary_source=source_settings.NO_PRIMARY)
+    folders.set_primary_source(fid, source_settings.NO_PRIMARY)
     assert source_settings.primary_for(pid, period) is None
-    folders.save_folder(fid, "Committee", primary_source="dblp")
+    folders.set_primary_source(fid, "dblp")
     assert source_settings.primary_for(pid, period) == "dblp"
-    assert folders.folders()[0].primary_source == "dblp"
+    assert folders.primary_source(fid) == "dblp"
+    # Shared: by the folders using the same settings (one within it), and their copies.
+    sub = folders.save_folder(None, "Session", parent_id=fid)
+    assert folders.primary_source(sub) == "dblp"
+    folders.use_own_settings(sub)
+    folders.set_primary_source(sub, "hal")
+    assert (folders.primary_source(fid), folders.primary_source(sub)) == ("dblp", "hal")
     # Not for someone without a profile there (nothing would count), nor a disabled source.
     other = make_person("John Roe")
     add_source(other, "dblp", "y", [pub("c", "Paper C", 2020, "ACL")])

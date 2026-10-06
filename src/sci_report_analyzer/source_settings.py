@@ -60,9 +60,12 @@ def set_default_primary(source: str | None) -> None:
     set_setting(PRIMARY_KEY, {"source": source})
 
 
-def folder_primary(folder: Folder | None) -> str | None:
-    """The primary source of a folder: its own, else the default (None: none)."""
-    source = folder.primary_source if folder is not None else None
+def folder_primary(s, folder: Folder | None) -> str | None:
+    """The primary source of a folder: its settings', else the default (None: none)."""
+    from .folders import used_settings
+
+    found = used_settings(s, folder.id) if folder is not None else None
+    source = found.primary_source if found is not None else None
     if source is None:
         return default_primary()
     return None if source == NO_PRIMARY else source
@@ -73,7 +76,7 @@ def primary_for(person_id: int, period_id: int | None = None) -> str | None:
     enabled and the person has a validated profile there (else nothing would count)."""
     with session_scope() as s:
         period = s.get(Period, period_id) if period_id else None
-        source = folder_primary(period.folder if period else None)
+        source = folder_primary(s, period.folder if period else None)
         if source is None or not enabled(source):
             return None
         linked = s.scalar(
