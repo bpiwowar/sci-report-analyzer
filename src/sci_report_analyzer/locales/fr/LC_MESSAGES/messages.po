@@ -1021,11 +1021,18 @@ msgstr "Copié (Markdown)"
 msgid "Copied (with the references)"
 msgstr "Copié (avec les références)"
 
+#, python-brace-format
+msgid "Copied ({filter})"
+msgstr "Copié ({filter})"
+
 msgid "Copy"
 msgstr "Copier"
 
 msgid "Copy a name:"
 msgstr "Copier un nom :"
+
+msgid "Copy filters"
+msgstr "Filtres de copie"
 
 msgid "Copy its settings to…"
 msgstr "Copier ses réglages vers…"
@@ -1048,6 +1055,9 @@ msgstr "Copier les réglages de « {folder} »"
 
 msgid "Copy those of"
 msgstr "Copier celles de"
+
+msgid "Copy through"
+msgstr "Copier via"
 
 msgid "Corrections for this paper"
 msgstr "Corrections pour cet article"
@@ -2204,6 +2214,9 @@ msgstr "Liste Markdown"
 msgid "Marked as the {track} track"
 msgstr "Marqué comme session {track}"
 
+msgid "Marmotte (CNRS)"
+msgstr "Marmotte (CNRS)"
+
 msgid "Match"
 msgstr "Appariement"
 
@@ -2501,6 +2514,9 @@ msgstr "Plus aucun conflit."
 
 msgid "No conflict: imported entries will simply be added."
 msgstr "Aucun conflit : les entrées importées seront simplement ajoutées."
+
+msgid "No copy filter enabled: see Settings → Copy filters"
+msgstr "Aucun filtre de copie activé : voir Paramètres → Filtres de copie"
 
 msgid "No document"
 msgstr "Aucun document"
@@ -3409,6 +3425,9 @@ msgstr "Réessayer"
 msgid "Reviewer (rapporteur)"
 msgstr "Rapporteur"
 
+msgid "Rich text for Marmotte's forms (basic formatting only): # headings numbered as banners, ## as bold lines, lists as paragraphs; comments (%% … %%), callouts, tasks, tags and the lines tagged #question or #to-check left out, tables too."
+msgstr "Texte enrichi pour les formulaires de Marmotte (mise en forme de base seulement) : titres # numérotés en bandeaux, ## en lignes en gras, listes en paragraphes ; commentaires (%% … %%), encadrés, tâches, étiquettes et lignes étiquetées #question ou #to-check retirés, tableaux aussi."
+
 msgid "Roles"
 msgstr "Rôles"
 
@@ -3671,6 +3690,12 @@ msgstr "Mots du titre en commun"
 #, python-brace-format
 msgid "Shared with {folders}: changed for them too"
 msgstr "Partagés avec {folders} : modifiés pour eux aussi"
+
+msgid "Shift+click on a copy button (the notes, the excerpts) copies through a filter: those enabled here (several: the one to use is asked)."
+msgstr "Maj+clic sur un bouton de copie (les notes, les extraits) copie via un filtre : ceux activés ici (plusieurs : celui à utiliser est demandé)."
+
+msgid "Shift+click: through a copy filter (e.g. rich text for a form; see Settings)"
+msgstr "Maj+clic : via un filtre de copie (par ex. texte enrichi pour un formulaire ; voir Paramètres)"
 
 msgid "Shift-click: add to the selection (or remove) · Alt-click: only this one"
 msgstr "Maj-clic : ajouter à la sélection (ou retirer) · Alt-clic : celui-ci seulement"

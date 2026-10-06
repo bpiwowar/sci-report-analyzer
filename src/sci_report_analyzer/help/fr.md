@@ -230,6 +230,14 @@ bouton ↗ de la barre d'outils, le curseur dessus) affiche les détails de son 
 nouvelle fenêtre. Copier remplace les citations, suivies des références, numérotées
 comme citées.
 
+**Filtres de copie** : Maj+clic sur un bouton de copie (les notes, les extraits) copie via un
+filtre, en texte enrichi collé mis en forme dans un formulaire : ceux activés dans Paramètres →
+Filtres de copie (plusieurs : celui à utiliser est demandé). **Marmotte** (CNRS) garde la mise en
+forme de base que permettent ses formulaires : titres `#` en bandeaux numérotés (« --- 1. Recherche --- »),
+`##` en lignes en gras, listes en paragraphes (« • … ») ; les commentaires (`%% … %%`, par ex.
+l'emplacement des citations), encadrés, tâches, étiquettes et lignes étiquetées #question ou
+#to-check sont retirés, les tableaux aussi.
+
 **PDF** : l'icône PDF à côté d'un titre ouvre le PDF stocké de l'article dans une nouvelle fenêtre (rouge ;
 ✎ une fois annoté). Une icône grise signifie qu'un lien en accès ouvert (ou un DOI) est connu : cliquez dessus pour
 télécharger le PDF (après confirmation, sauf si elle est désactivée) et l'ouvrir. La visionneuse (PDF.js,

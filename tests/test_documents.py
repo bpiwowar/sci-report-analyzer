@@ -11,9 +11,10 @@ from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
 from sqlalchemy import select
 
-from sci_report_analyzer import documents, folders, pdfs, pubview, reports
+from sci_report_analyzer import copy_filters, documents, folders, pdfs, pubview, reports
 from sci_report_analyzer.db.models import Publication, SectionText
 from sci_report_analyzer.db.session import session_scope
+from sci_report_analyzer.ui import copying
 from sci_report_analyzer.ui.mdedit import MarkdownEditor, inline_quote, quote
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
@@ -469,6 +470,23 @@ async def test_folder_notes_cite_and_copy(user: User, monkeypatch, fake_viewer):
     user.find(marker="folder-note-copy").click()
     assert len(copied) == 1 and copied[0].startswith("See [1].")
     assert TITLES["a"] in copied[0]
+    # Shift+click: through the copy filter enabled (none: says so), as rich text.
+    rich = []
+    monkeypatch.setattr(copying, "copy_rich", lambda html, plain: rich.append((html, plain)))
+    [button] = user.find(marker="folder-note-copy").elements
+    [listener] = [x for x in button._event_listeners.values() if x.type == "click"]
+
+    def shift_click() -> None:
+        with user.client:
+            button._handle_event({"listener_id": listener.id, "args": {"shiftKey": True}})
+
+    shift_click()
+    await user.should_see("No copy filter enabled")
+    copy_filters.set_enabled(["marmotte"])
+    shift_click()
+    assert len(rich) == 1 and rich[0][0].startswith("<p>See [1].</p>")
+    assert rich[0][1].startswith("See [1].")
+    assert len(copied) == 1
     # The documents page has them too.
     copied.clear()
     inserted.clear()

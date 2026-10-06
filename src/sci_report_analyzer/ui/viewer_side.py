@@ -15,6 +15,7 @@ from ..i18n import N_, _
 from ..sources.base import SourceError
 from . import section_text
 from .categories_editor import categories_dialog
+from .copying import copy_button
 from .dialogs import actions, close, confirm, ok_handler, transient_dialog
 from .dnd import draggable, drop_zone
 from .mdedit import MarkdownEditor, inline_quote, quote
@@ -425,11 +426,6 @@ class Side:
         ``{mark}-copy``."""
         context = context or self.note_context
 
-        def copy() -> None:
-            if (e := editor()) is not None:
-                ui.clipboard.write(reports.with_references(e.value, context()))
-                ui.notify(_("Copied (with the references)"))
-
         async def see() -> None:
             if (e := editor()) is not None:
                 key = await e.cited_at_cursor()
@@ -450,9 +446,12 @@ class Side:
                 e.open_cited = self.open_cited
 
         ui.timer(0, made, once=True)
-        ui.button(icon="content_copy", on_click=copy).props("flat dense round size=sm").tooltip(
-            _("Copy the note, its citations numbered and the papers cited listed")
-        ).mark(f"{mark}-copy")
+        copy_button(
+            lambda: reports.with_references(e.value, context()) if (e := editor()) else None,
+            _("Copy the note, its citations numbered and the papers cited listed"),
+            f"{mark}-copy",
+            _("Copied (with the references)"),
+        )
 
     def open_cited(self, key: str) -> None:
         """The paper of a citation key, in a new window: its details on the person's page."""
@@ -1052,14 +1051,11 @@ class _ExcerptsSection:
             ui.label(_("Categories of {folder}").format(folder=folder_name)).classes(
                 "font-medium grow"
             )
-            ui.button(
-                icon="content_copy",
-                on_click=lambda: (
-                    ui.clipboard.write(categories.markdown(folder_id, self.side.period_id)),
-                    ui.notify(_("Copied (Markdown)")),
-                ),
-            ).props("flat dense round size=sm").tooltip(_("Copy the excerpts, as Markdown")).mark(
-                "excerpts-copy"
+            copy_button(
+                lambda: categories.markdown(folder_id, self.side.period_id),
+                _("Copy the excerpts, as Markdown"),
+                "excerpts-copy",
+                _("Copied (Markdown)"),
             )
             ui.button(icon="badge", on_click=self.name_documents).props(
                 "flat dense round size=sm"

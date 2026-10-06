@@ -227,6 +227,13 @@ Alt-clicked and typed), the citations renumbered. ⌘/Ctrl-click on a citation (
 toolbar's ↗ button, the cursor on it) shows its paper's details in a new window. Copy
 substitutes the citations, followed by the references, numbered as cited.
 
+**Copy filters**: Shift+click on a copy button (the notes, the excerpts) copies through a
+filter, as rich text pasted formatted into a form: those enabled in Settings → Copy filters
+(several: the one to use is asked). **Marmotte** (CNRS) keeps the basic formatting its
+forms allow: `#` headings as numbered banners (“--- 1. Research ---”), `##` as bold lines,
+lists as paragraphs (“• …”); the comments (`%% … %%`, e.g. the places of quotes), callouts,
+tasks, tags and the lines tagged #question or #to-check are left out, tables too.
+
 **PDFs**: the PDF icon next to a title opens the paper's stored PDF in a new window (red;
 ✎ once annotated). A grey icon means an open-access link (or a DOI) is known: click it to
 download the PDF (after confirmation, unless turned off) and open it. The viewer (PDF.js,

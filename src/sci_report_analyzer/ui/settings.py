@@ -63,6 +63,7 @@ NAV = (
         (
             ("contribution", N_("Contribution roles")),
             ("reports", N_("Citation templates")),
+            ("copy", N_("Copy filters")),
         ),
     ),
     (N_("Data"), (("data", N_("Data & cache")), ("io", N_("Import / export")))),
@@ -78,6 +79,7 @@ PANELS = {
     "tags": lambda: tags_tab(),
     "contribution": lambda: contribution_tab(),
     "reports": lambda: report_templates_tab(),
+    "copy": lambda: copy_filters_tab(),
     "data": lambda: data_tab(),
     "io": lambda: io_tab(),
 }
@@ -299,6 +301,12 @@ def report_templates_tab() -> None:
     from .citations import templates_section
 
     templates_section()
+
+
+def copy_filters_tab() -> None:
+    from .copying import filters_tab
+
+    filters_tab()
 
 
 # ---- matching ------------------------------------------------------------------------------
