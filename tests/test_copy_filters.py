@@ -56,3 +56,8 @@ def test_enabled_filters():
     assert copy_filters.enabled() == []
     copy_filters.set_enabled(["marmotte", "unknown"])
     assert copy_filters.enabled() == ["marmotte"]
+
+
+def test_strip_comments():
+    text = "A %% one %% B %% over\nlines %% C\n```\nkept %% in code %%\n```\nD %% two %%"
+    assert copy_filters.strip_comments(text) == "A  B  C\n```\nkept %% in code %%\n```\nD "

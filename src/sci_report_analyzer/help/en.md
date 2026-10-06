@@ -253,7 +253,8 @@ the selection (else turns the highlighting tool on or off), **T** text, **D** dr
 image (on or off), **A** area, **B** bookmark, **F** find the paper, **E** add to a
 category, **Q** quote into the note last used (a Markdown quote, with its page), **Shift+Q**
 quote there at the cursor, within the sentence (`"…" %% [Application, p. 4](link) %%`: the
-place in an Obsidian comment, linking back to the PDF's page; the note toolbars' ❝ button); PDF.js's own: ⌘F / Ctrl+F search, + / − zoom, N / P (or J / K) next and previous
+place in an Obsidian comment, linking back to the PDF's page, not shown in the preview; the
+note toolbars' ❝ button); PDF.js's own: ⌘F / Ctrl+F search, + / − zoom, N / P (or J / K) next and previous
 page, R rotate, Home / End, Delete removes the annotation selected. The panel's ⬇ button
 downloads the PDFs of all the papers shown; "Store a PDF" (details) uploads one. Settings →
 Data & cache shows the space used and cleans up the files of papers no longer in the database. A

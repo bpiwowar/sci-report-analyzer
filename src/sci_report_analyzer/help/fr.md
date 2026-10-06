@@ -255,7 +255,7 @@ la sélection (sinon active ou désactive l'outil de surlignage), **T** texte, *
 image (activer ou désactiver), **A** zone, **B** signet, **F** trouver l'article, **E** ajouter à une
 catégorie, **Q** citer dans la dernière note utilisée (une citation Markdown, avec sa page), **Maj+Q**
 citer au curseur, dans la phrase (`"…" %% [Application, p. 4](lien) %%` : l'emplacement dans un
-commentaire Obsidian, renvoyant à la page du PDF ; le bouton ❝ des barres d'outils des notes) ; ceux de PDF.js : ⌘F / Ctrl+F recherche, + / − zoom, N / P (ou J / K) page suivante et
+commentaire Obsidian, renvoyant à la page du PDF, masqué dans l'aperçu ; le bouton ❝ des barres d'outils des notes) ; ceux de PDF.js : ⌘F / Ctrl+F recherche, + / − zoom, N / P (ou J / K) page suivante et
 précédente, R rotation, Home / End, Delete supprime l'annotation sélectionnée. Le bouton ⬇ du panneau
 télécharge les PDF de tous les articles affichés ; « Stocker un PDF » (détails) en téléverse un. Paramètres →
 Données et cache affiche l'espace utilisé et supprime les fichiers des articles qui ne sont plus dans la base de données. Un

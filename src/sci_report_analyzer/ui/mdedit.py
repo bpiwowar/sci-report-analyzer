@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from nicegui import ui
 
+from ..copy_filters import strip_comments
 from ..i18n import N_, _
 from .theme import NOTE_EXTRAS
 
@@ -273,7 +274,8 @@ class MarkdownEditor:
             self._on_change(text or "")
 
     def refresh_preview(self) -> None:
-        self.preview.content = self._render(self.value)
+        """The rendered text, without its Obsidian comments (``%% … %%``)."""
+        self.preview.content = strip_comments(self._render(self.value))
 
     def _layout(self) -> None:
         mode = self.mode.value or "edit"

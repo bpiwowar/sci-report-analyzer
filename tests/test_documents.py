@@ -200,8 +200,10 @@ async def test_document_page(user: User, monkeypatch, fake_viewer):
     options = list(user.find(marker="doc-note-cite-paper").elements.pop().options)
     assert options[:3] == ["anon2023sparse", "anon2022neural", "anon2021deep"]
     # The preview numbers the citations.
-    user.find(marker="doc-note").elements.pop().value = "See [@anon2022neural]."
+    user.find(marker="doc-note").elements.pop().value = "See [@anon2022neural]. %% [CV, p. 2] %%"
     await user.should_see("See [1].")
+    [preview] = [m for m in user.find(kind=ui.markdown).elements if "See [1]." in m.content]
+    assert "CV, p. 2" not in preview.content  # (the comments: not in the preview)
     # The paper cited at the cursor (or ⌘/Ctrl-clicked): its details, in a new window.
     opened = []
     monkeypatch.setattr(ui.navigate, "to", lambda url, new_tab=False: opened.append((url, new_tab)))
