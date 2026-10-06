@@ -225,7 +225,9 @@ person's other papers too), and "Cite them" (those not cited yet); the papers of
 numbered tag are reordered there too (dragged, their ↑ / ↓ arrows, or their number
 Alt-clicked and typed), the citations renumbered. ⌘/Ctrl-click on a citation (or the
 toolbar's ↗ button, the cursor on it) shows its paper's details in a new window. Copy
-substitutes the citations, followed by the references, numbered as cited.
+substitutes the citations, followed by the references, numbered as cited (or where
+`[]{.references}` is, alone on its line: the toolbar's 📚 button; `.notes`, `.tags`: with
+their notes, their tags).
 
 **Copy filters**: Shift+click on a copy button (the notes, the excerpts) copies through a
 filter, as rich text pasted formatted into a form: those enabled in Settings → Copy filters

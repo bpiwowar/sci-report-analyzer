@@ -228,7 +228,8 @@ recherche (Entrée cite le premier ; les autres articles de la personne aussi), 
 leurs flèches ↑ / ↓, ou leur numéro Alt-cliqué et saisi), les citations renumérotées. Un ⌘/Ctrl-clic sur une citation (ou le
 bouton ↗ de la barre d'outils, le curseur dessus) affiche les détails de son article dans une
 nouvelle fenêtre. Copier remplace les citations, suivies des références, numérotées
-comme citées.
+comme citées (ou là où se trouve `[]{.references}`, seul sur sa ligne : le bouton 📚 de la barre
+d'outils ; `.notes`, `.tags` : avec leurs notes, leurs étiquettes).
 
 **Filtres de copie** : Maj+clic sur un bouton de copie (les notes, les extraits) copie via un
 filtre, en texte enrichi collé mis en forme dans un formulaire : ceux activés dans Paramètres →

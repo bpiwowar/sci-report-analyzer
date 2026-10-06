@@ -13,6 +13,8 @@ syntax, substituted when shown or copied.
   ``{#.index}``: ``#2``, ``{**#.index** (.short-venue .year): .notes}``;
 - ``[@key]{.starred}``: a named template (Settings → Citation templates, or the folder's),
   also usable within another one (``{.starred: .notes}``);
+- ``[]{.references}`` (alone on its line): the papers cited, listed there rather than at
+  the end when copied (``.notes``, ``.tags``: with their notes, their tags);
 - ``[]{.publications}``, ``[]{.excerpts}`` (alone on their line): a block (see
   ``Context.blocks``), e.g. the summary of the period's publications, its excerpts by
   category (their headings below that of the block, each followed by the section's text if
@@ -289,6 +291,7 @@ class Rendered:
     cited: Counter = field(default_factory=Counter)  # key -> times
     unknown: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)  # (e.g. a template cycle)
+    references: bool = False  # (placed: []{.references})
 
 
 # ---- Attributes: classes ({.notes .tags}) or a template ({.short-venue (.year)}) ---------
@@ -440,19 +443,27 @@ def render(text: str, ctx: Context) -> Rendered:
 
     def blocks(src: str, before: str) -> str:
         def block(m: re.Match) -> str:
+            options = {o.lstrip(".") for o in m.group("options").split()}
+            if m.group("name") == "references":  # (once all cited: see below)
+                out.references = True
+                return f"\x01{'notes' in options:d}{'tags' in options:d}\x01"
             make = ctx.blocks.get(m.group("name"))
             if make is None:
                 return m.group(0)
             head = _HEADING.findall(before + src[: m.start()])
-            options = {o.lstrip(".") for o in m.group("options").split()}
             made.append(make(min(len(head[-1]) + 1, 6) if head else 2, options).rstrip("\n"))
             return f"\0{len(made) - 1}\0"
 
-        return _BLOCK.sub(block, src) if ctx.blocks else src
+        return _BLOCK.sub(block, src)
 
     chunks = _CODE.split(text)
     pieces = [c if i % 2 else prose(blocks(c, "".join(chunks[:i]))) for i, c in enumerate(chunks)]
     out.text = re.sub(r"\0(\d+)\0", lambda m: made[int(m.group(1))], "".join(pieces))
+    out.text = re.sub(
+        "\x01([01])([01])\x01",
+        lambda m: bibliography(ctx, notes=m.group(1) == "1", tags=m.group(2) == "1"),
+        out.text,
+    )
     out.unknown = list(unknown)
     out.errors = list(dict.fromkeys(out.errors))
     return out
@@ -470,9 +481,11 @@ def note_context(stats: list[PubStat], keys: dict[int, str]) -> Context:
 
 
 def with_references(text: str, ctx: Context) -> str:
-    """The text, its citations substituted, then the papers cited (by number)."""
-    out = render(text, ctx).text.rstrip()
-    if ctx.by_key:
+    """The text, its citations substituted, then the papers cited (by number; where
+    ``[]{.references}`` is, if anywhere)."""
+    r = render(text, ctx)
+    out = r.text.rstrip()
+    if ctx.by_key and not r.references:
         out += "\n\n## " + _("References") + "\n\n" + bibliography(ctx)
     return out + "\n"
 

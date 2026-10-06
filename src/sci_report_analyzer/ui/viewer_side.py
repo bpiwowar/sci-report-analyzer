@@ -404,6 +404,11 @@ class Side:
                 ),
             ),
             ("excerpts", "format_list_bulleted", _("Insert the excerpts (kept up to date)")),
+            (
+                "references",
+                "library_books",
+                _("Put the papers cited here (else at the end, when copied)"),
+            ),
         ):
             ui.button(
                 icon=icon,

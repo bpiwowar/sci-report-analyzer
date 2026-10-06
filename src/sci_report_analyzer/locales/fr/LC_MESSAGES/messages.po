@@ -3155,6 +3155,9 @@ msgstr ""
 msgid "Put the cursor on a citation ([@key]) first"
 msgstr "Placez d'abord le curseur sur une citation ([@key])"
 
+msgid "Put the papers cited here (else at the end, when copied)"
+msgstr "Placer ici les articles cités (sinon à la fin, à la copie)"
+
 msgid ""
 "Put the person in a folder, or add a period (Periods tab), to add "
 "documents."

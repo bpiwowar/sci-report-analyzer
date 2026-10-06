@@ -164,6 +164,28 @@ def test_note_with_references():
     )
 
 
+def test_references_placed():
+    """[]{.references}: the papers cited listed there (with all of them, those cited after
+    too), rather than at the end; not in code."""
+    pid, _ = _setup()
+    stats = asyncio.run(pubview.load_stats(pid))
+    keys = reports.citation_keys(stats)
+    text = "# Report\n\nSee [@smith2022neural].\n\n[]{.references}\n\n# After\n\n[@doe2021deep]\n"
+    out = reports.with_references(text, reports.note_context(stats, keys))
+    lines = out.splitlines()
+    assert lines[4].startswith("- [1] **The neural retrieval**")
+    assert lines[5].startswith("- [2] **Deep ranking for search**")
+    assert lines[-1] == "[2]" and "References" not in out
+    # In the preview too; with their notes, their tags (options).
+    r = reports.render("[@doe2021deep]\n\n[]{.references .tags}", reports.note_context(stats, keys))
+    assert r.references
+    assert r.text == "[1]\n\n- [1] **Deep ranking for search** · *SIGIR* · 2021 · CORE A"
+    # In code: as it is (the list at the end).
+    code = "[@doe2021deep]\n\n```\n[]{.references}\n```\n"
+    out = reports.with_references(code, reports.note_context(stats, keys))
+    assert "```\n[]{.references}\n```" in out and "## References" in out
+
+
 def test_named_templates_within_others_and_cycles():
     pid, _ = _setup()
     stats = asyncio.run(pubview.load_stats(pid))
