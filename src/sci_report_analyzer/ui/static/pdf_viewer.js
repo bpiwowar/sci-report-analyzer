@@ -589,7 +589,8 @@ document.addEventListener('webviewerloaded', (e) => {
   w.PDFViewerApplicationOptions.set('enableComment', true);
   // Its history (back and forward after following a link): not made for an embedded viewer.
   w.PDFViewerApplication.isViewerEmbedded = false;
-  w.PDFViewerApplicationOptions.set('externalLinkTarget', 4);  // (TOP, as when embedded)
+  // An external link (a URL in the PDF): in a new window, the PDF left where it was read.
+  w.PDFViewerApplicationOptions.set('externalLinkTarget', 2);  // (BLANK)
   const h = w.history, push = h.pushState.bind(h), replace = h.replaceState.bind(h);
   w.history.pushState = (s, ...rest) => {
     push(s, ...rest);
