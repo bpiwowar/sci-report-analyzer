@@ -24,24 +24,6 @@ ui.add_css(
 # The citation at the cursor: its paper highlighted in the pane (and scrolled to).
 _CURSOR_JS = r"""
 (() => {
-  const KEY = /-?@(\w+(?:[:.#$%&+?<>~\/-]\w+)*)/g;
-  // The key under the cursor: in a bracketed citation ([@a; @b], the nearest one), or @key.
-  const keyAt = (line, col) => {
-    for (const b of line.matchAll(/\[[^\[\]]*\]/g)) {
-      if (col < b.index || col > b.index + b[0].length) continue;
-      let best = null, dist = Infinity;
-      for (const m of b[0].matchAll(KEY)) {
-        const s = b.index + m.index, e = s + m[0].length;
-        const d = col < s ? s - col : col > e ? col - e : 0;
-        if (d < dist) { best = m[1]; dist = d; }
-      }
-      if (best) return best;
-    }
-    for (const m of line.matchAll(KEY)) {
-      if (col >= m.index && col <= m.index + m[0].length) return m[1];
-    }
-    return null;
-  };
   const state = {key: null};
   const mark = (scroll) => {
     const pane = getHtmlElement({PANE});
@@ -61,8 +43,7 @@ _CURSOR_JS = r"""
     if (!v) return;
     clearInterval(t);
     const update = () => {
-      const pos = v.state.selection.main.head, line = v.state.doc.lineAt(pos);
-      const key = keyAt(line.text, pos - line.from);
+      const key = vrCite.at(v, v.state.selection.main.head);
       if (key === state.key) return;
       state.key = key;
       mark(true);

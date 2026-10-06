@@ -53,6 +53,44 @@ def quote(text: str, where: str = "") -> str:
     return "> " + " ".join(text.split()) + (f" ({where})" if where else "")
 
 
+def inline_quote(text: str, where: str = "") -> str:
+    """``text`` quoted within a sentence, followed by ``where`` it is from (e.g. a link to its
+    page) in an Obsidian comment: ``"text" %% [Application, p. 4](/doc/1?page=4) %%``."""
+    return f'"{" ".join(text.split())}"' + (f" %% {where} %%" if where else "")
+
+
+# The citation key at a place of a line (window.vrCite.keyAt: also the papers pane's).
+ui.add_head_html(
+    r"""<script>
+window.vrCite = {
+  KEY: /-?@(\w+(?:[:.#$%&+?<>~\/-]\w+)*)/g,
+  // The key at ``col``: in a bracketed citation ([@a; @b], the nearest one), or @key.
+  keyAt(line, col) {
+    for (const b of line.matchAll(/\[[^\[\]]*\]/g)) {
+      if (col < b.index || col > b.index + b[0].length) continue;
+      let best = null, dist = Infinity;
+      for (const m of b[0].matchAll(this.KEY)) {
+        const s = b.index + m.index, e = s + m[0].length;
+        const d = col < s ? s - col : col > e ? col - e : 0;
+        if (d < dist) { best = m[1]; dist = d; }
+      }
+      if (best) return best;
+    }
+    for (const m of line.matchAll(this.KEY)) {
+      if (col >= m.index && col <= m.index + m[0].length) return m[1];
+    }
+    return null;
+  },
+  // That at a position of an editor's document.
+  at(v, pos) {
+    const line = v.state.doc.lineAt(pos);
+    return this.keyAt(line.text, pos - line.from);
+  },
+};
+</script>""",
+    shared=True,
+)
+
 _SHARE = "; flex:1 1 0; min-height:6rem"  # (a stacked editor and preview, sharing the height)
 
 
@@ -151,8 +189,11 @@ class MarkdownEditor:
                     ) as self.side:
                         side()
         self.on_mode: list[Callable[[str], None]] = []
+        # (set by the note editors citing papers: shows the paper of a key, e.g. ⌘-clicked)
+        self.open_cited: Callable[[str], None] | None = None
         self._layout()
         self._sync_scroll()
+        self._cite_clicks()
 
     def _sync_scroll(self) -> None:
         """The preview and the editor follow each other's scrolling (at the same proportion);
@@ -170,6 +211,37 @@ class MarkdownEditor:
             " e.addEventListener('scroll', () => follow(e, p));"
             " p.addEventListener('scroll', () => follow(p, e));"
             " }, 100); })()"
+        )
+
+    def _cite_clicks(self) -> None:
+        """⌘/Ctrl-click on a citation (``[@key]``): its paper shown (see ``open_cited``),
+        rather than another cursor."""
+        ui.on(
+            "vr-cite-open",
+            lambda e: (
+                self.open_cited(e.args["key"])
+                if self.open_cited and (e.args or {}).get("id") == self.editor.id
+                else None
+            ),
+        )
+        self.editor.client.run_javascript(
+            "(() => { let n = 0; const t = setInterval(() => {"
+            f" const v = getElement({self.editor.id})?.editor;"
+            " if (++n > 50) clearInterval(t); if (!v) return; clearInterval(t);"
+            " v.dom.addEventListener('mousedown', (ev) => {"
+            " if (!(ev.metaKey || ev.ctrlKey) || ev.button !== 0) return;"
+            " const pos = v.posAtCoords({x: ev.clientX, y: ev.clientY});"
+            " const key = pos == null ? null : vrCite.at(v, pos); if (!key) return;"
+            " ev.preventDefault(); ev.stopPropagation();"
+            f" emitEvent('vr-cite-open', {{id: {self.editor.id}, key}});"
+            " }, true); }, 100); })()"
+        )
+
+    async def cited_at_cursor(self) -> str | None:
+        """The key of the citation at the cursor, if any."""
+        return await self.editor.client.run_javascript(
+            f"(() => {{ const v = getElement({self.editor.id})?.editor;"
+            " return v ? vrCite.at(v, v.state.selection.main.head) : null; })()"
         )
 
     @property
@@ -213,6 +285,21 @@ class MarkdownEditor:
         if self.mode.value == "preview":
             self.mode.value = "split"
         self._js(f"v.dispatch(v.state.replaceSelection({json.dumps(text)}))")
+
+    def insert_inline(self, text: str) -> None:
+        """Insert ``text`` at the cursor (replacing the selection), apart from the words around
+        it (a space before, unless after an opening bracket; after, unless punctuation follows)."""
+        if self.mode.value == "preview":
+            self.mode.value = "split"
+        self._js(
+            "const d = v.state.doc, s = v.state.selection.main; "
+            "const b = d.sliceString(Math.max(0, s.from - 1), s.from), "
+            "a = d.sliceString(s.to, s.to + 1); "
+            f"const t = (b && !/[\\s(\\[]/.test(b) ? ' ' : '') + {json.dumps(text)} "
+            "+ (a && !/[\\s.,;:!?)\\]]/.test(a) ? ' ' : ''); "
+            "v.dispatch({changes: {from: s.from, to: s.to, insert: t}, "
+            "selection: {anchor: s.from + t.length}, scrollIntoView: true})"
+        )
 
     def insert_block(self, text: str) -> None:
         """Insert ``text`` as a paragraph of its own at the cursor (replacing the selection;

@@ -4,6 +4,7 @@ window.vrKeys = {
   // A key: the event of the action on the selection (that of a header button).
   selection: {
     q: 'vr-pdf-quote',  // (into the note last used)
+    Q: 'vr-pdf-quote-inline',  // (Shift+Q: there, at the cursor, linked back)
     e: 'vr-pdf-excerpt',  // (only with excerpts: the button there)
     b: 'vr-pdf-bookmark',
     f: 'vr-pdf-find',  // (without a selection: says so)

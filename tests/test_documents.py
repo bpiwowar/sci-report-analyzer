@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sci_report_analyzer import documents, folders, pdfs, pubview, reports
 from sci_report_analyzer.db.models import Publication, SectionText
 from sci_report_analyzer.db.session import session_scope
-from sci_report_analyzer.ui.mdedit import MarkdownEditor, quote
+from sci_report_analyzer.ui.mdedit import MarkdownEditor, inline_quote, quote
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
 
@@ -162,7 +162,7 @@ async def test_documents_tab_without_period(user: User):
 
 
 async def test_document_page(user: User, monkeypatch, fake_viewer):
-    _, period, ids = _person()
+    pid, period, ids = _person()
     doc = documents.add(period, "Application.pdf", PDF)
     await user.open(f"/doc/{doc}")
     await user.should_see(marker="pdf-frame")
@@ -201,6 +201,26 @@ async def test_document_page(user: User, monkeypatch, fake_viewer):
     # The preview numbers the citations.
     user.find(marker="doc-note").elements.pop().value = "See [@anon2022neural]."
     await user.should_see("See [1].")
+    # The paper cited at the cursor (or ⌘/Ctrl-clicked): its details, in a new window.
+    opened = []
+    monkeypatch.setattr(ui.navigate, "to", lambda url, new_tab=False: opened.append((url, new_tab)))
+    user.javascript_rules[re.compile(r".*vrCite\.at\(v, v\.state", re.S)] = lambda _: (
+        "anon2022neural"
+    )
+    user.find(marker="doc-note-see-cited").click()
+    for _i in range(50):
+        if opened:
+            break
+        await asyncio.sleep(0.02)
+    assert opened == [(f"/person/{pid}/{period}?pub={ids['b']}", True)]
+    layout = user.client.layout
+    clicked = [i for i, ls in layout._event_listeners.items() if ls.type == "vrCiteOpen"]
+    [note] = user.find(marker="doc-note").elements
+    for editor, key in ((-1, "anon2021deep"), (note.id, "anon2023sparse"), (note.id, "nokey")):
+        for listener in clicked:
+            layout._handle_event({"listener_id": listener, "args": {"id": editor, "key": key}})
+    assert opened[1:] == [(f"/person/{pid}/{period}?pub={ids['c']}", True)]  # (its editor's)
+    await user.should_see("No paper cited as @nokey")
     # Shift-click on a citation in the PDF: cited in the notes last used, at the cursor.
     inserted = []
     monkeypatch.setattr(MarkdownEditor, "insert", lambda self, text: inserted.append(text))
@@ -273,6 +293,9 @@ async def test_paper_pdf_bookmarks(user: User, fake_viewer):
 async def test_quote_into_the_notes(user: User, monkeypatch, fake_viewer):
     assert quote("Ranking\n models are  deep", "p. 2") == "> Ranking models are deep (p. 2)"
     assert quote("Selected on the page") == "> Selected on the page"
+    assert inline_quote("Ranking\n models", "[CV, p. 2](/doc/1?page=2)") == (
+        '"Ranking models" %% [CV, p. 2](/doc/1?page=2) %%'
+    )
     _, period, ids = _person()
     doc = documents.add(period, "Application.pdf", PDF)
     selection: dict = {"text": "Our ranking model\nbeats sparse ones", "p": 1}
@@ -289,6 +312,18 @@ async def test_quote_into_the_notes(user: User, monkeypatch, fake_viewer):
         await asyncio.sleep(0.02)
     assert inserted == [
         f"> Our ranking model beats sparse ones ([Application, p. 1](/doc/{doc}?page=1))"
+    ]
+    # Inline, at the cursor: in quotation marks, linked back in an Obsidian comment.
+    monkeypatch.setattr(MarkdownEditor, "insert_inline", lambda self, text: inserted.append(text))
+    inserted.clear()
+    assert len(user.find(marker="note-quote-inline").elements) == 2
+    user.find(marker="note-quote-inline").click()
+    for _i in range(50):
+        if inserted:
+            break
+        await asyncio.sleep(0.02)
+    assert inserted == [
+        f'"Our ranking model beats sparse ones" %% [Application, p. 1](/doc/{doc}?page=1) %%'
     ]
     # Nothing selected: says so.
     selection = {}

@@ -17,7 +17,7 @@ from . import section_text
 from .categories_editor import categories_dialog
 from .dialogs import actions, close, confirm, ok_handler, transient_dialog
 from .dnd import draggable, drop_zone
-from .mdedit import MarkdownEditor, quote
+from .mdedit import MarkdownEditor, inline_quote, quote
 from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
 from .pub_details import show_details
@@ -430,12 +430,38 @@ class Side:
                 ui.clipboard.write(reports.with_references(e.value, context()))
                 ui.notify(_("Copied (with the references)"))
 
+        async def see() -> None:
+            if (e := editor()) is not None:
+                key = await e.cited_at_cursor()
+                if key:
+                    self.open_cited(key)
+                else:
+                    ui.notify(_("Put the cursor on a citation ([@key]) first"), type="warning")
+
         ui.button(icon="format_quote", on_click=lambda: self.cite_dialog(editor, mark)).props(
             "flat dense round size=sm"
         ).tooltip(_("Cite a paper ([@key], numbered when copied)")).mark(f"{mark}-cite")
+        ui.button(icon="open_in_new", on_click=see).props("flat dense round size=sm").tooltip(
+            _("See the paper cited at the cursor, in a new window (or ⌘/Ctrl-click its citation)")
+        ).mark(f"{mark}-see-cited")
+
+        def made() -> None:  # (the note's editor, made after its toolbar)
+            if (e := editor()) is not None:
+                e.open_cited = self.open_cited
+
+        ui.timer(0, made, once=True)
         ui.button(icon="content_copy", on_click=copy).props("flat dense round size=sm").tooltip(
             _("Copy the note, its citations numbered and the papers cited listed")
         ).mark(f"{mark}-copy")
+
+    def open_cited(self, key: str) -> None:
+        """The paper of a citation key, in a new window: its details on the person's page."""
+        pub = next((i for i, k in reports.citation_keys(self.stats).items() if k == key), None)
+        if pub is None:
+            ui.notify(_("No paper cited as @{key}").format(key=key), type="warning")
+            return
+        period = f"/{self.period_id}" if self.period_id else ""
+        ui.navigate.to(f"/person/{self.person_id}{period}?pub={pub}", new_tab=True)
 
     def cite_dialog(self, editor: Callable[[], MarkdownEditor | None], mark: str) -> None:
         """Pick one of the person's papers (those of the PDF first): cited at the cursor."""
@@ -521,14 +547,22 @@ class Side:
             if (e := editor()) is not None:
                 self.notes[:] = [e, *(x for x in self.notes if x is not e)]
 
-        async def click() -> None:
+        async def click(inline: bool = False) -> None:
             used()
             if (e := editor()) is not None:
-                await self.quote(e)
+                await self.quote(e, inline=inline)
 
         ui.button(icon="post_add", on_click=click).props("flat dense round size=sm").tooltip(
             _("Quote the text selected in the PDF (or the highlight clicked), with its page (Q)")
         ).mark("note-quote")
+        ui.button(icon="format_quote", on_click=lambda: click(inline=True)).props(
+            "flat dense round size=sm"
+        ).tooltip(
+            _(
+                "Quote the text selected in the PDF at the cursor, in quotation marks, with a "
+                "link back to its page in a comment (Shift+Q)"
+            )
+        ).mark("note-quote-inline")
 
         def made() -> None:  # (the note's editor: listed, last; first once used)
             if (e := editor()) is not None:
@@ -537,9 +571,10 @@ class Side:
 
         ui.timer(0, made, once=True)
 
-    async def quote(self, editor: MarkdownEditor | None = None) -> None:
+    async def quote(self, editor: MarkdownEditor | None = None, *, inline: bool = False) -> None:
         """Quote the text selected (in the PDF; else on the page) into ``editor`` (else the
-        note last used), as a Markdown quote with its page."""
+        note last used), as a Markdown quote with its page; ``inline``: at the cursor, in
+        quotation marks, with a link back to its page in an Obsidian comment."""
         if editor is None:  # (Q: the notes' tab shown)
             notes = [e for e in self.notes if not e.editor.is_deleted]
             if not notes:
@@ -555,11 +590,15 @@ class Side:
             return
         page = sel.get("p")
         where = _("p. {page}").format(page=page) if page else ""
-        if editor is self.folder_editor:  # (the notes of all: names its source, linked)
+        text = pdftext.clean_pdf_text(sel["text"], one_paragraph=True)
+        if inline or editor is self.folder_editor:  # (names its source, linked back)
             name, url = self.source_link(page)
             name = name.replace("[", "(").replace("]", ")")
             where = f"[{name}, {where}]({url})" if where else f"[{name}]({url})"
-        editor.insert_block(quote(pdftext.clean_pdf_text(sel["text"], one_paragraph=True), where))
+        if inline:
+            editor.insert_inline(inline_quote(text, where))
+        else:
+            editor.insert_block(quote(text, where))
 
     async def tag_selection(self) -> None:
         """Tag the papers of the list selected in the PDF (e.g. an area over numbered

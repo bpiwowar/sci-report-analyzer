@@ -223,8 +223,9 @@ until cited, orange: not of the period's years; a click cites it, the ⋮ menu w
 template), the one at the cursor highlighted, a search (Enter cites the first match; the
 person's other papers too), and "Cite them" (those not cited yet); the papers of the
 numbered tag are reordered there too (dragged, their ↑ / ↓ arrows, or their number
-Alt-clicked and typed), the citations renumbered. Copy substitutes the
-citations, followed by the references, numbered as cited.
+Alt-clicked and typed), the citations renumbered. ⌘/Ctrl-click on a citation (or the
+toolbar's ↗ button, the cursor on it) shows its paper's details in a new window. Copy
+substitutes the citations, followed by the references, numbered as cited.
 
 **PDFs**: the PDF icon next to a title opens the paper's stored PDF in a new window (red;
 ✎ once annotated). A grey icon means an open-access link (or a DOI) is known: click it to
@@ -241,7 +242,9 @@ draw a rectangle, or Alt+drag; its text is the selection, and the rectangle its 
 (Escape, or a click elsewhere, drops it). Keys (single, but when typing): **H** highlights
 the selection (else turns the highlighting tool on or off), **T** text, **D** drawing, **I**
 image (on or off), **A** area, **B** bookmark, **F** find the paper, **E** add to a
-category; PDF.js's own: ⌘F / Ctrl+F search, + / − zoom, N / P (or J / K) next and previous
+category, **Q** quote into the note last used (a Markdown quote, with its page), **Shift+Q**
+quote there at the cursor, within the sentence (`"…" %% [Application, p. 4](link) %%`: the
+place in an Obsidian comment, linking back to the PDF's page; the note toolbars' ❝ button); PDF.js's own: ⌘F / Ctrl+F search, + / − zoom, N / P (or J / K) next and previous
 page, R rotate, Home / End, Delete removes the annotation selected. The panel's ⬇ button
 downloads the PDFs of all the papers shown; "Store a PDF" (details) uploads one. Settings →
 Data & cache shows the space used and cleans up the files of papers no longer in the database. A

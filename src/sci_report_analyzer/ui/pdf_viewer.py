@@ -308,6 +308,7 @@ def _selection_actions(side: Side, bookmarked: tuple[str, int], *, here: bool) -
         ui.on(event, act)
 
     ui.on("vr-pdf-quote", lambda: side.quote())
+    ui.on("vr-pdf-quote-inline", lambda: side.quote(inline=True))
     action(
         "vr-pdf-find",
         "manage_search",

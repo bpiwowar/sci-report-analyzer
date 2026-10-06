@@ -225,7 +225,9 @@ leurs numéros (rouge tant qu'ils ne sont pas cités, orange : hors des années 
 un clic le cite, le menu ⋮ avec un modèle), celui sous le curseur mis en évidence, une
 recherche (Entrée cite le premier ; les autres articles de la personne aussi), et « Les citer »
 (ceux pas encore cités) ; les articles de l'étiquette numérotée s'y réordonnent aussi (glissés,
-leurs flèches ↑ / ↓, ou leur numéro Alt-cliqué et saisi), les citations renumérotées. Copier remplace les citations, suivies des références, numérotées
+leurs flèches ↑ / ↓, ou leur numéro Alt-cliqué et saisi), les citations renumérotées. Un ⌘/Ctrl-clic sur une citation (ou le
+bouton ↗ de la barre d'outils, le curseur dessus) affiche les détails de son article dans une
+nouvelle fenêtre. Copier remplace les citations, suivies des références, numérotées
 comme citées.
 
 **PDF** : l'icône PDF à côté d'un titre ouvre le PDF stocké de l'article dans une nouvelle fenêtre (rouge ;
@@ -242,7 +244,9 @@ tracez un rectangle, ou Alt+glisser ; son texte constitue la sélection, et le 
 (Escape, ou un clic ailleurs, l'abandonne). Raccourcis (une seule touche, sauf pendant la saisie) : **H** surligne
 la sélection (sinon active ou désactive l'outil de surlignage), **T** texte, **D** dessin, **I**
 image (activer ou désactiver), **A** zone, **B** signet, **F** trouver l'article, **E** ajouter à une
-catégorie ; ceux de PDF.js : ⌘F / Ctrl+F recherche, + / − zoom, N / P (ou J / K) page suivante et
+catégorie, **Q** citer dans la dernière note utilisée (une citation Markdown, avec sa page), **Maj+Q**
+citer au curseur, dans la phrase (`"…" %% [Application, p. 4](lien) %%` : l'emplacement dans un
+commentaire Obsidian, renvoyant à la page du PDF ; le bouton ❝ des barres d'outils des notes) ; ceux de PDF.js : ⌘F / Ctrl+F recherche, + / − zoom, N / P (ou J / K) page suivante et
 précédente, R rotation, Home / End, Delete supprime l'annotation sélectionnée. Le bouton ⬇ du panneau
 télécharge les PDF de tous les articles affichés ; « Stocker un PDF » (détails) en téléverse un. Paramètres →
 Données et cache affiche l'espace utilisé et supprime les fichiers des articles qui ne sont plus dans la base de données. Un

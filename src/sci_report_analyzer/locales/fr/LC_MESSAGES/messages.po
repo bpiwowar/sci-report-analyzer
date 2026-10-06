@@ -2541,6 +2541,10 @@ msgstr "Personne dans ce dossier pour l'instant."
 msgid "No other category: create one first"
 msgstr "Aucune autre catégorie : créez-en une d'abord"
 
+#, python-brace-format
+msgid "No paper cited as @{key}"
+msgstr "Aucun article cité comme @{key}"
+
 msgid "No paper matches"
 msgstr "Aucun article ne correspond"
 
@@ -3132,6 +3136,9 @@ msgstr ""
 "Placé après le titre de la catégorie dans les extraits des notes, avant "
 "ses éléments. Vide : aucun."
 
+msgid "Put the cursor on a citation ([@key]) first"
+msgstr "Placez d'abord le curseur sur une citation ([@key])"
+
 msgid ""
 "Put the person in a folder, or add a period (Periods tab), to add "
 "documents."
@@ -3214,6 +3221,13 @@ msgid ""
 msgstr ""
 "Citer le texte sélectionné dans le PDF (ou le surlignage cliqué), avec sa"
 " page (Q)"
+
+msgid ""
+"Quote the text selected in the PDF at the cursor, in quotation marks, "
+"with a link back to its page in a comment (Shift+Q)"
+msgstr ""
+"Citer le texte sélectionné dans le PDF au curseur, entre guillemets, avec"
+" un lien vers sa page dans un commentaire (Maj+Q)"
 
 msgid "Rank"
 msgstr "Rang"
@@ -3553,6 +3567,9 @@ msgstr "Recherche des sources pour {name}…"
 
 msgid "Searching venues of every kind"
 msgstr "Recherche parmi les canaux de tous types"
+
+msgid "See the paper cited at the cursor, in a new window (or ⌘/Ctrl-click its citation)"
+msgstr "Voir l'article cité au curseur, dans une nouvelle fenêtre (ou ⌘/Ctrl-clic sur sa citation)"
 
 msgid ""
 "Select an area of a page (A, or Alt+drag): draw a rectangle on the page, "

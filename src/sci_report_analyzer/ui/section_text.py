@@ -73,6 +73,7 @@ def edit(side: Side, node: categories.Node) -> None:
             mark="section-text-input",
             height="14rem",
         )
+        editor.open_cited = side.open_cited
         ui.label(
             _(
                 "Put after the heading of the category in the excerpts of the notes, before its "
