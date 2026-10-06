@@ -62,6 +62,7 @@ NAV = (
         N_("Reports"),
         (
             ("contribution", N_("Contribution roles")),
+            ("skeletons", N_("Report templates")),
             ("reports", N_("Citation templates")),
             ("copy", N_("Copy filters")),
         ),
@@ -78,6 +79,7 @@ PANELS = {
     "tracks": lambda: tracks_tab(),
     "tags": lambda: tags_tab(),
     "contribution": lambda: contribution_tab(),
+    "skeletons": lambda: skeletons_tab(),
     "reports": lambda: report_templates_tab(),
     "copy": lambda: copy_filters_tab(),
     "data": lambda: data_tab(),
@@ -291,6 +293,16 @@ def contribution_tab() -> None:
         ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat")
         unsaved.cancel_button()
         ui.button(_("Save"), icon="save", on_click=save).mark("contribution-save")
+
+
+# ---- report templates ----------------------------------------------------------------------
+
+
+def skeletons_tab() -> None:
+    """The texts a report starts from (a folder's starting notes, a report)."""
+    from .report_templates import settings_section
+
+    settings_section()
 
 
 # ---- citation templates --------------------------------------------------------------------

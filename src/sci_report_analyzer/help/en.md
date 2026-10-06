@@ -238,6 +238,14 @@ substitutes the citations, followed by the references, numbered as cited (or whe
 `[]{.references}` is, alone on its line: the toolbar's 📚 button; `.notes`, `.tags`: with
 their notes, their tags).
 
+**Report templates** (Settings → Report templates): the texts a report starts from, their
+headings, blocks (`[]{.publications}`, `[]{.excerpts}`, `[]{.references}`) and guidance as
+comments (`%% … %%`, left out when shown or copied); one is shipped. A folder's starting
+notes (its settings, Reports tab: “From a template”) are copied from one; the toolbar's 📄
+button of the folder notes starts them from one (asked first when they are written), or
+saves their structure as one (“Save as a template…”: their headings and blocks, what is
+written left out).
+
 **Copy filters**: Shift+click on a copy button (the notes, the excerpts) copies through a
 filter, as rich text pasted formatted into a form: those enabled in Settings → Copy filters
 (several: the one to use is asked). **Marmotte** (CNRS) keeps the basic formatting its

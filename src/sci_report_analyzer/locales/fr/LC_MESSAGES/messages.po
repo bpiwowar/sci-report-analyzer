@@ -245,6 +245,9 @@ msgstr "Une composante de cette conférence commune"
 msgid "A percentage is compared with p"
 msgstr "Un pourcentage se compare à p"
 
+msgid "A report template needs a name"
+msgstr "Un modèle de rapport doit avoir un nom"
+
 msgid "A role has no name"
 msgstr "Un rôle n'a pas de nom"
 
@@ -624,6 +627,9 @@ msgstr "Tel que sélectionné"
 
 msgid "Ask before downloading a PDF"
 msgstr "Demander avant de télécharger un PDF"
+
+msgid "Assessment"
+msgstr "Appréciation"
 
 msgid "At least one role is needed"
 msgstr "Il faut au moins un rôle"
@@ -1491,6 +1497,9 @@ msgstr ""
 "Estimé : {n} ans avant la soutenance (theses.fr ne donne le début que des"
 " thèses en cours)"
 
+msgid "Evaluation report"
+msgstr "Rapport d'évaluation"
+
 msgid "Event"
 msgstr "Événement"
 
@@ -1642,6 +1651,9 @@ msgstr "Source"
 
 msgid "From (year)"
 msgstr "De (année)"
+
+msgid "From a template"
+msgstr "D'un modèle"
 
 msgid "From an open-access copy found by Unpaywall (by its DOI)"
 msgstr "Depuis une copie en accès ouvert trouvée par Unpaywall (par son DOI)"
@@ -1978,6 +1990,12 @@ msgstr ""
 
 msgid "Its demo track, one of its workshops…"
 msgstr "Sa session démo, un de ses ateliers…"
+
+msgid ""
+"Its headings and blocks, what is written left out (to edit in the settings):"
+msgstr ""
+"Ses titres et ses blocs, sans ce qui est écrit (à modifier dans les "
+"paramètres) :"
 
 #, python-brace-format
 msgid "Its identifier: {id} (it cannot be changed later)"
@@ -2600,6 +2618,9 @@ msgstr "Aucun dossier pour l'instant"
 msgid "No folder's settings change"
 msgstr "Les réglages d'aucun dossier ne changent"
 
+msgid "No heading nor block to keep in a template"
+msgstr "Aucun titre ni bloc à garder dans un modèle"
+
 msgid "No item in the text"
 msgstr "Aucun élément dans le texte"
 
@@ -2664,6 +2685,9 @@ msgstr "Aucune publication trouvée dans cette page"
 
 msgid "No ranking record found."
 msgstr "Aucune entrée de classement trouvée."
+
+msgid "No report template (Settings → Report templates)"
+msgstr "Aucun modèle de rapport (Paramètres → Modèles de rapport)"
 
 msgid "No similar venue: search one."
 msgstr "Aucun canal similaire : recherchez-en un."
@@ -3487,6 +3511,9 @@ msgstr ""
 msgid "Rename…"
 msgstr "Renommer…"
 
+msgid "Replace"
+msgstr "Remplacer"
+
 msgid "Replace all current matching settings"
 msgstr "Remplacer tous les paramètres d’appariement actuels"
 
@@ -3497,8 +3524,23 @@ msgstr ""
 "Remplacer efface tous les paramètres d’appariement actuels ; fusionner "
 "les conserve et vous laisse résoudre chaque conflit."
 
+msgid "Replace the notes of the folder on this person with the template?"
+msgstr "Remplacer les notes du dossier sur cette personne par le modèle ?"
+
+#, python-brace-format
+msgid "Replace the template “{name}”?"
+msgstr "Remplacer le modèle « {name} » ?"
+
 msgid "Report"
 msgstr "Rapport"
+
+msgid "Report templates"
+msgstr "Modèles de rapport"
+
+msgid "Report templates: start from one, or save this report's structure as one"
+msgstr ""
+"Modèles de rapport : partir de l'un d'eux, ou enregistrer la structure de ce"
+" rapport comme modèle"
 
 msgid "Reports"
 msgstr "Rapports"
@@ -3573,6 +3615,12 @@ msgstr "Enregistrer"
 msgid "Save aliases"
 msgstr "Enregistrer les variantes"
 
+msgid "Save as a report template"
+msgstr "Enregistrer comme modèle de rapport"
+
+msgid "Save as a template…"
+msgstr "Enregistrer comme modèle…"
+
 msgid "Save rule"
 msgstr "Enregistrer la règle"
 
@@ -3592,6 +3640,10 @@ msgstr "Enregistré"
 
 msgid "Saved (reload a person's page to see it)"
 msgstr "Enregistré (rechargez la page d’une personne pour le voir)"
+
+#, python-brace-format
+msgid "Saved as “{name}”"
+msgstr "Enregistré sous « {name} »"
 
 #, python-brace-format
 msgid "Saved at {time}"
@@ -3963,6 +4015,9 @@ msgstr "Listes étoilées"
 msgid "Start"
 msgstr "Début"
 
+msgid "Start from"
+msgstr "Partir de"
+
 #, python-brace-format
 msgid "Started {n} sync"
 msgid_plural "Started {n} syncs"
@@ -4247,6 +4302,9 @@ msgstr ""
 msgid "The other way round"
 msgstr "Dans l'autre sens"
 
+msgid "The overall opinion, and the points to raise."
+msgstr "L'avis d'ensemble, et les points à soulever."
+
 msgid ""
 "The paper's track (e.g. a demo): counted apart in the distribution; "
 "automatic: from the variants, the venue rules and the venue texts"
@@ -4267,10 +4325,16 @@ msgstr "Les articles étoilés dans la période d'une personne (★ : la premiè
 msgid "The papers starred within a person's period (★: the first list), in order: numbered in the first list they are in, written as it says ({index}: the number: its reference), and cited by [@key] (as inserted) as it says. Those of the lists to cite are the papers to discuss, each to be cited in the notes (without: those of the period's years)."
 msgstr "Les articles étoilés dans la période d'une personne (★ : la première liste), dans l'ordre : numérotés dans la première liste où ils sont, écrits comme elle le dit ({index} : le numéro : sa référence), et cités par [@clé] (telle qu'insérée) comme elle le dit. Ceux des listes à citer sont les articles à discuter, chacun à citer dans les notes (sans : ceux des années de la période)."
 
+msgid "The papers to discuss, cited ([@key]): what they bring."
+msgstr "Les articles à discuter, cités ([@key]) : ce qu'ils apportent."
+
 msgid "The period whose tags and notes are shown (e.g. a folder's)"
 msgstr ""
 "La période dont les étiquettes et notes sont affichées (p. ex. celle d'un"
 " dossier)"
+
+msgid "The person in a few lines: their profile, their strengths."
+msgstr "La personne en quelques lignes : son profil, ses points forts."
 
 #, python-brace-format
 msgid ""
@@ -4381,6 +4445,9 @@ msgstr ""
 "Les textes des sources portant ce nom lui appartiennent ; ajoutez des "
 "variantes ou des règles au canal pour reconnaître d'autres textes."
 
+msgid "The starting notes copied from a report template (Settings)"
+msgstr "Les notes de départ copiées d'un modèle de rapport (Paramètres)"
+
 msgid "The template of a citation without one: [@key], as inserted (e.g. {.number (.short-venue .year)}; empty: the number)"
 msgstr "Le modèle d'une citation sans modèle : [@clé], telle qu'insérée (par ex. {.number (.short-venue .year)} ; vide : le numéro)"
 
@@ -4402,6 +4469,22 @@ msgstr "Le texte de cette section (Markdown, p. ex. un résumé de ses élément
 
 msgid "The text of this section (click to edit it)"
 msgstr "Le texte de cette section (cliquez pour le modifier)"
+
+msgid ""
+"The texts a report can start from: its headings, the blocks "
+"`[]{.publications}` (the summary of the publications), `[]{.excerpts}` (the "
+"excerpts by category), `[]{.references}` (the papers cited), and guidance as"
+" comments `%% … %%` (left out when shown or copied). A folder's starting "
+"notes are copied from one (its settings: Reports), and a report from one "
+"(its toolbar), which also makes one from a report: its headings and blocks."
+msgstr ""
+"Les textes dont un rapport peut partir : ses titres, les blocs "
+"`[]{.publications}` (le résumé des publications), `[]{.excerpts}` (les "
+"extraits par catégorie), `[]{.references}` (les articles cités), et des "
+"consignes en commentaires `%% … %%` (omis à l'affichage et à la copie). Les "
+"notes de départ d'un dossier sont copiées de l'un d'eux (ses paramètres : "
+"Rapports), et un rapport aussi (sa barre d'outils), qui en fait également un"
+" à partir d'un rapport : ses titres et ses blocs."
 
 msgid "The track's identifier (in the exported settings)"
 msgstr "L'identifiant de la session (dans les paramètres exportés)"
@@ -4616,6 +4699,9 @@ msgid "Turn into a venue rule (to edit): its near variants match too"
 msgstr ""
 "En faire une règle du canal (à modifier) : ses variantes proches sont "
 "aussi reconnues"
+
+msgid "Two report templates have the same name"
+msgstr "Deux modèles de rapport ont le même nom"
 
 msgid "Two roles have the same name"
 msgstr "Deux rôles ont le même nom"

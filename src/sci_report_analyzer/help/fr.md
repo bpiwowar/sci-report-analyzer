@@ -237,6 +237,14 @@ nouvelle fenêtre. Copier remplace les citations, suivies des références, num�
 comme citées (ou là où se trouve `[]{.references}`, seul sur sa ligne : le bouton 📚 de la barre
 d'outils ; `.notes`, `.tags` : avec leurs notes, leurs étiquettes).
 
+**Modèles de rapport** (Paramètres → Modèles de rapport) : les textes dont un rapport part,
+ses titres, ses blocs (`[]{.publications}`, `[]{.excerpts}`, `[]{.references}`) et des
+consignes en commentaires (`%% … %%`, omis à l'affichage et à la copie) ; un est fourni. Les
+notes de départ d'un dossier (ses réglages, onglet Rapports : « D'un modèle ») sont copiées
+de l'un d'eux ; le bouton 📄 de la barre d'outils des notes du dossier les fait partir de l'un
+d'eux (en demandant d'abord quand elles sont écrites), ou enregistre leur structure comme
+modèle (« Enregistrer comme modèle… » : leurs titres et leurs blocs, sans ce qui est écrit).
+
 **Filtres de copie** : Maj+clic sur un bouton de copie (les notes, les extraits) copie via un
 filtre, en texte enrichi collé mis en forme dans un formulaire : ceux activés dans Paramètres →
 Filtres de copie (plusieurs : celui à utiliser est demandé). **Marmotte** (CNRS) garde la mise en

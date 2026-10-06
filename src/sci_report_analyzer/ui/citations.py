@@ -11,6 +11,7 @@ from .. import annotations, reports
 from ..i18n import N_, _
 from . import unsaved
 from .mdedit import MarkdownEditor
+from .report_templates import pick_menu
 
 TEMPLATES_HELP = N_(
     "How a paper is cited: `[@key]` followed by the template. `{.notes}`, `{.tags}`, "
@@ -358,6 +359,14 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
             )
             .mark("folder-skeleton")
         )
+        with (
+            ui.button(_("From a template"), icon="article")
+            .props("flat dense no-caps icon-right=arrow_drop_down")
+            .tooltip(_("The starting notes copied from a report template (Settings)"))
+            .mark("folder-skeleton-template"),
+            ui.menu(),
+        ):
+            pick_menu(lambda text: skeleton.set_value(text), "folder-skeleton-template")
 
         def add() -> None:
             own.append(reports.Template("", "{.number (.short-venue .year)}", ""))
