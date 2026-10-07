@@ -1718,6 +1718,34 @@ async def test_venue_marked_as_a_demo_track(user: User) -> None:
         assert {k.track for k in s.query(VenueKey).filter_by(venue_id=demo)} == {"demo"}
 
 
+async def test_hovering_a_variant_shows_its_records(user: User) -> None:
+    from sci_report_analyzer.db.models import Publication, VenueKey
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = make_person("Jane Doe")
+    add_source(
+        pid,
+        "hal",
+        "jd",
+        [
+            pub("a", "Paper A", 2023, WIDG, authors=["Jane Doe", "Bob"]),
+            pub("b", "Paper B", 2021, WIDG, authors=["Jane Doe"]),
+        ],
+    )
+    await user.open(f"/person/{pid}")
+    await user.should_see("Paper A")
+    with session_scope() as s:
+        vid = s.get(Publication, _pub_id("Paper A")).venue_id
+        (key,) = [k.key for k in s.query(VenueKey).filter_by(venue_id=vid)]
+    await user.open(f"/venues?focus={vid}")
+    user.find("venue-tab-matching").click()
+    mark = f"venue-variant-records-{key}"
+    await user.should_see(marker=mark)
+    user.find(mark).trigger("mouseenter")
+    await user.should_see("2023 · Paper A — Jane Doe, Bob [Jane Doe]")
+    await user.should_see("2021 · Paper B — Jane Doe [Jane Doe]")
+
+
 async def test_variant_track_as_a_coloured_chip(user: User) -> None:
     from sci_report_analyzer.db.models import Publication, VenueKey
     from sci_report_analyzer.db.session import session_scope

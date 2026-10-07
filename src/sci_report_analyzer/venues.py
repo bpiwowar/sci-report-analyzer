@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from . import venue_match
@@ -953,6 +953,43 @@ def venue_papers(pub_ids: Iterable[int]) -> list[VenuePaper]:
             for p, name in rows
         ]
     return sorted(out, key=lambda p: (p.person.lower(), -(p.year or 0), (p.title or "").lower()))
+
+
+@dataclass
+class TextRecord:
+    """A source record of a venue text (shown when hovering the text)."""
+
+    source: str
+    title: str | None
+    year: int | None
+    authors: str
+    person: str
+
+
+def text_records(pairs: Iterable[tuple[str, str]], limit: int = 8) -> tuple[list[TextRecord], int]:
+    """The source records of venue texts ((source, raw text)), most recent first (at most
+    ``limit``), and how many there are."""
+    from .db.models import Person
+
+    pairs = list(dict.fromkeys(pairs))
+    if not pairs:
+        return [], 0
+    match = or_(*(and_(SourceLink.source == src, SourcePub.venue == raw) for src, raw in pairs))
+    with session_scope() as s:
+        q = (
+            select(SourcePub, SourceLink.source, Person.name)
+            .join(SourceLink, SourceLink.id == SourcePub.link_id)
+            .join(Person, Person.id == SourceLink.person_id)
+            .where(match)
+        )
+        total = s.scalar(select(func.count()).select_from(q.subquery())) or 0
+        rows = s.execute(q.order_by(SourcePub.year.desc().nulls_last()).limit(limit)).all()
+        out = []
+        for sp, source, person in rows:
+            names = [a if isinstance(a, str) else a.get("name", "") for a in sp.authors or []]
+            authors = ", ".join(names[:3]) + (" et al." if len(names) > 3 else "")
+            out.append(TextRecord(source, sp.title, sp.year, authors, person))
+    return out, total
 
 
 def _row_tokens(r: VenueRow) -> set[str]:

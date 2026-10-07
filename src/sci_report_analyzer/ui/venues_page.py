@@ -1227,6 +1227,36 @@ def _names_editor(state: venues.VenueEdit) -> Callable[[], list[dict]]:
     return lambda: [dict(n) for n in names if (n.get("name") or "").strip()]
 
 
+def _records_on_hover(el: ui.element, pairs: list[tuple[str, str]]) -> ui.element:
+    """Hovering ``el`` shows the source records of the venue texts (loaded once, then)."""
+    with el:
+        tip = ui.tooltip().classes("text-xs max-w-lg")
+        with tip:
+            ui.label("…")
+    loaded = []
+
+    def load() -> None:
+        if loaded:
+            return
+        loaded.append(True)
+        records, total = venues.text_records(pairs)
+        tip.clear()
+        with tip:
+            for r in records:
+                ui.label(
+                    f"{r.year or '?'} · {r.title or _('(no title)')}"
+                    + (f" — {r.authors}" if r.authors else "")
+                    + f" [{r.person}]"
+                )
+            if not records:
+                ui.label(_("No record"))
+            if total > len(records):
+                ui.label(_("… and {n} more").format(n=total - len(records)))
+
+    el.on("mouseenter", load)
+    return el
+
+
 def decided_by(decision: dict | None) -> str:
     """Who made a decision and when ("jdoe, 2026-10-01"), if known."""
     if not decision:
@@ -1798,10 +1828,13 @@ def _matching_tab(
                 ui.label(cleaned).classes("text-sm").tooltip(
                     _("Cleaned text (after the normalization rules)")
                 )
-                ui.label(
-                    ngettext("{n} record", "{n} records", count).format(n=count)
-                    + (" · " + _("set by hand") if manual else "")
-                ).classes("text-xs text-grey grow")
+                _records_on_hover(
+                    ui.label(
+                        ngettext("{n} record", "{n} records", count).format(n=count)
+                        + (" · " + _("set by hand") if manual else "")
+                    ).classes("text-xs text-grey grow cursor-help"),
+                    [(t.source, t.raw) for t in texts],
+                ).mark(f"venue-variant-records-{key}")
                 _track_picker(
                     track,
                     lambda t, k=key: set_track(k, t),
@@ -1846,7 +1879,10 @@ def _matching_tab(
                     with ui.row().classes("items-center gap-2 no-wrap pl-4"):
                         source_tag(t.source)
                         n = row.source_texts.get((t.source, t.raw), 0)
-                        ui.label(f"{t.raw} ({n})").classes("text-xs")
+                        _records_on_hover(
+                            ui.label(f"{t.raw} ({n})").classes("text-xs cursor-help"),
+                            [(t.source, t.raw)],
+                        )
 
     @ui.refreshable
     def variants_view() -> None:
@@ -1946,7 +1982,10 @@ def _matching_tab(
                 for source, raw, n in use.examples[:5]:
                     with ui.row().classes("items-center gap-2 no-wrap pl-4"):
                         source_tag(source)
-                        ui.label(f"{raw} ({n})").classes("text-xs text-grey")
+                        _records_on_hover(
+                            ui.label(f"{raw} ({n})").classes("text-xs text-grey cursor-help"),
+                            [(source, raw)],
+                        )
                 if len(use.examples) > 5:
                     ui.label(_("… and {n} more").format(n=len(use.examples) - 5)).classes(
                         "text-xs text-grey pl-4"
