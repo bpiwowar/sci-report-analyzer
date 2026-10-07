@@ -434,7 +434,7 @@ class Side:
         ):
             ui.button(
                 icon=icon,
-                on_click=lambda name=name: self.folder_editor.insert_block(f"[]{{.{name}}}"),
+                on_click=lambda name=name: self.folder_editor.insert_block(f"[[{name}]]"),
             ).props("flat dense round size=sm").tooltip(tip).mark(f"folder-note-{name}")
         self.template_tools()
 

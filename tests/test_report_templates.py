@@ -24,7 +24,7 @@ Mostly #strong papers; [@doe2022neural] is the best.
 %% to check: the venue %%
 
 ## Activities
-   []{.excerpts .nested-influence}
+   [[excerpts#teaching]]
 
 ```
 # not a heading
@@ -36,13 +36,14 @@ Courses []{.excerpts} inline (not a block).
 
 #hashtag line
 []{.references}
+[[excerpts]] inline
 """
 
 
 def test_outline_keeps_headings_and_blocks():
     assert outline(REPORT) == (
         "# Jane Doe\n\n## Publications\n\n[]{.publications}\n\n## Activities\n\n"
-        "[]{.excerpts .nested-influence}\n\n### Teaching #not-a-heading-tag\n\n"
+        "[[excerpts#teaching]]\n\n### Teaching #not-a-heading-tag\n\n"
         "[]{.references}\n"
     )
     assert outline("Just text, [@key] and %% a comment %%.") == ""
@@ -51,8 +52,8 @@ def test_outline_keeps_headings_and_blocks():
 
 def test_templates_saved_and_defaults():
     [default] = report_templates.load()  # (never saved: the default one)
-    assert "[]{.publications}" in default.text and "[]{.excerpts}" in default.text
-    assert outline(default.text).count("[]{.") == 3  # (its guidance: comments only)
+    assert "[[publications]]" in default.text and "[[excerpts]]" in default.text
+    assert outline(default.text).count("[[") == 3  # (its guidance: comments only)
     report_templates.add("Prize", "## Why\n")
     assert [t.name for t in report_templates.load()] == [default.name, "Prize"]
     report_templates.add("Prize ", "## Why not\n\n")  # (the same name: replaced, in place)

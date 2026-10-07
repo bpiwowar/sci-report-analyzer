@@ -261,11 +261,12 @@ list are reordered there too (dragged, their ↑ / ↓ arrows, or their number
 Alt-clicked and typed), the citations renumbered. ⌘/Ctrl-click on a citation (or the
 toolbar's ↗ button, the cursor on it) shows its paper's details in a new window. Copy
 substitutes the citations, followed by the references, numbered as cited (or where
-`[]{.references}` is, alone on its line: the toolbar's 📚 button; `.notes`, `.tags`: with
-their notes, their tags).
+`[[references]]` is, alone on its line: the toolbar's 📚 button; `[[references notes tags]]`:
+with their notes, their tags). Blocks are written `[[name]]` (formerly `[]{.name}`, still
+read).
 
 **Report templates** (Settings → Report templates): the texts a report starts from, their
-headings, blocks (`[]{.publications}`, `[]{.excerpts}`, `[]{.references}`) and guidance as
+headings, blocks (`[[publications]]`, `[[excerpts]]`, `[[references]]`) and guidance as
 comments (`%% … %%`, left out when shown or copied); one is shipped. A folder's starting
 notes (its settings, Reports tab: “From a template”) are copied from one; the toolbar's 📄
 button of the folder notes starts them from one (asked first when they are written), or
@@ -331,12 +332,12 @@ number them (“[1]”, as first cited), the copy ending with the references.
 
 **Categories** (folder page: the category button; or the viewer's categories tab): a
 folder's ordered tree of categories (e.g. an evaluation grid), dragged to order and nest
-them, each with optional years; one with excerpts (there or below, of anyone in the folder)
+them, each with optional years and an id (`#id`, for the reports: see below); one with excerpts (there or below, of anyone in the folder)
 is deleted once they are moved to another one, chosen then. In a document's PDF (a report,
 an application… not a paper's), select a passage (or click a highlight), then ‘add to a
 category’ (header, or the E key; on an excerpt filed already, clicked or its text selected:
-edits it): click a category, or type to find it (Enter: the first
-one; a new name creates it, the dialog staying open), with the years it is about (those found
+edits it): click a category, or type to find it (the one chosen last proposed, marked and scrolled to: Enter picks it; typed, Enter:
+the first match; a new name creates it, the dialog staying open), with the years it is about (those found
 in the passage, e.g. “2026-32”: 2026–2032, and taken out of its text when leading it with a
 colon or ending it after one; its crossed-out calendar clears them, the text as selected
 again) and its markers if need be: salient (“saillant”, a strong point), influence
@@ -355,14 +356,16 @@ or copy as Markdown (unquoted, their places in Obsidian comments: `%% Applicatio
 p. 12 %%`, then their years; those showing influence also listed, by category, in a last
 “Rayonnement” section; the badge icon names the documents, e.g. a long file name as
 “Application”);
-the report's ❝ button inserts them, by category (the block `[]{.excerpts}`, kept up to
-date). Where the influence excerpts go: the folder's settings (“Rayonnement excerpts”) for its
-notes and the copy, or one block with an option: also listed in the Rayonnement section (the
-“rayonnement” category, else the last one), as by default (`[]{.excerpts .copy-influence}`);
-only there, under subsections named after their categories (nested as these, one level
-below), taken out of their categories, one left empty being left out
-(`[]{.excerpts .move-influence}`); or only in their categories, tagged #influence
-(`[]{.excerpts .mark-influence}`), e.g. turned into an icon by the copy filters. The salient
+the report's ❝ button inserts them, by category (the block `[[excerpts]]`, kept up to
+date); `[[excerpts#id]]` inserts those of the category of that id (and below it; its
+subcategories as headings below the block's heading), then left out of `[[excerpts]]`, e.g.
+`# Research` then `[[excerpts#research]]`, and `# Other activities` then `[[excerpts]]`.
+Where the influence excerpts go, the folder's settings say (“Rayonnement excerpts”): also
+listed in the Rayonnement section (the “rayonnement” category, else a last section), as by
+default; only there, under subsections named after their categories (nested as these, one
+level below), taken out of their categories, one left empty being left out; or only in their
+categories, tagged #influence, e.g. turned into an icon by the copy filters (the Rayonnement
+section: in the block with the “rayonnement” category, else in `[[excerpts]]`). The salient
 and caveat excerpts are always tagged. The folder's settings set each marker's tag (by
 default in the language of its reports: #salient, #influence, #caveat; in French
 #saillant, #rayonnement, #bemol) and whether an excerpt moves when marked (“First”, by

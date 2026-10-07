@@ -345,16 +345,16 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
             ui.textarea(
                 _("Starting notes"),
                 value=reports.skeleton(folder_id),
-                placeholder=f"## {_('Publications')}\n[]{{.publications}}\n\n"
-                f"## {_('Activities')}\n[]{{.excerpts}}",
+                placeholder=f"## {_('Publications')}\n[[publications]]\n\n"
+                f"## {_('Activities')}\n[[excerpts]]",
             )
             .props("dense outlined autogrow")
             .classes("w-full font-mono text-sm mt-2")
             .tooltip(
                 _(
                     "The text a person's notes start with, while empty (e.g. headings and the "
-                    "blocks []{.publications}: the summary of their publications, "
-                    "[]{.excerpts}: their excerpts by category)"
+                    "blocks [[publications]]: the summary of their publications, "
+                    "[[excerpts]]: their excerpts by category)"
                 )
             )
             .mark("folder-skeleton")

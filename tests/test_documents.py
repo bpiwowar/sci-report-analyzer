@@ -884,27 +884,59 @@ def test_nested_influence():
         "- Projet Comète. %% Dossier, p. 3 %%\n\n"
         "## Rayonnement\n\n- Prix Andromède. %% Dossier, p. 4 %%\n"
     )
-    # The folder's default, and a block's own choice (its classes).
+    # The folder's choice (a block's options, formerly, ignored).
     assert reports.influence_mode(folder) == "copy"
     reports.save_influence_mode(folder, "move")
     assert categories.markdown(folder, period) == categories.markdown(folder, period, mode="move")
     ctx = reports.folder_context([], period)
-    out = reports.render("# Dossier\n\n[]{.excerpts}\n", ctx).text
+    out = reports.render("# Dossier\n\n[[excerpts]]\n", ctx).text
     assert "\n## Comités" not in out and "\n### Comités et sociétés savantes\n" in out
-    out = reports.render("# Dossier\n\n[]{.excerpts .flat-influence}\n", ctx).text
-    assert "## Comités et sociétés savantes\n" in out and "**Comités et sociétés savantes**" in out
-    out = reports.render("[]{.excerpts .mark-influence}", ctx).text
-    assert "- #influence Projet Nébuleuse." in out and "### Comités" not in out
+    assert reports.render("# Dossier\n\n[]{.excerpts .flat-influence}\n", ctx).text == out
     reports.save_influence_mode(folder, "copy")
     ctx = reports.folder_context([], period)
     assert reports.render("[]{.excerpts}", ctx).text.startswith("## Comités")
-    out = reports.render("# Dossier\n\n[]{.excerpts  .nested-influence}\n", ctx).text
-    assert out.startswith("# Dossier\n\n## Recherche") and "\n### Rayonnement\n" not in out
-    assert "## Rayonnement\n\n- Prix Andromède." in out
-    assert "\n### Comités et sociétés savantes\n" in out
     # (formerly a flag: "nested_influence")
     reports._save_citations(folder, influence_mode=None, nested_influence=True)
     assert reports.influence_mode(folder) == "move"
+
+
+def test_excerpts_of_a_category_block():
+    """[[excerpts#id]]: the excerpts of the category of that id (and below), its
+    subcategories' headings at the block's level, then left out of [[excerpts]]; an unknown
+    id: a warning."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    projects = categories.add(folder, "Projects", research)
+    teaching = categories.add(folder, "Teaching")
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    categories.add_excerpt(research, period, "Ten papers.", 1, [], document_id=doc)
+    categories.add_excerpt(projects, period, "Led Nebula.", 2, [], document_id=doc)
+    led = categories.add_excerpt(teaching, period, "Two courses.", 3, [], document_id=doc)
+    categories.update_excerpt(led, influence=True)
+    assert categories.set_key(research, " my research ")
+    assert categories.tree(folder)[0].key == "my-research"
+    assert not categories.set_key(teaching, "my-research")  # (taken)
+    ctx = reports.folder_context([], period)
+    out = reports.render(
+        "# Research\n\n[[excerpts#my-research]]\n\n# Other stuff\n\n[[excerpts]]\n", ctx
+    ).text
+    assert out == (
+        "# Research\n\n- Ten papers. %% Dossier, p. 1 %%\n\n## Projects\n\n"
+        "- Led Nebula. %% Dossier, p. 2 %%\n\n# Other stuff\n\n"
+        "## Teaching\n\n- Two courses. %% Dossier, p. 3 %%\n\n"
+        "## Rayonnement\n\n- **Teaching**\n  - Two courses. %% Dossier, p. 3 %%\n"
+    )
+    # Nested ones: each its own (a block above another one leaving it out).
+    assert categories.set_key(projects, "projects")
+    out = reports.render("[[excerpts#my-research]]\n\n# P\n\n[[excerpts#projects]]", ctx).text
+    assert out == "- Ten papers. %% Dossier, p. 1 %%\n\n# P\n\n- Led Nebula. %% Dossier, p. 2 %%"
+    r = reports.render("[[excerpts#nope]]", ctx)
+    assert "⚠" in r.text and r.errors == ["No category with the id “nope”"]
+    # The old syntax, still read.
+    assert reports.render("[]{.excerpts}", ctx).text == reports.render("[[excerpts]]", ctx).text
 
 
 def test_excerpt_markers():
@@ -1524,6 +1556,12 @@ async def test_categories_editor(user: User, fake_viewer):
     # A colour (that of its excerpts), picked.
     user.find(marker=f"category-colour-pick-{teaching}").trigger("click", "#2196f3")
     assert categories.tree(folder)[0].colour == "#2196f3"
+    # Its id in the reports ([[excerpts#id]]), unique.
+    user.find(marker=f"category-key-{teaching}").type("Teaching duties").trigger("blur")
+    assert categories.tree(folder)[0].key == "Teaching-duties"
+    user.find(marker=f"category-key-{research}").type("Teaching-duties").trigger("blur")
+    await user.should_see("Another category has this id")
+    assert categories.tree(folder)[1].key is None
     # Not deleted with excerpts there (or below): moved first.
     new = categories.tree(folder)[2].id
     categories.add_excerpt(new, period, "Filed below.", 1, [], document_id=doc)

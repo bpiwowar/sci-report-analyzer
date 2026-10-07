@@ -15,17 +15,15 @@ syntax, substituted when shown or copied.
   ``{#.index}``: ``#2``, ``{**#.index** (.short-venue .year): .notes}``;
 - ``[@key]{.long}``: a named template (Settings → Citation templates, or the folder's), also
   usable within another one (``{.long: .notes}``);
-- ``[]{.references}`` (alone on its line): the papers cited, listed there rather than at
-  the end when copied (``.notes``, ``.tags``: with their notes, their tags);
-- ``[]{.publications}``, ``[]{.excerpts}`` (alone on their line): a block (see
+- ``[[references]]`` (alone on its line): the papers cited, listed there rather than at
+  the end when copied (``[[references notes tags]]``: with their notes, their tags);
+- ``[[publications]]``, ``[[excerpts]]`` (alone on their line): a block (see
   ``Context.blocks``), e.g. the summary of the period's publications, its excerpts by
   category (their headings below that of the block, each followed by the section's text if
-  any, see categories.section_texts); with its options as classes:
-  ``[]{.excerpts .move-influence}`` the "rayonnement" excerpts only in the Rayonnement
-  section, under subsections of their categories, ``.copy-influence``: also in their
-  categories, ``.mark-influence``: only in their categories, marked (the default: the
-  folder's, see ``influence_mode``; ``.nested-influence``, ``.flat-influence``: as move,
-  copy).
+  any, see categories.section_texts; the "rayonnement" excerpts as the folder says, see
+  ``influence_mode``); ``[[excerpts#key]]``: those of the category of that id (and below),
+  then left out of ``[[excerpts]]``. Pandoc's spans are read too: ``[]{.excerpts}``,
+  ``[]{.references .notes}``.
 
 Within a folder, the papers of its star lists (see annotations.star_lists) are numbered in
 the first one they are in (in its order, else by year), each list's numbers written as it
@@ -75,12 +73,26 @@ _INTEXT = re.compile(r"(?<![\w@\[])@(?P<key>" + _KEY + r")")
 # Code (fenced blocks, spans) is left as is.
 _CODE = re.compile(r"(```.*?(?:```|$)|`[^`\n]*`)", re.S)
 _LIST_ITEM = re.compile(r"[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?")
-# A block, alone on its line, with its options: []{.publications}, []{.excerpts .option}
+# A block, alone on its line, with its target and options: [[excerpts]], [[excerpts#key]],
+# [[references notes]], or as a Pandoc span: []{.publications}, []{.references .notes}
 _BLOCK = re.compile(
-    r"^[ \t]*\[\]\{\.(?P<name>[A-Za-z][\w-]*)(?P<options>(?:[ \t]+\.[A-Za-z][\w-]*)*)[ \t]*\}"
-    r"[ \t]*$",
+    r"^[ \t]*(?:\[\]\{\.(?P<name>[A-Za-z][\w-]*)(?P<options>(?:[ \t]+\.[A-Za-z][\w-]*)*)[ \t]*\}"
+    r"|\[\[[ \t]*(?P<wname>[A-Za-z][\w-]*)(?:\#(?P<target>[\w-]+))?"
+    r"(?P<woptions>(?:[ \t]+\.?[A-Za-z][\w-]*)*)[ \t]*\]\])[ \t]*$",
     re.M,
 )
+
+
+def block_parts(m: re.Match) -> tuple[str, str | None, set[str]]:
+    """A block's name, target (``#key``) and options."""
+    options = m.group("options") if m.group("name") else m.group("woptions")
+    return (
+        m.group("name") or m.group("wname"),
+        m.group("target"),
+        {o.lstrip(".") for o in (options or "").split()},
+    )
+
+
 _HEADING = re.compile(r"^(#{1,6})[ \t]", re.M)
 
 _STOP = {"a", "an", "the", "on", "of", "for", "in", "to", "and", "with", "from", "towards"}
@@ -224,6 +236,21 @@ def papers_to_discuss(
 # ---- Substitution ---------------------------------------------------------------------------
 
 
+@dataclass
+class Block:
+    """A block where it is: the level of its headings (that below the heading it is under),
+    its target (``#key``), its options, and the targets of the other blocks of that name."""
+
+    level: int
+    target: str | None = None
+    options: set[str] = field(default_factory=set)
+    others: set[str] = field(default_factory=set)
+
+
+class BlockError(ValueError):
+    """A block that cannot be made (e.g. an unknown target)."""
+
+
 class TemplateCycle(ValueError):
     """A template using itself (through others): ``path``, the names from the first one."""
 
@@ -246,9 +273,9 @@ class Context:
     templates: dict[str, str] = field(default_factory=dict)  # named ones: name -> {attrs}
     # The papers each to be cited (by default, the numbered ones; see citation_status).
     discuss: list[Paper] | None = None
-    # The blocks ([]{.name .option…} on its line): name -> its Markdown, given the level of
-    # its headings (that below the heading the block is under) and its options (classes).
-    blocks: dict[str, Callable[[int, set[str]], str]] = field(default_factory=dict)
+    # The blocks ([[name#target option…]] on its line): name -> its Markdown (BlockError: a
+    # warning instead).
+    blocks: dict[str, Callable[[Block], str]] = field(default_factory=dict)
     lists: list[StarList] = field(default_factory=list)  # (the folder's star lists)
     cite_default: str = ""  # (the template of [@key], without one: e.g. "{.number (.year)}")
     lang: str | None = None  # (that of the text generated: the folder's; none: the interface's)
@@ -361,7 +388,7 @@ class Rendered:
     cited: Counter = field(default_factory=Counter)  # key -> times
     unknown: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)  # (e.g. a template cycle)
-    references: bool = False  # (placed: []{.references})
+    references: bool = False  # (placed: [[references]])
 
 
 # ---- Attributes: classes ({.notes .tags}) or a template ({.short-venue (.year)}) ---------
@@ -520,22 +547,35 @@ def _render(text: str, ctx: Context) -> Rendered:
     # The blocks: their Markdown (not cited from) put back in place of a mark once cited.
     made: list[str] = []
 
+    chunks = _CODE.split(text)
+    targets: dict[str, set[str]] = {}  # (by block name)
+    for c in chunks[::2]:
+        for m in _BLOCK.finditer(c):
+            name, target, _options = block_parts(m)
+            if target:
+                targets.setdefault(name, set()).add(target)
+
     def blocks(src: str, before: str) -> str:
         def block(m: re.Match) -> str:
-            options = {o.lstrip(".") for o in m.group("options").split()}
-            if m.group("name") == "references":  # (once all cited: see below)
+            name, target, options = block_parts(m)
+            if name == "references":  # (once all cited: see below)
                 out.references = True
                 return f"\x01{'notes' in options:d}{'tags' in options:d}\x01"
-            make = ctx.blocks.get(m.group("name"))
+            make = ctx.blocks.get(name)
             if make is None:
                 return m.group(0)
             head = _HEADING.findall(before + src[: m.start()])
-            made.append(make(min(len(head[-1]) + 1, 6) if head else 2, options).rstrip("\n"))
+            level = min(len(head[-1]) + 1, 6) if head else 2
+            others = targets.get(name, set()) - {target}
+            try:
+                made.append(make(Block(level, target, options, others)).rstrip("\n"))
+            except BlockError as e:
+                out.errors.append(str(e))
+                return f"{m.group(0)} (⚠ {e})"
             return f"\0{len(made) - 1}\0"
 
         return _BLOCK.sub(block, src)
 
-    chunks = _CODE.split(text)
     pieces = [c if i % 2 else prose(blocks(c, "".join(chunks[:i]))) for i, c in enumerate(chunks)]
     out.text = re.sub(r"\0(\d+)\0", lambda m: made[int(m.group(1))], "".join(pieces))
     out.text = re.sub(
@@ -561,7 +601,7 @@ def note_context(stats: list[PubStat], keys: dict[int, str]) -> Context:
 
 def with_references(text: str, ctx: Context) -> str:
     """The text, its citations substituted, then the papers cited (by number; where
-    ``[]{.references}`` is, if anywhere)."""
+    ``[[references]]`` is, if anywhere)."""
     r = render(text, ctx)
     out = r.text.rstrip()
     if ctx.by_key and not r.references:
@@ -648,11 +688,6 @@ def save_language(folder_id: int, lang: str | None) -> None:
 # Rayonnement section, only there (by category), or only in their categories, marked.
 INFLUENCE_MODES = ("copy", "move", "mark")
 # A block's options choosing one (and the former ones).
-_INFLUENCE_OPTIONS = {
-    **{f"{m}-influence": m for m in INFLUENCE_MODES},
-    "flat-influence": "copy",
-    "nested-influence": "move",
-}
 
 
 def influence_mode(folder_id: int | None) -> str:
@@ -733,15 +768,25 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
     person_id, folder_id, years = found
     lang = language(folder_id)
 
-    def publications(_level: int, _options: set[str]) -> str:
+    def publications(_block: Block) -> str:
         rows = [s for s in stats if not s.hidden and in_years(s, years)]
         return "\n".join(saved_summary(rows, lang))
 
-    def excerpts(level: int, options: set[str]) -> str:
+    def excerpts(block: Block) -> str:
+        """Those of a category (and below: ``#key``), else all, but those of the other
+        blocks' categories."""
         from . import categories
 
-        mode = next((_INFLUENCE_OPTIONS[o] for o in options if o in _INFLUENCE_OPTIONS), None)
-        return categories.markdown(folder_id, period_id, level=level, mode=mode)
+        keys = {n.key: n.id for n in categories.tree(folder_id) if n.key}
+        if block.target is not None and block.target not in keys:
+            raise BlockError(_("No category with the id “{key}”").format(key=block.target))
+        return categories.markdown(
+            folder_id,
+            period_id,
+            level=block.level,
+            root=keys.get(block.target) if block.target else None,
+            exclude=[keys[k] for k in block.others if k in keys],
+        )
 
     n = numbering(folder_id)
     names = {t.id: t.name for t in annotations.all_tags()}

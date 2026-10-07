@@ -365,6 +365,8 @@ class Category(Base):
     # other categories are listed in it too.
     influence: Mapped[bool] = mapped_column(default=False, server_default="0")
     colour: Mapped[str | None] = mapped_column(String(16))  # (none: the default tint)
+    # Its id in the reports (`[[excerpts#id]]`: its excerpts there, not in [[excerpts]]).
+    key: Mapped[str | None] = mapped_column(String(64))
 
 
 class Excerpt(Base):
