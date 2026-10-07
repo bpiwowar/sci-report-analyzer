@@ -8,7 +8,7 @@ from html import escape
 from fastapi import Request
 from nicegui import background_tasks, ui
 
-from .. import annotations, folders, manual, persons, theses
+from .. import annotations, folders, manual, persons, source_settings, theses
 from ..db.models import Person, SourceLink, Thesis
 from ..i18n import _, ngettext
 from ..sources import ADAPTERS
@@ -778,10 +778,35 @@ def folders_section(person_id: int, on_change) -> None:
                     .classes("w-56")
                     .mark(f"folder-tags-{p.id}")
                 )
+                inherited = source_settings.primary_of_folder(p.folder_id)
+                primary = (
+                    ui.select(
+                        {
+                            None: _("The folder's ({source})").format(
+                                source=ADAPTERS[inherited].label
+                                if inherited in ADAPTERS
+                                else _("none")
+                            ),
+                            source_settings.NO_PRIMARY: _("None"),
+                            **{
+                                n: a.label
+                                for n, a in ADAPTERS.items()
+                                if a.linkable and a.provides_publications
+                            },
+                        },
+                        value=p.primary_source,
+                        label=_("Primary source"),
+                    )
+                    .props("dense")
+                    .classes("w-44")
+                    .tooltip(_("Papers this source doesn't list for the person are not counted"))
+                    .mark(f"period-primary-{p.id}")
+                )
 
-                def save(pid=p.id, a=start, b=end, t=tags) -> None:
+                def save(pid=p.id, a=start, b=end, t=tags, src=primary) -> None:
                     folders.set_period(pid, int_or_none(a.value), int_or_none(b.value))
                     folders.set_tags(pid, t.value or [])
+                    folders.set_period_primary(pid, src.value)
                     ui.notify(_("Period saved"))
                     on_change()
 

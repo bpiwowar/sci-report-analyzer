@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 09:30+0200\n"
+"POT-Creation-Date: 2026-10-07 09:34+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -3140,6 +3140,9 @@ msgstr ""
 "Les articles que cette source ne liste pas pour une personne ne sont pas "
 "comptés"
 
+msgid "Papers this source doesn't list for the person are not counted"
+msgstr "Les articles que cette source ne liste pas pour la personne ne sont pas comptés"
+
 msgid ""
 "Papers whose venue was picked or validated, or whose rank or kind was set"
 " by hand"
@@ -4356,6 +4359,10 @@ msgstr ""
 "qu'aucun dossier n'utilise plus sont supprimés ; les extraits vont dans "
 "les catégories de mêmes noms (ajoutées si elles manquent)."
 
+#, python-brace-format
+msgid "The folder's ({source})"
+msgstr "Celle du dossier ({source})"
+
 msgid "The former names stay variants, so their texts keep matching"
 msgstr ""
 "Les anciens noms restent des variantes, leurs textes sont donc toujours "
@@ -4435,6 +4442,8 @@ msgstr ""
 
 msgid "The papers shown: all, those the primary source lists, or the others"
 msgstr "Les articles montrés : tous, ceux que liste la source principale, ou les autres"
+"Les articles montrés : tous, ceux que liste la source principale, ou les "
+"autres"
 
 #, python-brace-format
 msgid ""

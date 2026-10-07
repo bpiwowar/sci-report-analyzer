@@ -532,6 +532,12 @@ def set_period(period_id: int, start: int | None, end: int | None) -> None:
         p.start_year, p.end_year = start, end
 
 
+def set_period_primary(period_id: int, source: str | None) -> None:
+    """The person's primary source in the folder (None: the folder's; see source_settings)."""
+    with session_scope() as s:
+        s.get(Period, period_id).primary_source = source
+
+
 def set_tags(period_id: int, tags: list[str]) -> None:
     """Set the person's tags in the folder (trimmed, without duplicates, sorted)."""
     with session_scope() as s:

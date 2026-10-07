@@ -146,6 +146,13 @@ def test_primary_source_default_and_folder_override():
     folders.set_primary_source(fid, "dblp")
     assert source_settings.primary_for(pid, period) == "dblp"
     assert folders.primary_source(fid) == "dblp"
+    # The person's own, in the folder (none: all their papers count), else the folder's.
+    folders.set_period_primary(period, source_settings.NO_PRIMARY)
+    assert source_settings.primary_for(pid, period) is None
+    folders.set_period_primary(period, "hal")
+    assert source_settings.primary_for(pid, period) == "hal"
+    folders.set_period_primary(period, None)
+    assert source_settings.primary_for(pid, period) == "dblp"
     # Shared: by the folders using the same settings (one within it), and their copies.
     sub = folders.save_folder(None, "Session", parent_id=fid)
     assert folders.primary_source(sub) == "dblp"

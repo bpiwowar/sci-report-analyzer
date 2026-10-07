@@ -252,6 +252,8 @@ class Period(Base):
     tags: Mapped[list[Any]] = mapped_column(default=list)
     # The person's notes within the folder (Markdown), for all their documents and papers.
     notes: Mapped[str | None]
+    # The primary source for the person in the folder (None: the folder's; "none": none).
+    primary_source: Mapped[str | None] = mapped_column(String(32))
 
     person: Mapped[Person] = relationship(back_populates="periods")
     folder: Mapped[Folder | None] = relationship(back_populates="periods")

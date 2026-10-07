@@ -32,7 +32,7 @@ and reports, to prepare an evaluation.
 Your **email** (Settings → API keys) is required before anything is fetched: it is sent to
 the sources (OpenAlex, Crossref and Unpaywall ask for it) so they can reach you.
 
-A **primary source** (Settings → Publication sources; a folder can use another one, or none) decides
+A **primary source** (Settings → Publication sources; a folder can use another one, or none, and so can a person in a folder, from their periods) decides
 which papers count: one it doesn't list for the person is left out of the reports and the
 summary, e.g. HAL, where CNRS researchers must deposit their papers. The panel lists them all
 by default (a warning says how many are not in HAL, each one marked); its filter *all / in

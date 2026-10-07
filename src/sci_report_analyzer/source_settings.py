@@ -71,12 +71,21 @@ def folder_primary(s, folder: Folder | None) -> str | None:
     return None if source == NO_PRIMARY else source
 
 
+def primary_of_folder(folder_id: int) -> str | None:
+    with session_scope() as s:
+        return folder_primary(s, s.get(Folder, folder_id))
+
+
 def primary_for(person_id: int, period_id: int | None = None) -> str | None:
-    """The primary source for a person's papers (within a period: that of its folder), if
-    enabled and the person has a validated profile there (else nothing would count)."""
+    """The primary source for a person's papers (within a period: its own, else that of its
+    folder), if enabled and the person has a validated profile there (else nothing would
+    count)."""
     with session_scope() as s:
         period = s.get(Period, period_id) if period_id else None
-        source = folder_primary(s, period.folder if period else None)
+        if period is not None and period.primary_source:
+            source = None if period.primary_source == NO_PRIMARY else period.primary_source
+        else:
+            source = folder_primary(s, period.folder if period else None)
         if source is None or not enabled(source):
             return None
         linked = s.scalar(

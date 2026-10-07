@@ -32,7 +32,7 @@ et des rapports, pour préparer une évaluation.
 Votre **adresse e-mail** (Paramètres → Clés d'API) est requise avant toute récupération : elle est envoyée
 aux sources (OpenAlex, Crossref et Unpaywall la demandent) afin qu'elles puissent vous contacter.
 
-Une **source principale** (Paramètres → Sources de publications ; un dossier peut en utiliser une autre, ou aucune) décide
+Une **source principale** (Paramètres → Sources de publications ; un dossier peut en utiliser une autre, ou aucune, tout comme une personne dans un dossier, depuis ses périodes) décide
 quels articles comptent : un article qu'elle ne liste pas pour la personne est exclu des rapports et de la
 synthèse, par exemple HAL, où les chercheurs du CNRS doivent déposer leurs articles. Le panneau les liste tous
 par défaut (un avertissement dit combien sont absents de HAL, chacun signalé) ; son filtre *tous / dans HAL /
