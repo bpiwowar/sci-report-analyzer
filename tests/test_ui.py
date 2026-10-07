@@ -2696,9 +2696,16 @@ async def test_primary_source_filters_the_panel(user: User) -> None:
     user.find("primary-source").elements.pop().value = "hal"
     assert source_settings.default_primary() == "hal"
     await user.open(f"/person/{pid}")
+    # All of them by default, with a warning: some are not in HAL (not counted).
     await user.should_see("Deep ranking for search")
-    await user.should_not_see("A workshop contribution")  # not in HAL: not counted
-    user.find("show-outside").click()
+    await user.should_see("A workshop contribution")
+    await user.should_see(marker="not-in-primary")
+    toggle = user.find("source-filter").elements.pop()
+    toggle.value = "primary"
+    await user.should_see("Deep ranking for search")
+    await user.should_not_see("A workshop contribution")
+    await user.should_not_see(marker="not-in-primary")
+    user.find("source-filter").elements.pop().value = "others"
     await user.should_see("A workshop contribution")
     await user.should_not_see("Deep ranking for search")
     # A folder without a primary source counts everything.

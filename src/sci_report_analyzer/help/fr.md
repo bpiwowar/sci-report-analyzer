@@ -33,9 +33,10 @@ Votre **adresse e-mail** (Paramètres → Clés d'API) est requise avant toute r
 aux sources (OpenAlex, Crossref et Unpaywall la demandent) afin qu'elles puissent vous contacter.
 
 Une **source principale** (Paramètres → Sources de publications ; un dossier peut en utiliser une autre, ou aucune) décide
-quels articles comptent : un article qu'elle ne liste pas pour la personne est exclu du panneau, des rapports
-et de la synthèse, par exemple HAL, où les chercheurs du CNRS doivent déposer leurs articles. L'interrupteur
-*seulement ceux absents de HAL* les liste, pour les y ajouter. Les autres sources aident toujours à trouver
+quels articles comptent : un article qu'elle ne liste pas pour la personne est exclu des rapports et de la
+synthèse, par exemple HAL, où les chercheurs du CNRS doivent déposer leurs articles. Le panneau les liste tous
+par défaut (un avertissement dit combien sont absents de HAL, chacun signalé) ; son filtre *tous / dans HAL /
+absents de HAL* ne montre que ceux qu'elle liste, ou que les autres, pour les y ajouter. Les autres sources aident toujours à trouver
 le canal et la session. Les personnes sans profil validé sur cette source ne sont pas concernées.
 
 ## Fusion

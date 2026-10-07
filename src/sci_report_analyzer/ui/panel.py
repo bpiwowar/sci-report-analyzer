@@ -141,7 +141,8 @@ class PublicationsPanel:
         # The source a paper must be in to count (None: any), and whether to show only the
         # papers it doesn't list (to fix them there).
         self.primary: str | None = None
-        self.show_outside = False
+        # Papers by the primary source: "all", "primary" (those it lists) or "others".
+        self.source_filter = "all"
         self.problems_only = False
         self.manual_only = False  # papers whose venue, rank or kind was decided by hand
         self.venue_filter: int | None = None  # only the papers of a venue
@@ -334,7 +335,11 @@ class PublicationsPanel:
                 continue
             if s.hidden and not self.show_hidden:
                 continue
-            if self.primary and self.outside(s) != self.show_outside:
+            if (
+                self.source_filter != "all"
+                and self.primary
+                and self.outside(s) != (self.source_filter == "others")
+            ):
                 continue
             if problems_filter and self.problems_only and not s.problems:
                 continue
@@ -398,7 +403,7 @@ class PublicationsPanel:
             or self.problems_only
             or self.manual_only
             or self.venue_filter
-            or self.show_outside
+            or self.source_filter != "all"
         )
 
     def reset_filters(self) -> None:
@@ -407,7 +412,8 @@ class PublicationsPanel:
         self.tag_filter = []
         self.track_filter = []
         self.text = ""
-        self.hide_preprints = self.problems_only = self.manual_only = self.show_outside = False
+        self.hide_preprints = self.problems_only = self.manual_only = False
+        self.source_filter = "all"
         self.venue_filter = None
         self._save_state()
         self.render()
@@ -658,22 +664,29 @@ class PublicationsPanel:
             n_outside = sum(
                 self.outside(s) for s in self.stats if not s.hidden and self.in_years(s)
             )
-            if self.primary and (n_outside or self.show_outside):
+            if self.primary:
 
-                def set_show_outside(e) -> None:
-                    self.show_outside = e.value
+                def set_source_filter(e) -> None:
+                    self.source_filter = e.value
                     self.sels = []
                     self.render()
 
-                ui.switch(
-                    _("only those not in {source} ({n})").format(
-                        source=ADAPTERS[self.primary].label, n=n_outside
-                    ),
-                    value=self.show_outside,
-                    on_change=set_show_outside,
-                ).tooltip(
-                    _("Papers the primary source doesn't list: not counted (add them there)")
-                ).mark("show-outside")
+                source = ADAPTERS[self.primary].label
+                ui.toggle(
+                    {
+                        "all": _("all"),
+                        "primary": _("in {source}").format(source=source),
+                        "others": _("not in {source} ({n})").format(source=source, n=n_outside),
+                    },
+                    value=self.source_filter,
+                    on_change=set_source_filter,
+                ).props("dense no-caps size=sm").tooltip(
+                    _("The papers shown: all, those the primary source lists, or the others")
+                ).mark("source-filter")
+                if n_outside and self.source_filter == "all":
+                    ui.icon("warning", size="sm", color="orange-8").tooltip(
+                        _("{n} papers not in {source}").format(n=n_outside, source=source)
+                    ).mark("not-in-primary")
             for sel in self.sels:
                 ui.chip(sel.label, removable=True, color="primary", text_color="white").on(
                     "remove", lambda s=sel: self.unpick(s)
@@ -1281,6 +1294,10 @@ class PublicationsPanel:
                     ui.icon("push_pin", size="xs", color="primary").tooltip(
                         _("venue or rank set by hand")
                     )
+                if self.outside(s):
+                    ui.icon("cloud_off", size="xs", color="orange-8").tooltip(
+                        _("Not in {source}").format(source=ADAPTERS[self.primary].label)
+                    ).mark(f"outside-{s.id}")
                 if problems := s.problems:
                     # Clicking it opens the details on the tab where they are settled.
                     with (

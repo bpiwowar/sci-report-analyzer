@@ -33,9 +33,10 @@ Your **email** (Settings → API keys) is required before anything is fetched: i
 the sources (OpenAlex, Crossref and Unpaywall ask for it) so they can reach you.
 
 A **primary source** (Settings → Publication sources; a folder can use another one, or none) decides
-which papers count: one it doesn't list for the person is left out of the panel, the reports
-and the summary, e.g. HAL, where CNRS researchers must deposit their papers. The switch
-*only those not in HAL* lists them, to add them there. The other sources still help find
+which papers count: one it doesn't list for the person is left out of the reports and the
+summary, e.g. HAL, where CNRS researchers must deposit their papers. The panel lists them all
+by default (a warning says how many are not in HAL, each one marked); its filter *all / in
+HAL / not in HAL* shows only those it lists, or only the others, to add them there. The other sources still help find
 the venue and track. People without a validated profile on that source are not affected.
 
 ## Merging

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 08:58+0200\n"
+"POT-Creation-Date: 2026-10-07 09:30+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -2840,6 +2840,10 @@ msgstr[1] "Introuvables pour {n} articles :"
 msgid "Not in {edition} (dropped from CORE)"
 msgstr "Absent de {edition} (retiré de CORE)"
 
+#, python-brace-format
+msgid "Not in {source}"
+msgstr "Absent de {source}"
+
 msgid "Not loaded: download it"
 msgstr "Non chargée : la télécharger"
 
@@ -3130,11 +3134,6 @@ msgid "Papers purged; re-syncing {n} person"
 msgid_plural "Papers purged; re-syncing {n} people"
 msgstr[0] "Articles purgés ; resynchronisation de {n} personne"
 msgstr[1] "Articles purgés ; resynchronisation de {n} personnes"
-
-msgid "Papers the primary source doesn't list: not counted (add them there)"
-msgstr ""
-"Articles que la source principale ne liste pas : non comptés (ajoutez-"
-"les-y)"
 
 msgid "Papers this source doesn't list for a person are not counted"
 msgstr ""
@@ -4434,6 +4433,9 @@ msgstr ""
 "l'ordre de première citation ({index} : le numéro ; par défaut : "
 "{default})"
 
+msgid "The papers shown: all, those the primary source lists, or the others"
+msgstr "Les articles montrés : tous, ceux que liste la source principale, ou les autres"
+
 #, python-brace-format
 msgid ""
 "The papers starred within a person's period (★: the first list), in "
@@ -5282,6 +5284,9 @@ msgstr "ajoutée"
 msgid "added (from the file)"
 msgstr "ajoutée (du fichier)"
 
+msgid "all"
+msgstr "tous"
+
 msgid "all ranking lists"
 msgstr "tous les classements"
 
@@ -5504,6 +5509,10 @@ msgstr "seulement hors de tout dossier"
 
 msgid "in progress"
 msgstr "en cours"
+
+#, python-brace-format
+msgid "in {source}"
+msgstr "dans {source}"
 
 #, python-brace-format
 msgid "in “{list}”"
@@ -5756,6 +5765,10 @@ msgstr "introuvable : {url}"
 msgid "not in the file (added here)"
 msgstr "absente du fichier (ajoutée ici)"
 
+#, python-brace-format
+msgid "not in {source} ({n})"
+msgstr "absents de {source} ({n})"
+
 msgid "not ranked"
 msgstr "non classé"
 
@@ -5794,10 +5807,6 @@ msgstr "uniquement pour"
 
 msgid "only for sources"
 msgstr "seulement pour les sources"
-
-#, python-brace-format
-msgid "only those not in {source} ({n})"
-msgstr "seulement ceux absents de {source} ({n})"
 
 #, python-brace-format
 msgid "only {sources}"
@@ -6279,6 +6288,10 @@ msgid "{n} paper with problems in the people's periods"
 msgid_plural "{n} papers with problems in the people's periods"
 msgstr[0] "{n} article avec des problèmes dans les périodes des personnes"
 msgstr[1] "{n} articles avec des problèmes dans les périodes des personnes"
+
+#, python-brace-format
+msgid "{n} papers not in {source}"
+msgstr "{n} articles absents de {source}"
 
 #, python-brace-format
 msgid "{n} person"
