@@ -178,3 +178,19 @@ def test_chosen_changes_only():
         "venue/a/name": "A",
     }
     assert shared.describe("venue/b/hosts", out) == "B · main conferences"
+
+
+def test_check_command_fixes_the_formatting(tmp_path, capsys):
+    from sci_report_analyzer import shared_cli
+
+    (tmp_path / "venues").mkdir()
+    (tmp_path / "settings.json").write_text(
+        '{"format": "sci-report-analyzer-shared", "version": 1}'
+    )
+    (tmp_path / "venues/x.json").write_text('{"name": "X", "id": "x", "kind": "intl_conference"}')
+    assert shared_cli.main(["check", str(tmp_path)]) == 1
+    assert "canonical" in capsys.readouterr().err
+    assert shared_cli.main(["check", str(tmp_path), "--fix"]) == 0
+    assert (tmp_path / "venues/x.json").read_text() == shared.dumps(
+        {"id": "x", "kind": "intl_conference", "name": "X"}
+    )

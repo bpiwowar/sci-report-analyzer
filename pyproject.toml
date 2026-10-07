@@ -25,6 +25,7 @@ dependencies = [
 
 [project.scripts]
 sci-report-analyzer = "sci_report_analyzer.main:main"
+sci-report-analyzer-shared = "sci_report_analyzer.shared_cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.17,<0.13.0"]

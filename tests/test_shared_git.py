@@ -175,3 +175,41 @@ def test_pull_links_a_new_member_venues(group, tmp_path):
         v = s.scalar(select(Venue).where(Venue.share_id == "stv"))
         assert v.kind == "natl_conference" and v.kind_manual
         assert len(list(s.scalars(select(Venue).where(Venue.name.like("%Team Venues%"))))) == 1
+
+
+@pytest.mark.nicegui_main_file("tests/app_main.py")
+async def test_shared_settings_screen(user, group, tmp_path):
+    from sci_report_analyzer import venues
+
+    vid = _venue()
+    await user.open("/settings?tab=shared")
+    await user.should_see(marker="shared-url")
+    user.find("shared-pull").click()
+    await user.should_see(marker="shared-pull-apply", retries=40)
+    user.find("shared-pull-apply").click()
+    await user.should_see("Pulled", retries=40)
+    user.find("shared-push").click()
+    await user.should_see(marker="shared-push-send", retries=40)
+    user.find("shared-message").type("our first decisions")
+    user.find("shared-push-send").click()
+    await user.should_see("Pushed", retries=40)
+    work = clone(group, tmp_path / "w")
+    assert json.loads((tmp_path / "w/venues/cgv.json").read_text())["short_name"] == "CGV"
+    assert run(work, "log", "-1", "--format=%s") == "our first decisions"
+    # A colleague's change, and one of mine: both shown, nothing in conflict.
+    path = tmp_path / "w/venues/cgv.json"
+    cgv = json.loads(path.read_text())
+    cgv["url"] = "https://cgv.example.org"
+    path.write_text(shared.dumps(cgv))
+    run(work, "commit", "-q", "-am", "website")
+    run(work, "push", "-q")
+    venues.update_venue(vid, kind="natl_conference")
+    await user.open("/settings?tab=shared")
+    user.find("shared-pull").click()
+    await user.should_see("1 change from the group", retries=40)
+    await user.should_see("push it after")
+    user.find("shared-pull-apply").click()
+    await user.should_see("Pulled", retries=40)
+    with session_scope() as s:
+        v = s.get(Venue, vid)
+        assert v.url == "https://cgv.example.org" and v.kind == "natl_conference"

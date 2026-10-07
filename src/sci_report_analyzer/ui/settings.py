@@ -36,7 +36,7 @@ from ..ranking.normalize import (
 )
 from ..ranking.service import MatchSettings, load_settings, save_settings, service
 from ..sources import ADAPTERS
-from . import scimago_years, unsaved
+from . import scimago_years, shared_settings, unsaved
 from .colours import ColourInput
 from .dialogs import actions, confirm, transient_dialog
 from .theme import fmt_dt, frame, level_hint, level_options, track_chip
@@ -67,7 +67,14 @@ NAV = (
             ("copy", N_("Copy filters")),
         ),
     ),
-    (N_("Data"), (("data", N_("Data & cache")), ("io", N_("Import / export")))),
+    (
+        N_("Data"),
+        (
+            ("data", N_("Data & cache")),
+            ("io", N_("Import / export")),
+            ("shared", N_("Shared settings")),
+        ),
+    ),
 )
 PANELS = {
     "sources": lambda: _publication_sources(),
@@ -84,6 +91,7 @@ PANELS = {
     "copy": lambda: copy_filters_tab(),
     "data": lambda: data_tab(),
     "io": lambda: io_tab(),
+    "shared": lambda: shared_settings.shared_tab(),
 }
 ui.add_css(
     """
