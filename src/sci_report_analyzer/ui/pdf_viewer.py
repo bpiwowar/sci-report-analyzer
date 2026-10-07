@@ -19,7 +19,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import Client, app, background_tasks, ui
 
-from .. import annotations, documents, livereload, pdfs, pdftext, persons
+from .. import annotations, documents, pdfs, pdftext, persons
 from ..i18n import N_, _, ngettext
 from .dialogs import transient_dialog
 from .theme import APP_NAME, bare_page
@@ -260,7 +260,6 @@ def viewer_frame(
             ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
         ui.label(title).classes("ellipsis grow min-w-0 font-medium")
         ui.label("").classes("text-sm opacity-80").props("id=vr-pdf-status").mark("pdf-status")
-        livereload.banner(dense=True)  # (--live-reload: a new version, to restart)
         for icon, step, tip in (
             ("arrow_back", "back", _("Back (after following a link; also ⌥← or ⌘[)")),
             ("arrow_forward", "forward", _("Forward (also ⌥→ or ⌘])")),
@@ -473,7 +472,6 @@ def _pane_frame(
         ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
         ui.label(title).classes("ellipsis grow min-w-0 font-medium")
         ui.label("").classes("text-sm opacity-80").props("id=vr-pane-status").mark("pane-status")
-        livereload.banner(dense=True)
         full_screen_button()
         _selection_actions(side, bookmarked, here=False)
         ui.button(icon="close_fullscreen").props("flat dense round color=white").on(

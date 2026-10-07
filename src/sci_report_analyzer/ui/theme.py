@@ -135,6 +135,9 @@ def _menu(compact: bool = False) -> None:
         ui.link(_("Settings"), "/settings").classes("text-white no-underline" + text)
         ui.link(_("Help"), "/help").classes("text-white no-underline" + text)
     with ui.row().classes("items-center no-wrap gap-1"):
+        from .. import livereload
+
+        livereload.banner()  # (--live-reload: a new version, to restart)
         language_menu(compact)
         dark = ui.dark_mode()
         ui.button(icon="dark_mode", on_click=dark.toggle).props(
@@ -152,9 +155,6 @@ def frame(title: str) -> Iterator[None]:
         _menu()
     ui.query(".nicegui-content").style("padding-top: 0")  # (close to the menu bar)
     with ui.column().classes("w-full max-w-screen-xl mx-auto px-4 pb-4 pt-1 gap-3"):
-        from .. import livereload
-
-        livereload.banner()
         from ..keys import get_key
 
         if not get_key("email"):

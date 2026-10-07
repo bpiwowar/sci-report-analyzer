@@ -159,7 +159,8 @@ async def test_viewer_page(user: User, fake_viewer):
 
 
 async def test_viewer_restart_notice(user: User, monkeypatch, fake_viewer):
-    """With --live-reload: a new version of the code, offered in the viewer's header too."""
+    """With --live-reload: a new version of the code, offered in the menu bar (of every page,
+    the PDF windows' too; not in the side panel's own window, without one)."""
     from sci_report_analyzer import livereload
 
     _, _, ids = _person()
@@ -167,14 +168,17 @@ async def test_viewer_restart_notice(user: User, monkeypatch, fake_viewer):
     pdfs.save(a, PDF, None)
     monkeypatch.setattr(livereload, "enabled", True)
     monkeypatch.setattr(livereload, "changed", {"ui/pdf_viewer.py"})
+    await user.open("/")
+    await user.should_see("New version available (1 file changed)")
     await user.open(f"/pdf/{a}")
     await user.should_see(marker="pdf-frame")
     await user.should_see("New version available (1 file changed)")
     await user.should_see("Restart & reload")
-    # The side panel in its own window: there too.
+    box = user.find(marker="live-reload").elements.pop()
+    assert any("menu-bar" in a._markers for a in box.ancestors())  # (in it)
     await user.open(f"/pdf/{a}?pane=k3y9token")
     await user.should_see(marker="pane-back")
-    await user.should_see("New version available (1 file changed)")
+    await user.should_not_see(marker="live-reload")
 
 
 async def test_viewer_details(user: User, fake_viewer):

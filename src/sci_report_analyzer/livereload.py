@@ -50,18 +50,15 @@ def restart() -> None:
     asyncio.get_running_loop().call_later(0.5, os.execv, sys.executable, argv)
 
 
-def banner(*, dense: bool = False) -> None:
-    """A banner (per page) announcing that a new version is available; ``dense``: in a header
-    bar (e.g. the PDF viewer's), on its colour."""
+def banner() -> None:
+    """In the menu bar (of every page, see theme._menu), on its colour: a new version is
+    available, to restart (its text in a tooltip, the bar's room kept)."""
     if not enabled:
         return
     from .sync import any_running
 
     state = {"dismissed": 0, "confirm": False}
-    if dense:
-        box = ui.row().classes("items-center no-wrap gap-1 shrink-0 text-sm")
-    else:
-        box = ui.row().classes("w-full items-center gap-3 bg-indigo-1 text-indigo-10 rounded p-2")
+    box = ui.row().classes("items-center no-wrap gap-1 shrink-0 text-sm")
     box.set_visibility(False)
     box.mark("live-reload")
 
@@ -80,21 +77,13 @@ def banner(*, dense: bool = False) -> None:
         box.set_visibility(False)
 
     with box:
-        if dense:  # (its text in a tooltip, the header's room kept)
-            with ui.icon("system_update"):
-                label = ui.tooltip()
-            button = ui.button(_("Restart & reload"), icon="restart_alt", on_click=apply)
-            button.props("dense outline color=white")
-            ui.button(icon="close", on_click=later).props("dense flat round color=white").tooltip(
-                _("Later")
-            )
-        else:
-            ui.icon("system_update")
-            label = ui.label()
-            ui.space()
-            button = ui.button(_("Restart & reload"), icon="restart_alt", on_click=apply)
-            button.props("dense")
-            ui.button(_("Later"), on_click=later).props("dense flat")
+        with ui.icon("system_update"):
+            label = ui.tooltip()
+        button = ui.button(_("Restart & reload"), icon="restart_alt", on_click=apply)
+        button.props("dense outline color=white")
+        ui.button(icon="close", on_click=later).props("dense flat round color=white").tooltip(
+            _("Later")
+        )
 
     def check() -> None:
         # Shown again if more files change after "Later".
