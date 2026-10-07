@@ -35,7 +35,7 @@ from .db.session import session_scope
 from .i18n import N_, _
 from .ranking import tracks as tracks_mod
 from .ranking.detection import DetectionRule, default_detection_rules
-from .ranking.levels import normalized
+from .ranking.levels import clean, clean_name, normalized
 from .ranking.normalize import NormRule, default_rules
 from .ranking.service import MatchSettings, VenuePattern, load_settings, save_settings, service
 from .text import ascii_fold
@@ -57,6 +57,8 @@ Items = dict[str, Any]  # item key -> value
 _STRUCTURED = ("sources", "kind_levels", "norm_rules", "detection_rules", "tracks")
 # A venue's decisions (``Venue.DECIDED``), as fields of its file.
 VENUE_FIELDS = Venue.DECIDED
+# A venue's decisions by period, each entry with its author: levels, former names.
+LISTS = ("levels", "names")
 SHARE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
 
@@ -230,8 +232,9 @@ def _venue_items(v: Venue, sids: dict[int, str]) -> Items:
     for f, value in _venue_values(v, sids).items():
         if value is not None:
             out[f"{p}/{f}"] = {"value": value, **decisions.get(f, {})}
-    if v.levels:
-        out[f"{p}/levels"] = [dict(lv) for lv in v.levels]
+    for f in LISTS:
+        if entries := getattr(v, f):
+            out[f"{p}/{f}"] = [dict(x) for x in entries]
     for k in v.keys:
         if k.manual:
             meta = {"track": k.track, "by": k.decided_by, "on": k.decided_on}
@@ -319,8 +322,8 @@ def _venue_file(sid: str, fields: dict[str, Any]) -> dict[str, Any]:
             out[field] = value["value"]
             if meta := {k: x for k, x in value.items() if k != "value" and x}:
                 decisions[field] = meta
-        elif field == "levels":
-            out["levels"] = value
+        elif field in LISTS:
+            out[field] = value
         elif field.startswith("variant/"):
             source, _sep, raw = field.removeprefix("variant/").partition("|")
             variants.append({"raw": raw, **({"source": source} if source else {}), **value})
@@ -413,11 +416,12 @@ def _venue_items_of(path: str, data: dict[str, Any]) -> Items:
                 except ValueError as err:
                     raise FormatError(path, _("venue rules: {error}").format(error=err)) from err
             items[f"{p}/{f}"] = {"value": value, **decisions.get(f, {})}
-    if data.get("levels"):
-        try:
-            items[f"{p}/levels"] = normalized(data["levels"])
-        except (ValueError, TypeError) as err:
-            raise FormatError(path, _("levels: {error}").format(error=err)) from err
+    for f, cleaner in (("levels", clean), ("names", clean_name)):
+        if data.get(f):
+            try:
+                items[f"{p}/{f}"] = normalized(data[f], cleaner)
+            except (ValueError, TypeError) as err:
+                raise FormatError(path, f"{f}: {err}") from err
     for var in data.get("variants") or []:
         if not isinstance(var, dict) or not var.get("raw"):
             raise FormatError(path, _("a variant without its text (raw)"))
@@ -653,8 +657,9 @@ def _apply_venues(new: Items, by_venue: dict[str, set[str]]) -> int:
             for f in VENUE_FIELDS:
                 if f in fields and f not in ("hosts", "joint"):
                     _set_field(v, f, item(sid, f))
-            if "levels" in fields:
-                v.levels = item(sid, "levels")
+            for f in LISTS:
+                if f in fields:
+                    setattr(v, f, item(sid, f))
             for f in fields & set(VENUE_FIELDS):
                 value = item(sid, f)
                 meta = {k: x for k, x in (value or {}).items() if k != "value" and x}
@@ -787,6 +792,7 @@ _FIELD_LABELS = {
     "hosts": N_("main conferences"),
     "joint": N_("joint venue"),
     "levels": N_("levels"),
+    "names": N_("former names"),
 }
 
 
@@ -801,6 +807,10 @@ def show(value: Any) -> str:
         from .ranking.levels import label
 
         return label(v)
+    if isinstance(v, list) and v and isinstance(v[0], dict) and "name" in v[0]:
+        from .ranking.levels import range_label
+
+        return " · ".join(f"{n['name']} ({range_label(n)})" for n in v)
     if isinstance(v, dict | list):
         return json.dumps(comparable(v), ensure_ascii=False, sort_keys=True)
     return str(v)

@@ -436,6 +436,7 @@ def member_view(
     names: dict[int, str],
 ) -> MemberView:
     tm = texts.get((m.link.source, m.venue)) if m.venue else None
+    tm = tm.at(m.year) if tm else None  # (a venue rule of its period)
     vid = by_issn.get(venue_match.norm_issn(m.issn) or "")
     via = "identifier" if vid else (tm.via if tm else None)
     vid = vid or (tm.venue_id if tm else None)
@@ -858,6 +859,7 @@ async def load_stats(person_id: int) -> list[PubStat]:
                 # writer; resolutions write the cache meanwhile).
                 pending_links[pub.id] = venue.id if venue else None
             year = pub.year_override or pub.year
+            former = venue.name_at(year) if venue else None  # (its name that year)
             badge, host = await _paper_badge(pub, kind, badge, venue, venues, year)
             text = best.venue if best else None
             validated = best is not None and best.source == pub.venue_source
@@ -925,7 +927,8 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     authors=authors,
                     author_marks=marks,
                     author_notes=notes,
-                    venue=(venue.name if venue else None)
+                    venue=(former or {}).get("name")
+                    or (venue.name if venue else None)
                     or text
                     or next((v.venue for v in views if v.venue), None),
                     url=url,
@@ -954,6 +957,8 @@ async def load_stats(person_id: int) -> list[PubStat]:
                     period_numbers=maps.period_numbers.get(pub.id, {}),
                     venue_short=None
                     if archival_only or no_venue
+                    else former["short_name"]
+                    if former and former.get("short_name")
                     else venue.short_name
                     if venue and venue.short_manual
                     else auto_short_name(

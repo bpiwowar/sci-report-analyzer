@@ -1,5 +1,5 @@
-"""Shared settings: a venue's levels by year range, its decisions' authors, its shared id;
-a variant's author
+"""Shared settings: a venue's levels by year range, its former names, its decisions'
+authors, its shared id; a variant's author; the venue of a text by period
 
 Revision ID: c3e8a1f5d7b9
 Revises: 9b5d3f7a2c61
@@ -23,6 +23,9 @@ def upgrade() -> None:
         batch.add_column(sa.Column("levels", sa.JSON(), nullable=True))
         batch.add_column(sa.Column("decisions", sa.JSON(), nullable=True))
         batch.add_column(sa.Column("share_id", sa.String(), nullable=True))
+        batch.add_column(sa.Column("names", sa.JSON(), nullable=True))
+    with op.batch_alter_table("venue_text") as batch:
+        batch.add_column(sa.Column("periods", sa.JSON(), nullable=True))
     conn = op.get_bind()
     rows = conn.execute(
         sa.text("SELECT id, level_type, level_rank FROM venue WHERE level_rank IS NOT NULL")
@@ -44,6 +47,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    with op.batch_alter_table("venue_text") as batch:
+        batch.drop_column("periods")
     with op.batch_alter_table("venue_key") as batch:
         batch.drop_column("decided_on")
         batch.drop_column("decided_by")
@@ -63,5 +68,6 @@ def downgrade() -> None:
     with op.batch_alter_table("venue") as batch:
         batch.drop_index("ix_venue_share_id")
         batch.drop_column("share_id")
+        batch.drop_column("names")
         batch.drop_column("decisions")
         batch.drop_column("levels")

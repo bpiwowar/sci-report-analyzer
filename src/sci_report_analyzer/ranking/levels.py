@@ -33,6 +33,23 @@ def clean(level: dict[str, Any]) -> dict[str, Any] | None:
     return out
 
 
+def clean_name(entry: dict[str, Any]) -> dict[str, Any] | None:
+    """A former name with its known fields only (none without a name)."""
+    name = str(entry.get("name") or "").strip()
+    if not name:
+        return None
+    out: dict[str, Any] = {"name": name}
+    if short := str(entry.get("short_name") or "").strip():
+        out["short_name"] = short
+    for f in ("from", "to"):
+        if (y := entry.get(f)) not in (None, ""):
+            out[f] = int(y)
+    for f in ("by", "on", "note"):
+        if v := entry.get(f):
+            out[f] = str(v)
+    return out
+
+
 def _start(level: dict[str, Any]) -> float:
     y = level.get("from")
     return float("-inf") if y is None else y
@@ -43,10 +60,12 @@ def _end(level: dict[str, Any]) -> float:
     return float("inf") if y is None else y
 
 
-def normalized(levels: Iterable[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
-    """The levels cleaned, by year; ``ValueError`` when two ranges overlap or one ends
-    before it starts. None when there is none."""
-    out = sorted((c for lv in levels or () if (c := clean(lv))), key=_start)
+def normalized(
+    levels: Iterable[dict[str, Any]] | None, cleaner=clean
+) -> list[dict[str, Any]] | None:
+    """The levels (or former names, ``cleaner=clean_name``) cleaned, by year; ``ValueError``
+    when two ranges overlap or one ends before it starts. None when there is none."""
+    out = sorted((c for lv in levels or () if (c := cleaner(lv))), key=_start)
     for lv in out:
         if _end(lv) < _start(lv):
             raise ValueError(

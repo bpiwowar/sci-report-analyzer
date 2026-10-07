@@ -660,6 +660,10 @@ class Venue(Base):
     # Who made its manual decisions, when and why: {field: {"by", "on", "note"}} (fields of
     # ``DECIDED``; a level's are on the level).
     decisions: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+    # Its former names by year range: [{"name", "short_name", "from", "to", "by", "on",
+    # "note"}, ...] (``name`` / ``short_name``: its current ones); a paper of a year one
+    # covers shows that name.
+    names: Mapped[list[Any] | None] = mapped_column(JSON(none_as_null=True))
     # Its id in shared settings (a group's folder: ``venues/<share_id>.json``).
     share_id: Mapped[str | None] = mapped_column(unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
@@ -677,6 +681,12 @@ class Venue(Base):
             return None
         return {"type": lv.get("type") or "conference", "rank": lv["rank"], "name": self.name}
 
+    def name_at(self, year: int | None) -> dict[str, Any] | None:
+        """Its former name (``{"name", "short_name"}``) in ``year``, if it had one."""
+        from ..ranking.levels import at
+
+        return at(self.names, year) if year is not None and self.names else None
+
     def host_at(self, year: int | None) -> int | None:
         """The main conference of a workshop for a paper of ``year``."""
         for h in self.hosts or []:
@@ -691,6 +701,7 @@ class Venue(Base):
         "kind": None,
         "kind_manual": False,
         "levels": None,
+        "names": None,
         "record_key": None,
         "match_text": None,
         "short_name": None,
@@ -780,6 +791,9 @@ class VenueText(Base):
     track: Mapped[str | None]
     # Other venues whose rules match the text too.
     conflicts: Mapped[list[Any]] = mapped_column(default=list)
+    # Its venue in some years, by venue rules limited to a period (before ``venue_id``,
+    # that of the other years): [{"from", "to", "venue_id", "pattern_index", "track"}].
+    periods: Mapped[list[Any] | None] = mapped_column(JSON(none_as_null=True))
 
     venue: Mapped[Venue | None] = relationship()
 

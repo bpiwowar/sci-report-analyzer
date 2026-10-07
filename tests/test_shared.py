@@ -51,7 +51,12 @@ def _decisions() -> tuple[int, int]:
 
 
 def test_folder_roundtrip_is_canonical(identity):
-    _decisions()
+    conf, _ws = _decisions()
+    venues.update_venue(
+        conf,
+        names=[{"name": "Old Shared Things", "short_name": "OST", "to": 2009}],
+        patterns=[{"pattern": "^Shared Things", "to_year": 2009}],
+    )
     items = shared.local_items()
     files = shared.files_from_items(items)
     assert shared.items_from_files(files) == items
@@ -60,6 +65,8 @@ def test_folder_roundtrip_is_canonical(identity):
     cst = json.loads(files["venues/cst.json"])
     assert cst["levels"][0]["note"] == "as CORE then" and cst["levels"][0]["by"] == "jdoe"
     assert cst["decisions"]["kind"]["by"] == "jdoe"
+    assert cst["names"][0]["short_name"] == "OST" and cst["names"][0]["by"] == "jdoe"
+    assert cst["patterns"] == [{"pattern": "^Shared Things", "to_year": 2009}]
     ws = next(json.loads(t) for p, t in files.items() if "workshop" in p)
     assert ws["hosts"] == [{"from": 2015, "venue": "cst"}]
     assert json.loads(files["settings.json"])["settings"] == {"min_score": 0.85}

@@ -36,7 +36,7 @@ from .ranking.kinds import (
     host_text,
     is_edited_volume,
 )
-from .ranking.levels import normalized
+from .ranking.levels import clean_name, normalized
 from .ranking.matcher import issn_key
 from .ranking.normalize import normalize, tokenize
 from .ranking.service import (
@@ -807,6 +807,7 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
             if sp.archival or not sp.link.active:
                 continue
             m = texts.get((sp.link.source, sp.venue))
+            m = m.at(sp.year) if m else None  # (a venue rule of its period)
             vid = by_issn.get(issn_key(sp.issn)) or (m and m.venue_id)
             if vid:
                 by_venue[vid].append(sp)
@@ -1427,7 +1428,8 @@ def pattern_uses(venue_id: int) -> list[PatternUse]:
         for (src, raw), m in texts.items():
             if (src, raw) not in counts:
                 continue
-            if m.venue_id == venue_id and m.via == "pattern" and m.pattern_index == i:
+            mine = m.venue_id == venue_id and m.via == "pattern" and m.pattern_index == i
+            if mine or any(p[2] == venue_id and p[4] == i for p in m.periods):
                 ex.append((src, raw, counts[(src, raw)]))
             elif m.venue_id != venue_id and r.applies(src, raw):
                 lost.append((src, raw, m.venue_name))
@@ -1447,8 +1449,9 @@ class VenueEdit:
     no_short: bool = False  # it has no acronym (none inferred)
     url: str = ""
     kind: str = ""
-    # Its levels by year range (``ranking.levels``; empty: automatic).
+    # Its levels by year range (``ranking.levels``; empty: automatic), its former names.
     levels: list[dict[str, Any]] = field(default_factory=list)
+    names: list[dict[str, Any]] = field(default_factory=list)
     level_type: str = "conference"  # (of a new level)
     record_key: str | None = None
     match_text: str = ""
@@ -1471,6 +1474,7 @@ def edit_state(venue_id: int, kind: str) -> VenueEdit | None:
             url=v.url or "",
             kind=v.kind if v.kind_manual else "",
             levels=[dict(lv) for lv in v.levels or []],
+            names=[dict(n) for n in v.names or []],
             level_type="journal" if kind.endswith("journal") else "conference",
             record_key=v.record_key,
             match_text=v.match_text or "",
@@ -1507,6 +1511,7 @@ def save_edit(venue_id: int, edit: VenueEdit, *, parts: Any = ..., hosts: Any = 
         url=normalize_url(edit.url),
         kind=edit.kind or None,
         levels=normalized(edit.levels),
+        names=normalized(edit.names, clean_name),
         record_key=edit.record_key,
         match_text=edit.match_text.strip() or None,
     )

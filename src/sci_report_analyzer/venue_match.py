@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
@@ -55,6 +55,24 @@ class TextMatch:
     track: str | None = None
     pattern_index: int | None = None
     conflicts: tuple[int, ...] = field(default=())
+    # Its venue in some years (venue rules limited to a period, by priority): (from, to,
+    # venue id, venue name, rule index, track).
+    periods: tuple[tuple, ...] = field(default=())
+
+    def at(self, year: int | None) -> TextMatch:
+        """The match of a paper of ``year`` (a venue rule of its period, else the text's)."""
+        for lo, hi, vid, name, index, track in self.periods:
+            if year is not None and (lo is None or lo <= year) and (hi is None or year <= hi):
+                return replace(
+                    self,
+                    venue_id=vid,
+                    venue_name=name,
+                    via="pattern",
+                    pattern_index=index,
+                    track=track,
+                    conflicts=(),
+                )
+        return self
 
 
 norm_issn = issn_key  # (its former name)
@@ -160,7 +178,18 @@ def _assign(s: Session, texts: list[VenueText], *, all_texts: bool) -> None:
     variants = {vk.key: vk for vk in s.scalars(select(VenueKey))}
     for t in texts:
         vk = variants.get(t.key)
-        found = hits.get(t.id, [])
+        found = [h for h in hits.get(t.id, []) if not h[2].dated]
+        dated = [h for h in hits.get(t.id, []) if h[2].dated]
+        t.periods = [
+            {
+                "from": r.from_year,
+                "to": r.to_year,
+                "venue_id": vid,
+                "pattern_index": i,
+                "track": r.track,
+            }
+            for vid, i, r in dated
+        ] or None
         t.pattern_index, t.track = None, None
         if vk is not None and vk.manual:
             t.venue_id, t.via, t.track = vk.venue_id, "variant", vk.track
@@ -331,6 +360,18 @@ def matches() -> dict[tuple[str, str], TextMatch]:
                 t.track,
                 t.pattern_index,
                 tuple(t.conflicts or ()),
+                tuple(
+                    (
+                        p.get("from"),
+                        p.get("to"),
+                        p["venue_id"],
+                        names.get(p["venue_id"]),
+                        p.get("pattern_index"),
+                        p.get("track"),
+                    )
+                    for p in t.periods or ()
+                    if p.get("venue_id") in names
+                ),
             )
             for t in s.scalars(select(VenueText))
         }

@@ -145,6 +145,21 @@ class VenuePattern(BaseModel):
     # Track (demo, findings, short...) of the publications whose venue text matches.
     track: str | None = None
     note: str | None = None
+    # The years of the papers it applies to (included; none: open).
+    from_year: int | None = None
+    to_year: int | None = None
+
+    @property
+    def dated(self) -> bool:
+        return self.from_year is not None or self.to_year is not None
+
+    def covers(self, year: int | None) -> bool:
+        if not self.dated:
+            return True
+        if year is None:
+            return False
+        lo, hi = self.from_year, self.to_year
+        return (lo is None or lo <= year) and (hi is None or year <= hi)
 
     @property
     def regex(self) -> str:

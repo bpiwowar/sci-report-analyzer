@@ -18,7 +18,7 @@ from ..ranking.badge import (
     sjr_periods,
 )
 from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
-from ..ranking.levels import normalized
+from ..ranking.levels import clean_name, normalized, range_label
 from ..ranking.service import VenuePattern, service
 from ..sources import ADAPTERS
 from . import dnd
@@ -1179,6 +1179,54 @@ def _levels_editor(state: venues.VenueEdit) -> Callable[[], list[dict]]:
     return lambda: [dict(lv) for lv in levels if lv.get("rank")]
 
 
+def _names_editor(state: venues.VenueEdit) -> Callable[[], list[dict]]:
+    """A venue's former names and acronyms by period (e.g. NIPS until 2017); returns them."""
+    names = [dict(n) for n in state.names]
+    with ui.row().classes("items-center gap-2"):
+        ui.label(_("Former names")).classes("font-medium")
+        ui.button(
+            _("Add a former name"),
+            icon="add",
+            on_click=lambda: (names.append({"name": "", "to": None}), lines.refresh()),
+        ).props("dense flat size=sm").mark("venue-name-add")
+
+    @ui.refreshable
+    def lines() -> None:
+        if names:
+            ui.label(
+                _("A paper of a year one covers shows that name (the name above: the current one).")
+            ).classes("text-xs text-grey")
+        for i, n in enumerate(names):
+            with ui.row().classes("items-center gap-2 no-wrap w-full").mark(f"venue-former-{i}"):
+                ui.input(
+                    _("Name"),
+                    value=n.get("name") or "",
+                    on_change=lambda e, n=n: n.update(name=e.value or ""),
+                ).props("dense").classes("grow").mark(f"venue-former-name-{i}")
+                ui.input(
+                    _("Short name"),
+                    value=n.get("short_name") or "",
+                    on_change=lambda e, n=n: n.update(short_name=e.value or None),
+                ).props("dense").classes("w-32").mark(f"venue-former-short-{i}")
+                for end, label in (("from", _("from")), ("to", _("to"))):
+                    ui.number(
+                        label,
+                        value=n.get(end),
+                        format="%d",
+                        on_change=lambda e, n=n, end=end: n.update(
+                            {end: int(e.value) if e.value else None}
+                        ),
+                    ).props("dense outlined").classes("w-24").mark(f"venue-former-{end}-{i}")
+                if who := decided_by(n):
+                    ui.label(who).classes("text-xs text-grey whitespace-nowrap")
+                ui.button(
+                    icon="delete", on_click=lambda i=i: (names.pop(i), lines.refresh())
+                ).props("flat round dense size=sm")
+
+    lines()
+    return lambda: [dict(n) for n in names if (n.get("name") or "").strip()]
+
+
 def decided_by(decision: dict | None) -> str:
     """Who made a decision and when ("jdoe, 2026-10-01"), if known."""
     if not decision:
@@ -1342,6 +1390,11 @@ def venue_dialog(
                 normalized(edit["levels"])
             except ValueError as err:
                 ui.notify(_("Levels: {error}").format(error=err), type="negative")
+                return
+            try:
+                normalized(edit["names"], clean_name)
+            except ValueError as err:
+                ui.notify(_("Former names: {error}").format(error=err), type="negative")
                 return
             venues.save_edit(
                 row.id,
@@ -1510,7 +1563,8 @@ def _ranking_tab(
 ) -> Callable[[], tuple[dict, object, object]]:
     """Its kind, main conferences (a workshop) or conferences (a joint venue), level and
     ranking record; returns their values to save: (fields, parts, hosts)."""
-    ui.label(_("Kind")).classes("font-medium")
+    names_value = _names_editor(state)
+    ui.label(_("Kind")).classes("font-medium mt-2")
     kind = (
         ui.select(
             {"": _("Automatic ({kind})").format(kind=KINDS[row.kind]), **VENUE_KINDS},
@@ -1651,6 +1705,7 @@ def _ranking_tab(
     return lambda: (
         {
             "kind": kind.value or "",
+            "names": names_value(),
             "levels": levels_value(),
             "record_key": chosen["key"],
         },
@@ -1878,6 +1933,9 @@ def _matching_tab(
                     ).classes("text-xs text-grey")
                     if r.track:
                         ui.label(f"→ {tracks.name(r.track)}").classes("text-xs text-primary")
+                    if r.dated:
+                        period = range_label({"from": r.from_year, "to": r.to_year})
+                        ui.badge(_("papers {years}").format(years=period), color="orange")
                     if r.note:
                         ui.label(r.note).classes("text-xs text-grey italic")
                     ui.button(icon="edit", on_click=lambda i=use.index: edit_rule(i)).props(

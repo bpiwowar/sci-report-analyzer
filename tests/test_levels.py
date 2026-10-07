@@ -120,3 +120,54 @@ def test_rules_stamped_when_changed(identity):
     reset.norm_rules = type(reset)().norm_rules  # (back to the defaults)
     save_settings(reset)
     assert load_settings().norm_rules[0].by is None
+
+
+def test_former_names_by_year():
+    pid = make_person()
+    add_source(
+        pid,
+        "dblp",
+        "x/1",
+        [
+            pub("a", "Old paper", 2016, "Neural Things Conference"),
+            pub("b", "New paper", 2020, "Neural Things Conference"),
+        ],
+    )
+    set_venue(
+        "Neural Things Conference",
+        name="Conference on Neural Things",
+        short_name="NeuThings",
+        names=[{"name": "Neural Things Processing", "short_name": "NTP", "to": 2017}],
+    )
+    st = stats(pid)
+    assert st["Old paper"].venue == "Neural Things Processing"
+    assert st["Old paper"].venue_short == "NTP"
+    assert st["New paper"].venue == "Conference on Neural Things"
+    assert st["New paper"].venue_short == "NeuThings"
+
+
+def test_a_dated_venue_rule_wins_in_its_years():
+    """A workshop that became a conference under the same name."""
+    from sci_report_analyzer.ranking.service import VenuePattern
+
+    pid = make_person()
+    add_source(
+        pid,
+        "dblp",
+        "x/1",
+        [
+            pub("a", "Old paper", 2013, "Theory of Things Meeting"),
+            pub("b", "New paper", 2016, "Theory of Things Meeting"),
+            pub("c", "Other", 2013, "Workshop on Elsewhere"),
+        ],
+    )
+    conf = set_venue("Theory of Things Meeting", kind="intl_conference")
+    ws = set_venue("Workshop on Elsewhere", kind="intl_workshop")
+    rule = VenuePattern(pattern="^Theory of Things", to_year=2014)
+    venues.update_venue(ws, patterns=[rule.model_dump()])
+    from sci_report_analyzer import venue_match
+
+    venue_match.refresh(reassign=True)
+    st = stats(pid)
+    assert st["Old paper"].venue_id == ws
+    assert st["New paper"].venue_id == conf

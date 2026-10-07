@@ -99,14 +99,21 @@ def _stamp_venue(v: Venue, name: str | None, new: bool) -> None:
                 decisions[f] = {**decisions.get(f, {}), **stamp(name)}
         else:
             decisions.pop(f, None)
-    if new or _changed(state, "levels"):
-        before = state.attrs.levels.history.deleted
-        old = [without_meta(lv) for lv in (before[0] if before else None) or []]
-        if v.levels:
-            v.levels = [
-                lv if without_meta(lv) in old and lv.get("on") else {**lv, **stamp(name)}
-                for lv in v.levels
-            ]
+    for f in ("levels", "names"):  # (lists: each entry its author)
+        if new or _changed(state, f):
+            before = state.attrs[f].history.deleted
+            old = [without_meta(x) for x in (before[0] if before else None) or []]
+            if entries := getattr(v, f):
+                setattr(
+                    v,
+                    f,
+                    [
+                        x
+                        if without_meta(x) in old and (x.get("on") or x.get("by"))
+                        else {**x, **stamp(name)}
+                        for x in entries
+                    ],
+                )
     if decisions != (v.decisions or {}):
         v.decisions = decisions or None
 

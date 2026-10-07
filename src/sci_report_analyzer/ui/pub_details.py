@@ -259,6 +259,23 @@ def venue_rule_dialog(
                 )
                 .mark("rule-track")
             )
+        with ui.row().classes("items-center gap-2"):
+            years = {
+                end: ui.number(
+                    label, value=getattr(old, f"{end}_year") if old else None, format="%d"
+                )
+                .props("dense outlined clearable")
+                .classes("w-28")
+                .mark(f"rule-{end}")
+                for end, label in (("from", _("papers from")), ("to", _("to")))
+            }
+            ui.label(
+                _(
+                    "Years of the papers it applies to (empty: every year). In its years, it "
+                    "wins over the text's variants and undated rules (e.g. a workshop that "
+                    "became a conference under the same name)."
+                )
+            ).classes("text-xs text-grey")
         note = (
             ui.input(_("note (optional)"), value=(old.note or "") if old else "")
             .props("dense outlined")
@@ -289,6 +306,8 @@ def venue_rule_dialog(
                 sources=list(only.value or []),
                 track=track.value or None,
                 note=note.value or None,
+                from_year=int(years["from"].value) if years["from"].value else None,
+                to_year=int(years["to"].value) if years["to"].value else None,
             )
 
         def preview(_e=None) -> None:

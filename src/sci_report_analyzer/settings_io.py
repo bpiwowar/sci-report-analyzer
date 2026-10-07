@@ -73,6 +73,7 @@ class VenueIO(BaseModel):
     url: str | None = None
     kind: str | None = None  # manual kind only
     levels: list[dict[str, Any]] | None = None  # by year range (``ranking.levels``)
+    names: list[dict[str, Any]] | None = None  # former names, by year range
     record_key: str | None = None
     match_text: str | None = None
     patterns: list[VenuePattern] | None = None
@@ -131,6 +132,7 @@ def export_settings(*, include_jcr: bool = False) -> SettingsFile:
                     url=v.url,
                     kind=v.kind if v.kind_manual else None,
                     levels=v.levels,
+                    names=v.names,
                     record_key=v.record_key,
                     match_text=v.match_text,
                     patterns=[VenuePattern.model_validate(p) for p in v.patterns]
@@ -297,6 +299,7 @@ def track_mapping(data: SettingsFile) -> TrackMapping:
 _VENUE_FIELDS = (
     "kind",
     "levels",
+    "names",
     "record_key",
     "match_text",
     "short_name",
@@ -356,6 +359,7 @@ def _venue_values(v: Venue | VenueIO) -> dict[str, Any]:
     return {
         "kind": kind,
         "levels": authorship.without_meta(v.levels) or None,
+        "names": authorship.without_meta(v.names) or None,
         "record_key": v.record_key,
         "match_text": v.match_text,
         "short_name": v.short_name if isinstance(v, VenueIO) else _short(v),
@@ -459,6 +463,8 @@ def _import_venue(s, vio: VenueIO, *, force: bool, take: set[str]) -> tuple[Venu
         venue.kind, venue.kind_manual = vio.kind, True
     if wanted("levels"):
         venue.levels = [dict(lv) for lv in vio.levels or []] or None
+    if wanted("names"):
+        venue.names = [dict(n) for n in vio.names or []] or None
     if wanted("record_key"):
         venue.record_key = vio.record_key
     if wanted("match_text"):
@@ -532,7 +538,7 @@ def _import_settings(
         if replace:
             for v in s.scalars(select(Venue)):
                 v.kind_manual = False
-                v.levels = v.record_key = v.match_text = v.decisions = None
+                v.levels = v.names = v.record_key = v.match_text = v.decisions = None
                 v.short_name = v.url = v.patterns = v.identifiers = v.hosts = None
                 v.short_manual = False
                 if v.joint and (v.joint.get("manual") or v.joint.get("use")):
