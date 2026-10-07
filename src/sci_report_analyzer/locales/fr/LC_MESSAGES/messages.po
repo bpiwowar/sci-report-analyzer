@@ -2321,7 +2321,7 @@ msgstr ""
 "quartile, une source OpenAlex)."
 
 msgid "Matching (rules and variants)"
-msgstr "Reconnaissance (règles et variantes)"
+msgstr "Règles"
 
 msgid ""
 "Matching settings (cleaning and detection rules, tracks…) and the venues'"
@@ -2372,7 +2372,7 @@ msgid "Merge with it (in its category)"
 msgstr "Fusionner avec lui (dans sa catégorie)"
 
 msgid "Merge with other venues"
-msgstr "Fusionner avec d'autres canaux"
+msgstr "Fusion"
 
 #, python-brace-format
 msgid "Merge {n} venue into this one"
@@ -2490,7 +2490,7 @@ msgid "Name aliases (one per line)"
 msgstr "Variantes du nom (une par ligne)"
 
 msgid "Name and ranking"
-msgstr "Nom et classement"
+msgstr "Nom et rang"
 
 msgid "Name of the conference"
 msgstr "Nom de la conférence"
@@ -3439,7 +3439,7 @@ msgstr "Rejetés ({n})"
 
 #, python-brace-format
 msgid "Related conferences ({n})"
-msgstr "Conférences liées ({n})"
+msgstr "Liés ({n})"
 
 msgid "Related venues?"
 msgstr "Canaux liés ?"
