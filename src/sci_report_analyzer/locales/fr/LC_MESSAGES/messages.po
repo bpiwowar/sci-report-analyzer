@@ -368,6 +368,10 @@ msgid "A workshop of this venue"
 msgstr "Un atelier de ce canal"
 
 #, python-brace-format
+msgid "A workshop of “{main}” (kept, its papers take its rank)"
+msgstr "Un atelier de « {main} » (conservé, ses articles prennent son rang)"
+
+#, python-brace-format
 msgid ""
 "A {kind} has no venue (the sources give “{venue}”): change its kind if it"
 " is a paper of a conference or journal."
@@ -3441,8 +3445,8 @@ msgstr "Rejetés ({n})"
 msgid "Related conferences ({n})"
 msgstr "Liés ({n})"
 
-msgid "Related venues?"
-msgstr "Canaux liés ?"
+msgid "Related venues"
+msgstr "Liés"
 
 msgid "Relation recorded"
 msgstr "Relation enregistrée"
@@ -4053,6 +4057,9 @@ msgstr "Alias de doctorant ajouté"
 msgid "Students"
 msgstr "Étudiants"
 
+msgid "Suggested related venues"
+msgstr "Canaux liés suggérés"
+
 msgid "Suggestion"
 msgstr "Suggestion"
 
@@ -4379,6 +4386,10 @@ msgstr "Le même canal (fusionné dans le principal)"
 msgid "The same venue (merged into this one)"
 msgstr "Le même canal (fusionné dans celui-ci)"
 
+#, python-brace-format
+msgid "The same venue as “{main}”"
+msgstr "Le même canal que « {main} »"
+
 msgid ""
 "The satellite tracks of the conferences (Findings, tutorials, demos, "
 "short papers…): a paper of a track is counted apart (e.g. “Short CORE "
@@ -4510,6 +4521,10 @@ msgstr ""
 msgid "The {source} source is disabled (Settings → Sources)"
 msgstr "La source {source} est désactivée (Paramètres → Sources)"
 
+#, python-brace-format
+msgid "The {track} track of “{main}”"
+msgstr "La session {track} de « {main} »"
+
 msgid "The “rayonnement” category: it also lists the influence excerpts"
 msgstr ""
 "La catégorie « rayonnement » : elle liste aussi les extraits de "
@@ -4635,6 +4650,11 @@ msgstr "Ce canal n'a pas d'acronyme : aucun n'est déduit"
 
 msgid "This venue has no paper any more"
 msgstr "Ce canal n'a plus d'article"
+
+msgid "This venue is"
+msgid_plural "These venues are"
+msgstr[0] "Ce canal est"
+msgstr[1] "Ces canaux sont"
 
 #, python-brace-format
 msgid "This venue is a {track} track"
@@ -6238,6 +6258,14 @@ msgstr "— automatique"
 
 msgid "— none"
 msgstr "— aucun"
+
+#, python-brace-format
+msgid ""
+"“{a}” and “{b}” are both main conferences in the same years: give each "
+"one its years."
+msgstr ""
+"« {a} » et « {b} » sont toutes deux conférences principales les mêmes "
+"années : donnez à chacune ses années."
 
 #, python-brace-format
 msgid "“{name}” has an excerpt (with its subcategories): move it first."

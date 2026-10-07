@@ -229,8 +229,8 @@ def merge_venues(
                 target.kind, target.kind_manual = other.kind, True
             if other.patterns:
                 target.patterns = [*(target.patterns or []), *other.patterns]
-            if other.hosts:
-                target.hosts = [*(target.hosts or []), *other.hosts]
+            if other.hosts:  # (the same main conference once)
+                target.hosts = merge_hosts([*(target.hosts or []), *other.hosts]) or None
             if other.joint and not target.joint:
                 target.joint = other.joint
             if other.identifiers:
@@ -245,11 +245,14 @@ def merge_venues(
         merged = set(other_ids) - {target_id}
         for w in s.scalars(select(Venue).where(Venue.hosts.is_not(None))):
             if any(h.get("venue_id") in merged for h in w.hosts):
-                w.hosts = [
-                    {**h, "venue_id": target_id} if h.get("venue_id") in merged else h
-                    for h in w.hosts
-                    if w.id != target_id or h.get("venue_id") not in (target_id, *merged)
-                ] or None
+                w.hosts = (
+                    merge_hosts(
+                        {**h, "venue_id": target_id} if h.get("venue_id") in merged else h
+                        for h in w.hosts
+                        if w.id != target_id or h.get("venue_id") not in (target_id, *merged)
+                    )
+                    or None
+                )
         # Joint venues made of a merged venue are now made of the target.
         for j in s.scalars(select(Venue).where(Venue.joint.is_not(None))):
             j.joint = _remap_joint(j.id, j.joint, merged, target_id)
@@ -419,13 +422,54 @@ def clear_manual(venue_id: int) -> None:
 # ---- workshops -------------------------------------------------------------------------------
 
 
+def _span(h: dict[str, Any]) -> tuple[float, float]:
+    """A main conference's years (included), either end open."""
+    lo, hi = h.get("from"), h.get("to")
+    return (float("-inf") if lo is None else lo, float("inf") if hi is None else hi)
+
+
+def merge_hosts(hosts: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """A workshop's main conferences ({"venue_id", "from", "to"}), each one listed once per
+    period: its periods that overlap or follow each other are merged (the place of the
+    first kept); those without a venue are left out."""
+    out: list[dict[str, Any]] = []
+    for h in hosts:
+        if not h.get("venue_id"):
+            continue
+        vid, (lo, hi) = int(h["venue_id"]), _span(h)
+        at = len(out)
+        for i in reversed(range(len(out))):  # (all those it touches, merged into one)
+            o = out[i]
+            o_lo, o_hi = _span(o)
+            if o["venue_id"] == vid and lo <= o_hi + 1 and o_lo <= hi + 1:
+                lo, hi, at = min(lo, o_lo), max(hi, o_hi), i
+                del out[i]
+        years = {"from": None if lo == float("-inf") else int(lo)}
+        years["to"] = None if hi == float("inf") else int(hi)
+        out.insert(at, {"venue_id": vid, **years})
+    return out
+
+
 def save_hosts(venue_id: int, hosts: list[dict[str, Any]]) -> None:
-    """Set a workshop's main conferences ({"venue_id", "from", "to"}, years included)."""
-    clean = [
-        {"venue_id": int(h["venue_id"]), "from": h.get("from") or None, "to": h.get("to") or None}
+    """Set a workshop's main conferences ({"venue_id", "from", "to"}, years included): the
+    same one once per period (see ``merge_hosts``); ValueError when two of them are for the
+    same years (which one would rank its papers?)."""
+    clean = merge_hosts(
+        {"venue_id": h["venue_id"], "from": h.get("from") or None, "to": h.get("to") or None}
         for h in hosts
         if h.get("venue_id") and int(h["venue_id"]) != venue_id
-    ]
+    )
+    for i, a in enumerate(clean):
+        for b in clean[i + 1 :]:
+            (a_lo, a_hi), (b_lo, b_hi) = _span(a), _span(b)
+            if a["venue_id"] != b["venue_id"] and a_lo <= b_hi and b_lo <= a_hi:
+                names = venue_names()
+                raise ValueError(
+                    _(
+                        "“{a}” and “{b}” are both main conferences in the same years: "
+                        "give each one its years."
+                    ).format(a=names.get(a["venue_id"], "?"), b=names.get(b["venue_id"], "?"))
+                )
     with session_scope() as s:
         v = s.get(Venue, venue_id)
         v.hosts = clean or None
@@ -1109,6 +1153,23 @@ def relation_choices(guess: str, *, both: bool = False) -> list[str]:
     return [guess, *(r for r in out if r != guess)]
 
 
+def merge_relations() -> list[str]:
+    """What venues merged into one can be for it: the same venue, its workshops (kept as
+    venues of their own) or one of its tracks (merged, their texts marked as such)."""
+    return ["same", "workshop", *(f"track:{t}" for t in track_ids())]
+
+
+def merge_relation(target: VenueRow, others: list[VenueRow]) -> str:
+    """What ``others``, merged into ``target``, look like for it (see ``merge_relations``):
+    its track (their texts name one), its workshops (workshops, ``target`` a conference),
+    else the same venue."""
+    guesses = {guess_relation(target, o) for o in others}
+    guess = guesses.pop() if len(guesses) == 1 else "same"
+    if guess.startswith("track:") or (guess == "workshop" and target.kind in CONFERENCE_KINDS):
+        return guess
+    return "same"
+
+
 def related(row: VenueRow, other: VenueRow) -> bool:
     """``other`` is already a part, a joint venue, a host or a workshop of ``row``."""
     return (
@@ -1179,7 +1240,11 @@ def relate_venues(row_id: int, other_ids: list[int], relation: str) -> int:
         set_joint_parts(sat, [*(j.get("parts") or []), main])
     elif kind == "workshop":
         with session_scope() as s:
-            hosts = s.get(Venue, sat).hosts or []
+            ws, host = s.get(Venue, sat), s.get(Venue, main)
+            hosts = ws.hosts or []
+            if ws.kind not in WORKSHOP_KINDS:  # (a national one when its conference is)
+                scope = "natl" if (host.kind or "").startswith("natl") else "intl"
+                ws.kind, ws.kind_manual = f"{scope}_workshop", True
         save_hosts(sat, [*hosts, {"venue_id": main, "from": None, "to": None}])
     else:
         raise ValueError(f"unknown relation: {relation!r}")

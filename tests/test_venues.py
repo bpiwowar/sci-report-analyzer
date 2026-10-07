@@ -1,5 +1,6 @@
 import asyncio
 
+import pytest
 from helpers import add_source, make_person, pub, set_kind, set_level
 from sqlalchemy import select
 
@@ -1093,6 +1094,106 @@ def test_relate_venues_as_track_and_joint():
     # Related now: not suggested again.
     rows = _rows()
     assert not venues.suggest_related(rows[main], list(rows.values()))
+
+
+def test_merge_relation_guessed_when_merging():
+    """Merged into a venue, another one is preselected as its track or its workshop."""
+    _pid, v = _emnlp_setup()
+    rows = _rows()
+    main = rows[v["Main paper"]]
+    assert venues.merge_relation(main, [rows[v["Findings paper"]]]) == "track:findings"
+    # (a joint conference: not offered when merging, the same venue then)
+    assert venues.merge_relation(main, [rows[v["Joint paper"]]]) == "same"
+    assert venues.merge_relations()[:2] == ["same", "workshop"]
+    assert "track:findings" in venues.merge_relations()
+
+
+def test_workshop_merged_as_a_workshop_of_its_conference():
+    pid = make_person()
+    add_source(
+        pid,
+        "dblp",
+        "x/1",
+        [
+            pub("a", "Main paper", 2019, "Symposium on Timely Rankings (STR)"),
+            pub("b", "Workshop paper", 2019, "Timely Workshop"),
+            pub("c", "Other paper", 2019, "Meeting on Gadgets"),
+        ],
+    )
+    _stats(pid)
+    host, wid = _venue_of("Main paper"), _venue_of("Workshop paper")
+    rows = _rows()
+    assert venues.merge_relation(rows[host], [rows[wid]]) == "workshop"
+    assert venues.merge_relation(rows[wid], [rows[host]]) == "same"  # (not a conference)
+    assert venues.relate_venues(host, [wid], "workshop") == host
+    ws = _stats(pid)["Workshop paper"]  # kept, ranked as its main conference
+    assert ws.venue_id == wid and ws.category.key == "workshop:b"
+    assert [h for h, *_ in _rows()[wid].hosts] == [host]
+
+    # A national conference's workshop is a national workshop.
+    venues.update_venue(host, kind="natl_conference")
+    other = _venue_of("Other paper")
+    venues.relate_venues(host, [other], "workshop")
+    with session_scope() as s:
+        assert s.get(Venue, other).kind == "natl_workshop"
+
+
+def test_merge_hosts_once_per_period():
+    def h(vid, lo=None, hi=None):
+        return {"venue_id": vid, "from": lo, "to": hi}
+
+    assert venues.merge_hosts([h(1), h(1)]) == [h(1)]
+    # Overlapping or following periods: one; apart: both.
+    assert venues.merge_hosts([h(1, 2015, 2018), h(2, 2019), h(1, 2017, 2020)]) == [
+        h(1, 2015, 2020),
+        h(2, 2019),
+    ]
+    assert venues.merge_hosts([h(1, None, 2015), h(1, 2016, 2017)]) == [h(1, None, 2017)]
+    assert venues.merge_hosts([h(1, 2010, 2012), h(1, 2015)]) == [h(1, 2010, 2012), h(1, 2015)]
+    assert venues.merge_hosts([h(None), h(1, 2015, 2015), h(1, 2014, 2016)]) == [h(1, 2014, 2016)]
+
+
+def _two_workshops():
+    pid = make_person()
+    add_source(
+        pid,
+        "dblp",
+        "x/1",
+        [
+            pub("a", "Main paper", 2019, "Symposium on Timely Rankings (STR)"),
+            pub("b", "Workshop paper", 2019, "Timely Workshop"),
+            pub("c", "Other workshop paper", 2019, "Workshop on Timely Things"),
+            pub("d", "Other paper", 2019, "Meeting on Gadgets"),
+        ],
+    )
+    _stats(pid)
+    titles = ("Main paper", "Workshop paper", "Other workshop paper", "Other paper")
+    return pid, [_venue_of(t) for t in titles]
+
+
+def test_merging_two_workshops_of_a_conference_keeps_one_host():
+    _pid, (host, ws, ws2, _other) = _two_workshops()
+    venues.save_hosts(ws, [{"venue_id": host}])
+    venues.save_hosts(ws2, [{"venue_id": host}])
+    venues.merge_venues(ws, [ws2])
+    assert [h for h, *_ in _rows()[ws].hosts] == [host]
+
+
+def test_save_hosts_merges_periods_and_refuses_overlaps():
+    _pid, (host, ws, _ws2, other) = _two_workshops()
+    venues.save_hosts(ws, [{"venue_id": host}, {"venue_id": host, "from": 2020}])
+    assert [(h, lo, hi) for h, _n, lo, hi in _rows()[ws].hosts] == [(host, None, None)]
+    # Another main conference in the same years: which one ranks its papers?
+    with pytest.raises(ValueError, match="same years"):
+        venues.save_hosts(ws, [{"venue_id": host, "to": 2019}, {"venue_id": other, "from": 2019}])
+    with pytest.raises(ValueError):
+        venues.relate_venues(other, [ws], "workshop")  # (STR, all its years, its host)
+    assert [h for h, *_ in _rows()[ws].hosts] == [host]
+    venues.save_hosts(ws, [{"venue_id": host, "to": 2018}, {"venue_id": other, "from": 2019}])
+    assert [(h, lo, hi) for h, _n, lo, hi in _rows()[ws].hosts] == [
+        (host, None, 2018),
+        (other, 2019, None),
+    ]
 
 
 WIDG_DEMO = "WIDG (Demonstration) Conference on Widget Processing (WIDG)"

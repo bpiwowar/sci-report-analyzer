@@ -1340,6 +1340,57 @@ async def test_drop_a_venue_onto_another(user: User) -> None:
     assert any(r["id"] == target for t in tables for r in t.rows)
 
 
+async def test_drop_a_workshop_onto_its_conference(user: User) -> None:
+    """Dropped onto a conference, a workshop is offered (preselected) to become one of its
+    workshops: kept as a venue, its main conference set; the other way round, merged."""
+    from nicegui.events import GenericEventArguments
+
+    from sci_report_analyzer.db.models import Publication, Venue
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = make_person("Jane Doe")
+    venue_texts = {"a": "Symposium on Timely Rankings (STR)", "b": "Timely Workshop"}
+    papers = [pub(k, f"Paper {k}", 2019, t, authors=["Jane Doe"]) for k, t in venue_texts.items()]
+    add_source(pid, "dblp", "jd", papers)
+    await user.open(f"/person/{pid}")
+    await user.should_see("Paper b")
+    with session_scope() as s:
+        host, ws = (s.get(Publication, _pub_id(f"Paper {k}")).venue_id for k in "ab")
+    await user.open("/venues?tab=conferences")
+    await user.should_see("Drag a venue onto another one")
+    (table,) = [t for t in user.find(ui.table).elements if any(r["id"] == host for r in t.rows)]
+    for listener in table._event_listeners.values():
+        if listener.type == "venue_drop":
+            args = GenericEventArguments(sender=table, client=table.client, args={})
+            args.args.update(src=ws, dst=host)
+            with table.parent_slot:
+                listener.handler(args)
+    await user.should_see(marker="venue-merge-relation")
+    (relation,) = user.find("venue-merge-relation").elements
+    assert relation.value == "workshop"
+    assert "workshop of" in user.find("venue-merge-what").elements.pop().text
+    await user.should_not_see(marker="venue-merge-name")  # (the workshop keeps its own)
+    user.find("venue-merge-swap").click()  # (the workshop kept: the same venue)
+    assert relation.value == "same"
+    await user.should_see(marker="venue-merge-name")
+    user.find("venue-merge-swap").click()
+    assert relation.value == "workshop"
+    user.find("venue-merge-confirm").click()
+    for _ in range(50):
+        with session_scope() as s:
+            if s.get(Venue, ws).hosts:
+                break
+        await asyncio.sleep(0.02)
+    with session_scope() as s:
+        w = s.get(Venue, ws)
+        assert w.kind == "intl_workshop" and [h["venue_id"] for h in w.hosts] == [host]
+        assert s.get(Venue, host) is not None
+        w.hosts = [*w.hosts, *w.hosts]  # (listed twice, as an older merge did)
+    await user.open(f"/venues?focus={ws}")
+    await user.should_see(marker="venue-host-0")  # its main conference, once
+    await user.should_not_see(marker="venue-host-1")
+
+
 async def test_merge_while_searching_keeps_the_search(user: User) -> None:
     """A merge from the list updates its rows in place: the search text and the tab stay."""
     from nicegui.events import GenericEventArguments
@@ -1643,7 +1694,11 @@ async def test_venue_opens_in_place_with_merge_suggestions(user: User) -> None:
     await user.open(f"/person/{pid}")
     await user.should_see("Paper A")
     user.find(f"pub-venue-link-{a}").click()  # the venue dialog, on the person's page
-    await user.should_see(marker="venue-suggestions", retries=40)
+    await user.should_see(marker="venue-tab-related", retries=40)
+    (tab,) = user.find("venue-tab-related").elements
+    assert tab.props["alert-icon"] == "update"  # (suggestions there)
+    user.find("venue-tab-related").click()
+    await user.should_see(marker="venue-suggestions")
     user.find("venue-suggest-merge-0").click()
     await user.should_see(marker="venue-merge-confirm")
     user.find("venue-merge-confirm").click()
@@ -1839,7 +1894,9 @@ async def test_venue_suggestion_as_a_track(user: User) -> None:
     await user.open(f"/person/{pid}")
     await user.should_see("Paper A")
     user.find(f"pub-venue-link-{a}").click()
-    await user.should_see(marker="venue-suggestions", retries=40)
+    await user.should_see(marker="venue-tab-related", retries=40)
+    user.find("venue-tab-related").click()
+    await user.should_see(marker="venue-suggestions")
     (select,) = user.find("venue-suggest-relation-0").elements
     assert select.value == "track:findings"
     user.find("venue-suggest-merge-0").click()
