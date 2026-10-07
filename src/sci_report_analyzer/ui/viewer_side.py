@@ -83,6 +83,7 @@ class Side:
         # The excerpt selected (clicked: its tint on the PDF, or its entry), and the entries of
         # the categories' tab (by excerpt: highlighted when selected).
         self.excerpt: int | None = None
+        self.last_category: int | None = None  # (chosen last in category_picker, here)
         # (an excerpt's edit dialog, once the categories' tab is there: see _ExcerptsSection)
         self.edit_excerpt: Callable[[categories.ExcerptView], None] | None = None
         self.excerpt_rows: dict[int, ui.element] = {}
@@ -995,8 +996,16 @@ def category_picker(
     or ending it: see categories.split_years; cleared, the text as it was), influence flag
     and tags (passed to ``chosen`` as keywords, with ``text``, so taken out or not);
     ``merge``: or merge it with an excerpt (called with it, and whether only its place is
-    cited), the similar ones shown with a warning."""
+    cited), the similar ones shown with a warning. The category chosen last (here, else that
+    of the excerpt filed last) is proposed: marked, scrolled to, and Enter picks it (nothing
+    typed)."""
     folder_id, folder_name = side.folder
+    tree = categories.tree(folder_id)
+    last = side.last_category
+    if last is None and side.period_id is not None:
+        last = categories.last_category(side.period_id)
+    if last == current or all(n.id != last for n in tree):
+        last = None
     with side.host.dialogs, transient_dialog(_(title), width="w-full max-w-xl") as (dlg, _card):
         years, filed = categories.split_years(text) if properties else (None, text)
         quote = ui.label().classes("text-sm text-grey").mark("excerpt-text")
@@ -1017,9 +1026,11 @@ def category_picker(
         )
         search = (
             ui.input(
-                placeholder=_("Find a category of {folder} (Enter: the first one)").format(
-                    folder=folder_name
-                )
+                placeholder=(
+                    _("Find a category of {folder} (Enter: the last one chosen)")
+                    if last is not None
+                    else _("Find a category of {folder} (Enter: the first one)")
+                ).format(folder=folder_name)
             )
             .props("dense outlined clearable autofocus")
             .classes("w-full")
@@ -1034,6 +1045,7 @@ def category_picker(
         def pick(cat_id: int) -> None:
             if cat_id == current:
                 return
+            side.last_category = cat_id
             chosen(cat_id, **({"text": filed} if properties else {}), **props())
             name = next((n.path for n in categories.tree(folder_id) if n.id == cat_id), "")
             ui.notify(_(done).format(category=name))
@@ -1055,6 +1067,7 @@ def category_picker(
                     ui.row()
                     .classes("w-full items-center no-wrap gap-1 cursor-pointer hover:bg-grey-2")
                     .style(f"padding-left:{1.2 * indent}rem")
+                    .classes("vr-last-category bg-blue-1" if n.id == last else "")
                     .on("click", lambda n=n: pick(n.id))
                     .mark(f"pick-category-{n.id}")
                 ):
@@ -1062,6 +1075,10 @@ def category_picker(
                     ui.label(n.path if q else n.name).classes(
                         "grow" + (" text-grey" if n.id == current else "")
                     )
+                    if n.id == last:
+                        ui.icon("history", size="xs", color="primary").tooltip(
+                            _("The last category chosen (Enter, nothing typed)")
+                        ).mark("category-last")
                     if n.id == current:
                         ui.label(_("(its category)")).classes("text-xs text-grey")
                     if n.years:
@@ -1069,7 +1086,9 @@ def category_picker(
 
         def enter() -> None:
             nodes = matching()
-            if nodes:
+            if last is not None and not (search.value or "").strip():
+                pick(last)
+            elif nodes:
                 pick(nodes[0].id)
             elif (search.value or "").strip():
                 create()
@@ -1092,6 +1111,11 @@ def category_picker(
         search.on("keydown.enter", enter)
         with ui.column().classes("w-full gap-0 max-h-96 overflow-auto"):
             listing()
+        if last is not None:  # (scrolled to, once shown)
+            ui.run_javascript(
+                "setTimeout(() => document.querySelector('.vr-last-category')"
+                "?.scrollIntoView({block: 'nearest'}), 200);"
+            )
         with ui.row().classes("w-full items-center gap-2"):
             parent = (
                 ui.select(parents(), value=0, label=_("Create under"))

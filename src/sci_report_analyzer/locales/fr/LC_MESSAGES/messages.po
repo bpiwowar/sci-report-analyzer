@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 17:18+0200\n"
+"POT-Creation-Date: 2026-10-07 17:23+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -1676,6 +1676,10 @@ msgstr "Récupération des articles du candidat…"
 #, python-brace-format
 msgid "Find a category of {folder} (Enter: the first one)"
 msgstr "Trouver une catégorie de {folder} (Entrée : la première)"
+
+#, python-brace-format
+msgid "Find a category of {folder} (Enter: the last one chosen)"
+msgstr "Chercher une catégorie de {folder} (Entrée : la dernière choisie)"
 
 msgid "Find a paper, Enter: cite it"
 msgstr "Chercher un article, Entrée : le citer"
@@ -4554,6 +4558,9 @@ msgstr "La langue des mots de la règle (toutes : une règle générale)"
 
 msgid "The language whose words the rule removes (any: a general rule)"
 msgstr "La langue dont la règle retire des mots (toutes : une règle générale)"
+
+msgid "The last category chosen (Enter, nothing typed)"
+msgstr "La dernière catégorie choisie (Entrée, sans rien taper)"
 
 #, python-brace-format
 msgid "The level its conferences share ({names})"

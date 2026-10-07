@@ -1285,6 +1285,42 @@ async def test_tag_from_a_list_in_the_pdf(user: User, fake_viewer):
     assert not annotations.panel_state(pid).get("tag_filter")  # (the person's panel as it was)
 
 
+async def test_last_category_proposed(user: User, fake_viewer):
+    """Filing an excerpt: the category of the one filed last proposed (marked; Enter, nothing
+    typed, picks it), then the one chosen last."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    impact = categories.add(folder, "Impact")
+    doc = documents.add(period, "Application.pdf", PDF)
+    categories.add_excerpt(impact, period, "Cited a lot.", 1, [], document_id=doc)
+    assert categories.last_category(period) == impact
+    selection = {"text": "Our ranking model beats sparse ones", "p": 1, "rects": []}
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker="category-last")
+    user.find(marker="category-search").trigger("keydown.enter")
+    await user.should_see("Added to Impact")
+    # Another category chosen: proposed next.
+    selection = {**selection, "text": "Ten papers at SIGIR."}
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker=f"pick-category-{research}")
+    user.find(marker=f"pick-category-{research}").click()
+    await user.should_see("Added to Research")
+    selection = {**selection, "text": "Two at ECIR."}
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker="category-last")
+    user.find(marker="category-search").trigger("keydown.enter")
+    await user.should_see("Added to Research")
+    assert sorted(x.category_id for x in categories.excerpts(period)) == sorted(
+        [impact, impact, research, research]
+    )
+
+
 async def test_excerpts_in_the_viewer(user: User, fake_viewer):
     from sci_report_analyzer import categories
 
@@ -1325,6 +1361,7 @@ async def test_excerpts_in_the_viewer(user: User, fake_viewer):
     await user.should_see(marker=f"pick-category-{impact}")
     user.find(marker=f"pick-category-{impact}").click()
     await user.should_see("Added to Impact")
+    assert categories.last_category(period) == impact
     # Edited (text, years), then moved with the picker.
     user.find(marker=f"excerpt-edit-{e.id}").click()
     await user.should_see(marker=f"excerpt-original-{e.id}")

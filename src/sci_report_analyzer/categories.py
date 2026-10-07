@@ -822,6 +822,17 @@ def tints(period_id: int, document_id: int, names: dict[int, str]) -> list[dict]
     ]
 
 
+def last_category(period_id: int) -> int | None:
+    """The category of the excerpt of a person filed last, if any."""
+    with session_scope() as s:
+        return s.scalar(
+            select(Excerpt.category_id)
+            .where(Excerpt.period_id == period_id)
+            .order_by(Excerpt.created_at.desc(), Excerpt.id.desc())
+            .limit(1)
+        )
+
+
 def _last(s, category_id: int, period_id: int) -> int:
     """The position of the last excerpt of a category (of a person)."""
     return (
