@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 13:28+0200\n"
+"POT-Creation-Date: 2026-10-07 13:40+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -1279,6 +1279,9 @@ msgstr ""
 "Supprimer le dossier « {folder} » et ses périodes ? Ses personnes sont "
 "conservées."
 
+msgid "Delete the person"
+msgstr "Supprimer la personne"
+
 msgid "Delete the rule"
 msgstr "Supprimer la règle"
 
@@ -1472,6 +1475,9 @@ msgstr "Modifier les catégories"
 
 msgid "Edit the folder"
 msgstr "Modifier le dossier"
+
+msgid "Edit the person"
+msgstr "Modifier la personne"
 
 msgid "Edit the regex"
 msgstr "Modifier la regex"
@@ -2597,6 +2603,9 @@ msgstr "Variantes du nom"
 msgid "Name variants · {n} to review"
 msgstr "Variantes du nom · {n} à examiner"
 
+msgid "Name, affiliation, ORCID, name aliases, notes"
+msgstr "Nom, affiliation, ORCID, variantes du nom, notes"
+
 msgid "Names of the documents"
 msgstr "Noms des documents"
 
@@ -3319,6 +3328,9 @@ msgstr "Actes (éd.) {category}"
 msgid "Proceedings (ed.)"
 msgstr "Actes (éd.)"
 
+msgid "Profile"
+msgstr "Profil"
+
 #, python-brace-format
 msgid "Profile on {source}"
 msgstr "Profil sur {source}"
@@ -3371,6 +3383,9 @@ msgstr "Récupéré : {venues} canaux modifiés"
 
 msgid "Purge and re-sync"
 msgstr "Purger et resynchroniser"
+
+msgid "Purge the papers"
+msgstr "Purger les articles"
 
 #, python-brace-format
 msgid "Purge the papers of {who}?"

@@ -8,7 +8,7 @@ and reports, to prepare an evaluation.
 ## People and sources
 
 1. **Add a person** (name, optional affiliation). Every source is searched and the possible
-   profiles are listed as *candidates* in the **Sources** tab.
+   profiles are listed as *candidates* in the **Profile** tab (also where the person is edited, purged or deleted).
 2. **Validate** the right profiles and **reject** the others. Only validated profiles are used.
    You can also paste a profile URL or id (DBLP, HAL, ORCID, Semantic Scholar, Google Scholar,
    theses.fr, OpenAlex). Once a source is validated, a candidate's papers can be **checked

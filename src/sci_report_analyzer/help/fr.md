@@ -8,7 +8,7 @@ et des rapports, pour préparer une évaluation.
 ## Personnes et sources
 
 1. **Ajoutez une personne** (nom, affiliation facultative). Chaque source est interrogée et les profils
-   possibles sont listés comme *candidats* dans l'onglet **Sources**.
+   possibles sont listés comme *candidats* dans l'onglet **Profil** (où l'on modifie, purge ou supprime aussi la personne).
 2. **Validez** les bons profils et **rejetez** les autres. Seuls les profils validés sont utilisés.
    Vous pouvez aussi coller l'URL ou l'identifiant d'un profil (DBLP, HAL, ORCID, Semantic Scholar, Google Scholar,
    theses.fr, OpenAlex). Une fois une source validée, les articles d'un candidat peuvent être **confrontés

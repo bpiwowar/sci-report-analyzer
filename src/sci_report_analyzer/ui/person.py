@@ -108,6 +108,7 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
                     panel.url_extra = {"tab": tab}
                 panel.build()
             with ui.tab_panel("sources"):
+                _person_actions(person)
                 panel.names_box = ui.column().classes("w-full").mark("name-variants")
                 panel.render_names()
                 sources_view(person_id, on_change=panel.reload)
@@ -164,22 +165,30 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
                     ui.label(person.affiliation).classes("text-sm text-grey")
         with ui.tabs(value=tab).props("inline-label dense").classes("grow") as tabs:
             ui.tab("publications", _("Publications"), icon="article")
-            ui.tab("sources", _("Sources"), icon="hub")
+            ui.tab("sources", _("Profile"), icon="manage_accounts").mark("tab-profile")
             ui.tab("periods", _("Periods"), icon="date_range")
             ui.tab("theses", _("Theses"), icon="school")
             ui.tab("report", _("Report"), icon="description").mark("tab-report")
-        with ui.row():
-            ui.button(
-                icon="delete_sweep",
-                on_click=lambda: purge_dialog([person.id], person.name, ui.navigate.reload),
-            ).props("flat round color=negative").tooltip(
-                _("Purge: remove all papers and re-sync")
-            ).mark("purge-person")
-            ui.button(icon="edit", on_click=lambda: _edit_dialog(person)).props("flat round")
-            ui.button(icon="delete", on_click=lambda: _delete_dialog(person)).props(
-                "flat round color=negative"
-            )
     return tabs
+
+
+def _person_actions(person: Person) -> None:
+    """The person's details to edit; their data to purge, or the person to delete."""
+    with ui.row().classes("w-full items-center gap-2").mark("person-actions"):
+        ui.button(_("Edit the person"), icon="edit", on_click=lambda: _edit_dialog(person)).props(
+            "outline"
+        ).tooltip(_("Name, affiliation, ORCID, name aliases, notes")).mark("edit-person")
+        ui.space()
+        ui.button(
+            _("Purge the papers"),
+            icon="delete_sweep",
+            on_click=lambda: purge_dialog([person.id], person.name, ui.navigate.reload),
+        ).props("flat color=negative").tooltip(_("Purge: remove all papers and re-sync")).mark(
+            "purge-person"
+        )
+        ui.button(
+            _("Delete the person"), icon="delete", on_click=lambda: _delete_dialog(person)
+        ).props("flat color=negative").mark("delete-person")
 
 
 def _edit_dialog(person: Person) -> None:
