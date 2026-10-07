@@ -719,8 +719,8 @@ def test_categories_and_markdown():
     categories.set_group_text(later, "Taught  and gave\ncourses.")
     assert [t["page"] for t in categories.tints(period, doc, {})] == [1, 2]
     assert categories.markdown(folder, period) == (
-        "## Teaching\n\n- Taught and gave courses. %% Application, p. 1; p. 2; Other, p. 1 %%"
-        " — 2019–2020\n"
+        "## Teaching\n\n- Taught and gave courses. %% “Taught IR (M2).” (Application, p. 1); "
+        "p. 2; “Elsewhere.” (Other, p. 1) %% — 2019–2020\n"
     )
     # Might be already an excerpt: similar words, or found by a query.
     assert [v.id for v in categories.similar_excerpts(period, "Gave courses, at university")] == [
@@ -907,6 +907,61 @@ def test_nested_influence():
     assert reports.influence_mode(folder) == "move"
 
 
+def test_excerpt_markers():
+    """Salient and caveat excerpts tagged (the folder's tags, by default in its language),
+    the marked ones first in their categories (salient, influence, caveat) unless not."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Recherche")
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    plain = categories.add_excerpt(research, period, "Projet Comète.", 1, [], document_id=doc)
+    weak = categories.add_excerpt(
+        research, period, "Peu d'encadrement.", 2, [], document_id=doc, caveat=True
+    )
+    prize = categories.add_excerpt(research, period, "Prix Andromède.", 3, [], document_id=doc)
+    categories.update_excerpt(prize, influence=True)
+    best = categories.add_excerpt(research, period, "Projet Nébuleuse.", 4, [], document_id=doc)
+    categories.update_excerpt(best, salient=True, tags=["ERC"])
+    view = {e.id: e for e in categories.excerpts(period)}
+    assert view[best].salient and view[weak].caveat and not view[plain].salient
+    assert categories.markdown(folder, period, mode="mark") == (
+        "## Recherche\n\n"
+        "- #ERC #salient Projet Nébuleuse. %% Dossier, p. 4 %%\n"
+        "- #influence Prix Andromède. %% Dossier, p. 3 %%\n"
+        "- #caveat Peu d'encadrement. %% Dossier, p. 2 %%\n"
+        "- Projet Comète. %% Dossier, p. 1 %%\n"
+    )
+    # The folder's tags (in French by default), and those not first.
+    reports.save_language(folder, "fr")
+    assert reports.markers(folder)["caveat"] == reports.Marker("bemol")
+    marks = reports.markers(folder)
+    reports.save_markers(
+        folder,
+        {
+            **marks,
+            "salient": reports.Marker("#fort", first=False),
+            "caveat": reports.Marker("bemol", first=False),
+        },
+    )
+    assert reports.markers(folder)["salient"] == reports.Marker("fort", first=False)
+    assert reports.markers(folder)["influence"] == reports.Marker("rayonnement")
+    assert categories.markdown(folder, period, mode="mark") == (
+        "## Recherche\n\n"
+        "- #rayonnement Prix Andromède. %% Dossier, p. 3 %%\n"
+        "- Projet Comète. %% Dossier, p. 1 %%\n"
+        "- #bemol Peu d'encadrement. %% Dossier, p. 2 %%\n"
+        "- #ERC #fort Projet Nébuleuse. %% Dossier, p. 4 %%\n"
+    )
+    reports.save_language(folder, None)  # (a default tag follows the language)
+    assert reports.markers(folder)["caveat"] == reports.Marker("caveat", first=False)
+    # Passed on to the next one of a group.
+    assert categories.merge_excerpts(plain, best) is None
+    categories.remove_excerpt(best)
+    assert {e.id: e for e in categories.excerpts(period)}[plain].salient
+
+
 def test_section_texts():
     """A text per category and person (Markdown, e.g. a summary): after the heading of its
     section; nested, that of a section left out in the Rayonnement section."""
@@ -1016,10 +1071,15 @@ def test_section_summarised_by_its_text():
         reports.render("[]{.excerpts}", reports.folder_context([], period)).text
     )
     assert "Deux **cours**." in shown and "Zorglub" not in shown
-    # Nested, a section left out: its text in the Rayonnement section, its excerpts not.
+    # (the text without its excerpts: they follow it in the notes)
+    categories.set_section_text(period, teaching, "Deux **cours**.")
+    assert categories.markdown(folder, period, mode="copy") == out
+    # Nested, a section left out: its text in the Rayonnement section (its excerpts after it,
+    # in a comment).
     categories.set_section_text(period, research, "Un projet.", summary_only=True)
     assert categories.markdown(folder, period, mode="move").endswith(
-        "## Rayonnement\n\n### Recherche\n\nUn projet.\n"
+        "## Rayonnement\n\n### Recherche\n\nUn projet.\n\n"
+        "%% Excerpts (not shown):\n- Projet Nébuleuse. (Dossier, p. 3)\n%%\n"
     )
     # Not summarised: listed again; moved with the text.
     categories.set_section_text(period, teaching, text, summary_only=False)

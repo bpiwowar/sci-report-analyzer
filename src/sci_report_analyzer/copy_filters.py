@@ -55,8 +55,14 @@ class TagRule:
     highlight: bool = False
 
 
-# Until some are set: the "rayonnement" excerpts marked in their categories as a globe.
-DEFAULT_TAG_RULES = [TagRule("influence", "🌍")]
+# Until some are set: the tags of the excerpts' markers by default (see reports.markers),
+# as icons: influence ("rayonnement") a globe, salient ("saillant") a star, caveat ("bémol")
+# a warning sign.
+DEFAULT_TAG_RULES = [
+    *(TagRule(t, "🌍") for t in ("influence", "rayonnement")),
+    *(TagRule(t, "⭐") for t in ("salient", "saillant")),
+    *(TagRule(t, "⚠️") for t in ("caveat", "bemol")),
+]
 
 
 def tag_rules() -> list[TagRule]:

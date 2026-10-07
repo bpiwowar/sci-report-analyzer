@@ -929,18 +929,18 @@ async def test_section_text_of_a_category(user: User) -> None:
     user.find(marker="section-text-save").click()
     assert categories.section_texts(period) == {}
     await user.should_not_see(marker=f"section-text-{research}")
-    # Summarised by its text only: its excerpts in a comment of the text (not shown), not
-    # listed.
+    # Summarised by its text only: its excerpts not in the text (but in a comment after it in
+    # the notes), still listed here.
     user.find(marker=f"section-text-edit-{research}").click()
     user.find(marker="section-text-input").elements.pop().value = "Summary."
     user.find(marker="section-summary-only").click()
-    text = user.find(marker="section-text-input").elements.pop().value
-    assert text == "Summary.\n\n%% Excerpts (not shown):\n- Led a project. ((untitled), p. 1)\n%%"
+    assert user.find(marker="section-text-input").elements.pop().value == "Summary."
     user.find(marker="section-text-save").click()
     assert categories.summarised(period) == {research}
+    assert categories.section_text(period, research) == "Summary."
     await user.should_see(marker=f"section-text-{research}", content="Summary.")
     await user.should_see(marker=f"section-summary-only-{research}")
-    await user.should_not_see("Led a project.")
+    await user.should_see("Led a project.")
 
 
 async def test_remove_from_folder_keeping_or_deleting_data(user: User) -> None:

@@ -1,8 +1,8 @@
 """The text of a category's section in a person's excerpts within a folder (Markdown, e.g. a
 summary of its items: after its heading in the notes' ``[]{.excerpts}``): shown under the
 category in the categories' tab, edited with its pencil (on hover) or a click on it. The
-section can be summarised by its text only: its excerpts not listed (in the tab either),
-kept in a comment of the text (``%% … %%``, not shown) for reference."""
+section can be summarised by its text only: its excerpts not listed in the notes, but in a
+comment after the text (``%% … %%``, not shown) for reference; still listed in the tab."""
 
 from __future__ import annotations
 
@@ -46,8 +46,8 @@ def edit_button(side: Side, node: categories.Node) -> None:
 
 def show(side: Side, node: categories.Node, text: str, hidden: int | None = None) -> None:
     """Under a category's header row: its section's text, rendered without its comments
-    (nothing without one), then, summarised by it only, how many excerpts are not listed
-    (``hidden``); clicked: edited."""
+    (nothing without one), then, summarised by it only, how many excerpts are not listed in
+    the notes (``hidden``); clicked: edited."""
     indent = f"margin-left:{1.2 * node.depth + 0.6}rem; width:auto"
     if (shown := strip_comments(_rendered(side, text))).strip():
         ui.markdown(shown, extras=NOTE_EXTRAS).classes(
@@ -59,7 +59,7 @@ def show(side: Side, node: categories.Node, text: str, hidden: int | None = None
         ui.label(
             _("Summarised by its text, its excerpts not listed ({count})").format(count=hidden)
         ).classes("vr-section-text text-xs text-grey italic").style(indent).tooltip(
-            _("They are kept in a comment of the text (%% … %%); click to edit it")
+            _("In the notes and the copy, they follow the text in a comment (%% … %%)")
         ).on("click", lambda: edit(side, node)).mark(f"section-summary-only-{node.id}")
 
 
@@ -70,8 +70,8 @@ def _rendered(side: Side, text: str) -> str:
 
 def edit(side: Side, node: categories.Node) -> None:
     """A dialog: the section's text, in the notes' Markdown editor (with its preview; empty:
-    removed), and whether the section is summarised by it only (checked: its excerpts added
-    to the text in a comment, if not there yet)."""
+    removed), and whether the section is summarised by it only (its excerpts then in a
+    comment after it in the notes, see categories.markdown)."""
     if side.period_id is None:
         return
     period_id = side.period_id
@@ -92,20 +92,15 @@ def edit(side: Side, node: categories.Node) -> None:
             )
         ).classes("text-xs text-grey")
 
-        def summarise(on: bool) -> None:
-            if on:
-                editor.value = categories.with_excerpts_comment(editor.value, period_id, node.id)
-
         only = (
             ui.checkbox(
                 _("Only this text, its excerpts not listed"),
                 value=node.id in categories.summarised(period_id),
-                on_change=lambda e: summarise(bool(e.value)),
             )
             .tooltip(
                 _(
-                    "The section summarised by its text: its excerpts hidden, kept in the text "
-                    "between %% … %% for reference (not shown)"
+                    "The section summarised by its text: in the notes and the copy, its "
+                    "excerpts follow it between %% … %% for reference (not shown)"
                 )
             )
             .mark("section-summary-only")

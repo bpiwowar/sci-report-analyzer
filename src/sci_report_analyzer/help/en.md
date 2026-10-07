@@ -280,8 +280,8 @@ lists as paragraphs (“• …”); the comments (`%% … %%`, e.g. the places 
 tasks, tags and the lines tagged #question or #to-check are left out, tables too. A tag can
 instead be turned into a text (Settings → Copy filters → Tags turned into a text): one before
 the line's text (e.g. an icon, 🌍) and one after, in a colour (or highlighted), in bold, the
-line's text too if checked, e.g. #influence (by default: 🌍), the tag of the rayonnement
-excerpts marked in their categories. Marmotte keeps bold, italics, underlining, text colours,
+line's text too if checked, e.g. the tags of the excerpts' markers (by default: 🌍 for
+#influence or #rayonnement, ⭐ for #salient or #saillant, ⚠️ for #caveat or #bemol). Marmotte keeps bold, italics, underlining, text colours,
 highlights, emojis (🌍 ⭐ 📣) and symbols (★ ✦ ◆ ➤); it drops superscripts, font sizes and
 strikethroughs.
 
@@ -338,16 +338,17 @@ category’ (header, or the E key): click a category, or type to find it (Enter:
 one; a new name creates it, the dialog staying open), with the years it is about (those found
 in the passage, e.g. “2026-32”: 2026–2032, and taken out of its text when leading it with a
 colon or ending it after one; its crossed-out calendar clears them, the text as selected
-again) and whether
-it shows the person's influence (“rayonnement”) if need be; when it might be an excerpt
+again) and its markers if need be: salient (“saillant”, a strong point), influence
+(“rayonnement”) or caveat (“bémol”, a reservation); when it might be an excerpt
 already (similar words, shown with a warning; or found by typing its words), merge it with
 that one instead, keeping its text or only its place (a reference). The categories tab lists
-the person's excerpts (click: go to the passage), to edit (text, years, influence, colour:
+the person's excerpts (click: go to the passage), to edit (text, years, markers, colour:
 its tint on the PDF; the passages as selected are shown, to go back to or add to the text),
 move (with the same picker), merge (drag one onto another, or its merge icon then a click on
 the other: grouped, each its own quote or only its place, its link / quote icon switching,
 on one item with the other's category, years…; the group's pencil edits its overall text,
-its excerpts then cited by their places only, all still tinted on the PDF; taken out again
+e.g. one sentence summarising them, its excerpts then quoted in the comment after it, with
+their places, all still tinted on the PDF; taken out again
 with its split icon), reorder (dragged onto the top or bottom edge of another one), remove,
 or copy as Markdown (unquoted, their places in Obsidian comments: `%% Application, p. 4;
 p. 12 %%`, then their years; those showing influence also listed, by category, in a last
@@ -360,13 +361,17 @@ notes and the copy, or one block with an option: also listed in the Rayonnement 
 only there, under subsections named after their categories (nested as these, one level
 below), taken out of their categories, one left empty being left out
 (`[]{.excerpts .move-influence}`); or only in their categories, tagged #influence
-(`[]{.excerpts .mark-influence}`), e.g. turned into an icon by the copy filters. Each
-category can have a text of its own for the person (Markdown, e.g. a summary of its items; its pencil, on hover, in the categories
-tab, or a click on the text): put after its heading, before its items (nested, that of a
-category left empty goes under its subsection of the Rayonnement section). With “Only this
-text, its excerpts not listed”, the section is summarised by its text: its excerpts are no
-longer listed (in the categories tab either), but added to the text between `%% … %%` (a
-comment, never shown) for reference.
+(`[]{.excerpts .mark-influence}`), e.g. turned into an icon by the copy filters. The salient
+and caveat excerpts are always tagged. The folder's settings set each marker's tag (by
+default in the language of its reports: #salient, #influence, #caveat; in French
+#saillant, #rayonnement, #bemol) and whether its excerpts are first in their categories
+(“First”: by default, salient ones first, then influence, then caveats). Each category can
+have a text of its own for the person (Markdown, e.g. a summary of its items; its pencil, on
+hover, in the categories tab, or a click on the text): put after its heading, before its
+items (nested, that of a category left empty goes under its subsection of the Rayonnement
+section). With “Only this text, its excerpts not listed”, the section is summarised by its
+text: in the notes and the copy, its excerpts are not listed but follow the text between
+`%% … %%` (a comment, never shown) for reference; the categories tab still lists them.
 
 **Folders** (Reports page) group people, e.g. for a hiring committee: a folder has a name,
 a date and can be hidden. Each person has their **own period** in each of their folders

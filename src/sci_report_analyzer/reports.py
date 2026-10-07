@@ -669,6 +669,50 @@ def save_influence_mode(folder_id: int, mode: str) -> None:
     _save_citations(folder_id, influence_mode=mode, nested_influence=None)
 
 
+# An excerpt's markers (see categories.ExcerptView), in their order first in their categories.
+MARKERS = ("salient", "influence", "caveat")
+# Their tags by default, in the language of the reports.
+DEFAULT_MARKER_TAGS = {
+    "en": {"salient": "salient", "influence": "influence", "caveat": "caveat"},
+    "fr": {"salient": "saillant", "influence": "rayonnement", "caveat": "bemol"},
+}
+
+
+@dataclass(frozen=True)
+class Marker:
+    """How an excerpt's marker shows in the folder's reports: its tag (salient, caveat:
+    always; influence: in the mode "mark", see influence_mode), and whether the excerpts
+    marked are first in their categories."""
+
+    tag: str
+    first: bool = True
+
+
+def markers(folder_id: int | None) -> dict[str, Marker]:
+    """The folder's markers (see MARKERS), their tags by default in its language."""
+    saved = _citations(folder_id).get("markers") or {}
+    lang = language(folder_id) or i18n.language()
+    defaults = DEFAULT_MARKER_TAGS.get(lang, DEFAULT_MARKER_TAGS["en"])
+    out = {}
+    for m in MARKERS:
+        v = saved.get(m) or {}
+        out[m] = Marker((v.get("tag") or "").strip("# ") or defaults[m], v.get("first", True))
+    return out
+
+
+def save_markers(folder_id: int, values: dict[str, Marker]) -> None:
+    """(a tag left as the default one: not saved, following the language)"""
+    lang = language(folder_id) or i18n.language()
+    defaults = DEFAULT_MARKER_TAGS.get(lang, DEFAULT_MARKER_TAGS["en"])
+    _save_citations(
+        folder_id,
+        markers={
+            m: {"tag": "" if v.tag == defaults[m] else v.tag, "first": v.first}
+            for m, v in values.items()
+        },
+    )
+
+
 def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
     """For the notes of the folder of a period (the person's in it): its star lists (their
     papers numbered there), its numbering and its templates; the papers to discuss, those
