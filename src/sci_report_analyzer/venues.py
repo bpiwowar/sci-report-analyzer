@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter, defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -187,6 +187,8 @@ def update_venue(venue_id: int, **values: Any) -> None:
             v.short_manual = bool(values["short_name"])  # (none: inferred again)
         if "kind" in values:
             v.kind_manual = bool(values["kind"])
+            s.flush()
+            _scope_workshops(s)  # (a workshop is national when its conference is)
         if renamed and v.joint:  # (named by hand, no longer after its conferences)
             v.joint = {**v.joint, "auto_name": False}
         s.flush()
@@ -256,6 +258,8 @@ def merge_venues(
         # Joint venues made of a merged venue are now made of the target.
         for j in s.scalars(select(Venue).where(Venue.joint.is_not(None))):
             j.joint = _remap_joint(j.id, j.joint, merged, target_id)
+        s.flush()
+        _scope_workshops(s)
     values = {
         "name": (name or "").strip(),
         "short_name": (short_name or "").strip(),
@@ -450,6 +454,27 @@ def merge_hosts(hosts: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def workshop_kind(
+    hosts: Iterable[dict[str, Any]] | None, kinds: Mapping[int, str | None], kind: str | None
+) -> str:
+    """A workshop's kind: national when its main conference is (the latest one), else
+    international; with no main conference of known scope, after its own ``kind``."""
+    for h in sorted(hosts or [], key=lambda h: _span(h)[1], reverse=True):
+        k = kinds.get(h["venue_id"]) or ""
+        if k.startswith(("natl_", "intl_")):
+            return f"{k[:4]}_workshop"
+    return "natl_workshop" if (kind or "").startswith("natl") else "intl_workshop"
+
+
+def _scope_workshops(s: Session) -> None:
+    """Workshops are national or international as their main conference."""
+    venues = list(s.scalars(select(Venue)))
+    kinds = {v.id: v.kind for v in venues}
+    for v in venues:
+        if v.hosts and v.kind in WORKSHOP_KINDS:
+            v.kind = kinds[v.id] = workshop_kind(v.hosts, kinds, v.kind)
+
+
 def save_hosts(venue_id: int, hosts: list[dict[str, Any]]) -> None:
     """Set a workshop's main conferences ({"venue_id", "from", "to"}, years included): the
     same one once per period (see ``merge_hosts``); ValueError when two of them are for the
@@ -474,8 +499,8 @@ def save_hosts(venue_id: int, hosts: list[dict[str, Any]]) -> None:
         v = s.get(Venue, venue_id)
         v.hosts = clean or None
         if clean and v.kind not in WORKSHOP_KINDS:
-            v.kind = "natl_workshop" if (v.kind or "").startswith("natl") else "intl_workshop"
-            v.kind_manual = True
+            v.kind, v.kind_manual = "intl_workshop", True  # (its scope: its conference's)
+        _scope_workshops(s)
     _changed()
 
 
@@ -534,12 +559,12 @@ def split_as_workshop(key: str) -> int:
         vk = s.get(VenueKey, key)
         host = vk.venue
         text = vk.example or key
-        scope = "natl" if (host.kind or "").startswith("natl") else "intl"
+        hosts = [{"venue_id": host.id, "from": None, "to": None}]
         venue = Venue(
             name=service.clean(text, vk.source) or text,
-            kind=f"{scope}_workshop",
+            kind=workshop_kind(hosts, {host.id: host.kind}, None),
             kind_manual=True,
-            hosts=[{"venue_id": host.id, "from": None, "to": None}],
+            hosts=hosts,
         )
         s.add(venue)
         s.flush()
@@ -906,8 +931,8 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
             )
             if kind not in VENUE_KINDS:  # (a thesis: not a venue's kind)
                 kind = "other"
-            if v.hosts and kind not in WORKSHOP_KINDS:
-                kind = "natl_workshop" if kind.startswith("natl") else "intl_workshop"
+            if v.hosts:  # (national or international as its main conference)
+                kind = workshop_kind(v.hosts, {i: x.kind for i, x in by_id.items()}, kind)
             if kind != v.kind:
                 auto_kinds[v.id] = kind
         row = VenueRow(
@@ -964,6 +989,8 @@ async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> li
             for vid, short in auto_shorts.items():
                 if (v := s.get(Venue, vid)) is not None and not v.short_manual:
                     v.short_name = short
+            if auto_kinds:  # (their workshops follow a conference's new scope)
+                _scope_workshops(s)
     if detect and only is None and _store_parts(venues, detect_parts(out)):
         return await venue_rows(only, detect=False)
     return out
@@ -1284,11 +1311,7 @@ def relate_venues(row_id: int, other_ids: list[int], relation: str) -> int:
         set_joint_parts(sat, [*(j.get("parts") or []), main])
     elif kind == "workshop":
         with session_scope() as s:
-            ws, host = s.get(Venue, sat), s.get(Venue, main)
-            hosts = ws.hosts or []
-            if ws.kind not in WORKSHOP_KINDS:  # (a national one when its conference is)
-                scope = "natl" if (host.kind or "").startswith("natl") else "intl"
-                ws.kind, ws.kind_manual = f"{scope}_workshop", True
+            hosts = s.get(Venue, sat).hosts or []
         save_hosts(sat, [*hosts, {"venue_id": main, "from": None, "to": None}])
     else:
         raise ValueError(f"unknown relation: {relation!r}")

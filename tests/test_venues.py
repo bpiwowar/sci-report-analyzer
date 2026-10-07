@@ -1137,6 +1137,12 @@ def test_workshop_merged_as_a_workshop_of_its_conference():
     venues.relate_venues(host, [other], "workshop")
     with session_scope() as s:
         assert s.get(Venue, other).kind == "natl_workshop"
+    # …whatever it was, and following its conference's kind.
+    with session_scope() as s:
+        assert s.get(Venue, wid).kind == "natl_workshop"
+    venues.update_venue(host, kind="intl_conference")
+    with session_scope() as s:
+        assert s.get(Venue, other).kind == s.get(Venue, wid).kind == "intl_workshop"
 
 
 def test_merge_hosts_once_per_period():
