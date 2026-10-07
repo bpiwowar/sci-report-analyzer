@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 
 import pytest
 from helpers import (
@@ -1299,6 +1300,10 @@ async def test_drop_a_venue_onto_another(user: User) -> None:
 
     from sci_report_analyzer.db.models import Venue
     from sci_report_analyzer.db.session import session_scope
+    from sci_report_analyzer.ui.venues_page import _ROW_SLOT
+
+    # (in the browser: a Vue template sees no window global, vrDnd alone is undefined there)
+    assert re.search(r"(?<!view\.)vrDnd", _ROW_SLOT) is None
 
     pid = _seed()
     await user.open(f"/person/{pid}")
