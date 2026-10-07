@@ -86,6 +86,8 @@ class Side:
         self.last_category: int | None = None  # (chosen last in category_picker, here)
         # (an excerpt's edit dialog, once the categories' tab is there: see _ExcerptsSection)
         self.edit_excerpt: Callable[[categories.ExcerptView], None] | None = None
+        # (an excerpt not shown in the categories' tab, collapsed or searched: shown)
+        self.reveal_excerpt: Callable[[int], None] | None = None
         self.excerpt_rows: dict[int, ui.element] = {}
         # A link from a selection to a paper (documents): (pub id, page, rects, text).
         self.link: Callable[[int, int, list, str], None] | None = None
@@ -323,6 +325,8 @@ class Side:
         """An excerpt selected (else none): highlighted on the PDF, and its entry in the
         categories' tab (shown, scrolled to)."""
         self.excerpt = excerpt_id
+        if excerpt_id is not None and excerpt_id not in self.excerpt_rows and self.reveal_excerpt:
+            self.reveal_excerpt(excerpt_id)
         for i, row in self.excerpt_rows.items():
             if i == excerpt_id:
                 row.classes(add="vr-excerpt-on")
@@ -1130,15 +1134,22 @@ def category_picker(
             ui.button(_("Close"), on_click=dlg.close).props("flat").mark("category-close")
 
 
+COLLAPSED = "ui.excerpts.collapsed"  # the categories shown collapsed in the excerpts (sticky)
+
+
 class _ExcerptsSection:
     """The excerpts of the person (in the folder) by category: to go to (in this PDF, or
     another one), edit, move, merge (drag one onto another, or its merge icon then a click
-    on the other), remove, copy as Markdown."""
+    on the other), discard from the generated text, remove, copy as Markdown; the categories
+    collapsed (each, or all), the excerpts searched."""
 
     def __init__(self, side: Side) -> None:
         self.side = side
         self.merging: categories.ExcerptView | None = None  # (merged with the one clicked)
+        self.collapsed: set[int] = set(annotations.ui_state(COLLAPSED) or [])
+        self.query = ""  # (the excerpts searched: only those matching shown)
         side.edit_excerpt = self.edit_excerpt  # (E on an excerpt filed already)
+        side.reveal_excerpt = self.reveal
         self.listing()
 
     @ui.refreshable_method
@@ -1154,6 +1165,13 @@ class _ExcerptsSection:
             ui.label(_("Categories of {folder}").format(folder=folder_name)).classes(
                 "font-medium grow"
             )
+            if nodes:
+                ui.button(icon="unfold_less", on_click=lambda: self.collapse_all(nodes)).props(
+                    "flat dense round size=sm"
+                ).tooltip(_("Collapse all the categories")).mark("categories-collapse-all")
+                ui.button(icon="unfold_more", on_click=lambda: self.collapse_all([])).props(
+                    "flat dense round size=sm"
+                ).tooltip(_("Expand all the categories")).mark("categories-expand-all")
             copy_button(
                 lambda: categories.markdown(folder_id, self.side.period_id),
                 _("Copy the excerpts, as Markdown"),
@@ -1176,12 +1194,45 @@ class _ExcerptsSection:
                 )
             ).classes("text-sm text-grey")
             return
+        ui.input(
+            placeholder=_("Search the excerpts (their text, tags, or a section's text)"),
+            value=self.query,
+            on_change=lambda e: self.search(e.value),
+        ).props("dense outlined clearable debounce=300").classes("w-full").mark(
+            "excerpts-search"
+        ).add_slot("prepend", '<q-icon name="search" />')
+        self.body()
+
+    @ui.refreshable_method
+    def body(self) -> None:
+        """The categories, their texts and excerpts (searched: only those matching, and the
+        categories with some, or whose text matches; collapsed: not what is within)."""
+        if self.side.folder is None or self.side.period_id is None:
+            return
+        nodes = categories.tree(self.side.folder[0])
         by_cat: dict[int, list[categories.ExcerptView]] = {}
         self.side.excerpt_rows.clear()
         for e in categories.excerpts(self.side.period_id, grouped=True):
             by_cat.setdefault(e.category_id, []).append(e)
         texts = categories.section_texts(self.side.period_id)
         summarised = categories.summarised(self.side.period_id)
+        query = self.query.strip().casefold()
+        found: set[int] = set()  # (searched: the categories shown, with those above them)
+        if query:
+            parents = {n.id: n.parent_id for n in nodes}
+            for n in nodes:
+                hits = [e for e in by_cat.get(n.id, []) if self.matches(e, query)]
+                by_cat[n.id] = hits
+                if hits or query in texts.get(n.id, "").casefold():
+                    i: int | None = n.id
+                    while i is not None and i not in found:
+                        found.add(i)
+                        i = parents.get(i)
+            if not found:
+                ui.label(_("No excerpt matches")).classes("text-sm text-grey").mark(
+                    "excerpts-search-none"
+                )
+                return
         merging = self.merging
         if merging:
             with ui.row().classes("w-full items-center no-wrap gap-1 bg-amber-1 p-1 rounded"):
@@ -1192,11 +1243,18 @@ class _ExcerptsSection:
                 ui.button(icon="close", on_click=lambda: self.merge_mode(None)).props(
                     "flat dense round size=xs"
                 ).tooltip(_("Cancel")).mark("excerpt-merge-cancel")
+        unseen: set[int] = set()  # (within a collapsed category)
         for n in nodes:
+            if query and n.id not in found:
+                continue
+            if n.parent_id in unseen or (not query and n.parent_id in self.collapsed):
+                unseen.add(n.id)
+                continue
             items = by_cat.get(n.id, [])
+            folded = not query and n.id in self.collapsed
             with (
                 ui.row()
-                .classes("w-full items-center gap-1 rounded")
+                .classes("w-full items-center no-wrap gap-1 rounded")
                 .style(f"padding-left:{1.2 * n.depth}rem")
                 .mark(f"category-header-{n.id}") as header
             ):
@@ -1207,6 +1265,15 @@ class _ExcerptsSection:
                     lambda source_id, _where, n=n: self.drop_on_category(source_id, n.id),
                     zoned=False,
                 )
+                if items or n.children or texts.get(n.id):
+                    ui.button(
+                        icon="chevron_right" if folded else "expand_more",
+                        on_click=lambda n=n: self.toggle(n.id),
+                    ).props("flat dense round size=xs color=grey-7").classes("shrink-0").tooltip(
+                        _("Show what is within it") if folded else _("Hide what is within it")
+                    ).mark(f"category-toggle-{n.id}")
+                else:
+                    ui.element("div").classes("w-5 shrink-0")
                 ui.element("div").classes("w-3 h-3 rounded-full shrink-0").style(
                     f"background: {n.colour}"
                 ).tooltip(_("The colour of its excerpts (edit the categories to change it)")).mark(
@@ -1222,13 +1289,20 @@ class _ExcerptsSection:
                 if items:
                     ui.badge(str(len(items))).props("rounded color=amber-8")
                 section_text.edit_button(self.side, n)
+            if folded:
+                unseen.add(n.id)
+                continue
             # (summarised by its text only: its excerpts not listed in the notes, here yes)
             hidden = len(items) if n.id in summarised else None
             section_text.show(self.side, n, texts.get(n.id, ""), hidden)
             if n.influence:  # (after its own: those flagged elsewhere, as copied)
                 paths = {c.id: c.path for c in nodes}
                 flagged = [
-                    e for c in nodes if c.id != n.id for e in by_cat.get(c.id, []) if e.influence
+                    e
+                    for c in nodes
+                    if c.id != n.id
+                    for e in by_cat.get(c.id, [])
+                    if e.influence and not e.discarded
                 ]
                 for e in flagged:
                     ui.label(f"{paths[e.category_id]} · {e.quoted}").classes(
@@ -1241,9 +1315,11 @@ class _ExcerptsSection:
             for e in items:  # (an excerpt, or a group: its lead, then the others)
                 with (
                     ui.column()
-                    .classes("w-full gap-0")
+                    .classes("w-full gap-0" + (" opacity-50" if e.discarded else ""))
                     .style(f"padding-left:{1.2 * n.depth + 0.6}rem")
-                    .mark(f"excerpt-{e.id}") as block
+                    .mark(
+                        f"excerpt-{e.id}" + (f" excerpt-discarded-{e.id}" if e.discarded else "")
+                    ) as block
                 ):
                     # (onto its top or bottom: placed before / after it; its middle: merged)
                     draggable(block, "excerpt", e.id)
@@ -1254,13 +1330,55 @@ class _ExcerptsSection:
                         middle="merge",
                     )
                     if e.group_text:
-                        ui.label(e.group_text).classes("text-sm line-clamp-4").style(
-                            f"border-left: 3px solid {e.colour}; padding-left: 0.4rem"
-                        ).tooltip(_("The text of the group (edit it with its pencil)")).mark(
-                            f"excerpt-group-text-{e.id}"
-                        )
+                        ui.label(e.group_text).classes(
+                            "text-sm line-clamp-4" + (" line-through" if e.discarded else "")
+                        ).style(f"border-left: 3px solid {e.colour}; padding-left: 0.4rem").tooltip(
+                            _("The text of the group (edit it with its pencil)")
+                        ).mark(f"excerpt-group-text-{e.id}")
                     for x in e.parts:
                         self.quote(x, e, merging)
+
+    @staticmethod
+    def matches(e: categories.ExcerptView, query: str) -> bool:
+        """Whether an excerpt (a group) has the text searched: in its text (as edited, or
+        selected; that of the group, of the others), or a tag."""
+        words = [e.group_text or "", *e.tag_names]
+        words += [t for x in e.parts for t in (x.text, x.original or "")]
+        return any(query in w.casefold() for w in words)
+
+    def search(self, value: str | None) -> None:
+        self.query = value or ""
+        self.body.refresh()
+
+    def toggle(self, cat_id: int) -> None:
+        self.collapsed.symmetric_difference_update({cat_id})
+        annotations.save_ui_state(COLLAPSED, sorted(self.collapsed))
+        self.body.refresh()
+
+    def reveal(self, excerpt_id: int) -> None:
+        """An excerpt selected (e.g. on the PDF) shown: the search cleared, the categories
+        above it expanded."""
+        if self.side.folder is None or self.side.period_id is None:
+            return
+        found = next(
+            (x for x in categories.excerpts(self.side.period_id) if x.id == excerpt_id), None
+        )
+        if found is None:
+            return
+        parents = {n.id: n.parent_id for n in categories.tree(self.side.folder[0])}
+        i: int | None = found.category_id
+        while i is not None:
+            self.collapsed.discard(i)
+            i = parents.get(i)
+        annotations.save_ui_state(COLLAPSED, sorted(self.collapsed))
+        self.query = ""
+        self.listing.refresh()
+
+    def collapse_all(self, nodes: list[categories.Node]) -> None:
+        """Collapse the categories (none: expand them all)."""
+        self.collapsed = {n.id for n in nodes}
+        annotations.save_ui_state(COLLAPSED, sorted(self.collapsed))
+        self.body.refresh()
 
     def quote(
         self,
@@ -1287,7 +1405,10 @@ class _ExcerptsSection:
                 label = ui.label(x.text).classes(
                     "cursor-pointer hover:underline "
                     + ("text-xs text-grey italic line-clamp-1" if cited else "text-sm line-clamp-3")
+                    + (" line-through" if lead.discarded else "")
                 )
+                if lead.discarded and not member:
+                    label.tooltip(_("Left out of the generated text (the notes, the reports)"))
                 if x.ref_only:
                     label.tooltip(_("Only its place is cited (merged as a reference)"))
                 if merging and merging.id != lead.id:
@@ -1363,6 +1484,17 @@ class _ExcerptsSection:
                             *cite,
                             ("move", "drive_file_move", _("Move to another category"), self.move),
                             (
+                                "discard",
+                                "replay" if lead.discarded else "clear",
+                                _("Put it back in the generated text")
+                                if lead.discarded
+                                else _(
+                                    "Leave it out of the generated text (the notes, the "
+                                    "reports): still kept, and listed here"
+                                ),
+                                self.discard,
+                            ),
+                            (
                                 "merge",
                                 "call_merge",
                                 _(
@@ -1392,6 +1524,10 @@ class _ExcerptsSection:
     def drop_on_category(self, source_id: int, category_id: int) -> None:
         """An excerpt dropped onto a category's heading: moved there, first."""
         categories.file_excerpt_first(source_id, category_id)
+        self.side.refresh_excerpts()
+
+    def discard(self, x: categories.ExcerptView) -> None:
+        categories.set_discarded(x.id, not x.discarded)
         self.side.refresh_excerpts()
 
     def split(self, x: categories.ExcerptView) -> None:

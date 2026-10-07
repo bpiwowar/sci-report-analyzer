@@ -346,14 +346,17 @@ sélectionné) et, le cas échéant, ses marqueurs : saillant (un point fort), r
 bémol (une réserve) ; lorsqu'il pourrait déjà s'agir d'un extrait
 existant (mots similaires, signalé par un avertissement ; ou trouvé en tapant ses mots), fusionnez-le plutôt avec
 celui-ci, en conservant son texte ou seulement son emplacement (une référence). L'onglet des catégories liste
-les extraits de la personne (clic : aller au passage), pour les modifier (texte, années, marqueurs, couleur :
+les extraits de la personne (clic : aller au passage ; une catégorie repliée avec son chevron, ou toutes ;
+recherchés par leur texte, leurs étiquettes ou le texte d'une section), pour les modifier (texte, années, marqueurs, couleur :
 sa teinte sur le PDF ; les passages tels que sélectionnés sont affichés, pour y revenir ou les ajouter au texte),
 les déplacer (avec le même sélecteur), les fusionner (en faisant glisser l'un sur l'autre, ou avec son icône de fusion puis un clic sur
 l'autre : regroupés, chacun avec sa propre citation ou seulement son emplacement, son icône lien / citation basculant de l'un à l'autre,
 sur un seul élément avec la catégorie, les années… de l'autre ; le crayon du groupe modifie son texte d'ensemble,
 par ex. une phrase qui les résume, ses extraits étant alors cités dans le commentaire qui le suit, avec leurs
 emplacements, tous toujours teintés sur le PDF ; à nouveau sortis
-avec son icône de séparation), les réordonner (en les faisant glisser sur le bord supérieur ou inférieur d'un autre), les supprimer,
+avec son icône de séparation), les réordonner (en les faisant glisser sur le bord supérieur ou inférieur d'un autre), les écarter
+(son ✕ : laissés hors du texte généré, les notes et rapports, toujours conservés et listés, barrés ;
+rétablis avec le même bouton), les supprimer,
 ou les copier en Markdown (sans guillemets, leurs emplacements dans des commentaires Obsidian : `%% Application, p. 4;
 p. 12 %%`, puis leurs années ; ceux qui témoignent du rayonnement sont aussi listés, par catégorie, dans une dernière
 section « Rayonnement » ; l'icône de badge nomme les documents, par exemple un long nom de fichier sous la forme

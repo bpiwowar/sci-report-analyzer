@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 17:45+0200\n"
+"POT-Creation-Date: 2026-10-07 18:06+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -1102,6 +1102,9 @@ msgstr "Co-auteurs par article · moy. {avg} ({n})"
 msgid "Code"
 msgstr "Code"
 
+msgid "Collapse all the categories"
+msgstr "Replier toutes les catégories"
+
 msgid "Colour"
 msgstr "Couleur"
 
@@ -1648,6 +1651,9 @@ msgstr "Des extraits y ont été classés entre-temps"
 msgid "Excerpts, by category"
 msgstr "Extraits, par catégorie"
 
+msgid "Expand all the categories"
+msgstr "Déplier toutes les catégories"
+
 #, python-brace-format
 msgid "Expected {…} with balanced parentheses, e.g. {.short-venue (.year)}"
 msgstr ""
@@ -1878,6 +1884,9 @@ msgstr "Masquer une notice mal attribuée / non pertinente"
 
 msgid "Hide the folders within it"
 msgstr "Masquer les dossiers qu'il contient"
+
+msgid "Hide what is within it"
+msgstr "Masquer ce qu'elle contient"
 
 msgid "Highlight"
 msgstr "Surligner"
@@ -2333,6 +2342,16 @@ msgstr "Dernier ({year}) : {quartile}"
 msgid "Latest listing ({year}): {rank}"
 msgstr "Dernier classement ({year}) : {rank}"
 
+msgid ""
+"Leave it out of the generated text (the notes, the reports): still kept, "
+"and listed here"
+msgstr ""
+"Le laisser hors du texte généré (les notes, les rapports) : toujours "
+"conservé, et listé ici"
+
+msgid "Left out of the generated text (the notes, the reports)"
+msgstr "Laissé hors du texte généré (les notes, les rapports)"
+
 msgid "Level (by hand)"
 msgstr "Niveau (à la main)"
 
@@ -2782,6 +2801,9 @@ msgstr "Aucun extrait d'un document pour l’instant"
 
 msgid "No excerpt has these words"
 msgstr "Aucun extrait n'a ces mots"
+
+msgid "No excerpt matches"
+msgstr "Aucun extrait ne correspond"
 
 msgid "No folder yet"
 msgstr "Aucun dossier pour l'instant"
@@ -3498,6 +3520,9 @@ msgstr ""
 "Placé après le titre de la catégorie dans les extraits des notes, avant "
 "ses éléments. Vide : aucun."
 
+msgid "Put it back in the generated text"
+msgstr "Le remettre dans le texte généré"
+
 msgid "Put the cursor on a citation ([@key]) first"
 msgstr "Placez d'abord le curseur sur une citation ([@key])"
 
@@ -3999,6 +4024,11 @@ msgstr "Rechercher dans les classements avec (vide : les textes du canal)"
 msgid "Search sources again"
 msgstr "Relancer la recherche des sources"
 
+msgid "Search the excerpts (their text, tags, or a section's text)"
+msgstr ""
+"Rechercher les extraits (leur texte, leurs étiquettes, ou le texte d'une "
+"section)"
+
 msgid "Search venues (name, acronym, source text)"
 msgstr "Rechercher des canaux (nom, acronyme, texte source)"
 
@@ -4206,6 +4236,9 @@ msgid ""
 msgstr ""
 "Afficher le panneau latéral (notes, extraits, signets…) dans une autre "
 "fenêtre, par exemple sur un autre écran ; à nouveau : retour ici"
+
+msgid "Show what is within it"
+msgstr "Afficher ce qu'elle contient"
 
 msgid "Shown again"
 msgstr "Réaffiché"

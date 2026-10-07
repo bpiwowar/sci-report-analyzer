@@ -11,7 +11,15 @@ from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
 from sqlalchemy import select
 
-from sci_report_analyzer import copy_filters, documents, folders, pdfs, pubview, reports
+from sci_report_analyzer import (
+    annotations,
+    copy_filters,
+    documents,
+    folders,
+    pdfs,
+    pubview,
+    reports,
+)
 from sci_report_analyzer.db.models import Publication, SectionText
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.ui import copying, documents_page
@@ -1903,3 +1911,92 @@ async def test_excerpt_selected(user: User, monkeypatch, fake_viewer):
     user.find(content="Our ranking model.").click()  # (its entry)
     assert on() == [first]
     assert scripts[-1].startswith(f"vrDoc.select({first});")
+
+
+def test_excerpt_discarded():
+    """An excerpt discarded: left out of the generated text (its section too, without any
+    other), struck through in the section's excerpts for reference; put back."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    teaching = categories.add(folder, "Teaching")
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    kept = categories.add_excerpt(research, period, "Ten papers.", 1, [], document_id=doc)
+    out = categories.add_excerpt(research, period, "A poster.", 2, [], document_id=doc)
+    alone = categories.add_excerpt(teaching, period, "Two courses.", 3, [], document_id=doc)
+    categories.set_discarded(out, True)
+    categories.set_discarded(alone, True)
+    text = categories.markdown(folder, period)
+    assert "Ten papers." in text and "A poster." not in text and "Teaching" not in text
+    assert categories.section_excerpts(period, research) == (
+        "- Ten papers. (Dossier, p. 1)\n- ~~A poster. (Dossier, p. 2)~~"
+    )
+    categories.set_section_text(period, research, "Summary.", summary_only=True)
+    assert "A poster." not in categories.markdown(folder, period)
+    # A group's lead removed: the next one leads it, discarded too.
+    categories.merge_excerpts(kept, out)
+    categories.remove_excerpt(out)
+    assert [e.discarded for e in categories.excerpts(period) if e.id == kept] == [True]
+    categories.set_discarded(kept, False)
+    categories.set_discarded(alone, False)
+    assert "Two courses." in categories.markdown(folder, period)
+
+
+async def test_excerpts_collapsed_searched_discarded(user: User, fake_viewer):
+    """In the categories' tab: a category collapsed (its excerpts and subcategories hidden;
+    sticky), all of them collapsed or expanded; the excerpts searched (their text, a
+    section's text); an excerpt selected on the PDF, hidden: shown; one discarded, back."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    projects = categories.add(folder, "Projects", research)
+    teaching = categories.add(folder, "Teaching")
+    doc = documents.add(period, "Application.pdf", PDF)
+    documents.set_lines(doc, LINES)
+    paper = categories.add_excerpt(
+        research, period, "Ten papers.", 1, [[72, 680, 300, 690]], document_id=doc
+    )
+    nebula = categories.add_excerpt(projects, period, "Led Nebula.", 1, [], document_id=doc)
+    course = categories.add_excerpt(teaching, period, "Two courses.", 2, [], document_id=doc)
+    categories.set_section_text(period, teaching, "Taught **Zorglub** studies.")
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker=f"excerpt-{nebula}")
+    user.find(marker=f"category-toggle-{research}").click()
+    await user.should_not_see(marker=f"excerpt-{paper}")
+    await user.should_not_see(marker=f"category-header-{projects}")
+    await user.should_see(marker=f"excerpt-{course}")
+    assert annotations.ui_state("ui.excerpts.collapsed") == [research]
+    user.find(marker="categories-expand-all").click()
+    await user.should_see(marker=f"excerpt-{nebula}")
+    user.find(marker="categories-collapse-all").click()
+    await user.should_not_see(marker=f"excerpt-{course}")
+    await user.should_see(marker=f"category-header-{teaching}")
+    # Selected on the PDF while hidden: its categories expanded.
+    _page_event(user, "vrDocExcerpt", {"id": paper})
+    await user.should_see(marker=f"excerpt-part-{paper}")
+    await user.should_not_see(marker=f"excerpt-{course}")
+    user.find(marker="categories-expand-all").click()
+    # Searched: only the excerpts matching (and their categories, those above them).
+    user.find(marker="excerpts-search").type("nebula")
+    await user.should_not_see(marker=f"excerpt-{paper}")
+    await user.should_see(marker=f"excerpt-{nebula}")
+    await user.should_see(marker=f"category-header-{research}")
+    await user.should_not_see(marker=f"category-header-{teaching}")
+    user.find(marker="excerpts-search").clear().type("zorglub")  # (a section's text)
+    await user.should_see(marker=f"category-header-{teaching}")
+    await user.should_not_see(marker=f"excerpt-{course}")
+    user.find(marker="excerpts-search").clear().type("nothing like it")
+    await user.should_see(marker="excerpts-search-none")
+    user.find(marker="excerpts-search").clear()
+    await user.should_see(marker=f"excerpt-{course}")
+    # Discarded: left out of the generated text, still listed; back.
+    user.find(marker=f"excerpt-discard-{course}").click()
+    await user.should_see(marker=f"excerpt-discarded-{course}")
+    assert "Two courses." not in categories.markdown(folder, period)
+    user.find(marker=f"excerpt-discard-{course}").click()
+    await user.should_not_see(marker=f"excerpt-discarded-{course}")
+    assert "Two courses." in categories.markdown(folder, period)

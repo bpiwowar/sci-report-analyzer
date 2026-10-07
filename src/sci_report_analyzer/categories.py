@@ -533,7 +533,11 @@ def excerpts_comment(period_id: int, category_id: int) -> str:
     the folder's reports."""
     from . import reports
 
-    items = [e for e in excerpts(period_id, grouped=True) if e.category_id == category_id]
+    items = [
+        e
+        for e in excerpts(period_id, grouped=True)
+        if e.category_id == category_id and not e.discarded
+    ]
     if not items:
         return ""
     found = folders.folder_of_period(period_id)
@@ -544,7 +548,8 @@ def excerpts_comment(period_id: int, category_id: int) -> str:
 
 def section_excerpts(period_id: int, category_id: int) -> str:
     """The excerpts of a category's section and of those below it (each under its path), as
-    Markdown items with their places in parentheses, for reference; "" without any."""
+    Markdown items with their places in parentheses, for reference (those discarded: struck
+    through); "" without any."""
     ids = subtree(category_id)
     items = [e for e in excerpts(period_id, grouped=True) if e.category_id in ids]
     if not items:
@@ -553,7 +558,13 @@ def section_excerpts(period_id: int, category_id: int) -> str:
     paths = {n.id: n.path for n in tree(found[0])} if found else {}
     lines: list[str] = []
     for cat_id in ids:
-        own = [f"- {_markdown_item(e, comments=False)}" for e in items if e.category_id == cat_id]
+        own = [
+            f"- ~~{_markdown_item(e, comments=False)}~~"
+            if e.discarded
+            else f"- {_markdown_item(e, comments=False)}"
+            for e in items
+            if e.category_id == cat_id
+        ]
         if own and cat_id != category_id:
             lines.append(f"\n**{paths.get(cat_id, '')}**\n")
         lines.extend(own)
@@ -628,6 +639,7 @@ class ExcerptView:
     tags: list[tuple[str, str]] = field(default_factory=list)  # (name, colour; the group's)
     salient: bool = False
     caveat: bool = False
+    discarded: bool = False  # (left out of the generated text: see set_discarded)
 
     @property
     def tag_names(self) -> list[str]:
@@ -812,6 +824,7 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
                 tags=[(t.name, t.colour) for t in e.tags],
                 salient=e.salient,
                 caveat=e.caveat,
+                discarded=e.discarded,
             )
             for e, doc, title, colour in rows
         ]
@@ -952,6 +965,7 @@ def remove_excerpt(excerpt_id: int) -> None:
                 lead.group_id = None
                 lead.start_year, lead.end_year = e.start_year, e.end_year
                 lead.influence, lead.salient, lead.caveat = e.influence, e.salient, e.caveat
+                lead.discarded = e.discarded
                 lead.group_text = e.group_text
                 lead.tags = list(e.tags)
                 for x in others[1:]:
@@ -1014,6 +1028,14 @@ def set_ref_only(excerpt_id: int, ref_only: bool) -> None:
     with session_scope() as s:
         if e := s.get(Excerpt, excerpt_id):
             e.ref_only = ref_only
+
+
+def set_discarded(excerpt_id: int, discarded: bool) -> None:
+    """Leave an excerpt (the group it leads) out of the generated text (the notes, the
+    reports, the copies), or put it back; it is still kept, and listed."""
+    with session_scope() as s:
+        if e := s.get(Excerpt, excerpt_id):
+            e.discarded = discarded
 
 
 def set_group_text(excerpt_id: int, text: str | None) -> None:
@@ -1110,9 +1132,9 @@ def markdown(
     instead, under subsections named after their categories (as nested as these, one level
     below), taken out of their categories ("nested" below); "mark": them only in their
     categories, tagged as the folder says (see reports.markers: also the tags of the
-    excerpts salient or caveats). The categories with
-    no excerpt (nor below) are left out. A section's text (see section_texts) follows its
-    heading; nested, that of a section left out (all its excerpts taken out) follows the
+    excerpts salient or caveats). The categories with no excerpt (nor below) are left out,
+    as are the excerpts discarded (see set_discarded). A section's text (see section_texts)
+    follows its heading; nested, that of a section left out (all its excerpts taken out) follows the
     heading of its subsection in the Rayonnement section; a section summarised by its text
     only (see summarised): its excerpts not listed there, but in a comment after its text
     (see with_excerpts_comment). In the language of the folder's reports.
@@ -1161,7 +1183,8 @@ def _markdown(
     texts, summary_only = section_texts(period_id), summarised(period_id)
     by_cat: dict[int, list[ExcerptView]] = {}
     for e in excerpts(period_id, grouped=True):
-        by_cat.setdefault(e.category_id, []).append(e)
+        if not e.discarded:
+            by_cat.setdefault(e.category_id, []).append(e)
     gather = next((n for n in nodes if n.influence), None)
     # Those whose flagged excerpts are listed apart (nested: not those below the gathering one).
     apart = [n for n in nodes if n is not gather]
