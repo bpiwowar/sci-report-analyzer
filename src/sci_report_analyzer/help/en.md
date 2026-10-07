@@ -344,14 +344,17 @@ again) and its markers if need be: salient (“saillant”, a strong point), inf
 (“rayonnement”) or caveat (“bémol”, a reservation); when it might be an excerpt
 already (similar words, shown with a warning; or found by typing its words), merge it with
 that one instead, keeping its text or only its place (a reference). The categories tab lists
-the person's excerpts (click: go to the passage), to edit (text, years, markers, colour:
+the person's excerpts (click: go to the passage; a category collapsed with its chevron, or all of
+them; searched by their text, tags or a section's text), to edit (text, years, markers, colour:
 its tint on the PDF; the passages as selected are shown, to go back to or add to the text),
 move (with the same picker), merge (drag one onto another, or its merge icon then a click on
 the other: grouped, each its own quote or only its place, its link / quote icon switching,
 on one item with the other's category, years…; the group's pencil edits its overall text,
 e.g. one sentence summarising them, its excerpts then quoted in the comment after it, with
 their places, all still tinted on the PDF; taken out again
-with its split icon), reorder (dragged onto the top or bottom edge of another one), remove,
+with its split icon), reorder (dragged onto the top or bottom edge of another one), discard
+(its ✕: left out of the generated text, the notes and reports, still kept and listed, struck
+through; back with the same button), remove,
 or copy as Markdown (unquoted, their places in Obsidian comments: `%% Application, p. 4;
 p. 12 %%`, then their years; those showing influence also listed, by category, in a last
 “Rayonnement” section; the badge icon names the documents, e.g. a long file name as
