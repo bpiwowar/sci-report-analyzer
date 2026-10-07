@@ -73,22 +73,30 @@ def rekey(s: Session) -> None:
     kept_venues = {k.venue_id for k in rows if k.manual}
     kept_venues |= {v.id for v in s.scalars(select(Venue)) if v.has_manual}
     rows.sort(key=lambda k: (not k.manual, k.venue_id not in kept_venues, k.venue_id, k.key))
-    new: dict[str, tuple[int, bool, str | None, str | None, str | None]] = {}
+    new: dict[str, tuple[int, bool, str | None, str | None, str | None, tuple]] = {}
     merged: dict[int, int] = {}  # venue whose variant collided -> the venue keeping the key
     for vk in rows:
         key = service.key(vk.example, vk.source) if vk.example else vk.key
         if not key:
             continue
         if key not in new:
-            new[key] = (vk.venue_id, vk.manual, vk.example, vk.source, vk.track)
+            decided = (vk.decided_by, vk.decided_on)
+            new[key] = (vk.venue_id, vk.manual, vk.example, vk.source, vk.track, decided)
         elif not vk.manual:
             merged.setdefault(vk.venue_id, new[key][0])
     s.expunge_all()
     s.execute(delete(VenueKey))
-    for key, (vid, manual, example, source, track) in new.items():
+    for key, (vid, manual, example, source, track, (by, on)) in new.items():
         s.add(
             VenueKey(
-                key=key, venue_id=vid, manual=manual, example=example, source=source, track=track
+                key=key,
+                venue_id=vid,
+                manual=manual,
+                example=example,
+                source=source,
+                track=track,
+                decided_by=by,
+                decided_on=on,
             )
         )
     s.flush()

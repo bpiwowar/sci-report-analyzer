@@ -121,6 +121,8 @@ def _stamp_key(k: VenueKey, name: str | None, new: bool) -> None:
     state = inspect(k)
     if not k.manual:
         k.decided_by = k.decided_on = None
+    elif new and (k.decided_by or k.decided_on):  # (its key recomputed)
+        return
     elif new or any(_changed(state, f) for f in ("manual", "venue_id", "track")):
         k.decided_by, k.decided_on = name, today()
 
