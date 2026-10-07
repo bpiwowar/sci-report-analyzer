@@ -4,7 +4,7 @@ A source's venue text is cleaned by the normalization rules (settings), then mat
 venue, by priority:
 
 1. a manual variant (a raw text assigned to the venue by hand, matched by its key);
-2. a venue rule (a regex on the raw text, optionally restricted to sources; SQLite
+2. a venue rule (a regex on the raw or cleaned text, optionally restricted to sources; SQLite
    ``REGEXP``), source-restricted rules first;
 3. an automatic variant (same key), else a new automatic venue.
 
@@ -164,7 +164,8 @@ def _pattern_hits(
     rules.sort(key=lambda r: not r[2].sources)
     hits: dict[int, list[tuple[int, int, VenuePattern]]] = defaultdict(list)
     for vid, i, rule in rules:
-        q = select(VenueText.id).where(VenueText.raw.regexp_match(rule.regex))
+        column = VenueText.clean if rule.cleaned else VenueText.raw
+        q = select(VenueText.id).where(column.regexp_match(rule.regex))
         if rule.sources:
             q = q.where(VenueText.source.in_(rule.sources))
         for tid in s.scalars(q):

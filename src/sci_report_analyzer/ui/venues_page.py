@@ -1934,7 +1934,7 @@ def _matching_tab(
                 ui.button(
                     icon="rule",
                     on_click=lambda c=cleaned, t=track: edit_rule(
-                        prefill=VenuePattern(pattern=venues.text_regex(c), track=t)
+                        prefill=VenuePattern(pattern=venues.text_regex(c), cleaned=True, track=t)
                     ),
                 ).props("flat round dense size=sm").tooltip(
                     _("Turn into a venue rule (to edit): its near variants match too")
@@ -2052,6 +2052,8 @@ def _matching_tab(
             with ui.column().classes("gap-0 w-full").mark(f"venue-rule-{use.index}"):
                 with ui.row().classes("items-center gap-2 no-wrap"):
                     ui.label(r.pattern).classes("font-mono text-sm")
+                    if r.cleaned:
+                        ui.label(_("on the cleaned text")).classes("text-xs text-grey")
                     ui.label(
                         _("only {sources}").format(sources=", ".join(r.sources))
                         if r.sources

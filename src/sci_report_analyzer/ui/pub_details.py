@@ -214,6 +214,10 @@ def venue_rule_dialog(
             with ui.row().classes("items-center gap-2"):
                 source_tag(source)
                 ui.label(f"“{raw}”").classes("font-mono text-sm")
+                if (clean := service.clean(raw, source)) != raw:
+                    ui.label(_("cleaned as: “{text}”").format(text=clean)).classes(
+                        "text-xs text-grey font-mono"
+                    )
         target = (
             ui.select(options, value=venue_id, with_input=True, label=_("Venue"))
             .props("dense outlined")
@@ -247,6 +251,13 @@ def venue_rule_dialog(
                 .mark("rule-sources")
             )
             icase = ui.checkbox(_("ignore case"), value=old.ignore_case if old else True)
+            cleaned = (
+                ui.checkbox(_("on the cleaned text"), value=old.cleaned if old else False)
+                .tooltip(
+                    _("Match the text after the cleaning rules (settings), not the raw source text")
+                )
+                .mark("rule-cleaned")
+            )
             track = (
                 ui.select(
                     {"": _("no track"), **tracks.names()},
@@ -304,6 +315,7 @@ def venue_rule_dialog(
             return VenuePattern(
                 pattern=pattern.value,
                 ignore_case=icase.value,
+                cleaned=cleaned.value,
                 sources=list(only.value or []),
                 track=track.value or None,
                 note=note.value or None,
@@ -366,7 +378,7 @@ def venue_rule_dialog(
                                     "text-orange-9"
                                 )
 
-        for el in (pattern, only, icase, track, target):
+        for el in (pattern, only, icase, cleaned, track, target):
             el.on_value_change(preview)
 
         def store(

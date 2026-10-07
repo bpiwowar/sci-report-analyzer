@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from .db.models import Period, Person, Publication, SourceLink, Thesis
 from .db.session import session_scope
 from .source_settings import active_links
+from .sources.hal import is_document
 
 
 def load(person_id: int) -> Person | None:
@@ -19,6 +20,19 @@ def load(person_id: int) -> Person | None:
         return s.scalar(
             select(Person).where(Person.id == person_id).options(selectinload(Person.links))
         )
+
+
+def last_sync(person: Person) -> dt.datetime | None:
+    """When the person's sources were last synchronized (the latest of their used, validated
+    sources, not the HAL documents added by hand; None: never)."""
+    dates = [
+        ln.last_synced_at
+        for ln in person.links
+        if ln.active
+        and ln.last_synced_at
+        and not (ln.source == "hal" and is_document(ln.external_id))
+    ]
+    return max(dates, default=None)
 
 
 def people_with_counts() -> list[tuple[Person, int]]:

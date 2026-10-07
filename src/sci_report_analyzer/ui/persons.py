@@ -467,6 +467,10 @@ def _card(
                 ui.icon("circle", size="8px", color=colour).classes("-ml-1 mr-1")
             if not validated:
                 ui.label(_("no validated source")).classes("text-sm text-grey")
+            elif synced := persons.last_sync(person):
+                ui.label(_("last sync {when}").format(when=fmt_dt(synced))).classes(
+                    "text-xs text-grey ml-1"
+                ).mark(f"last-sync-{person.id}")
         with ui.row().classes("gap-2"):
             if pending:
                 ui.badge(

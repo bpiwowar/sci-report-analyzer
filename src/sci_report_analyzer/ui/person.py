@@ -178,6 +178,10 @@ def _person_actions(person: Person) -> None:
         ui.button(_("Edit the person"), icon="edit", on_click=lambda: _edit_dialog(person)).props(
             "outline"
         ).tooltip(_("Name, affiliation, ORCID, name aliases, notes")).mark("edit-person")
+        if synced := persons.last_sync(person):
+            ui.label(_("last sync {when}").format(when=fmt_dt(synced))).classes(
+                "text-sm text-grey"
+            ).tooltip(_("Last synchronization of the person's sources")).mark("person-last-sync")
         ui.space()
         ui.button(
             _("Purge the papers"),

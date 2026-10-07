@@ -57,8 +57,8 @@ Chaque source donne un texte de canal, qui est apparié à un canal :
 1. Le texte est nettoyé par les **règles de nettoyage** (Paramètres → Règles de nettoyage : expressions régulières,
    éventuellement pour certaines sources seulement, qui suppriment les années, les ordinaux, les plages de pages…).
 2. Il appartient au canal qui l'a comme **variante** (même texte nettoyé) ; une variante ajoutée
-   à la main l'emporte sur tout le reste. Sinon, une **règle de canal** (une expression régulière sur le texte de la source,
-   dans l'onglet Appariement du canal) peut le revendiquer ; sinon, un nouveau canal est créé.
+   à la main l'emporte sur tout le reste. Sinon, une **règle de canal** (une expression régulière sur le texte brut de la source,
+   ou sur son texte nettoyé, dans l'onglet Appariement du canal) peut le revendiquer ; sinon, un nouveau canal est créé.
    Une notice dont l'ISSN figure sur un canal appartient à celui-ci quel que soit son texte.
 3. Les variantes et les règles de canal peuvent attribuer aux articles une **session** (démo, findings…).
 

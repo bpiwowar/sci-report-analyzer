@@ -1463,14 +1463,14 @@ def rule_variants(venue_id: int, rule: VenuePattern) -> RuleVariants:
     """The venue's variants whose source texts (else the text it was made from) all match
     ``rule``."""
     venue_match.refresh()
-    texts: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    texts: dict[str, list[tuple[str, str, str | None]]] = defaultdict(list)
     for m in venue_match.matches().values():
-        texts[m.key].append((m.source, m.raw))
+        texts[m.key].append((m.source, m.raw, m.clean))
     out = RuleVariants()
     with session_scope() as s:
         for vk in s.scalars(select(VenueKey).where(VenueKey.venue_id == venue_id)):
-            raws = texts.get(vk.key) or ([(vk.source, vk.example)] if vk.example else [])
-            if not raws or not all(rule.applies(src, raw) for src, raw in raws):
+            raws = texts.get(vk.key) or ([(vk.source, vk.example, None)] if vk.example else [])
+            if not raws or not all(rule.applies(*t) for t in raws):
                 continue
             text = service.clean(vk.example, vk.source) if vk.example else vk.key
             found = RuleVariant(vk.key, text, vk.track or None)
@@ -1533,7 +1533,7 @@ def pattern_effects(
         m = texts.get((source, raw))
         if m is None:
             continue
-        now = rule.applies(source, raw)
+        now = rule.applies(source, raw, m.clean)
         was = m.via == "pattern" and m.venue_id == venue_id and m.pattern_index == replaces
         if now and m.venue_id != venue_id:
             if m.via == "variant":
@@ -1568,7 +1568,7 @@ def pattern_uses(venue_id: int) -> list[PatternUse]:
             mine = m.venue_id == venue_id and m.via == "pattern" and m.pattern_index == i
             if mine or any(p[2] == venue_id and p[4] == i for p in m.periods):
                 ex.append((src, raw, counts[(src, raw)]))
-            elif m.venue_id != venue_id and r.applies(src, raw):
+            elif m.venue_id != venue_id and r.applies(src, raw, m.clean):
                 lost.append((src, raw, m.venue_name))
         out.append(PatternUse(i, r, sorted(ex, key=lambda e: -e[2]), lost))
     return out

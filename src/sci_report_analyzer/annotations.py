@@ -363,6 +363,14 @@ def reject_alias(person_id: int, name: str, student: str | None = None) -> None:
         p.name_rejects = rejects
 
 
+def unreject_alias(person_id: int, name: str, student: str | None = None) -> None:
+    """Forget that ``name`` was said not to be the person (or the student): suggested again."""
+    from .db.models import Person
+
+    with session_scope() as s:
+        _unreject(s.get(Person, person_id), student or OWNER, name)
+
+
 def _unreject(p, key: str, name: str) -> None:
     rejects = dict(p.name_rejects or {})
     if name in rejects.get(key, []):

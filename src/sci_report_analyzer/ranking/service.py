@@ -138,12 +138,15 @@ def is_ranked(b: Badge | None) -> bool:
 class VenuePattern(BaseModel):
     """A venue's regex rule: source venue texts it matches belong to the venue.
 
-    Stored on the venue (``Venue.patterns``) and matched against the raw venue texts of the
-    sources (SQLite ``REGEXP``, i.e. Python's ``re.search``).
+    Stored on the venue (``Venue.patterns``) and matched against the venue texts of the
+    sources, raw or cleaned by the normalization rules (SQLite ``REGEXP``, i.e. Python's
+    ``re.search``).
     """
 
     pattern: str
     ignore_case: bool = True
+    # Matched against the text cleaned by the normalization rules (else the raw text).
+    cleaned: bool = False
     # Sources whose venue texts the rule applies to (empty: every source).
     sources: list[str] = Field(default_factory=list)
     # Track (demo, findings, short...) of the publications whose venue text matches.
@@ -173,11 +176,17 @@ class VenuePattern(BaseModel):
     def compiled(self) -> re.Pattern | None:
         return safe_compile(self.pattern, self.ignore_case)
 
-    def applies(self, source: str | None, raw: str | None) -> bool:
+    def applies(self, source: str | None, raw: str | None, clean: str | None = None) -> bool:
+        """Whether it matches a source's venue text (``clean``: the text cleaned, when
+        known)."""
         if not raw or (self.sources and source not in self.sources):
             return False
         rx = self.compiled()
-        return bool(rx and rx.search(raw))
+        if rx is None:
+            return False
+        if self.cleaned:
+            return bool(rx.search(service.clean(raw, source) if clean is None else clean))
+        return bool(rx.search(raw))
 
 
 def _default_sources() -> dict[str, bool]:

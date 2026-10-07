@@ -77,6 +77,22 @@ async def test_people_page(user: User) -> None:
     assert [(r["name"], r["pubs"], r["n_folders"]) for r in table.rows] == [("Jane Doe", 2, 0)]
 
 
+async def test_person_last_sync(user: User) -> None:
+    from sci_report_analyzer import folders, persons
+    from sci_report_analyzer.ui.theme import fmt_dt
+
+    pid = _seed()
+    when = persons.last_sync(persons.load(pid))
+    assert when is not None
+    await user.open(f"/person/{pid}?tab=sources")  # (in the Profile tab only)
+    await user.should_see(marker="person-last-sync")
+    await user.should_see(f"last sync {fmt_dt(when)}")
+    fid = folders.save_folder(None, "Hiring committee")
+    folders.add_person(fid, pid)
+    await user.open(f"/?folder={fid}")  # (and on the folder's cards)
+    await user.should_see(marker=f"last-sync-{pid}")
+
+
 async def test_publications_panel(user: User) -> None:
     pid = _seed()
     await user.open(f"/person/{pid}")
@@ -1380,6 +1396,25 @@ async def test_name_variants_are_in_the_sources_tab(user: User) -> None:
         el = el.parent_slot.parent
         parents.append(el)
     assert box in parents  # in the Sources tab, not in the publications panel
+
+
+async def test_name_variants_always_shown_and_removable(user: User) -> None:
+    from sci_report_analyzer import annotations, persons
+
+    pid = make_person("Jane Doe")
+    await user.open(f"/person/{pid}?tab=sources")
+    await user.should_see("Name variants", retries=40)  # (shown even without any)
+    annotations.add_alias(pid, "J. Doe")
+    add_source(pid, "hal", "jd", [pub("h1", "Some paper", 2020, "V", authors=["J. Doe", "X Y"])])
+    await user.open(f"/person/{pid}?tab=sources")
+    await user.should_see(marker="name-alias-J. Doe", retries=40)
+    user.find(marker="name-alias-J. Doe").trigger("remove")
+    await user.should_see(marker="name-rejected-J. Doe", retries=40)
+    p = persons.load(pid)
+    assert p.aliases == [] and p.name_rejects["owner"] == ["J. Doe"]
+    user.find(marker="name-rejected-J. Doe").trigger("remove")
+    await user.should_see("Name variants · 1 to review", retries=40)  # suggested again
+    assert persons.load(pid).name_rejects["owner"] == []
 
 
 async def test_drop_a_venue_onto_another(user: User) -> None:

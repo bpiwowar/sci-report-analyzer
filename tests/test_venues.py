@@ -397,6 +397,28 @@ def test_explain_shows_rules_and_match():
     assert (e.via, e.detail) == ("pattern", "^Venue One,")  # a rule beats an automatic variant
 
 
+def test_rule_on_the_cleaned_text():
+    pid = make_person()
+    add_source(
+        pid,
+        "hal",
+        "idhal:x",
+        [pub("a", "Paper A", 2020, "Venue One, 2021"), pub("b", "Paper B", 2020, "Other")],
+    )
+    other = stats(pid)["Paper B"].venue_id
+    raw_rule = VenuePattern(pattern="^Venue One$")
+    rule = VenuePattern(pattern="^Venue One$", cleaned=True)
+    assert not raw_rule.applies("hal", "Venue One, 2021")
+    assert rule.applies("hal", "Venue One, 2021")
+    assert [e.raw for e in venues.pattern_effects(other, raw_rule)] == []
+    assert [e.raw for e in venues.pattern_effects(other, rule)] == ["Venue One, 2021"]
+    venues.save_patterns(other, [rule])
+    a = stats(pid)["Paper A"]
+    assert a.venue_id == other and a.members[0].via == "pattern"
+    (use,) = venues.pattern_uses(other)
+    assert [e[1] for e in use.examples] == ["Venue One, 2021"]
+
+
 def test_a_track_wins_and_the_validated_source_decides():
     from sci_report_analyzer import annotations, venues
     from sci_report_analyzer.ranking.service import VenuePattern

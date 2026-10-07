@@ -13,7 +13,8 @@ from urllib.parse import urlencode
 
 from nicegui import background_tasks, ui
 
-from .. import annotations, contribution, manual, source_settings
+from .. import annotations, contribution, manual, persons, source_settings
+from ..authors import fold_name
 from ..i18n import N_, _, ngettext
 from ..pubview import (
     HIST_CAP,
@@ -732,9 +733,13 @@ class PublicationsPanel:
             self._name_variants()
 
     def _name_variants(self) -> None:
-        """Spellings of the person's name seen in the sources (to confirm as aliases)."""
+        """Spellings of the person's name seen in the sources (to confirm as aliases), the
+        confirmed ones (aliases: to remove) and those said not to be them (to restore)."""
         from collections import Counter
 
+        person = persons.load(self.person_id)
+        if person is None:
+            return
         pending: Counter[str] = Counter()
         confirmed: Counter[str] = Counter()
         for st in self.stats:
@@ -743,20 +748,44 @@ class PublicationsPanel:
                     pending[st.authors[i]] += 1
                 elif m == "owner":
                     confirmed[st.authors[i]] += 1
-        if not pending and len(confirmed) <= 1:
-            return
+        aliases = {fold_name(a): a for a in person.aliases or []}
+        aliases.pop(fold_name(person.name), None)
+        seen = {fold_name(n) for n in confirmed}
+        for a in aliases.values():  # (aliases no paper uses)
+            if fold_name(a) not in seen:
+                confirmed[a] = 0
+        rejected = (person.name_rejects or {}).get(annotations.OWNER, [])
         title = (
             _("Name variants · {n} to review").format(n=len(pending))
             if pending
             else _("Name variants")
         )
         with ui.expansion(title, icon="badge", value=bool(pending)).classes("w-full"):
+            if not (pending or confirmed or rejected):
+                ui.label(_("No spelling of the name found in the sources yet.")).classes(
+                    "text-sm text-grey"
+                )
             if confirmed:
-                ui.label(
-                    _("Confirmed: {names}").format(
-                        names=", ".join(f"{n} ({c})" for n, c in confirmed.most_common())
-                    )
-                ).classes("text-sm")
+                with ui.row().classes("items-center gap-1"):
+                    ui.label(_("Confirmed:")).classes("text-sm")
+                    for name, count in confirmed.most_common():
+                        alias = aliases.get(fold_name(name))
+                        chip = ui.chip(f"{name} ({count})", removable=alias is not None).props(
+                            "dense"
+                        )
+                        if alias is None:
+                            chip.tooltip(_("The person's name, or their position in a source"))
+                            continue
+
+                        def remove(n=name) -> None:
+                            for a in person.aliases or []:
+                                if fold_name(a) == fold_name(n):
+                                    annotations.remove_alias(self.person_id, a)
+                            background_tasks.create(self.reload())
+
+                        chip.on("remove", remove).tooltip(
+                            _("Remove: not a spelling of the person's name")
+                        ).mark(f"name-alias-{name}")
             for name, count in pending.most_common():
                 with ui.row().classes("items-center gap-2"):
                     span(author_html(name, "owner?", None))
@@ -776,6 +805,18 @@ class PublicationsPanel:
                     ui.button(_("not them"), icon="close", on_click=reject).props(
                         "dense flat color=negative"
                     )
+            if rejected:
+                with ui.row().classes("items-center gap-1"):
+                    ui.label(_("Not them:")).classes("text-sm text-grey")
+                    for name in rejected:
+
+                        def restore(n=name) -> None:
+                            annotations.unreject_alias(self.person_id, n)
+                            background_tasks.create(self.reload())
+
+                        ui.chip(name, removable=True).props("dense outline").on(
+                            "remove", restore
+                        ).tooltip(_("Remove: suggest it again")).mark(f"name-rejected-{name}")
 
     def _add_publication(self) -> None:
         """A paper the sources miss, by its DOI or its HAL id (or their URLs)."""

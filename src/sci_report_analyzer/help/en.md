@@ -58,7 +58,8 @@ Each source gives a venue text, which is matched to a venue:
    possibly for some sources only, removing years, ordinals, page ranges…).
 2. It belongs to the venue having it as a **variant** (same cleaned text); a variant added
    by hand wins over everything else. Otherwise a **venue rule** (a regex on the source's
-   text, on the venue's Matching tab) can claim it; otherwise a new venue is created.
+   raw text, or on its cleaned text, on the venue's Matching tab) can claim it; otherwise a
+   new venue is created.
    A record with an ISSN listed on a venue belongs to it whatever its text.
 3. Variants and venue rules can mark papers with a **track** (demo, findings…).
 
