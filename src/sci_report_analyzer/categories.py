@@ -516,6 +516,24 @@ def excerpts_comment(period_id: int, category_id: int) -> str:
         return "\n".join([f"%% {_comment_header()}", *lines, "%%"])
 
 
+def section_excerpts(period_id: int, category_id: int) -> str:
+    """The excerpts of a category's section and of those below it (each under its path), as
+    Markdown items with their places in parentheses, for reference; "" without any."""
+    ids = subtree(category_id)
+    items = [e for e in excerpts(period_id, grouped=True) if e.category_id in ids]
+    if not items:
+        return ""
+    found = folders.folder_of_period(period_id)
+    paths = {n.id: n.path for n in tree(found[0])} if found else {}
+    lines: list[str] = []
+    for cat_id in ids:
+        own = [f"- {_markdown_item(e, comments=False)}" for e in items if e.category_id == cat_id]
+        if own and cat_id != category_id:
+            lines.append(f"\n**{paths.get(cat_id, '')}**\n")
+        lines.extend(own)
+    return "\n".join(lines).strip()
+
+
 def with_excerpts_comment(text: str, period_id: int, category_id: int) -> str:
     """A section's text followed by its excerpts in a comment (see excerpts_comment), unless
     it already has them."""

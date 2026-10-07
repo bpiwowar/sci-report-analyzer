@@ -1042,6 +1042,27 @@ def test_section_texts():
         assert s.scalars(select(SectionText)).all() == []
 
 
+def test_section_excerpts():
+    """A section's excerpts and those of its subsections (under their paths), for reference
+    when writing its text."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    projects = categories.add(folder, "Projects", research)
+    other = categories.add(folder, "Teaching")
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    categories.add_excerpt(projects, period, "Led Nebula.", 3, [], document_id=doc)
+    categories.add_excerpt(research, period, "Ten papers.", 1, [], document_id=doc)
+    categories.add_excerpt(other, period, "Two courses.", 2, [], document_id=doc)
+    assert categories.section_excerpts(period, research) == (
+        "- Ten papers. (Dossier, p. 1)\n\n**Research › Projects**\n\n- Led Nebula. (Dossier, p. 3)"
+    )
+    assert categories.section_excerpts(period, projects) == "- Led Nebula. (Dossier, p. 3)"
+    assert categories.section_excerpts(period, categories.add(folder, "Misc")) == ""
+
+
 def test_section_summarised_by_its_text():
     """A section summarised by its text only: its excerpts not listed, kept in the text in a
     comment (not rendered); nested, a section left out: in the Rayonnement section too."""

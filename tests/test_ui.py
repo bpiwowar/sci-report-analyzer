@@ -914,6 +914,8 @@ async def test_section_text_of_a_category(user: User) -> None:
     await user.should_see("Led a project.")
     await user.should_not_see(marker=f"section-text-{research}")
     user.find(marker=f"section-text-edit-{research}").click()
+    # (its excerpts listed, for reference)
+    await user.should_see(marker="section-text-excerpts")
     user.find(marker="section-text-input").elements.pop().value = "A *strong* record."
     user.find(marker="section-text-save").click()
     assert categories.section_texts(period) == {research: "A *strong* record."}

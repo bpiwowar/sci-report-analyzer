@@ -91,6 +91,16 @@ def edit(side: Side, node: categories.Node) -> None:
                 "items. Empty: none."
             )
         ).classes("text-xs text-grey")
+        if listed := categories.section_excerpts(period_id, node.id):
+            with (
+                ui.expansion(_("Its excerpts (and those of its subsections)"), value=True)
+                .props("dense")
+                .classes("w-full text-sm")
+                .mark("section-text-excerpts")
+            ):
+                ui.markdown(listed, extras=NOTE_EXTRAS).classes(
+                    "w-full vr-note text-sm text-grey-9 max-h-60 overflow-auto"
+                )
 
         only = (
             ui.checkbox(
