@@ -92,6 +92,8 @@ CONFERENCE_KINDS = ("intl_conference", "natl_conference")
 JOURNAL_KINDS = ("intl_journal", "natl_journal")
 # Conference-like kinds (a paper in them is in "proceedings"; levels are CORE ranks).
 CONFERENCE_LIKE = (*CONFERENCE_KINDS, *WORKSHOP_KINDS)
+# The kinds of a ranked venue: their rank is to check when none was found.
+RANKED_KINDS = (*CONFERENCE_LIKE, *JOURNAL_KINDS)
 
 # The regexes deciding a kind (Settings → Detection rules; defaults in ``detection``).
 # A workshop's rank is that of its main conference.

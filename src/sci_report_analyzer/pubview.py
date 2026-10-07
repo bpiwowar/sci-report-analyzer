@@ -32,6 +32,7 @@ from .merge import main_members
 from .ranking import tracks
 from .ranking.badge import (
     BASE_CATEGORIES,
+    CHECKED,
     KIND_ORDER,
     Badge,
     Category,
@@ -39,11 +40,13 @@ from .ranking.badge import (
     category_label,
     category_of,
     category_order,
+    review,
 )
 from .ranking.kinds import (
     CONFERENCE_LIKE,
     KIND_SHORT,
     NO_VENUE_KINDS,
+    RANKED_KINDS,
     UNRANKED_KINDS,
     VENUE_KINDS,
     WORKSHOP_KINDS,
@@ -225,6 +228,16 @@ class PubStat:
         if self.missing:
             out.append(_("no longer in any source"))
         return out
+
+    @property
+    def review(self) -> str | None:
+        """Whether its rank was checked (``ranking.badge.review``): set by hand for the paper,
+        or its venue's."""
+        if self.hidden or self.archival_only:
+            return None
+        if self.rank_override:
+            return CHECKED if self.kind in RANKED_KINDS else None
+        return review(self.badge, self.kind)
 
     @property
     def problem_tab(self) -> str:
@@ -782,8 +795,12 @@ async def _paper_badge(
     host = None
     if kind in UNRANKED_KINDS and not pub.rank_override:
         badge = None  # an edited volume: not a paper of its venue
-    if kind in WORKSHOP_KINDS and not pub.rank_override and not _has_decision(venue):
-        badge, host = await workshop_badge(venue, year, venues)
+    checked = bool(badge and badge.unranked)
+    if kind in WORKSHOP_KINDS and not pub.rank_override and (checked or not _has_decision(venue)):
+        # (checked, not ranked: that of its main conference, if it has one)
+        wbadge, host = await workshop_badge(venue, year, venues)
+        if host is not None or not checked:
+            badge = wbadge
     if (
         not pub.rank_override
         and not is_ranked(badge)
@@ -792,8 +809,11 @@ async def _paper_badge(
         # Default level of the kind (e.g. every national conference is "C").
         vtype = "conference" if kind in CONFERENCE_LIKE else "journal"
         name = venue.name if venue else None
+        was_checked = bool(badge and badge.unranked)
         badge = badge_from_level({"type": vtype, "rank": level, "name": name})
         badge.extra["kind_default"] = kind
+        if was_checked:
+            badge.extra["checked"] = True  # (its venue: checked, not ranked)
     return badge, host
 
 

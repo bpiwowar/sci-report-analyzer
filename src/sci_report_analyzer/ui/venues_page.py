@@ -12,13 +12,14 @@ from .. import venue_match, venues
 from ..i18n import N_, _, ngettext
 from ..ranking import tracks
 from ..ranking.badge import (
+    TO_CHECK,
     UNRANKED_COLOUR,
     category_of,
     core_periods,
     sjr_periods,
 )
 from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
-from ..ranking.levels import clean_name, normalized, range_label
+from ..ranking.levels import NONE, clean_name, normalized, range_label
 from ..ranking.service import VenuePattern, service
 from ..sources import ADAPTERS
 from . import dnd
@@ -59,13 +60,23 @@ def _chip_html(row: venues.VenueRow) -> str:
         badge = None
     cat = category_of(badge, None, row.kind)
     label = cat.label if badge or cat.base_key.startswith("k_") else _("not ranked")
-    colour = cat.colour
+    colour, style, title = cat.colour, "", None
     if dropped := venues.dropped_from_core(badge):
         label = _("CORE {rank} until {year}").format(rank=dropped[0], year=dropped[1])
         colour = UNRANKED_COLOUR
-    return chip_html(label, colour) + (
+    if badge and badge.unranked:
+        label, colour = _("not ranked ✓"), UNRANKED_COLOUR
+        title = _("Checked: in no ranking")
+    elif row.review == TO_CHECK:
+        label, style = f"{label} ?", TO_CHECK_STYLE
+        title = _("To check: no rank found, or a fuzzy match, and no decision by hand")
+    return chip_html(label, colour, style=style, title=title) + (
         f' <span title="{escape(_("manual decision"))}">✎</span>' if row.manual else ""
     )
+
+
+# A venue whose rank is to check: a dashed outline.
+TO_CHECK_STYLE = "outline:1px dashed #9a6700;outline-offset:1px"
 
 
 def _track_picker(
@@ -628,6 +639,8 @@ class _View:
     tab: str
     dialogs: ui.element
     filter: str = ""
+    # The tabs showing only the venues whose rank is to check.
+    to_check: set[str] = field(default_factory=set)
     reload: Callable[[], object] = lambda: None
     # Shows new rows in the list in place; False: the list must be rebuilt.
     update: Callable[[list[venues.VenueRow]], bool] = lambda _rows: False
@@ -929,18 +942,23 @@ def _table(
                 "pubs": r.publications,
                 "people": len(r.people),
                 "variants": len(r.variants),
+                "to_check": r.review == TO_CHECK,
             }
             for r in sorted(rows, key=lambda r: (-r.publications, r.name.lower()))
         ]
+
+    def shown() -> list[dict]:
+        """The rows of the tab (all kinds when searching), those to check if asked."""
+        out = everything if searching[0] else own
+        return [r for r in out if r["to_check"]] if name in view.to_check else out
 
     # A search looks in every kind (a venue may be misclassified): the kind column tells.
     own, everything = data(rows), data(all_rows)
     by_id = {r.id: r for r in all_rows}
     kinds = TABS[name][1] if name in TABS else {r.kind for r in rows}
+    searching = [bool(view.filter)]
     table = (
-        ui.table(
-            columns=columns, rows=everything if view.filter else own, row_key="id", pagination=50
-        )
+        ui.table(columns=columns, rows=shown(), row_key="id", pagination=50)
         .classes("w-full")
         .props("dense flat")
     )
@@ -958,20 +976,34 @@ def _table(
     all_kinds.mark("venue-list-all-kinds")
     all_kinds.bind_visibility_from(table, "filter", backward=bool)
 
-    searching = [bool(view.filter)]
-
     def filtered(e) -> None:
         view.filter = e.value or ""
         if searching[0] != bool(view.filter):
             searching[0] = bool(view.filter)
-            table.rows = everything if view.filter else own
+            table.rows = shown()
+
+    def checking(e) -> None:
+        (view.to_check.add if e.value else view.to_check.discard)(name)
+        table.rows = shown()
 
     filt.on_value_change(filtered)
+    to_check = (
+        ui.switch(_to_check_label(own), value=name in view.to_check, on_change=checking)
+        .props("dense")
+        .tooltip(
+            _(
+                "The venues whose rank is to check: none found, or a fuzzy match, and no "
+                'decision by hand (a level, "not ranked" included, or a record)'
+            )
+        )
+        .mark(f"venue-list-to-check-{name}" if name else "venue-list-to-check")
+    )
     filt.move(target_index=0)
-    all_kinds.move(target_index=1)
+    to_check.move(target_index=1)
+    all_kinds.move(target_index=2)
     ui.label(_("Drag a venue onto another one to merge it into that one.")).classes(
         "text-xs text-grey"
-    ).move(target_index=2)
+    ).move(target_index=3)
 
     def open_row(e) -> None:
         if (row := by_id.get(e.args["id"])) is not None:
@@ -996,10 +1028,15 @@ def _table(
         own, everything = data([r for r in new_rows if r.kind in kinds]), data(new_rows)
         by_id.clear()
         by_id.update((r.id, r) for r in new_rows)
-        table.rows = everything if searching[0] else own
+        to_check.text = _to_check_label(own)
+        table.rows = shown()
         table.update()
 
     return update
+
+
+def _to_check_label(rows: list[dict]) -> str:
+    return _("To check ({n})").format(n=sum(r["to_check"] for r in rows))
 
 
 _ROW_SLOT = (
@@ -1101,21 +1138,26 @@ def _hosts_editor(row: venues.VenueRow, go) -> Callable[[], list[dict] | None]:
     return lambda: ... if (now := [h for h in hosts if h["venue_id"]]) == saved else now
 
 
-def _levels_editor(state: venues.VenueEdit) -> Callable[[], list[dict]]:
-    """A venue's levels set by hand, by year range (none: automatic); returns them."""
+def _levels_editor(
+    state: venues.VenueEdit, confirmed: Callable[[], object] = lambda: None
+) -> Callable[[], list[dict]]:
+    """A venue's levels set by hand, by year range (none: automatic); returns them.
+    ``confirmed``: called when the venue is said to be in no ranking (every year)."""
     levels = [dict(lv) for lv in state.levels]
     ui.label(_("Level (by hand)")).classes("font-medium mt-2")
     ui.label(
         _(
             "A level for every year, or one per period (e.g. B until 2017, A from 2018): a "
             "paper takes the level of its year; the years no period covers keep the "
-            "ranking below (record or automatic)."
+            'ranking below (record or automatic). "Not ranked": checked, in no ranking '
+            "(unlike a venue no one checked)."
         )
     ).classes("text-xs text-grey")
 
     def options(t: str, current: str | None) -> dict[str, str]:
         known = CORE_RANKS if t == "conference" else QUARTILES
-        return level_options([*known, *([current] if current and current not in known else [])])
+        extra = [current] if current and current not in (*known, NONE) else []
+        return {**level_options([*known, *extra]), NONE: _("not ranked (checked)")}
 
     @ui.refreshable
     def lines() -> None:
@@ -1173,9 +1215,23 @@ def _levels_editor(state: venues.VenueEdit) -> Callable[[], list[dict]]:
         levels.append({"type": ltype, "rank": "A" if ltype == "conference" else "Q1"})
         lines.refresh()
 
-    ui.button(
-        _("Add a level") if not levels else _("Add a period"), icon="add", on_click=add
-    ).props("dense flat size=sm").mark("venue-level-add")
+    def not_ranked() -> None:
+        levels[:] = [{"type": state.level_type, "rank": NONE}]
+        confirmed()
+        lines.refresh()
+
+    with ui.row().classes("items-center gap-2"):
+        ui.button(
+            _("Add a level") if not levels else _("Add a period"), icon="add", on_click=add
+        ).props("dense flat size=sm").mark("venue-level-add")
+        ui.button(_("Not ranked (checked)"), icon="check", on_click=not_ranked).props(
+            "dense flat size=sm"
+        ).tooltip(
+            _(
+                "Checked: the venue is in no ranking, every year (its kind, if automatic, "
+                "is kept as it is now)"
+            )
+        ).mark("venue-level-none")
     return lambda: [dict(lv) for lv in levels if lv.get("rank")]
 
 
@@ -1636,7 +1692,11 @@ def _ranking_tab(
         lambda k: k not in WORKSHOP_KINDS and (k or row.kind not in WORKSHOP_KINDS),
     )
 
-    levels_value = _levels_editor(state)
+    def confirm_kind() -> None:
+        if not kind.value and row.kind in VENUE_KINDS:  # (checked too: kept by hand)
+            kind.value = row.kind
+
+    levels_value = _levels_editor(state, confirm_kind)
 
     ui.label(_("Ranking record (by hand)")).classes("font-medium mt-2")
     chosen = {"key": state.record_key}

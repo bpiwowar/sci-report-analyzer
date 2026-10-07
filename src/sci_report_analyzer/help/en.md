@@ -135,6 +135,14 @@ the ACL: EMNLP* is EMNLP's Findings track), a joint conference including it (EMN
 or one of its workshops; change it if needed, then apply. Venue decisions are part of the
 exported settings.
 
+**Not ranked, checked.** A venue with no rank found may be in no ranking, or just not
+matched yet: its rank shows "?" (dashed) until someone decides, and the venue lists and the
+person's papers can show only those **to check** (as do the papers of a fuzzy match). The
+level **Not ranked (checked)** says the venue is in no ranking (for some periods, or every
+year: the button of that name, which also keeps its kind as it is); its papers stay in the
+category of their kind (and take the kind's default level, if any). A workshop with a main
+conference still takes its rank.
+
 **Periods.** A venue's level set by hand can change over time: give one level per period
 (e.g. B until 2017, A from 2018) and each paper takes the level of its year; the years no
 period covers keep the venue's other ranking (its record, else the automatic one). A venue

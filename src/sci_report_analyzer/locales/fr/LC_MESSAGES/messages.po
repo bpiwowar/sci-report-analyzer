@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 09:34+0200\n"
+"POT-Creation-Date: 2026-10-07 12:50+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -108,6 +108,10 @@ msgstr ""
 msgid "; ties are broken by source priority ({order})"
 msgstr " ; les ex æquo sont départagés par la priorité des sources ({order})"
 
+#, python-brace-format
+msgid "? rank to check ({n})"
+msgstr "? rang à vérifier ({n})"
+
 msgid "A DOI starts with 10. (e.g. 10.1145/3404835.3462812)"
 msgstr "Un DOI commence par 10. (p. ex. 10.1145/3404835.3462812)"
 
@@ -201,12 +205,14 @@ msgstr "Une lettre, puis des lettres, chiffres, - ou _ (p. ex. starred)"
 msgid ""
 "A level for every year, or one per period (e.g. B until 2017, A from "
 "2018): a paper takes the level of its year; the years no period covers "
-"keep the ranking below (record or automatic)."
+"keep the ranking below (record or automatic). \"Not ranked\": checked, in"
+" no ranking (unlike a venue no one checked)."
 msgstr ""
 "Un niveau pour toutes les années, ou un par période (p. ex. B jusqu'en "
 "2017, A à partir de 2018) : un article prend le niveau de son année ; les"
 " années qu'aucune période ne couvre gardent le classement ci-dessous "
-"(entrée de classement ou automatique)."
+"(entrée de classement ou automatique). « Non classé » : vérifié, dans "
+"aucun classement (à la différence d'un canal que personne n'a vérifié)."
 
 msgid "A manual variant or a more specific rule wins"
 msgstr "Une variante manuelle ou une règle plus spécifique prime"
@@ -872,6 +878,16 @@ msgstr "Chapitre"
 
 msgid "Check the effect on the venue texts"
 msgstr "Vérifier l’effet sur les textes de canal de publication"
+
+msgid "Checked: in no ranking"
+msgstr "Vérifié : dans aucun classement"
+
+msgid ""
+"Checked: the venue is in no ranking, every year (its kind, if automatic, "
+"is kept as it is now)"
+msgstr ""
+"Vérifié : le canal n'est dans aucun classement, quelle que soit l'année "
+"(son type, s'il est automatique, est gardé tel quel)"
 
 msgid "Choose"
 msgstr "Choisir"
@@ -2850,6 +2866,9 @@ msgstr "Non chargée : la télécharger"
 msgid "Not of the period's years"
 msgstr "Hors des années de la période"
 
+msgid "Not ranked (checked)"
+msgstr "Non classé (vérifié)"
+
 msgid "Not related: never propose it again"
 msgstr "Sans rapport : ne plus jamais le proposer"
 
@@ -3104,6 +3123,14 @@ msgstr "Article"
 msgid "Papers"
 msgstr "Articles"
 
+msgid ""
+"Papers in a venue whose rank was not checked: none found, or a fuzzy "
+"match, and no decision by hand (\"not ranked\" included)"
+msgstr ""
+"Articles d'un canal dont le rang n'a pas été vérifié : aucun trouvé, ou "
+"une correspondance approchée, et aucune décision manuelle (« non classé »"
+" compris)"
+
 msgid "Papers in this document"
 msgstr "Articles de ce document"
 
@@ -3141,7 +3168,9 @@ msgstr ""
 "comptés"
 
 msgid "Papers this source doesn't list for the person are not counted"
-msgstr "Les articles que cette source ne liste pas pour la personne ne sont pas comptés"
+msgstr ""
+"Les articles que cette source ne liste pas pour la personne ne sont pas "
+"comptés"
 
 msgid ""
 "Papers whose venue was picked or validated, or whose rank or kind was set"
@@ -4441,9 +4470,10 @@ msgstr ""
 "{default})"
 
 msgid "The papers shown: all, those the primary source lists, or the others"
-msgstr "Les articles montrés : tous, ceux que liste la source principale, ou les autres"
+msgstr ""
 "Les articles montrés : tous, ceux que liste la source principale, ou les "
-"autres"
+"autresLes articles montrés : tous, ceux que liste la source principale, "
+"ou les autres"
 
 #, python-brace-format
 msgid ""
@@ -4639,6 +4669,14 @@ msgstr ""
 "ISSN et articles des autres ; ses propres décisions l'emportent, celles "
 "des autres complètent ce qui lui manque."
 
+msgid ""
+"The venues whose rank is to check: none found, or a fuzzy match, and no "
+"decision by hand (a level, \"not ranked\" included, or a record)"
+msgstr ""
+"Les canaux dont le rang est à vérifier : aucun trouvé, ou une "
+"correspondance approchée, et aucune décision manuelle (un niveau, « non "
+"classé » compris, ou une entrée de classement)"
+
 #, python-brace-format
 msgid "The {source} source is disabled (Settings → Sources)"
 msgstr "La source {source} est désactivée (Paramètres → Sources)"
@@ -4792,6 +4830,15 @@ msgstr "À"
 
 msgid "To (year)"
 msgstr "À (année)"
+
+#, python-brace-format
+msgid "To check ({n})"
+msgstr "À vérifier ({n})"
+
+msgid "To check: no rank found, or a fuzzy match, and no decision by hand"
+msgstr ""
+"À vérifier : aucun rang trouvé, ou une correspondance approchée, et "
+"aucune décision manuelle"
 
 msgid "Track"
 msgstr "Session"
@@ -5780,6 +5827,12 @@ msgstr "absents de {source} ({n})"
 
 msgid "not ranked"
 msgstr "non classé"
+
+msgid "not ranked (checked)"
+msgstr "non classé (vérifié)"
+
+msgid "not ranked ✓"
+msgstr "non classé ✓"
 
 #, python-brace-format
 msgid "not the person's ORCID ({orcid})"

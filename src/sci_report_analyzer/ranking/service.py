@@ -128,7 +128,11 @@ def _drop_generic_journal(m: MatchResult, badge: Badge | None, raw: str) -> bool
 
 
 def is_ranked(b: Badge | None) -> bool:
-    return bool(b and (b.coreRank or (b.quartile and b.quartile.startswith("Q")) or b.manual))
+    return bool(
+        b
+        and not b.unranked
+        and (b.coreRank or (b.quartile and b.quartile.startswith("Q")) or b.manual)
+    )
 
 
 class VenuePattern(BaseModel):

@@ -53,6 +53,9 @@ class Badge:
     manual: bool = False
     archival: bool = False
     forced: bool = False
+    # Checked by hand: in no ranking (a level ``levels.NONE``); a venue no one checked has
+    # no badge.
+    unranked: bool = False
     # Levels set by hand by year range (``ranking.levels``): the badge is that of this year
     # (``at_year`` gives a paper's); ``fallback``: the badge (a dict) of the years none covers.
     levels: list[dict[str, Any]] | None = None
@@ -100,6 +103,8 @@ class Badge:
 
     @property
     def rank_label(self) -> str:
+        if self.unranked:
+            return _("not ranked")
         if self.archival:
             return self.name or _("archival")
         if self.quartile:
@@ -227,6 +232,14 @@ def badge_from_record(rec: Record, score: float, exact: bool) -> Badge:
 
 def badge_from_level(level: dict[str, Any]) -> Badge:
     is_journal = level.get("type") == "journal"
+    if level["rank"] == level_ranges.NONE:
+        return Badge(
+            name=level.get("name") or "",
+            source="manual",
+            type=level.get("type", "conference"),
+            manual=True,
+            unranked=True,
+        )
     return Badge(
         name=level.get("name") or "",
         source="manual",
@@ -280,6 +293,32 @@ def badge_archival(key: str) -> Badge:
         type="journal",
         archival=True,
     )
+
+
+# ---- Review status --------------------------------------------------------------------------
+
+# A venue's rank: decided by hand (a level, "not ranked" included, or a record), found by an
+# exact automatic match, or to check (a fuzzy match, or no rank and no decision).
+CHECKED, AUTO, TO_CHECK = "checked", "auto", "to_check"
+
+
+def review(badge: Badge | None, kind: str | None) -> str | None:
+    """Whether the rank of a venue (or a paper) of ``kind`` was checked: ``CHECKED``,
+    ``AUTO`` or ``TO_CHECK``; None for a kind never ranked (a preprint, a book...)."""
+    from .kinds import RANKED_KINDS
+
+    if kind not in RANKED_KINDS:
+        return None
+    if badge is None:
+        return TO_CHECK
+    if badge.extra.get("kind_default"):
+        # The kind's default level: its venue in no ranking, checked or not.
+        return CHECKED if badge.extra.get("checked") else TO_CHECK
+    if badge.manual or badge.forced:
+        return CHECKED
+    if badge.exact and (badge.coreRank or badge.quartile):
+        return AUTO
+    return TO_CHECK
 
 
 # ---- Categories (distribution bar) ---------------------------------------------------------
@@ -377,7 +416,7 @@ def detect_track(venue: str | None) -> str | None:
 
 
 def _base(badge: Badge | None) -> tuple[str, str, str]:
-    if badge is None:
+    if badge is None or badge.unranked:
         return "unranked", _("unranked"), UNRANKED_COLOUR
     key = _QUARTILE_KEYS.get(badge.quartile or "") or _CORE_KEYS.get(badge.coreRank or "")
     if key:

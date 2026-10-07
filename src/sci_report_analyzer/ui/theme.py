@@ -314,6 +314,8 @@ def badge_details(b: Badge) -> str:
         b.name or _("(unnamed)"),
         _("matched via {source} ({how})").format(source=b.source, how=how),
     ]
+    if b.unranked or b.extra.get("checked"):
+        lines.append(_("Checked: in no ranking"))
     if b.quartile:
         if b.sjrYear:
             lines.append(

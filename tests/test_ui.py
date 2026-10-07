@@ -306,6 +306,35 @@ async def test_venue_dialog_and_manual_level(user: User) -> None:
     await user.should_see("Test a venue string")
 
 
+async def test_venue_not_ranked_checked(user: User) -> None:
+    """A venue in no ranking, checked by hand: its papers are no longer to check."""
+    from sqlalchemy import select
+
+    from sci_report_analyzer.db.models import Publication, Venue
+    from sci_report_analyzer.db.session import session_scope
+    from sci_report_analyzer.ranking.levels import NONE
+
+    pid = _seed()
+    await user.open(f"/person/{pid}?check=1")
+    await user.should_see(marker="to-check-only")
+    await user.should_see("A workshop contribution")
+    with session_scope() as s:
+        vid = s.scalar(
+            select(Publication.venue_id).where(Publication.title == "A workshop contribution")
+        )
+    await user.open(f"/venues?focus={vid}")
+    await user.should_see(marker="venue-level-none")
+    user.find("venue-level-none").click()
+    user.find("venue-save").click()
+    with session_scope() as s:
+        v = s.get(Venue, vid)
+        assert [lv["rank"] for lv in v.levels] == [NONE]
+        assert v.kind_manual and v.kind == "intl_workshop"  # (its kind confirmed too)
+    await user.open(f"/person/{pid}?check=1")
+    await user.should_see(marker="to-check-only")
+    await user.should_not_see("A workshop contribution")
+
+
 async def test_venue_dialog_no_acronym_or_validated(user: User) -> None:
     from sqlalchemy import select
 

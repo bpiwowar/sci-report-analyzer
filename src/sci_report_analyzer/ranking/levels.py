@@ -3,7 +3,8 @@
 A level is ``{"type": "conference" | "journal", "rank": "A", "from": 2018, "to": None}``
 (years included, either one open), with who set it (``by``), when (``on``, ISO date) and
 why (``note``). The ranges never overlap; a paper of a year none covers takes the venue's
-other ranking (its record, else automatic).
+other ranking (its record, else automatic). The rank ``NONE`` says the venue was checked
+and is in no ranking those years (unlike a venue no one looked at).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import Any
 from ..i18n import _
 
 FIELDS = ("type", "rank", "from", "to", "by", "on", "note")
+NONE = "none"  # the rank of a venue checked by hand and in no ranking
 
 
 def clean(level: dict[str, Any]) -> dict[str, Any] | None:
@@ -111,10 +113,15 @@ def range_label(level: dict[str, Any]) -> str:
     return f"{'' if lo is None else lo}–{'' if hi is None else hi}"
 
 
+def rank_label(rank: str) -> str:
+    """A level's rank as shown ("A", "Q1", "not ranked")."""
+    return _("not ranked") if rank == NONE else rank
+
+
 def label(levels: list[dict[str, Any]] | None) -> str:
     """The levels in a line: "B (–2017) · A (2018–)"."""
     if not levels:
         return ""
     if len(levels) == 1 and levels[0].get("from") is None and levels[0].get("to") is None:
-        return levels[0]["rank"]
-    return " · ".join(f"{lv['rank']} ({range_label(lv)})" for lv in levels)
+        return rank_label(levels[0]["rank"])
+    return " · ".join(f"{rank_label(lv['rank'])} ({range_label(lv)})" for lv in levels)

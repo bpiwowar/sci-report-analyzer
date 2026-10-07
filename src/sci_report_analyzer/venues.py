@@ -17,17 +17,20 @@ from .db.models import Publication, SourceLink, SourcePub, Venue, VenueKey, utcn
 from .db.session import session_scope
 from .i18n import _
 from .ranking.badge import (
+    CHECKED,
     Badge,
     category_of,
     category_order,
     core_rank_at,
     edition_year,
+    review,
 )
 from .ranking.detection import Rule
 from .ranking.kinds import (
     CONFERENCE_KINDS,
     JOURNAL_KINDS,
     KINDS,
+    UNRANKED_KINDS,
     VENUE_KINDS,
     WORKSHOP_KINDS,
     WORKSHOP_RE,
@@ -850,6 +853,15 @@ class VenueRow:
     parts_manual: bool = False
     joint_use: int | None = None  # the part whose level it takes, chosen by hand
     joint_differ: bool = False  # its parts have different levels
+
+    @property
+    def review(self) -> str | None:
+        """Whether its rank was checked (``ranking.badge.review``); a workshop with a main
+        conference set takes its rank."""
+        if self.kind in WORKSHOP_KINDS and self.hosts:
+            return CHECKED
+        badge = None if self.kind in UNRANKED_KINDS else self.badge
+        return review(badge, self.kind)
 
 
 async def venue_rows(only: set[int] | None = None, *, detect: bool = True) -> list[VenueRow]:

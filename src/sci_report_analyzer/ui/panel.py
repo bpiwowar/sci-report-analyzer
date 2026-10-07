@@ -34,7 +34,7 @@ from ..pubview import (
     year_counts,
 )
 from ..ranking import tracks
-from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR
+from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR, TO_CHECK
 from ..ranking.kinds import KIND_SHORT
 from ..sources import ADAPTERS
 from .dialogs import actions, ok_handler, transient_dialog
@@ -145,6 +145,7 @@ class PublicationsPanel:
         self.source_filter = "all"
         self.problems_only = False
         self.manual_only = False  # papers whose venue, rank or kind was decided by hand
+        self.to_check_only = False  # papers whose rank is to check (no decision on it)
         self.venue_filter: int | None = None  # only the papers of a venue
         self.open_pub: int | None = None  # a publication to open once loaded
         # Called on each render (e.g. the Theses tab, which follows the period).
@@ -214,6 +215,7 @@ class PublicationsPanel:
         self.show_hidden = q.get("hidden") == "1"
         self.problems_only = q.get("problems") == "1"
         self.manual_only = q.get("manual") == "1"
+        self.to_check_only = q.get("check") == "1"
         self.venue_filter = int_or_none(q.get("venue", "")) or None
         self.open_pub = int_or_none(q.get("pub", "")) or None
         self.sels = decode_sels(q.get("sel"))
@@ -240,6 +242,7 @@ class PublicationsPanel:
             ("hidden", self.show_hidden),
             ("problems", self.problems_only),
             ("manual", self.manual_only),
+            ("check", self.to_check_only),
         ):
             if on:
                 out[key] = "1"
@@ -345,6 +348,8 @@ class PublicationsPanel:
                 continue
             if self.manual_only and not s.decided_by_hand:
                 continue
+            if self.to_check_only and s.review != TO_CHECK:
+                continue
             if self.venue_filter and s.venue_id != self.venue_filter:
                 continue
             if (
@@ -402,6 +407,7 @@ class PublicationsPanel:
             or self.hide_preprints
             or self.problems_only
             or self.manual_only
+            or self.to_check_only
             or self.venue_filter
             or self.source_filter != "all"
         )
@@ -413,6 +419,7 @@ class PublicationsPanel:
         self.track_filter = []
         self.text = ""
         self.hide_preprints = self.problems_only = self.manual_only = False
+        self.to_check_only = False
         self.source_filter = "all"
         self.venue_filter = None
         self._save_state()
@@ -625,6 +632,24 @@ class PublicationsPanel:
                     _(
                         "Papers whose venue was picked or validated, or whose rank or kind was set "
                         "by hand"
+                    )
+                )
+            n_check = sum(s.review == TO_CHECK for s in self.base_rows())
+            if n_check or self.to_check_only:
+
+                def set_to_check(e) -> None:
+                    self.to_check_only = e.value
+                    self.sels = []
+                    self.render()
+
+                ui.switch(
+                    _("? rank to check ({n})").format(n=n_check),
+                    value=self.to_check_only,
+                    on_change=set_to_check,
+                ).mark("to-check-only").tooltip(
+                    _(
+                        "Papers in a venue whose rank was not checked: none found, or a fuzzy "
+                        'match, and no decision by hand ("not ranked" included)'
                     )
                 )
             if self.venue_filter:

@@ -135,6 +135,16 @@ the ACL: EMNLP* est la session Findings d'EMNLP), une conférence commune qui l'
 ou un de ses ateliers ; changez-la si besoin, puis appliquez. Les décisions sur les canaux font partie des
 paramètres exportés.
 
+**Non classé, vérifié.** Un canal sans rang trouvé peut n'être dans aucun classement, ou
+n'avoir simplement pas encore été reconnu : son rang affiche « ? » (en pointillés) jusqu'à ce
+que quelqu'un décide, et les listes de canaux comme les articles d'une personne peuvent
+n'afficher que ceux **à vérifier** (de même pour les articles d'une correspondance approchée).
+Le niveau **Non classé (vérifié)** dit que le canal n'est dans aucun classement (pour
+certaines périodes, ou toutes les années : le bouton de ce nom, qui garde aussi son type tel
+quel) ; ses articles restent dans la catégorie de leur type (et prennent le niveau par
+défaut du type, s'il y en a un). Un atelier qui a une conférence principale en prend
+toujours le rang.
+
 **Périodes.** Le niveau fixé à la main d'un canal peut changer avec le temps : donnez un
 niveau par période (p. ex. B jusqu'en 2017, A à partir de 2018) et chaque article prend le
 niveau de son année ; les années qu'aucune période ne couvre gardent l'autre classement du

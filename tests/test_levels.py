@@ -171,3 +171,75 @@ def test_a_dated_venue_rule_wins_in_its_years():
     st = stats(pid)
     assert st["Old paper"].venue_id == ws
     assert st["New paper"].venue_id == conf
+
+
+def test_not_ranked_by_hand_is_checked():
+    """ "Not ranked" by hand: the kind's category, but checked (unlike a venue no one did)."""
+    from sci_report_analyzer.ranking.badge import CHECKED, TO_CHECK
+
+    pid = make_person()
+    add_source(
+        pid,
+        "dblp",
+        "x/1",
+        [
+            pub("a", "Old paper", 2014, "Symposium on Unlisted Things"),
+            pub("b", "New paper", 2020, "Symposium on Unlisted Things"),
+            pub("c", "Other paper", 2020, "Colloquium of Nobody Looked"),
+        ],
+    )
+    for raw in ("Symposium on Unlisted Things", "Colloquium of Nobody Looked"):
+        set_venue(raw, kind="intl_conference")
+    set_venue(
+        "Symposium on Unlisted Things", levels=[{"rank": levels.NONE, "from": 2015, "note": "x"}]
+    )
+    st = stats(pid)
+    new = st["New paper"]
+    assert new.badge.unranked and new.badge.manual and not new.badge.coreRank
+    assert new.category.base_key == "k_intl_conference"
+    assert new.review == CHECKED
+    assert st["Old paper"].review == TO_CHECK  # (no range covers 2014)
+    assert st["Other paper"].review == TO_CHECK
+    assert levels.label([{"rank": levels.NONE}]) == "not ranked"
+    rows = {r.name: r for r in asyncio.run(venues.venue_rows())}
+    assert rows["Symposium on Unlisted Things"].review == CHECKED
+    assert rows["Colloquium of Nobody Looked"].review == TO_CHECK
+
+
+def test_not_ranked_takes_the_kind_default_level_and_stays_checked():
+    from sci_report_analyzer.ranking.badge import CHECKED, TO_CHECK
+
+    pid = make_person()
+    add_source(
+        pid,
+        "dblp",
+        "x/1",
+        [
+            pub("a", "Checked paper", 2020, "Rencontres de truc"),
+            pub("b", "Unchecked paper", 2020, "Journées de machin"),
+        ],
+    )
+    for raw in ("Rencontres de truc", "Journées de machin"):
+        set_venue(raw, kind="natl_conference")
+    set_venue("Rencontres de truc", levels=[{"rank": levels.NONE}])
+    s = load_settings()
+    s.kind_levels = {"natl_conference": "C"}
+    save_settings(s)
+    st = stats(pid)
+    assert st["Checked paper"].badge.coreRank == "C"
+    assert st["Checked paper"].review == CHECKED
+    assert st["Unchecked paper"].badge.coreRank == "C"
+    assert st["Unchecked paper"].review == TO_CHECK
+
+
+def test_a_workshop_not_ranked_takes_its_main_conference():
+    pid = make_person()
+    add_source(pid, "dblp", "x/1", [pub("a", "Workshop paper", 2020, "Workshop on Small Bits")])
+    host = set_venue("Conference on Big Things", kind="intl_conference", levels=[{"rank": "A"}])
+    set_venue(
+        "Workshop on Small Bits",
+        kind="intl_workshop",
+        levels=[{"rank": levels.NONE}],
+        hosts=[{"venue_id": host}],
+    )
+    assert stats(pid)["Workshop paper"].badge.coreRank == "A"
