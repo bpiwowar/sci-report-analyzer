@@ -371,7 +371,7 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     user.find(marker="folder-edit").click()
     await user.should_see(marker="folder-tab-notes")
     user.find(marker="folder-tab-notes").click()  # (shared settings: language, numbering…)
-    user.find(marker="folder-nested-influence").click()
+    user.find(marker="folder-influence-mode").elements.pop().value = "move"
     user.find(marker="folder-language").elements.pop().value = "fr"
     await user.should_see(marker="folder-same-formats")  # (both "#{index}")
     user.find(marker="folder-number-format").clear().type("[{index}]")
@@ -396,7 +396,7 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
         ("starred", "§{index}", "{.number (.year)}", True),
     ]
     assert annotations.first_list(period).name == "maybe"
-    assert reports.nested_influence(fid)
+    assert reports.influence_mode(fid) == "move"
     assert reports.language(fid) == "fr"
     await user.open(f"/pdf/{a}?period={period}")
     await user.should_see(marker="folder-note-mode")

@@ -857,8 +857,8 @@ def test_nested_influence():
     categories.add_excerpt(projects, period, "Projet Comète.", 3, [], document_id=doc)
     flat = categories.markdown(folder, period)
     assert flat.startswith("## Comités et sociétés savantes\n\n- Membre du Comité Galactique.")
-    assert categories.markdown(folder, period, nested=False) == flat
-    assert categories.markdown(folder, period, nested=True) == (
+    assert categories.markdown(folder, period, mode="copy") == flat
+    assert categories.markdown(folder, period, mode="move") == (
         "## Recherche\n\n### Projets\n\n- Projet Comète. %% Dossier, p. 3 %%\n\n"
         "## Rayonnement\n\n"
         "### Comités et sociétés savantes\n\n- Membre du Comité Galactique. %% Dossier, p. 1 %%\n\n"
@@ -868,29 +868,43 @@ def test_nested_influence():
     outreach = categories.add(folder, "Rayonnement")
     categories.add_excerpt(outreach, period, "Prix Andromède.", 4, [], document_id=doc)
     categories.set_influence(folder, outreach)
-    assert categories.markdown(folder, period, nested=True, level=3).endswith(
+    assert categories.markdown(folder, period, mode="move", level=3).endswith(
         "### Rayonnement\n\n- Prix Andromède. %% Dossier, p. 4 %%\n\n"
         "#### Comités et sociétés savantes\n\n"
         "- Membre du Comité Galactique. %% Dossier, p. 1 %%\n\n"
         "#### Recherche\n\n##### Projets\n\n"
         "- Projet Nébuleuse. %% Dossier, p. 2 %% — 2021–2024\n"
     )
+    # Marked: only in their categories (the gathering one as any other).
+    assert categories.markdown(folder, period, mode="mark") == (
+        "## Comités et sociétés savantes\n\n"
+        "- #influence Membre du Comité Galactique. %% Dossier, p. 1 %%\n\n"
+        "## Recherche\n\n### Projets\n\n"
+        "- #influence Projet Nébuleuse. %% Dossier, p. 2 %% — 2021–2024\n"
+        "- Projet Comète. %% Dossier, p. 3 %%\n\n"
+        "## Rayonnement\n\n- Prix Andromède. %% Dossier, p. 4 %%\n"
+    )
     # The folder's default, and a block's own choice (its classes).
-    assert not reports.nested_influence(folder)
-    reports.save_nested_influence(folder, True)
-    assert categories.markdown(folder, period) == categories.markdown(folder, period, nested=True)
+    assert reports.influence_mode(folder) == "copy"
+    reports.save_influence_mode(folder, "move")
+    assert categories.markdown(folder, period) == categories.markdown(folder, period, mode="move")
     ctx = reports.folder_context([], period)
     out = reports.render("# Dossier\n\n[]{.excerpts}\n", ctx).text
     assert "\n## Comités" not in out and "\n### Comités et sociétés savantes\n" in out
     out = reports.render("# Dossier\n\n[]{.excerpts .flat-influence}\n", ctx).text
     assert "## Comités et sociétés savantes\n" in out and "**Comités et sociétés savantes**" in out
-    reports.save_nested_influence(folder, False)
+    out = reports.render("[]{.excerpts .mark-influence}", ctx).text
+    assert "- #influence Projet Nébuleuse." in out and "### Comités" not in out
+    reports.save_influence_mode(folder, "copy")
     ctx = reports.folder_context([], period)
     assert reports.render("[]{.excerpts}", ctx).text.startswith("## Comités")
     out = reports.render("# Dossier\n\n[]{.excerpts  .nested-influence}\n", ctx).text
     assert out.startswith("# Dossier\n\n## Recherche") and "\n### Rayonnement\n" not in out
     assert "## Rayonnement\n\n- Prix Andromède." in out
     assert "\n### Comités et sociétés savantes\n" in out
+    # (formerly a flag: "nested_influence")
+    reports._save_citations(folder, influence_mode=None, nested_influence=True)
+    assert reports.influence_mode(folder) == "move"
 
 
 def test_section_texts():
@@ -920,7 +934,7 @@ def test_section_texts():
     categories.set_section_text(period, research, "Une recherche *très* active.")
     assert categories.section_texts(period)[research] == "Une recherche *très* active."
     # After the heading, before the items (a section left out: its text too).
-    assert categories.markdown(folder, period, nested=False) == (
+    assert categories.markdown(folder, period, mode="copy") == (
         "## Enseignement\n\nDeux **cours**.\n\n- Cours de Zorglub. %% Dossier, p. 1 %%\n\n"
         "## Recherche\n\nUne recherche *très* active.\n\n### Projets\n\nUn projet.\n\n"
         "- Projet Nébuleuse. %% Dossier, p. 2 %%\n\n"
@@ -928,7 +942,7 @@ def test_section_texts():
     )
     # Nested: the sections left out (all their excerpts taken out), their texts in the
     # Rayonnement section.
-    assert categories.markdown(folder, period, nested=True) == (
+    assert categories.markdown(folder, period, mode="move") == (
         "## Enseignement\n\nDeux **cours**.\n\n- Cours de Zorglub. %% Dossier, p. 1 %%\n\n"
         "## Rayonnement\n\n"
         "### Recherche\n\nUne recherche *très* active.\n\n#### Projets\n\nUn projet.\n\n"
@@ -936,7 +950,7 @@ def test_section_texts():
     )
     # A section kept: its text stays there.
     categories.add_excerpt(projects, period, "Projet Comète.", 3, [], document_id=doc)
-    out = categories.markdown(folder, period, nested=True)
+    out = categories.markdown(folder, period, mode="move")
     assert "## Recherche\n\nUne recherche *très* active.\n\n### Projets\n\nUn projet.\n\n" in out
     assert "### Recherche\n\n#### Projets\n\n- Projet Nébuleuse." in out
     # In the notes, through the block.
@@ -995,7 +1009,7 @@ def test_section_summarised_by_its_text():
     assert categories.summarised(period) == {teaching}
     categories.set_section_text(period, teaching, text)  # (unchanged)
     assert categories.summarised(period) == {teaching}
-    out = categories.markdown(folder, period, nested=False)
+    out = categories.markdown(folder, period, mode="copy")
     assert out.startswith(f"## Enseignement\n\nDeux **cours**.\n\n{block}\n\n## Recherche\n")
     assert "- Cours de Zorglub. %%" not in out  # (listed: with its places in a comment)
     shown = copy_filters.strip_comments(
@@ -1004,7 +1018,7 @@ def test_section_summarised_by_its_text():
     assert "Deux **cours**." in shown and "Zorglub" not in shown
     # Nested, a section left out: its text in the Rayonnement section, its excerpts not.
     categories.set_section_text(period, research, "Un projet.", summary_only=True)
-    assert categories.markdown(folder, period, nested=True).endswith(
+    assert categories.markdown(folder, period, mode="move").endswith(
         "## Rayonnement\n\n### Recherche\n\nUn projet.\n"
     )
     # Not summarised: listed again; moved with the text.

@@ -7,7 +7,7 @@ from __future__ import annotations
 import html as _html
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 import markdown
 
@@ -32,6 +32,74 @@ def enabled() -> list[str]:
 
 def set_enabled(names: list[str]) -> None:
     set_setting(ENABLED_KEY, [n for n in FILTERS if n in names])
+
+
+# ---- Tags turned into text (e.g. #influence into an icon), with a colour -------------------
+
+TAG_RULES_KEY = "copy.tag-rules"
+
+
+@dataclass(frozen=True)
+class TagRule:
+    """A tag (without "#") replaced, on its line, by a text before that line's (e.g. an
+    icon) and one after, in a colour (#RRGGBB; "": none), that of the line's text too if
+    ``whole``."""
+
+    tag: str
+    before: str = ""
+    after: str = ""
+    color: str = ""
+    whole: bool = False
+
+
+def tag_rules() -> list[TagRule]:
+    return [TagRule(**r) for r in get_setting(TAG_RULES_KEY) or [] if r.get("tag")]
+
+
+def set_tag_rules(rules: list[TagRule]) -> None:
+    set_setting(TAG_RULES_KEY, [asdict(r) for r in rules if r.tag.strip("# ")])
+
+
+def _tag_re(tag: str) -> re.Pattern:
+    return re.compile(r"(?<!\S)#" + re.escape(tag.strip("# ")) + r"(?![\w/-])[ \t]*")
+
+
+def apply_tag_rules(lines: list[str], rules: list[TagRule]) -> list[str]:
+    """The lines with a tag of the rules (not headings; not in code): that tag removed, the
+    rule's texts around the line's text (after its list marker), as HTML spans when
+    coloured."""
+    found = [(_tag_re(r.tag), r) for r in rules]
+
+    def coloured(text: str, color: str) -> str:
+        c = _flatten_hex(color)
+        return f'<span style="color:{c}">{text}</span>' if text and HEX_RE.match(c) else text
+
+    def apply(line: str) -> str:
+        if HEADING_RE.match(line):
+            return line
+        for pattern, r in found:
+            hit = False
+
+            def drop(p: str, pattern=pattern) -> str:
+                nonlocal hit
+                q = pattern.sub("", p)
+                hit = hit or q != p
+                return q
+
+            stripped = _outside_code(line, drop)
+            if not hit:
+                continue
+            marker = LIST_RE.match(stripped)
+            head = marker.group(0) if marker else ""
+            text = stripped[len(head) :].strip()
+            before, after = (_html.escape(x.strip(), quote=False) for x in (r.before, r.after))
+            if not r.whole:
+                before, after = coloured(before, r.color), coloured(after, r.color)
+            text = " ".join(x for x in (before, text, after) if x)
+            line = head + (coloured(text, r.color) if r.whole else text)
+        return line
+
+    return _outside_fences(lines, apply)
 
 
 # ---- Marmotte: a CKEditor with only basic formatting (no headings, tables, lists) ----------
@@ -279,12 +347,14 @@ def _render(lines: list[str]) -> str:
     return "\n".join(parts)
 
 
-def marmotte(md: str) -> tuple[str, str]:
+def marmotte(md: str, rules: list[TagRule] | None = None) -> tuple[str, str]:
     """For Marmotte's forms (a CKEditor with only basic formatting): the whole text, its
     comments, callouts, tasks and tags left out (with the lines tagged #question or
-    #to-check), "#" headings as numbered banners, "##" as bold lines, lists as paragraphs,
-    tables left out."""
+    #to-check; those of the tag ``rules``, None: the settings', turned into their texts),
+    "#" headings as numbered banners, "##" as bold lines, lists as paragraphs, tables left
+    out."""
     lines = strip_comments(md).splitlines()
+    lines = apply_tag_rules(lines, tag_rules() if rules is None else rules)
     lines = blank_before_lists(replace_tables(strip_callouts_and_tags(lines)))
     html = normalize_highlights(_render(lines))
     html = re.sub(r"(?:<p><br></p>\s*){2,}", SPACER + "\n", html).strip()
@@ -299,7 +369,8 @@ FILTERS: dict[str, Filter] = {
         N_(
             "Rich text for Marmotte's forms (basic formatting only): # headings numbered as "
             "banners, ## as bold lines, lists as paragraphs; comments (%% … %%), callouts, "
-            "tasks, tags and the lines tagged #question or #to-check left out, tables too."
+            "tasks, tags (but those turned into a text: see below) and the lines tagged "
+            "#question or #to-check left out, tables too."
         ),
         marmotte,
     ),

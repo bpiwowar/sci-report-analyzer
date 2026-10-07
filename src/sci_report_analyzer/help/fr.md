@@ -280,7 +280,10 @@ Filtres de copie (plusieurs : celui à utiliser est demandé). **Marmotte** (CN
 forme de base que permettent ses formulaires : titres `#` en bandeaux numérotés (« --- 1. Recherche --- »),
 `##` en lignes en gras, listes en paragraphes (« • … ») ; les commentaires (`%% … %%`, par ex.
 l'emplacement des citations), encadrés, tâches, étiquettes et lignes étiquetées #question ou
-#to-check sont retirés, les tableaux aussi.
+#to-check sont retirés, les tableaux aussi. Une étiquette peut à la place devenir un texte
+(Paramètres → Filtres de copie → Étiquettes changées en texte) : un avant le texte de la ligne
+(par ex. une icône, 🌍) et un après, d'une couleur (aussi celle du texte de la ligne si coché),
+par ex. #influence, l'étiquette des extraits de rayonnement marqués dans leurs catégories.
 
 **PDF** : l'icône PDF à côté d'un titre ouvre le PDF stocké de l'article dans une nouvelle fenêtre (rouge ;
 ✎ une fois annoté). Une icône grise signifie qu'un lien en accès ouvert (ou un DOI) est connu : cliquez dessus pour
@@ -349,12 +352,14 @@ p. 12 %%`, puis leurs années ; ceux qui témoignent du rayonnement sont aussi 
 section « Rayonnement » ; l'icône de badge nomme les documents, par exemple un long nom de fichier sous la forme
 « Application ») ;
 le bouton ❝ du rapport les insère, par catégorie (le bloc `[]{.excerpts}`, tenu à jour).
-En option, les extraits de rayonnement ne figurent que dans la section Rayonnement (la
-catégorie « rayonnement », sinon la dernière section), sous des sous-sections au nom de leurs
-catégories (imbriquées comme elles, un niveau plus bas), et sont retirés de leurs catégories
-(une catégorie restée vide disparaît) : les réglages du dossier (« Extraits de rayonnement
-seulement dans la section Rayonnement ») pour ses notes et la copie, ou un seul bloc avec
-`[]{.excerpts .nested-influence}` (et `[]{.excerpts .flat-influence}` comme par défaut).
+Où vont les extraits de rayonnement : les réglages du dossier (« Extraits de rayonnement »)
+pour ses notes et la copie, ou un seul bloc avec une option : listés aussi dans la section
+Rayonnement (la catégorie « rayonnement », sinon la dernière section), comme par défaut
+(`[]{.excerpts .copy-influence}`) ; seulement là, sous des sous-sections au nom de leurs
+catégories (imbriquées comme elles, un niveau plus bas), retirés de leurs catégories (une
+catégorie restée vide disparaît) (`[]{.excerpts .move-influence}`) ; ou seulement dans leurs
+catégories, avec l'étiquette #influence (`[]{.excerpts .mark-influence}`), par ex. changée en
+icône par les filtres de copie.
 Chaque catégorie peut avoir un texte propre à la personne (Markdown, par exemple un résumé de
 ses éléments ; son crayon, au survol, dans l'onglet des catégories, ou un clic sur le texte) :
 placé après son titre, avant ses éléments (en mode imbriqué, celui d'une catégorie restée

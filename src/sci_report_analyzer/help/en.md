@@ -277,7 +277,10 @@ filter, as rich text pasted formatted into a form: those enabled in Settings →
 (several: the one to use is asked). **Marmotte** (CNRS) keeps the basic formatting its
 forms allow: `#` headings as numbered banners (“--- 1. Research ---”), `##` as bold lines,
 lists as paragraphs (“• …”); the comments (`%% … %%`, e.g. the places of quotes), callouts,
-tasks, tags and the lines tagged #question or #to-check are left out, tables too.
+tasks, tags and the lines tagged #question or #to-check are left out, tables too. A tag can
+instead be turned into a text (Settings → Copy filters → Tags turned into a text): one before
+the line's text (e.g. an icon, 🌍) and one after, in a colour (that of the line's text too if
+checked), e.g. #influence, the tag of the rayonnement excerpts marked in their categories.
 
 **PDFs**: the PDF icon next to a title opens the paper's stored PDF in a new window (red;
 ✎ once annotated). A grey icon means an open-access link (or a DOI) is known: click it to
@@ -348,13 +351,14 @@ p. 12 %%`, then their years; those showing influence also listed, by category, i
 “Rayonnement” section; the badge icon names the documents, e.g. a long file name as
 “Application”);
 the report's ❝ button inserts them, by category (the block `[]{.excerpts}`, kept up to
-date). Optionally, the influence excerpts are only in the Rayonnement section (the
-“rayonnement” category, else the last one), under subsections named after their categories
-(nested as these, one level below), and taken out of their categories (one left empty is
-left out): the folder's settings (“Rayonnement excerpts only in the Rayonnement section”)
-for its notes and the copy, or one block with `[]{.excerpts .nested-influence}` (and
-`[]{.excerpts .flat-influence}` as by default). Each category can have a text of its own for
-the person (Markdown, e.g. a summary of its items; its pencil, on hover, in the categories
+date). Where the influence excerpts go: the folder's settings (“Rayonnement excerpts”) for its
+notes and the copy, or one block with an option: also listed in the Rayonnement section (the
+“rayonnement” category, else the last one), as by default (`[]{.excerpts .copy-influence}`);
+only there, under subsections named after their categories (nested as these, one level
+below), taken out of their categories, one left empty being left out
+(`[]{.excerpts .move-influence}`); or only in their categories, tagged #influence
+(`[]{.excerpts .mark-influence}`), e.g. turned into an icon by the copy filters. Each
+category can have a text of its own for the person (Markdown, e.g. a summary of its items; its pencil, on hover, in the categories
 tab, or a click on the text): put after its heading, before its items (nested, that of a
 category left empty goes under its subsection of the Rayonnement section). With “Only this
 text, its excerpts not listed”, the section is summarised by its text: its excerpts are no

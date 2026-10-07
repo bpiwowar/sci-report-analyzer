@@ -21,9 +21,11 @@ syntax, substituted when shown or copied.
   ``Context.blocks``), e.g. the summary of the period's publications, its excerpts by
   category (their headings below that of the block, each followed by the section's text if
   any, see categories.section_texts); with its options as classes:
-  ``[]{.excerpts .nested-influence}`` the "rayonnement" excerpts only in the Rayonnement
-  section, under subsections of their categories (``.flat-influence``: also in their
-  categories, as by default; the default: the folder's, see ``nested_influence``).
+  ``[]{.excerpts .move-influence}`` the "rayonnement" excerpts only in the Rayonnement
+  section, under subsections of their categories, ``.copy-influence``: also in their
+  categories, ``.mark-influence``: only in their categories, marked (the default: the
+  folder's, see ``influence_mode``; ``.nested-influence``, ``.flat-influence``: as move,
+  copy).
 
 Within a folder, the papers of its star lists (see annotations.star_lists) are numbered in
 the first one they are in (in its order, else by year), each list's numbers written as it
@@ -642,14 +644,29 @@ def save_language(folder_id: int, lang: str | None) -> None:
     _save_citations(folder_id, lang=lang or None)
 
 
-def nested_influence(folder_id: int | None) -> bool:
-    """Whether the folder's excerpts flagged "influence" are by default only in its
-    Rayonnement section, under subsections of their categories (see categories.markdown)."""
-    return bool(_citations(folder_id).get("nested_influence"))
+# Where the excerpts flagged "influence" go (see categories.markdown): also listed in the
+# Rayonnement section, only there (by category), or only in their categories, marked.
+INFLUENCE_MODES = ("copy", "move", "mark")
+# A block's options choosing one (and the former ones).
+_INFLUENCE_OPTIONS = {
+    **{f"{m}-influence": m for m in INFLUENCE_MODES},
+    "flat-influence": "copy",
+    "nested-influence": "move",
+}
 
 
-def save_nested_influence(folder_id: int, nested: bool) -> None:
-    _save_citations(folder_id, nested_influence=nested)
+def influence_mode(folder_id: int | None) -> str:
+    """Where the folder's excerpts flagged "influence" go by default (see INFLUENCE_MODES;
+    formerly "nested_influence": move, else copy)."""
+    c = _citations(folder_id)
+    mode = c.get("influence_mode")
+    if mode in INFLUENCE_MODES:
+        return mode
+    return "move" if c.get("nested_influence") else "copy"
+
+
+def save_influence_mode(folder_id: int, mode: str) -> None:
+    _save_citations(folder_id, influence_mode=mode, nested_influence=None)
 
 
 def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
@@ -678,10 +695,8 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
     def excerpts(level: int, options: set[str]) -> str:
         from . import categories
 
-        nested = True if "nested-influence" in options else None
-        if "flat-influence" in options:
-            nested = False
-        return categories.markdown(folder_id, period_id, level=level, nested=nested)
+        mode = next((_INFLUENCE_OPTIONS[o] for o in options if o in _INFLUENCE_OPTIONS), None)
+        return categories.markdown(folder_id, period_id, level=level, mode=mode)
 
     n = numbering(folder_id)
     names = {t.id: t.name for t in annotations.all_tags()}

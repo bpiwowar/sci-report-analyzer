@@ -1,3 +1,6 @@
+import pytest
+from nicegui.testing import User
+
 from sci_report_analyzer import copy_filters
 from sci_report_analyzer.copy_filters import marmotte
 
@@ -61,3 +64,39 @@ def test_enabled_filters():
 def test_strip_comments():
     text = "A %% one %% B %% over\nlines %% C\n```\nkept %% in code %%\n```\nD %% two %%"
     assert copy_filters.strip_comments(text) == "A  B  C\n```\nkept %% in code %%\n```\nD "
+
+
+def test_tag_rules():
+    """A tag turned into a text before (and after) its line's, coloured; without a rule:
+    removed."""
+    md = (
+        "- #influence Membre du **Comité** %% Dossier, p. 1 %% — 2021\n"
+        "- Projet `#influence` #positive\n"
+    )
+    icon = copy_filters.TagRule("influence", "🌍", color="#c00")
+    html, plain = marmotte(md, [icon])
+    assert '<p>• <span style="color:#CC0000">🌍</span> Membre du <strong>Comité</strong>' in html
+    assert "<code>#influence</code>" in html and "#positive" not in html  # (not in code)
+    assert plain.startswith("• 🌍 Membre du Comité")
+    line = copy_filters.TagRule("#influence", "★", "(R)", "#7030A0", whole=True)
+    html, _ = marmotte(md, [line])
+    assert (
+        '<span style="color:#7030A0">★ Membre du <strong>Comité</strong>  — 2021 (R)</span>' in html
+    )
+    html, _ = marmotte(md, [])
+    assert "<p>• Membre du" in html
+    # Saved in the settings (used by default; those without a tag left out).
+    copy_filters.set_tag_rules([icon, copy_filters.TagRule(" ")])
+    assert copy_filters.tag_rules() == [icon]
+    assert marmotte(md)[0] == marmotte(md, [icon])[0]
+
+
+@pytest.mark.nicegui_main_file("tests/app_main.py")
+async def test_tag_rules_settings(user: User):
+    await user.open("/settings?tab=copy")
+    user.find(marker="tag-rule-add").click()
+    await user.should_see(marker="tag-rule-tag-0")
+    user.find(marker="tag-rule-tag-0").type("influence")
+    user.find(marker="tag-rule-before-0").type("🌍")
+    user.find(marker="tag-rule-whole-0").click()
+    assert copy_filters.tag_rules() == [copy_filters.TagRule("influence", "🌍", whole=True)]

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import asdict
 
 from nicegui import ui
 
@@ -85,3 +86,59 @@ def filters_tab() -> None:
                 _(f.label), value=name in on, on_change=lambda e, n=name: toggled(n, e.value)
             ).mark(f"copy-filter-on-{name}")
             ui.label(_(f.description)).classes("text-xs text-grey ml-10")
+    tag_rules_section()
+
+
+def tag_rules_section() -> None:
+    """The tags turned into a text (e.g. #influence into a coloured icon) when copied."""
+    ui.label(_("Tags turned into a text")).classes("text-base mt-4")
+    ui.label(
+        _(
+            "When copied through a filter, a tag replaced on its line by a text before it "
+            "(e.g. an icon) and one after, in a colour (that of the line's text too if "
+            "checked); e.g. #influence, the tag of the “rayonnement” excerpts marked in their "
+            "categories."
+        )
+    ).classes("text-sm text-grey")
+    rules = [asdict(r) for r in copy_filters.tag_rules()]
+
+    def save() -> None:
+        copy_filters.set_tag_rules([copy_filters.TagRule(**r) for r in rules])
+
+    @ui.refreshable
+    def rows() -> None:
+        for i, r in enumerate(rules):
+            with ui.row().classes("items-center gap-2 no-wrap"):
+
+                def setter(key: str, r=r):
+                    return lambda e: (r.update({key: e.value}), save())
+
+                ui.input(_("Tag"), value=r["tag"], on_change=setter("tag")).props(
+                    'dense prefix="#"'
+                ).classes("w-32").mark(f"tag-rule-tag-{i}")
+                ui.input(_("Before"), value=r["before"], on_change=setter("before")).props(
+                    "dense"
+                ).classes("w-24").mark(f"tag-rule-before-{i}")
+                ui.input(_("After"), value=r["after"], on_change=setter("after")).props(
+                    "dense"
+                ).classes("w-24").mark(f"tag-rule-after-{i}")
+                ui.color_input(_("Colour"), value=r["color"], on_change=setter("color")).props(
+                    "dense"
+                ).classes("w-32").mark(f"tag-rule-color-{i}")
+                ui.checkbox(_("The line too"), value=r["whole"], on_change=setter("whole")).mark(
+                    f"tag-rule-whole-{i}"
+                )
+
+                def remove(i=i) -> None:
+                    del rules[i]
+                    save()
+                    rows.refresh()
+
+                ui.button(icon="delete", on_click=remove).props("flat dense round size=sm")
+
+    def add() -> None:
+        rules.append(asdict(copy_filters.TagRule("")))
+        rows.refresh()
+
+    rows()
+    ui.button(_("Add a tag"), icon="add", on_click=add).props("flat no-caps").mark("tag-rule-add")

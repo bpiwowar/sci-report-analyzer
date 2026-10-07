@@ -88,7 +88,7 @@ def add(name: str, text: str) -> None:
 
 def outline(report: str) -> str:
     """The structure of a written report, as a template: its headings and its blocks
-    (``[]{.publications}``, ``[]{.excerpts .nested-influence}``…, alone on their line), in
+    (``[]{.publications}``, ``[]{.excerpts .move-influence}``…, alone on their line), in
     order; what is written (text, citations, comments, code) left out."""
     kept: list[str] = []
     fenced = False

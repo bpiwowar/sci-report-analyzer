@@ -942,11 +942,16 @@ def cited_documents(period_id: int) -> list[tuple[int, str]]:
     return [(i, n) for i, n in rows]
 
 
-def _markdown_item(e: ExcerptView, *, comments: bool = True) -> str:
+# The tag marking the excerpts flagged "influence" (mode "mark", see markdown; e.g. turned
+# into an icon by a copy filter, see copy_filters.TagRule).
+INFLUENCE_TAG = "influence"
+
+
+def _markdown_item(e: ExcerptView, *, comments: bool = True, mark: bool = False) -> str:
     """An excerpt as Markdown: its tags (Obsidian #tags, first), its quotes (a group: on one
     item, as one text if edited; those merged as references only: their places), each with
     its places between Obsidian comments (``%% Application, p. 4; p. 12 %%``; without
-    ``comments``: in parentheses), then its years."""
+    ``comments``: in parentheses), then its years; ``mark``: tagged INFLUENCE_TAG too."""
     from .pubview import hashtag
 
     chunks: list[tuple[str | None, list[str]]] = []  # (a quote, its places)
@@ -968,33 +973,37 @@ def _markdown_item(e: ExcerptView, *, comments: bool = True) -> str:
         chunks = [(None, pending)]
     wrap = "%% {} %%" if comments else "({})"
     quotes = [(f"{t} " if t else "") + wrap.format("; ".join(places)) for t, places in chunks]
-    tags = "".join(f"{hashtag(t)} " for t in e.tag_names)
+    names = list(dict.fromkeys(map(hashtag, e.tag_names)))
+    if mark and hashtag(INFLUENCE_TAG) not in names:
+        names.append(hashtag(INFLUENCE_TAG))
+    tags = "".join(f"{t} " for t in names)
     return tags + " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
 
 
-def markdown(folder_id: int, period_id: int, *, level: int = 2, nested: bool | None = None) -> str:
+def markdown(folder_id: int, period_id: int, *, level: int = 2, mode: str | None = None) -> str:
     """The excerpts by category (headings; a category's years in its heading), as Markdown
     (unquoted, their places between Obsidian comments: ``%% Application, p. 4; p. 12 %%``),
     their tags first (Obsidian #tags), with their years. The excerpts with the "influence"
     flag (left in their categories too) are also listed, one item per category (its path in
     bold, them nested below), in the folder's "rayonnement" category (after its own
-    excerpts; see set_influence), else in a "Rayonnement" section at the end. ``nested``
-    (None: the folder's choice, see reports.nested_influence): them only there instead, under
-    subsections named after their categories (as nested as these, one level below), taken
-    out of their categories. The categories with no excerpt (nor below) are left out. A
-    section's text (see section_texts) follows its heading; nested, that of a section left
-    out (all its excerpts taken out) follows the heading of its subsection in the
-    Rayonnement section; a section summarised by its text only (see summarised): its
+    excerpts; see set_influence), else in a "Rayonnement" section at the end (``mode``
+    "copy"; None: the folder's choice, see reports.influence_mode). "move": them only there
+    instead, under subsections named after their categories (as nested as these, one level
+    below), taken out of their categories ("nested" below); "mark": them only in their
+    categories, tagged INFLUENCE_TAG. The categories with no excerpt (nor below) are
+    left out. A section's text (see section_texts) follows its heading; nested, that of a
+    section left out (all its excerpts taken out) follows the heading of its subsection in
+    the Rayonnement section; a section summarised by its text only (see summarised): its
     excerpts not listed there. In the language of the folder's reports."""
     from . import reports
 
-    if nested is None:
-        nested = reports.nested_influence(folder_id)
+    mode = mode or reports.influence_mode(folder_id)
     with i18n.using(reports.language(folder_id)):
-        return _markdown(folder_id, period_id, level, nested)
+        return _markdown(folder_id, period_id, level, mode)
 
 
-def _markdown(folder_id: int, period_id: int, level: int, nested: bool) -> str:
+def _markdown(folder_id: int, period_id: int, level: int, mode: str) -> str:
+    nested, marked = mode == "move", mode == "mark"
     nodes = tree(folder_id)
     texts, summary_only = section_texts(period_id), summarised(period_id)
     by_cat: dict[int, list[ExcerptView]] = {}
@@ -1013,7 +1022,9 @@ def _markdown(folder_id: int, period_id: int, level: int, nested: bool) -> str:
 
         mark(gather)
         apart = [n for n in nodes if n.id not in below]
-    flagged = {n.id: [e for e in by_cat.get(n.id, []) if e.influence] for n in apart}
+    flagged = {
+        n.id: [] if marked else [e for e in by_cat.get(n.id, []) if e.influence] for n in apart
+    }
     shown = {
         k: [e for e in v if not (nested and e.influence and k in flagged)]
         for k, v in by_cat.items()
@@ -1072,7 +1083,7 @@ def _markdown(folder_id: int, period_id: int, level: int, nested: bool) -> str:
         out += text(n)
         listed = [] if n.id in summary_only else shown.get(n.id, [])
         for e in listed:  # (a group: its quotes, on one item)
-            out.append("- " + _markdown_item(e))
+            out.append("- " + _markdown_item(e, mark=marked and e.influence))
         if listed and (n is not gather or nested or not gathered):
             out.append("")
         if n is gather:

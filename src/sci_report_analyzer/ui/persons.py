@@ -542,12 +542,15 @@ def _tags_editor(member: folders.Member, options: list[str]) -> None:
 
 # ---- folders -------------------------------------------------------------------------------
 
-NESTED_TIP = N_(
-    "In []{.excerpts} (and the copied excerpts): the excerpts flagged "
-    "“rayonnement” taken out of their categories, listed under subsections "
-    "named after them; one block: []{.excerpts .nested-influence} or "
-    "[]{.excerpts .flat-influence}"
+INFLUENCE_TIP = N_(
+    "In []{.excerpts} (and the copied excerpts), the excerpts flagged “rayonnement”; one "
+    "block: []{.excerpts .copy-influence}, .move-influence or .mark-influence"
 )
+INFLUENCE_MODES = {
+    "copy": N_("Also in the Rayonnement section"),
+    "move": N_("Only in the Rayonnement section, by category"),
+    "mark": N_("Only in their categories, marked"),
+}
 
 
 ARCHIVED_TIP = N_(
@@ -605,7 +608,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 hidden = ui.checkbox(_("Archived"), value=f.hidden if f else False).tooltip(
                     _(ARCHIVED_TIP)
                 )
-            nested = lang = primary = None
+            influence = lang = primary = None
             if f is not None:
                 with ui.tab_panel("notes").classes("p-0 gap-2"):
                     from .citations import folder_citations_section
@@ -620,13 +623,15 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                         .tooltip(_("Of what is generated: references, excerpts, summary…"))
                         .mark("folder-language")
                     )
-                    nested = (
-                        ui.checkbox(
-                            _("Rayonnement excerpts only in the Rayonnement section, by category"),
-                            value=reports.nested_influence(f.id),
+                    influence = (
+                        ui.select(
+                            {k: _(v) for k, v in INFLUENCE_MODES.items()},
+                            value=reports.influence_mode(f.id),
+                            label=_("Rayonnement excerpts"),
                         )
-                        .tooltip(_(NESTED_TIP))
-                        .mark("folder-nested-influence")
+                        .classes("w-96")
+                        .tooltip(_(INFLUENCE_TIP))
+                        .mark("folder-influence-mode")
                     )
                     default = source_settings.default_primary()
                     primary = (
@@ -666,8 +671,8 @@ def folder_dialog(f: folders.FolderView | None) -> None:
             if citations_save is not None and citations_save() is False:
                 tabs.value = "notes"
                 return False
-            if nested is not None:
-                reports.save_nested_influence(f.id, bool(nested.value))
+            if influence is not None:
+                reports.save_influence_mode(f.id, influence.value)
             if lang is not None:
                 reports.save_language(f.id, lang.value or None)
             if primary is not None:
