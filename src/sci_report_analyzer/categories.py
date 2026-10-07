@@ -6,7 +6,7 @@ summary): listed by category, as Markdown for a report."""
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -108,6 +108,7 @@ class Node:
     children: list[Node] = field(default_factory=list)
     influence: bool = False  # (the folder's "rayonnement": see set_influence)
     colour: str = DEFAULT_COLOUR  # (that of its excerpts: their tint on the PDFs)
+    key: str | None = None  # (its id in the reports: [[excerpts#key]])
 
     @property
     def years(self) -> str:
@@ -142,6 +143,7 @@ def _tree(s, settings_id: int) -> list[Node]:
             n = Node(c.id, c.name, c.parent_id, depth, path, c.start_year, c.end_year)
             n.influence = bool(c.influence)
             n.colour = c.colour or DEFAULT_COLOUR
+            n.key = c.key
             out.append(n)
             n.children = walk(c.id, depth + 1, path)
             nodes.append(n)
@@ -193,6 +195,29 @@ def update(
             if name is not None and name.strip():
                 c.name = name.strip()
             c.start_year, c.end_year = start, end
+
+
+def clean_key(key: str | None) -> str:
+    """A category's id as written in the reports: its words joined by "-" (letters, digits,
+    "_", "-")."""
+    return "-".join(re.sub(r"[^\w-]+", " ", key or "").split())
+
+
+def set_key(cat_id: int, key: str | None) -> bool:
+    """A category's id in the reports (``[[excerpts#key]]``; empty: none); False if another
+    category of its settings has it."""
+    key = clean_key(key) or None
+    with session_scope() as s:
+        if (c := s.get(Category, cat_id)) is None:
+            return False
+        if key is not None and s.scalar(
+            select(Category.id).where(
+                Category.settings_id == c.settings_id, Category.key == key, Category.id != cat_id
+            )
+        ):
+            return False
+        c.key = key
+        return True
 
 
 def set_colour(cat_id: int, colour: str | None) -> None:
@@ -361,6 +386,7 @@ def copy_settings(s, source_id: int, settings_id: int) -> int:
             end_year=n.end_year,
             influence=n.influence,
             colour=n.colour,
+            key=n.key,
         )
         s.add(c)
         s.flush()
@@ -1065,7 +1091,15 @@ def _markdown_item(e: ExcerptView, *, comments: bool = True, marks: list[str] = 
     return tags + " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
 
 
-def markdown(folder_id: int, period_id: int, *, level: int = 2, mode: str | None = None) -> str:
+def markdown(
+    folder_id: int,
+    period_id: int,
+    *,
+    level: int = 2,
+    mode: str | None = None,
+    root: int | None = None,
+    exclude: Collection[int] = (),
+) -> str:
     """The excerpts by category (headings; a category's years in its heading), as Markdown
     (unquoted, their places between Obsidian comments: ``%% Application, p. 4; p. 12 %%``),
     their tags first (Obsidian #tags), with their years. The excerpts with the "influence"
@@ -1081,15 +1115,31 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2, mode: str | None
     heading; nested, that of a section left out (all its excerpts taken out) follows the
     heading of its subsection in the Rayonnement section; a section summarised by its text
     only (see summarised): its excerpts not listed there, but in a comment after its text
-    (see with_excerpts_comment). In the language of the folder's reports."""
+    (see with_excerpts_comment). In the language of the folder's reports.
+
+    ``root``: only a category's section (its text and excerpts, without its heading: those
+    of its subcategories at ``level``); ``exclude``: without some categories' sections (and
+    those below them), e.g. those put elsewhere in the report (``[[excerpts#key]]``). The
+    influence excerpts are gathered (see above) in the part with the "rayonnement" category,
+    else in that with all the categories (no ``root``)."""
     from . import reports
 
     mode = mode or reports.influence_mode(folder_id)
     with i18n.using(reports.language(folder_id)):
-        return _markdown(folder_id, period_id, level, mode, reports.markers(folder_id))
+        return _markdown(
+            folder_id, period_id, level, mode, reports.markers(folder_id), root, exclude
+        )
 
 
-def _markdown(folder_id: int, period_id: int, level: int, mode: str, markers: dict) -> str:
+def _markdown(
+    folder_id: int,
+    period_id: int,
+    level: int,
+    mode: str,
+    markers: dict,
+    root: int | None = None,
+    exclude: Collection[int] = (),
+) -> str:
     nested, marked = mode == "move", mode == "mark"
 
     def marks(e: ExcerptView) -> list[str]:
@@ -1097,6 +1147,17 @@ def _markdown(folder_id: int, period_id: int, level: int, mode: str, markers: di
         return [m.tag for k, m in markers.items() if on[k]]
 
     nodes = tree(folder_id)
+    by_id = {n.id: n for n in nodes}
+
+    def under(i: int) -> set[int]:
+        return {i}.union(*(under(c.id) for c in by_id[i].children)) if i in by_id else set()
+
+    # (the categories of this part of the report, and the depth of its top headings)
+    kept = under(root) if root is not None else set(by_id)
+    for i in exclude:  # (not those above it, nor itself)
+        if root not in (below := under(i)):
+            kept -= below
+    shift = by_id[root].depth + 1 if root in by_id else 0
     texts, summary_only = section_texts(period_id), summarised(period_id)
     by_cat: dict[int, list[ExcerptView]] = {}
     for e in excerpts(period_id, grouped=True):
@@ -1165,16 +1226,21 @@ def _markdown(folder_id: int, period_id: int, level: int, mode: str, markers: di
                 out += [*(f"- {x}" for x in items), *([""] if items else [])]
         return out
 
-    gathered = influence(level + gather.depth) if gather is not None else influence(level)
+    if gather is not None:
+        gathered = influence(level + gather.depth - shift) if gather.id in kept else []
+    else:
+        gathered = influence(level) if root is None else []
 
     def own(n: Node) -> int:
-        return len(shown.get(n.id, [])) + (len(gathered) if n is gather else 0)
+        here = len(shown.get(n.id, [])) if n.id in kept else 0
+        return here + (len(gathered) if n is gather else 0)
 
     out: list[str] = []
     for n in nodes:
-        if not counted(n, own):
+        if n.id not in kept or not counted(n, own):
             continue
-        out.append(heading(n, level + n.depth))
+        if n.id != root:
+            out.append(heading(n, level + n.depth - shift))
         out += text(n)
         listed = [] if n.id in summary_only else shown.get(n.id, [])
         for e in listed:  # (a group: its quotes, on one item)

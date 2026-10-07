@@ -1,5 +1,5 @@
 """Report templates (Settings → Report templates): named texts a report (the notes of a
-person within a folder) starts from, their headings and blocks (``[]{.excerpts}``…) with,
+person within a folder) starts from, their headings and blocks (``[[excerpts]]``…) with,
 if any, guidance in Obsidian comments (``%% … %%``, left out when shown or copied).
 
 General (an AppSetting, as the citation templates): a folder's starting notes (its
@@ -35,14 +35,14 @@ def default_templates() -> list[ReportTemplate]:
                     f"## {_('Summary')}",
                     "%% " + _("The person in a few lines: their profile, their strengths.") + " %%",
                     f"## {_('Publications')}",
-                    "[]{.publications}",
+                    "[[publications]]",
                     "%% " + _("The papers to discuss, cited ([@key]): what they bring.") + " %%",
                     f"## {_('Activities')}",
-                    "[]{.excerpts}",
+                    "[[excerpts]]",
                     f"## {_('Assessment')}",
                     "%% " + _("The overall opinion, and the points to raise.") + " %%",
                     f"## {_('References')}",
-                    "[]{.references}",
+                    "[[references]]",
                 ]
             )
             + "\n",
@@ -88,7 +88,7 @@ def add(name: str, text: str) -> None:
 
 def outline(report: str) -> str:
     """The structure of a written report, as a template: its headings and its blocks
-    (``[]{.publications}``, ``[]{.excerpts .move-influence}``…, alone on their line), in
+    (``[[publications]]``, ``[[excerpts#key]]``…, alone on their line), in
     order; what is written (text, citations, comments, code) left out."""
     kept: list[str] = []
     fenced = False

@@ -1,5 +1,5 @@
 """The text of a category's section in a person's excerpts within a folder (Markdown, e.g. a
-summary of its items: after its heading in the notes' ``[]{.excerpts}``): shown under the
+summary of its items: after its heading in the notes. ``[[excerpts]]``): shown under the
 category in the categories' tab, edited with its pencil (on hover) or a click on it. The
 section can be summarised by its text only: its excerpts not listed in the notes, but in a
 comment after the text (``%% … %%``, not shown) for reference; still listed in the tab."""

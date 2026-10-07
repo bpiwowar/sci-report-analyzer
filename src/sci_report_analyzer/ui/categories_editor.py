@@ -102,6 +102,31 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                     for field in (title, start, end):
                         field.on("blur", save)
                         field.on("keydown.enter", save)
+                    key = (
+                        ui.input(placeholder=_("id"), value=n.key or "")
+                        .props("dense borderless prefix=#")
+                        .classes("w-24")
+                        .tooltip(
+                            _(
+                                "Its id in the reports: [[excerpts#id]] lists its excerpts (and "
+                                "those below it) there, then left out of [[excerpts]]"
+                            )
+                        )
+                        .mark(f"category-key-{n.id}")
+                    )
+
+                    def save_key(_e=None, n=n, k=key) -> None:
+                        if not categories.set_key(n.id, k.value):
+                            ui.notify(_("Another category has this id"), type="warning")
+                            k.value = n.key or ""
+                            return
+                        n.key = categories.clean_key(k.value) or None
+                        k.value = n.key or ""
+                        if changed:
+                            changed()
+
+                    key.on("blur", save_key)
+                    key.on("keydown.enter", save_key)
                     ui.button(
                         icon="campaign",
                         on_click=lambda n=n: (

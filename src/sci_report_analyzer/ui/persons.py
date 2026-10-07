@@ -543,10 +543,7 @@ def _tags_editor(member: folders.Member, options: list[str]) -> None:
 
 # ---- folders -------------------------------------------------------------------------------
 
-INFLUENCE_TIP = N_(
-    "In []{.excerpts} (and the copied excerpts), the excerpts flagged “rayonnement”; one "
-    "block: []{.excerpts .copy-influence}, .move-influence or .mark-influence"
-)
+INFLUENCE_TIP = N_("In [[excerpts]] (and the copied excerpts), the excerpts flagged “rayonnement”")
 INFLUENCE_MODES = {
     "copy": N_("Also in the Rayonnement section"),
     "move": N_("Only in the Rayonnement section, by category"),

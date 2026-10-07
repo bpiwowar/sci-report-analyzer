@@ -263,11 +263,12 @@ recherche (Entrée cite le premier ; les autres articles de la personne aussi), 
 leurs flèches ↑ / ↓, ou leur numéro Alt-cliqué et saisi), les citations renumérotées. Un ⌘/Ctrl-clic sur une citation (ou le
 bouton ↗ de la barre d'outils, le curseur dessus) affiche les détails de son article dans une
 nouvelle fenêtre. Copier remplace les citations, suivies des références, numérotées
-comme citées (ou là où se trouve `[]{.references}`, seul sur sa ligne : le bouton 📚 de la barre
-d'outils ; `.notes`, `.tags` : avec leurs notes, leurs étiquettes).
+comme citées (ou là où se trouve `[[references]]`, seul sur sa ligne : le bouton 📚 de la barre
+d'outils ; `[[references notes tags]]` : avec leurs notes, leurs étiquettes). Les blocs
+s'écrivent `[[nom]]` (autrefois `[]{.nom}`, toujours lu).
 
 **Modèles de rapport** (Paramètres → Modèles de rapport) : les textes dont un rapport part,
-ses titres, ses blocs (`[]{.publications}`, `[]{.excerpts}`, `[]{.references}`) et des
+ses titres, ses blocs (`[[publications]]`, `[[excerpts]]`, `[[references]]`) et des
 consignes en commentaires (`%% … %%`, omis à l'affichage et à la copie) ; un est fourni. Les
 notes de départ d'un dossier (ses réglages, onglet Rapports : « D'un modèle ») sont copiées
 de l'un d'eux ; le bouton 📄 de la barre d'outils des notes du dossier les fait partir de l'un
@@ -332,11 +333,12 @@ les numérotent (« [1] », dans l'ordre de première citation), la copie se t
 
 **Catégories** (page du dossier : le bouton des catégories ; ou l'onglet des catégories de la visionneuse) :
 l'arborescence ordonnée des catégories d'un dossier (par exemple une grille d'évaluation), que l'on fait glisser pour les ordonner et les imbriquer,
-chacune avec des années facultatives ; une catégorie contenant des extraits (directement ou en dessous, de n'importe quelle personne du dossier)
+chacune avec des années facultatives et un identifiant (`#id`, pour les rapports : voir plus bas) ; une catégorie contenant des extraits (directement ou en dessous, de n'importe quelle personne du dossier)
 n'est supprimée qu'une fois ceux-ci déplacés vers une autre, choisie à ce moment-là. Dans le PDF d'un document (un rapport,
 un dossier de candidature… pas celui d'un article), sélectionnez un passage (ou cliquez sur un surlignage), puis « ajouter à une
 catégorie » (en-tête, ou touche E ; sur un extrait déjà classé, cliqué ou son texte
-sélectionné : le modifie) : cliquez sur une catégorie, ou tapez pour la trouver (Enter : la première ;
+sélectionné : le modifie) : cliquez sur une catégorie, ou tapez pour la trouver (la dernière choisie est proposée, marquée et affichée :
+Entrée la prend ; en tapant, Entrée : la première trouvée ;
 un nouveau nom la crée, la boîte de dialogue restant ouverte), avec les années concernées (celles trouvées
 dans le passage, par exemple « 2026-32 » : 2026–2032, et retirées de son texte quand elles le commencent
 suivies de deux-points ou le terminent après eux ; son calendrier barré les efface, le texte redevenant celui
@@ -356,15 +358,17 @@ ou les copier en Markdown (sans guillemets, leurs emplacements dans des commenta
 p. 12 %%`, puis leurs années ; ceux qui témoignent du rayonnement sont aussi listés, par catégorie, dans une dernière
 section « Rayonnement » ; l'icône de badge nomme les documents, par exemple un long nom de fichier sous la forme
 « Application ») ;
-le bouton ❝ du rapport les insère, par catégorie (le bloc `[]{.excerpts}`, tenu à jour).
-Où vont les extraits de rayonnement : les réglages du dossier (« Extraits de rayonnement »)
-pour ses notes et la copie, ou un seul bloc avec une option : listés aussi dans la section
-Rayonnement (la catégorie « rayonnement », sinon la dernière section), comme par défaut
-(`[]{.excerpts .copy-influence}`) ; seulement là, sous des sous-sections au nom de leurs
-catégories (imbriquées comme elles, un niveau plus bas), retirés de leurs catégories (une
-catégorie restée vide disparaît) (`[]{.excerpts .move-influence}`) ; ou seulement dans leurs
-catégories, avec leur étiquette (`[]{.excerpts .mark-influence}`), par ex. changée en icône
-par les filtres de copie. Les extraits saillants et les bémols ont toujours leur étiquette.
+le bouton ❝ du rapport les insère, par catégorie (le bloc `[[excerpts]]`, tenu à jour) ;
+`[[excerpts#id]]` insère ceux de la catégorie de cet identifiant (et en dessous ; ses
+sous-catégories en titres sous celui du bloc), alors omis de `[[excerpts]]`, par ex.
+`# Recherche` puis `[[excerpts#recherche]]`, et `# Autres activités` puis `[[excerpts]]`.
+Où vont les extraits de rayonnement, les réglages du dossier le disent (« Extraits de
+rayonnement ») : listés aussi dans la section Rayonnement (la catégorie « rayonnement »,
+sinon une dernière section), comme par défaut ; seulement là, sous des sous-sections au nom
+de leurs catégories (imbriquées comme elles, un niveau plus bas), retirés de leurs catégories
+(une catégorie restée vide disparaît) ; ou seulement dans leurs catégories, avec leur
+étiquette, par ex. changée en icône par les filtres de copie (la section Rayonnement : dans
+le bloc qui a la catégorie « rayonnement », sinon dans `[[excerpts]]`). Les extraits saillants et les bémols ont toujours leur étiquette.
 Les réglages du dossier fixent l'étiquette de chaque marqueur (par défaut dans la langue de
 ses rapports : #saillant, #rayonnement, #bemol ; en anglais #salient, #influence, #caveat) et
 si un extrait se déplace quand on le marque (« En premier », par défaut) : marqué, il passe en
