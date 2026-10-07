@@ -134,6 +134,24 @@ the ACL: EMNLP* est la session Findings d'EMNLP), une conférence commune qui l'
 ou un de ses ateliers ; changez-la si besoin, puis appliquez. Les décisions sur les canaux font partie des
 paramètres exportés.
 
+**Périodes.** Le niveau fixé à la main d'un canal peut changer avec le temps : donnez un
+niveau par période (p. ex. B jusqu'en 2017, A à partir de 2018) et chaque article prend le
+niveau de son année ; les années qu'aucune période ne couvre gardent l'autre classement du
+canal (son entrée de classement, sinon le classement automatique). Un canal garde aussi ses
+**anciens noms** (NIPS jusqu'en 2017, puis NeurIPS) : un article affiche le nom et le sigle
+de son année. Une **règle de canal** peut être limitée aux articles de certaines années :
+ces années-là, elle l'emporte sur les variantes du texte (p. ex. un atelier devenu
+conférence sous le même nom).
+
+**Paramètres partagés.** Un groupe peut partager ses paramètres et ses décisions sur les
+canaux par un dépôt git (Paramètres → Paramètres partagés) : un fichier par canal, relu
+comme du code. **Récupérer** prend les changements du groupe et garde les vôtres (une
+décision changée des deux côtés est un conflit que vous tranchez) ; **Envoyer** propose les
+vôtres, sur une branche à vous pour une demande de fusion (pull request) ou sur la branche
+du groupe. Chaque décision garde qui l'a prise et quand (votre nom, réglé là), et peut dire
+pourquoi (la note d'un niveau). Les personnes, les articles et les lignes JCR ne sont jamais
+partagés. Le format : `docs/json-formats.md`.
+
 ## Catégories et niveaux
 
 <!-- levels -->

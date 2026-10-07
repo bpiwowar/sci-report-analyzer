@@ -134,6 +134,22 @@ the ACL: EMNLP* is EMNLP's Findings track), a joint conference including it (EMN
 or one of its workshops; change it if needed, then apply. Venue decisions are part of the
 exported settings.
 
+**Periods.** A venue's level set by hand can change over time: give one level per period
+(e.g. B until 2017, A from 2018) and each paper takes the level of its year; the years no
+period covers keep the venue's other ranking (its record, else the automatic one). A venue
+also keeps its **former names** (NIPS until 2017, then NeurIPS): a paper shows the name and
+acronym of its year. A **venue rule** can be limited to the papers of some years: in those
+years it wins over the text's variants (e.g. a workshop that became a conference under the
+same name).
+
+**Shared settings.** A group can share its settings and venue decisions through a git
+repository (Settings → Shared settings): one file per venue, reviewed like code. **Pull**
+takes the group's changes and keeps yours (a decision changed on both sides is a conflict
+you resolve); **Push** proposes yours, on a branch of your own for a pull request or on the
+group's branch. Each decision records who made it and when (your name, set there), and can
+say why (the note of a level). People, papers and JCR rows are never shared. The format:
+`docs/json-formats.md`.
+
 ## Categories and levels
 
 <!-- levels -->

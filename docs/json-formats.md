@@ -6,13 +6,14 @@ The JSON files SciReport Analyzer reads or writes outside its database. The data
 | File | Written by | Read by |
 |------|-----------|---------|
 | [Settings file](#settings-file) (`sci-report-analyzer-settings.json`) | Settings → Import / export → *Export settings* | Settings → Import / export → *Import* |
+| [Shared settings folder](#shared-settings-folder) (a group's git repository) | Settings → Shared settings → *Push* | Settings → Shared settings → *Pull*; `sci-report-analyzer-shared check` |
 | [Ranking records](#ranking-records): `datasets/journals.json` | `scripts/build_datasets.py` | the app (downloaded from GitHub) |
 | [Ranking records](#ranking-records): `data/conferences.json`, `data/conferences.past.json` | `scripts/build_core.py` | the app (shipped) |
 | [Data directory files](#data-directory-files): `datasets/journals.json`, `datasets/scimago.json`, `datasets/predatory.json` | the app | the app |
 | [`location.json`](#locationjson) | Settings → Data | the app, at startup |
 
-Code: `settings_io.py` (settings file), `ranking/datasets.py` (datasets), `config.py`
-(`location.json`).
+Code: `settings_io.py` (settings file), `shared.py` and `shared_git.py` (shared settings
+folder), `ranking/datasets.py` (datasets), `config.py` (`location.json`).
 
 ## Settings file
 
@@ -24,7 +25,8 @@ uses.
 ### Versioning
 
 `format` must be `"sci-report-analyzer-settings"`, or the file is rejected. `version` (now
-`6`) must be 6 or later: older files (with `flags`, or tracks without `name_rules`) are
+`7`; 6 had a single level per venue, `level_type` / `level_rank`, read as a level for every
+year) must be 6 or later: older files (with `flags`, or tracks without `name_rules`) are
 refused. Every other field is optional: a missing one takes its default, an unknown one is
 ignored.
 
@@ -33,7 +35,7 @@ ignored.
 | Field | Type | Default | |
 |-------|------|---------|-|
 | `format` | `"sci-report-analyzer-settings"` | that | required in effect (the only accepted value) |
-| `version` | int | `6` | 6 or later |
+| `version` | int | `7` | 6 or later |
 | `exported_at` | string \| null | null | ISO 8601, UTC, seconds (`2026-10-04T09:00:00+00:00`) |
 | `matching` | [Matching](#matching) | defaults | |
 | `venues` | list of [Venue](#venue) | `[]` | only venues with a manual decision or a manual variant are exported |
@@ -66,6 +68,10 @@ ignored.
 | `detection_rules` | list of [DetectionRule](#detectionrule) | the built-in rules | regexes classifying venues, by `id`; a missing one takes its default |
 | `tracks` | list of [Track](#track) | the built-in tracks | the satellite tracks, in their order; a built-in one missing is appended with its default |
 | `core_edition` | `"publication"` \| `"latest"` | `"publication"` | CORE edition giving a paper its rank |
+
+A cleaning rule, detection rule or track also has `by`, `on` (ISO date) and `note`: who
+set or changed it, when and why (none: a built-in default). They are stamped when the
+settings are saved, and never change how it applies.
 
 #### NormRule
 
@@ -174,19 +180,49 @@ imported.
 
 | Field | Type | Default | |
 |-------|------|---------|-|
-| `name` | string | required | |
+| `name` | string | required | its current name |
+| `id` | string \| null | null | its id in shared settings (`Venue.share_id`) |
 | `variants` | list of [Variant](#variant) | `[]` | |
 | `short_name` | string \| null | null | Set by hand, e.g. `"ICLR"`; `""`: the venue has no acronym; null: inferred (not exported) |
 | `url` | string \| null | null | website |
 | `kind` | string \| null | null | a manual [kind](#venue-kinds) only (an automatic one is not exported) |
-| `level_type` | `"conference"` \| `"journal"` \| null | null | null with a `level_rank`: conference |
-| `level_rank` | string \| null | null | manual level: `A*`…`C` (CORE) or `Q1`…`Q4` |
+| `levels` | list of [Level](#level) \| null | null | manual levels, by year range |
+| `names` | list of [Former name](#former-name) \| null | null | its former names, by year range |
 | `record_key` | string \| null | null | ranking record picked by hand: `source:type:id`, `id` being the record's `sourceId` or its normalized name (`scimago:journal:21100497291`, `core:conference:acm international conference on research and development in information retrieval`) |
 | `match_text` | string \| null | null | "Search rankings as" text |
 | `patterns` | list of [VenuePattern](#venuepattern) \| null | null | venue rules |
 | `identifiers` | object \| null | null | `{"issn": ["1234-5678", …]}` |
 | `hosts` | list of [Host](#host) \| null | null | a workshop's main conferences |
 | `joint` | [Joint](#joint) \| null | null | a joint venue's parts |
+| `decisions` | object \| null | null | who made each decision: field → `{"by", "on", "note"}` (`kind`, `short_name`, `url`, `record_key`, `match_text`, `patterns`, `identifiers`, `hosts`, `joint`; a level's or name's are on it) |
+
+#### Level
+
+A level set by hand for the papers of a period (`ranking.levels`). The ranges of a venue
+never overlap; a paper of a year none covers takes the venue's other ranking (its record,
+else the automatic one).
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `type` | `"conference"` \| `"journal"` | `"conference"` | |
+| `rank` | string | required | `A*`…`C` (CORE), `Q1`…`Q4`, or any typed level |
+| `from` | int \| null | null | first year (included; null: open) |
+| `to` | int \| null | null | last year (included; null: open) |
+| `by` | string \| null | null | who set it (Settings → Shared settings → *Your name*) |
+| `on` | string \| null | null | when (ISO date) |
+| `note` | string \| null | null | why |
+
+#### Former name
+
+A name the venue had for a period (`ranking.levels.clean_name`): a paper of a year it
+covers shows it (its acronym too). The ranges never overlap.
+
+| Field | Type | Default | |
+|-------|------|---------|-|
+| `name` | string | required | |
+| `short_name` | string \| null | null | its acronym then |
+| `from`, `to` | int \| null | null | its years (included; null: open) |
+| `by`, `on`, `note` | string \| null | null | as for a [Level](#level) |
 
 #### Variant
 
@@ -198,6 +234,7 @@ A raw venue text of the venue (`VariantIO`).
 | `source` | string \| null | null | its source (`dblp`, `hal`, `orcid`, `openalex`, `semanticscholar`, `scholar`, `doi`, `thesesfr`): that source's rules apply |
 | `manual` | bool | true | assigned by hand (never re-assigned automatically) |
 | `track` | string \| null | null | a [track](#track)'s `id` (`findings`, `tutorial`, `demo`, `short`…) |
+| `by`, `on` | string \| null | null | who assigned it by hand, when |
 
 A variant already in another local venue moves only with *Replace*, or when its conflict is
 taken in a merge.
@@ -214,6 +251,7 @@ A regex: the source venue texts it matches (`re.search`) belong to the venue
 | `sources` | list of string | `[]` | sources it applies to (empty: all) |
 | `track` | string \| null | null | [track](#track) of the matching papers (its `id`) |
 | `note` | string \| null | null | |
+| `from_year`, `to_year` | int \| null | null | the years of the papers it applies to (included; null: open). A rule with years wins, in its years, over the text's variants and the undated rules (a text of the venue in some years only) |
 
 #### Host
 
@@ -263,7 +301,7 @@ variant's or venue rule's track any more).
 ```json
 {
   "format": "sci-report-analyzer-settings",
-  "version": 6,
+  "version": 7,
   "exported_at": "2026-10-04T09:00:00+00:00",
   "matching": {
     "sources": {"scimago": true, "core": true, "jcr": true, "openalex": false, "predatory": true},
@@ -319,14 +357,123 @@ variant's or venue rule's track any more).
     {
       "name": "Journal of Imaginary Results",
       "variants": [{"raw": "J. Imag. Res.", "source": "hal", "manual": true, "track": null}],
-      "level_type": "journal",
-      "level_rank": "Q1",
+      "levels": [{"type": "journal", "rank": "Q1", "by": "jdoe", "on": "2026-10-01"}],
       "identifiers": {"issn": ["1234-5678"]}
     }
   ],
   "jcr": null
 }
 ```
+
+## Shared settings folder
+
+A group's matching settings and venue decisions, as a folder of JSON files kept in a git
+repository (Settings → Shared settings; code: `shared.py`, `shared_git.py`). Only manual
+decisions are in it: automatic ones are found again from each member's datasets and papers.
+People, papers and JCR rows are never in it.
+
+```
+settings.json          the format; the matching settings that differ from the defaults
+norm_rules.json        the cleaning rules added, changed or removed, and their order
+detection_rules.json   the detection rules changed
+tracks.json            the tracks added or changed, and their order
+venues/<id>.json       a venue's manual decisions (one file per venue)
+```
+
+A missing file means "the app's defaults"; other files of the repository (a README, a CI
+workflow…) are ignored and kept by a push. Every file is written **canonically**: sorted
+keys, 2-space indent, UTF-8, a final newline (`jq -S --indent 2 .` gives the same). The same
+settings always give the same bytes, so a diff shows only what changed. A file written by
+hand is read as long as it is valid; `sci-report-analyzer-shared check --fix` rewrites it
+canonically.
+
+### `settings.json`
+
+```json
+{
+  "format": "sci-report-analyzer-shared",
+  "version": 1,
+  "settings": {"min_score": 0.85},
+  "sources": {"openalex": true},
+  "kind_levels": {"natl_conference": "C"}
+}
+```
+
+`settings`: the [Matching](#matching) fields that differ from their default, other than
+those below; `sources`, `kind_levels`: as in [Matching](#matching), the entries that
+differ. A `version` above the app's is refused.
+
+### Rules and tracks
+
+`norm_rules.json` is `{"rules": [...], "order": [ids]}`: the [NormRule](#normrule)s that
+differ from their default or are added (by `id`), and a built-in one removed as
+`{"id": "…", "removed": true}`; `order`, when the rules are not in their natural order (the
+built-in ones in theirs, then those added, by id). `detection_rules.json` is
+`{"rules": [...]}`: the [DetectionRule](#detectionrule)s changed. `tracks.json` is
+`{"tracks": [...], "order": [ids]}`, like the cleaning rules ([Track](#track)). Give the
+rules you add an id of your own (`custom1-jdoe`): two members adding `custom1` would be the
+same rule.
+
+### `venues/<id>.json`
+
+```json
+{
+  "id": "taln",
+  "name": "Traitement Automatique des Langues Naturelles",
+  "short_name": "TALN",
+  "kind": "natl_conference",
+  "levels": [
+    {"type": "conference", "rank": "C", "to": 2017, "by": "jdoe", "on": "2026-03-12"},
+    {"type": "conference", "rank": "B", "from": 2018, "by": "alice", "on": "2026-10-01",
+     "note": "selective since the merge with CORIA"}
+  ],
+  "names": [{"name": "TALN-RECITAL", "to": 2019, "by": "jdoe", "on": "2026-03-12"}],
+  "hosts": [{"venue": "acl", "from": 2015}],
+  "decisions": {"kind": {"by": "jdoe", "on": "2026-03-12"}},
+  "variants": [{"raw": "TALN 2024", "source": "hal", "by": "alice", "on": "2026-10-01"}]
+}
+```
+
+`id`: the file's name, `[a-z0-9][a-z0-9_-]*`, set once (from its acronym or name) and
+never changed: renaming a venue does not rename its file. The fields are those of a
+[Venue](#venue) of the settings file, except `hosts` (`{"venue": <id>, "from", "to"}`) and
+`joint` (`{"parts": [ids], "use": id}`), which name venues by id; a venue only named there
+has a file with its `name` only. `variants` holds only the variants assigned by hand. On a
+member's first pull, a venue of the folder is attached to their venue of the same name or
+variant.
+
+### Pull, push
+
+- **Pull** reads the group's latest commit and merges it with the local settings against
+  the last commit pulled (three-way, item by item: a setting, a rule, a venue's field, a
+  variant): changed on one side only, that side's value is taken (removals included);
+  changed on both, differently, it is a conflict to resolve (the first pull: the group's
+  value by default). Who set a value is not compared: the same value set by two members is
+  no conflict. A venue's name never conflicts (the group's is taken).
+- **Push** proposes the local changes the group lacks (chosen one by one), as a commit on
+  top of the group's latest one, after a pull. *On a branch of mine* pushes it as
+  `settings/<name>-<date>` to open a pull request from (most git hosts print its link);
+  *on the group's branch* updates it directly. The app keeps its own copy of the
+  repository in the data directory (`shared-settings/`) and never checks it out; git's own
+  credentials (SSH keys, credential helper) are used.
+
+### Checking a pull request
+
+```yaml
+# .github/workflows/check.yml in the group's repository
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uvx --from git+https://github.com/bpiwowar/sci-report-analyzer sci-report-analyzer-shared check .
+```
+
+`sci-report-analyzer-shared check [FOLDER] [--fix]` exits with 1 when a file is not valid
+JSON or not valid settings, a regex does not compile, levels or names overlap, a venue
+named by another is missing, or a file is not canonical (`--fix` rewrites them).
 
 ## Ranking records
 
