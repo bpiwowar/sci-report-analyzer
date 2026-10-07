@@ -1417,6 +1417,22 @@ async def test_name_variants_always_shown_and_removable(user: User) -> None:
     assert persons.load(pid).name_rejects["owner"] == []
 
 
+async def test_name_at_a_source_position_can_be_removed(user: User) -> None:
+    from sci_report_analyzer import persons
+
+    pid = make_person("Jane Doe")
+    # (an id-based source: the person is its first author, whatever the name)
+    add_source(
+        pid, "dblp", "jd", [pub("d1", "Some paper", 2020, "V", authors=["K. Smith"], author_pos=1)]
+    )
+    await user.open(f"/person/{pid}?tab=sources")
+    await user.should_see(marker="name-alias-K. Smith", retries=40)
+    user.find(marker="name-alias-K. Smith").trigger("remove")
+    await user.should_see(marker="name-rejected-K. Smith", retries=40)
+    assert persons.load(pid).name_rejects["owner"] == ["K. Smith"]
+    await user.should_not_see(marker="name-alias-K. Smith")
+
+
 async def test_drop_a_venue_onto_another(user: User) -> None:
     from nicegui.events import GenericEventArguments
 

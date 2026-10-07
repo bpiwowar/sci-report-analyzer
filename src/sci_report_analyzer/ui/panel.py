@@ -769,18 +769,22 @@ class PublicationsPanel:
                 with ui.row().classes("items-center gap-1"):
                     ui.label(_("Confirmed:")).classes("text-sm")
                     for name, count in confirmed.most_common():
-                        alias = aliases.get(fold_name(name))
-                        chip = ui.chip(f"{name} ({count})", removable=alias is not None).props(
-                            "dense"
-                        )
-                        if alias is None:
-                            chip.tooltip(_("The person's name, or their position in a source"))
+                        # (the person's name, accents and case aside, is theirs for good)
+                        main = fold_name(name) == fold_name(person.name)
+                        chip = ui.chip(f"{name} ({count})", removable=not main).props("dense")
+                        if main:
+                            chip.tooltip(_("The person's name"))
                             continue
 
                         def remove(n=name) -> None:
-                            for a in person.aliases or []:
-                                if fold_name(a) == fold_name(n):
-                                    annotations.remove_alias(self.person_id, a)
+                            # An alias, else a spelling at the person's position in a source.
+                            found = [
+                                a for a in person.aliases or [] if fold_name(a) == fold_name(n)
+                            ]
+                            for a in found:
+                                annotations.remove_alias(self.person_id, a)  # (rejected too)
+                            if not found:
+                                annotations.reject_alias(self.person_id, n)
                             background_tasks.create(self.reload())
 
                         chip.on("remove", remove).tooltip(

@@ -704,7 +704,9 @@ class PeopleIndex:
         former_after = service.settings.former_student_after
         for i, a in enumerate(authors):
             f = fold_name(a)
-            if not owner_found and (f in self.owner_exact or (pos_exact and pos == i + 1)):
+            # (a spelling said not to be them wins over a source's position)
+            at_pos = pos_exact and pos == i + 1 and f not in self.owner_rejects
+            if not owner_found and (f in self.owner_exact or at_pos):
                 marks.append("owner")
                 owner_found = True
                 continue
