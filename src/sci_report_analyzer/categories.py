@@ -707,6 +707,9 @@ def add_excerpt(
         s.add(e)
         _set_tags(s, e, tags or [])
         s.flush()
+        firsts = _firsts(period_id)
+        if _rank(e, firsts) < len(firsts):
+            _place_by_rank(s, e, firsts)
         return e.id
 
 
@@ -807,6 +810,42 @@ def _last(s, category_id: int, period_id: int) -> int:
     )
 
 
+def _firsts(period_id: int) -> list[str]:
+    """The markers whose excerpts go first in their categories (see reports.markers), in
+    order."""
+    from . import reports
+
+    found = folders.folder_of_period(period_id)
+    return [k for k, m in reports.markers(found[0] if found else None).items() if m.first]
+
+
+def _rank(e: Excerpt, firsts: list[str]) -> int:
+    """Its group among the excerpts of its category: that of its first marker going first
+    (see _firsts), else after them."""
+    return min((i for i, k in enumerate(firsts) if getattr(e, k)), default=len(firsts))
+
+
+def _place_by_rank(s, e: Excerpt, firsts: list[str]) -> None:
+    """An excerpt (leading its group, or alone) moved to the top of its group (see _rank),
+    the others of its category in their order."""
+    others = list(
+        s.scalars(
+            select(Excerpt)
+            .where(
+                Excerpt.category_id == e.category_id,
+                Excerpt.period_id == e.period_id,
+                Excerpt.group_id.is_(None),
+                Excerpt.id != e.id,
+            )
+            .order_by(Excerpt.position, Excerpt.id)
+        )
+    )
+    rank = _rank(e, firsts)
+    at = next((i for i, x in enumerate(others) if _rank(x, firsts) >= rank), len(others))
+    for k, x in enumerate([*others[:at], e, *others[at:]], 1):
+        x.position = k
+
+
 def place_excerpt(excerpt_id: int, target_id: int, where: str) -> None:
     """Put an excerpt (with its group) "before" or "after" another one (in its category)."""
     with session_scope() as s:
@@ -876,8 +915,13 @@ def update_excerpt(
         if e := s.get(Excerpt, excerpt_id):
             if text is not None and text.strip():
                 e.text = " ".join(text.split())
+            firsts = _firsts(e.period_id)
+            before = _rank(e, firsts)
             e.start_year, e.end_year, e.influence = start, end, influence
             e.salient, e.caveat = salient, caveat
+            if _rank(e, firsts) != before:  # (checked or unchecked: moved, see _place_by_rank)
+                s.flush()
+                _place_by_rank(s, e, firsts)
             if tags is not None:
                 _set_tags(s, e, tags)
 
@@ -997,7 +1041,7 @@ def markdown(folder_id: int, period_id: int, *, level: int = 2, mode: str | None
     instead, under subsections named after their categories (as nested as these, one level
     below), taken out of their categories ("nested" below); "mark": them only in their
     categories, tagged as the folder says (see reports.markers: also the tags of the
-    excerpts salient or caveats, and those first in their categories). The categories with
+    excerpts salient or caveats). The categories with
     no excerpt (nor below) are left out. A section's text (see section_texts) follows its
     heading; nested, that of a section left out (all its excerpts taken out) follows the
     heading of its subsection in the Rayonnement section; a section summarised by its text
@@ -1017,16 +1061,10 @@ def _markdown(folder_id: int, period_id: int, level: int, mode: str, markers: di
         on = {"salient": e.salient, "caveat": e.caveat, "influence": marked and e.influence}
         return [m.tag for k, m in markers.items() if on[k]]
 
-    def rank(e: ExcerptView) -> int:
-        """Those marked first in their categories (as the folder says), in the markers'
-        order."""
-        firsts = [i for i, (k, m) in enumerate(markers.items()) if m.first and getattr(e, k)]
-        return min(firsts, default=len(markers))
-
     nodes = tree(folder_id)
     texts, summary_only = section_texts(period_id), summarised(period_id)
     by_cat: dict[int, list[ExcerptView]] = {}
-    for e in sorted(excerpts(period_id, grouped=True), key=rank):
+    for e in excerpts(period_id, grouped=True):
         by_cat.setdefault(e.category_id, []).append(e)
     gather = next((n for n in nodes if n.influence), None)
     # Those whose flagged excerpts are listed apart (nested: not those below the gathering one).

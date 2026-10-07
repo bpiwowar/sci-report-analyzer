@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 15:58+0200\n"
+"POT-Creation-Date: 2026-10-07 16:43+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -654,6 +654,13 @@ msgstr "Alt-clic : fixer son numéro au sein de « {tag} »"
 
 msgid "Among the papers"
 msgstr "Parmi les articles"
+
+msgid ""
+"An excerpt marked moves first in its category (unmarked: after those "
+"marked)"
+msgstr ""
+"Un extrait marqué passe en tête de sa catégorie (démarqué : après ceux "
+"marqués)"
 
 msgid "Annotations"
 msgstr "Annotations"
@@ -4477,9 +4484,6 @@ msgstr "La couleur de ses extraits (leur teinte dans les PDF)"
 
 msgid "The conferences found in its texts (on saving)."
 msgstr "Les conférences trouvées dans ses textes (à l'enregistrement)."
-
-msgid "The excerpts marked first in their categories"
-msgstr "Les extraits marqués en premier dans leurs catégories"
 
 msgid "The excerpts, as selected"
 msgstr "Les extraits, tels que sélectionnés"

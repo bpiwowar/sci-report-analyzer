@@ -364,8 +364,10 @@ below), taken out of their categories, one left empty being left out
 (`[]{.excerpts .mark-influence}`), e.g. turned into an icon by the copy filters. The salient
 and caveat excerpts are always tagged. The folder's settings set each marker's tag (by
 default in the language of its reports: #salient, #influence, #caveat; in French
-#saillant, #rayonnement, #bemol) and whether its excerpts are first in their categories
-(“First”: by default, salient ones first, then influence, then caveats). Each category can
+#saillant, #rayonnement, #bemol) and whether an excerpt moves when marked (“First”, by
+default): marked, it moves to the top of its category, among those marked so (salient ones
+first, then influence, then caveats); unmarked, after them; it can then be moved as one
+likes, the report following that order. Each category can
 have a text of its own for the person (Markdown, e.g. a summary of its items; its pencil, on
 hover, in the categories tab, or a click on the text): put after its heading, before its
 items (nested, that of a category left empty goes under its subsection of the Rayonnement

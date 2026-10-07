@@ -669,7 +669,7 @@ def save_influence_mode(folder_id: int, mode: str) -> None:
     _save_citations(folder_id, influence_mode=mode, nested_influence=None)
 
 
-# An excerpt's markers (see categories.ExcerptView), in their order first in their categories.
+# An excerpt's markers (see categories.ExcerptView), in their order (see Marker.first).
 MARKERS = ("salient", "influence", "caveat")
 # Their tags by default, in the language of the reports.
 DEFAULT_MARKER_TAGS = {
@@ -681,8 +681,9 @@ DEFAULT_MARKER_TAGS = {
 @dataclass(frozen=True)
 class Marker:
     """How an excerpt's marker shows in the folder's reports: its tag (salient, caveat:
-    always; influence: in the mode "mark", see influence_mode), and whether the excerpts
-    marked are first in their categories."""
+    always; influence: in the mode "mark", see influence_mode), and whether an excerpt marked
+    (or no longer) moves first in its category (see categories.update_excerpt), among those
+    marked so (salient, influence, caveat), or after them; then moved as one likes."""
 
     tag: str
     first: bool = True

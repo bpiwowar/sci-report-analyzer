@@ -366,8 +366,10 @@ catégories, avec leur étiquette (`[]{.excerpts .mark-influence}`), par ex. cha
 par les filtres de copie. Les extraits saillants et les bémols ont toujours leur étiquette.
 Les réglages du dossier fixent l'étiquette de chaque marqueur (par défaut dans la langue de
 ses rapports : #saillant, #rayonnement, #bemol ; en anglais #salient, #influence, #caveat) et
-si ses extraits viennent en premier dans leurs catégories (« En premier » : par défaut, les
-saillants d'abord, puis le rayonnement, puis les bémols).
+si un extrait se déplace quand on le marque (« En premier », par défaut) : marqué, il passe en
+tête de sa catégorie, parmi ceux marqués ainsi (les saillants d'abord, puis le rayonnement,
+puis les bémols) ; démarqué, après eux ; on peut ensuite le déplacer à son gré, le rapport
+suivant cet ordre.
 Chaque catégorie peut avoir un texte propre à la personne (Markdown, par exemple un résumé de
 ses éléments ; son crayon, au survol, dans l'onglet des catégories, ou un clic sur le texte) :
 placé après son titre, avant ses éléments (en mode imbriqué, celui d'une catégorie restée

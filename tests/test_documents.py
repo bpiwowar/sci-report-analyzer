@@ -908,8 +908,9 @@ def test_nested_influence():
 
 
 def test_excerpt_markers():
-    """Salient and caveat excerpts tagged (the folder's tags, by default in its language),
-    the marked ones first in their categories (salient, influence, caveat) unless not."""
+    """Salient and caveat excerpts tagged (the folder's tags, by default in its language);
+    marked (or no longer), moved first in their categories (salient, influence, caveat) unless
+    not, then moved as one likes (the report in their order)."""
     from sci_report_analyzer import categories
 
     _, period, _ = _person()
@@ -933,7 +934,11 @@ def test_excerpt_markers():
         "- #caveat Peu d'encadrement. %% Dossier, p. 2 %%\n"
         "- Projet Comète. %% Dossier, p. 1 %%\n"
     )
-    # The folder's tags (in French by default), and those not first.
+    # Moved as one likes: kept so.
+    categories.place_excerpt(plain, best, "before")
+    order = [e.id for e in categories.excerpts(period)]
+    assert order == [plain, best, prize, weak]
+    # The folder's tags (in French by default), and markers not moving their excerpts.
     reports.save_language(folder, "fr")
     assert reports.markers(folder)["caveat"] == reports.Marker("bemol")
     marks = reports.markers(folder)
@@ -947,11 +952,17 @@ def test_excerpt_markers():
     )
     assert reports.markers(folder)["salient"] == reports.Marker("fort", first=False)
     assert reports.markers(folder)["influence"] == reports.Marker("rayonnement")
+    categories.update_excerpt(weak)  # (no longer a caveat: not moved)
+    assert [e.id for e in categories.excerpts(period)] == order
+    categories.update_excerpt(weak, influence=True)  # (first)
+    assert [e.id for e in categories.excerpts(period)] == [weak, plain, best, prize]
+    categories.update_excerpt(prize)  # (after those marked first)
+    assert [e.id for e in categories.excerpts(period)] == [weak, prize, plain, best]
     assert categories.markdown(folder, period, mode="mark") == (
         "## Recherche\n\n"
-        "- #rayonnement Prix Andromède. %% Dossier, p. 3 %%\n"
+        "- #rayonnement Peu d'encadrement. %% Dossier, p. 2 %%\n"
+        "- Prix Andromède. %% Dossier, p. 3 %%\n"
         "- Projet Comète. %% Dossier, p. 1 %%\n"
-        "- #bemol Peu d'encadrement. %% Dossier, p. 2 %%\n"
         "- #ERC #fort Projet Nébuleuse. %% Dossier, p. 4 %%\n"
     )
     reports.save_language(folder, None)  # (a default tag follows the language)

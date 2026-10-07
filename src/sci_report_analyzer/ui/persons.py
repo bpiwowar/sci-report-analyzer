@@ -575,7 +575,12 @@ def markers_section(folder_id: int) -> Callable[[], dict[str, reports.Marker]]:
                 )
                 first = (
                     ui.checkbox(_("First"), value=m.first)
-                    .tooltip(_("The excerpts marked first in their categories"))
+                    .tooltip(
+                        _(
+                            "An excerpt marked moves first in its category (unmarked: "
+                            "after those marked)"
+                        )
+                    )
                     .mark(f"folder-marker-first-{key}")
                 )
                 fields[key] = (tag, first)
