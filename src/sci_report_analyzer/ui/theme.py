@@ -116,6 +116,9 @@ CSS += f".vr-dim {{ opacity:{DIM_OPACITY}; }}\n"
 # The menu bar of a page without the frame (see bare_page), and a person's header there:
 # hidden in full screen (a PDF's, see pdf_viewer.full_screen_button).
 CSS += "body.vr-full :is(.vr-menu-bar, .vr-person-header) { display: none !important; }\n"
+# In a dialog's card (a flex column, scrolled when too high), tab panels at their full height:
+# shrunk, they would clip their content (overflow hidden), not scrolled.
+CSS += ".q-dialog .q-tab-panels { flex-shrink: 0; }\n"
 ui.add_css(CSS, shared=True)  # (every page: also the PDF windows)
 
 
