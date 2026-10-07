@@ -42,18 +42,28 @@ TAG_RULES_KEY = "copy.tag-rules"
 @dataclass(frozen=True)
 class TagRule:
     """A tag (without "#") replaced, on its line, by a text before that line's (e.g. an
-    icon) and one after, in a colour (#RRGGBB; "": none), that of the line's text too if
-    ``whole``."""
+    icon) and one after, in a colour (#RRGGBB; "": none; ``highlight``: as background), in
+    bold if ``bold``; that of the line's text too if ``whole``. (Marmotte keeps these, not
+    superscripts, font sizes or strikethroughs.)"""
 
     tag: str
     before: str = ""
     after: str = ""
     color: str = ""
     whole: bool = False
+    bold: bool = False
+    highlight: bool = False
+
+
+# Until some are set: the "rayonnement" excerpts marked in their categories as a globe.
+DEFAULT_TAG_RULES = [TagRule("influence", "🌍")]
 
 
 def tag_rules() -> list[TagRule]:
-    return [TagRule(**r) for r in get_setting(TAG_RULES_KEY) or [] if r.get("tag")]
+    saved = get_setting(TAG_RULES_KEY)
+    if saved is None:
+        return list(DEFAULT_TAG_RULES)
+    return [TagRule(**r) for r in saved if r.get("tag")]
 
 
 def set_tag_rules(rules: list[TagRule]) -> None:
@@ -66,13 +76,21 @@ def _tag_re(tag: str) -> re.Pattern:
 
 def apply_tag_rules(lines: list[str], rules: list[TagRule]) -> list[str]:
     """The lines with a tag of the rules (not headings; not in code): that tag removed, the
-    rule's texts around the line's text (after its list marker), as HTML spans when
-    coloured."""
+    rule's texts around the line's text (after its list marker), styled as it says (HTML
+    spans, <strong>)."""
     found = [(_tag_re(r.tag), r) for r in rules]
 
-    def coloured(text: str, color: str) -> str:
-        c = _flatten_hex(color)
-        return f'<span style="color:{c}">{text}</span>' if text and HEX_RE.match(c) else text
+    def styled(text: str, r: TagRule) -> str:
+        if not text:
+            return text
+        if r.bold:
+            text = f"<strong>{text}</strong>"
+        c = _flatten_hex(r.color)
+        if HEX_RE.match(c):
+            text = (
+                f'<span style="{"background-color" if r.highlight else "color"}:{c}">{text}</span>'
+            )
+        return text
 
     def apply(line: str) -> str:
         if HEADING_RE.match(line):
@@ -94,9 +112,9 @@ def apply_tag_rules(lines: list[str], rules: list[TagRule]) -> list[str]:
             text = stripped[len(head) :].strip()
             before, after = (_html.escape(x.strip(), quote=False) for x in (r.before, r.after))
             if not r.whole:
-                before, after = coloured(before, r.color), coloured(after, r.color)
+                before, after = styled(before, r), styled(after, r)
             text = " ".join(x for x in (before, text, after) if x)
-            line = head + (coloured(text, r.color) if r.whole else text)
+            line = head + (styled(text, r) if r.whole else text)
         return line
 
     return _outside_fences(lines, apply)
@@ -370,7 +388,9 @@ FILTERS: dict[str, Filter] = {
             "Rich text for Marmotte's forms (basic formatting only): # headings numbered as "
             "banners, ## as bold lines, lists as paragraphs; comments (%% … %%), callouts, "
             "tasks, tags (but those turned into a text: see below) and the lines tagged "
-            "#question or #to-check left out, tables too."
+            "#question or #to-check left out, tables too. Marmotte keeps bold, italics, "
+            "underlining, text colours, highlights, emojis and symbols (★ ✦ ◆ ➤), not "
+            "superscripts, font sizes or strikethroughs."
         ),
         marmotte,
     ),

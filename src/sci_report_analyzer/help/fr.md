@@ -282,8 +282,11 @@ forme de base que permettent ses formulaires : titres `#` en bandeaux numérot�
 l'emplacement des citations), encadrés, tâches, étiquettes et lignes étiquetées #question ou
 #to-check sont retirés, les tableaux aussi. Une étiquette peut à la place devenir un texte
 (Paramètres → Filtres de copie → Étiquettes changées en texte) : un avant le texte de la ligne
-(par ex. une icône, 🌍) et un après, d'une couleur (aussi celle du texte de la ligne si coché),
-par ex. #influence, l'étiquette des extraits de rayonnement marqués dans leurs catégories.
+(par ex. une icône, 🌍) et un après, d'une couleur (ou surlignés), en gras, aussi le texte de la
+ligne si coché, par ex. #influence (par défaut : 🌍), l'étiquette des extraits de rayonnement
+marqués dans leurs catégories. Marmotte garde le gras, l'italique, le soulignement, les couleurs
+de texte, le surlignage, les emojis (🌍 ⭐ 📣) et les symboles (★ ✦ ◆ ➤) ; il retire les
+exposants, les tailles de police et le texte barré.
 
 **PDF** : l'icône PDF à côté d'un titre ouvre le PDF stocké de l'article dans une nouvelle fenêtre (rouge ;
 ✎ une fois annoté). Une icône grise signifie qu'un lien en accès ouvert (ou un DOI) est connu : cliquez dessus pour

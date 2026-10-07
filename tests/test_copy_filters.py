@@ -83,20 +83,32 @@ def test_tag_rules():
     assert (
         '<span style="color:#7030A0">★ Membre du <strong>Comité</strong>  — 2021 (R)</span>' in html
     )
+    styled = copy_filters.TagRule("influence", "R", color="#FFF3A3", bold=True, highlight=True)
+    html, _ = marmotte(md, [styled])
+    assert '<span style="background-color:#FFF3A3"><strong>R</strong></span> Membre' in html
     html, _ = marmotte(md, [])
     assert "<p>• Membre du" in html
-    # Saved in the settings (used by default; those without a tag left out).
+    # By default, a globe; else those saved (those without a tag left out; none: none).
+    assert copy_filters.tag_rules() == [copy_filters.TagRule("influence", "🌍")]
+    assert marmotte(md)[1].startswith("• 🌍 Membre du Comité")
     copy_filters.set_tag_rules([icon, copy_filters.TagRule(" ")])
     assert copy_filters.tag_rules() == [icon]
     assert marmotte(md)[0] == marmotte(md, [icon])[0]
+    copy_filters.set_tag_rules([])
+    assert copy_filters.tag_rules() == []
 
 
 @pytest.mark.nicegui_main_file("tests/app_main.py")
 async def test_tag_rules_settings(user: User):
     await user.open("/settings?tab=copy")
+    await user.should_see(marker="tag-rule-tag-0")  # (the default one)
     user.find(marker="tag-rule-add").click()
-    await user.should_see(marker="tag-rule-tag-0")
-    user.find(marker="tag-rule-tag-0").type("influence")
-    user.find(marker="tag-rule-before-0").type("🌍")
-    user.find(marker="tag-rule-whole-0").click()
-    assert copy_filters.tag_rules() == [copy_filters.TagRule("influence", "🌍", whole=True)]
+    await user.should_see(marker="tag-rule-tag-1")
+    user.find(marker="tag-rule-tag-1").type("prize")
+    user.find(marker="tag-rule-before-1").type("★")
+    user.find(marker="tag-rule-bold-1").click()
+    user.find(marker="tag-rule-whole-1").click()
+    assert copy_filters.tag_rules() == [
+        copy_filters.TagRule("influence", "🌍"),
+        copy_filters.TagRule("prize", "★", whole=True, bold=True),
+    ]

@@ -279,8 +279,11 @@ forms allow: `#` headings as numbered banners (“--- 1. Research ---”), `##` 
 lists as paragraphs (“• …”); the comments (`%% … %%`, e.g. the places of quotes), callouts,
 tasks, tags and the lines tagged #question or #to-check are left out, tables too. A tag can
 instead be turned into a text (Settings → Copy filters → Tags turned into a text): one before
-the line's text (e.g. an icon, 🌍) and one after, in a colour (that of the line's text too if
-checked), e.g. #influence, the tag of the rayonnement excerpts marked in their categories.
+the line's text (e.g. an icon, 🌍) and one after, in a colour (or highlighted), in bold, the
+line's text too if checked, e.g. #influence (by default: 🌍), the tag of the rayonnement
+excerpts marked in their categories. Marmotte keeps bold, italics, underlining, text colours,
+highlights, emojis (🌍 ⭐ 📣) and symbols (★ ✦ ◆ ➤); it drops superscripts, font sizes and
+strikethroughs.
 
 **PDFs**: the PDF icon next to a title opens the paper's stored PDF in a new window (red;
 ✎ once annotated). A grey icon means an open-access link (or a DOI) is known: click it to

@@ -95,9 +95,9 @@ def tag_rules_section() -> None:
     ui.label(
         _(
             "When copied through a filter, a tag replaced on its line by a text before it "
-            "(e.g. an icon) and one after, in a colour (that of the line's text too if "
-            "checked); e.g. #influence, the tag of the “rayonnement” excerpts marked in their "
-            "categories."
+            "(e.g. an icon) and one after, in a colour (or highlighted), in bold, the line's "
+            "text too if checked; e.g. #influence, the tag of the “rayonnement” excerpts "
+            "marked in their categories."
         )
     ).classes("text-sm text-grey")
     rules = [asdict(r) for r in copy_filters.tag_rules()]
@@ -125,6 +125,12 @@ def tag_rules_section() -> None:
                 ui.color_input(_("Colour"), value=r["color"], on_change=setter("color")).props(
                     "dense"
                 ).classes("w-32").mark(f"tag-rule-color-{i}")
+                ui.checkbox(_("Bold"), value=r["bold"], on_change=setter("bold")).mark(
+                    f"tag-rule-bold-{i}"
+                )
+                ui.checkbox(
+                    _("Highlight"), value=r["highlight"], on_change=setter("highlight")
+                ).tooltip(_("The colour as background")).mark(f"tag-rule-highlight-{i}")
                 ui.checkbox(_("The line too"), value=r["whole"], on_change=setter("whole")).mark(
                     f"tag-rule-whole-{i}"
                 )
