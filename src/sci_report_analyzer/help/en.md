@@ -334,7 +334,8 @@ folder's ordered tree of categories (e.g. an evaluation grid), dragged to order 
 them, each with optional years; one with excerpts (there or below, of anyone in the folder)
 is deleted once they are moved to another one, chosen then. In a document's PDF (a report,
 an application… not a paper's), select a passage (or click a highlight), then ‘add to a
-category’ (header, or the E key): click a category, or type to find it (Enter: the first
+category’ (header, or the E key; on an excerpt filed already, clicked or its text selected:
+edits it): click a category, or type to find it (Enter: the first
 one; a new name creates it, the dialog staying open), with the years it is about (those found
 in the passage, e.g. “2026-32”: 2026–2032, and taken out of its text when leading it with a
 colon or ending it after one; its crossed-out calendar clears them, the text as selected

@@ -335,7 +335,8 @@ l'arborescence ordonnée des catégories d'un dossier (par exemple une grille d'
 chacune avec des années facultatives ; une catégorie contenant des extraits (directement ou en dessous, de n'importe quelle personne du dossier)
 n'est supprimée qu'une fois ceux-ci déplacés vers une autre, choisie à ce moment-là. Dans le PDF d'un document (un rapport,
 un dossier de candidature… pas celui d'un article), sélectionnez un passage (ou cliquez sur un surlignage), puis « ajouter à une
-catégorie » (en-tête, ou touche E) : cliquez sur une catégorie, ou tapez pour la trouver (Enter : la première ;
+catégorie » (en-tête, ou touche E ; sur un extrait déjà classé, cliqué ou son texte
+sélectionné : le modifie) : cliquez sur une catégorie, ou tapez pour la trouver (Enter : la première ;
 un nouveau nom la crée, la boîte de dialogue restant ouverte), avec les années concernées (celles trouvées
 dans le passage, par exemple « 2026-32 » : 2026–2032, et retirées de son texte quand elles le commencent
 suivies de deux-points ou le terminent après eux ; son calendrier barré les efface, le texte redevenant celui

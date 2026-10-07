@@ -1221,6 +1221,16 @@ async def test_excerpt_from_an_area(user: User, monkeypatch, fake_viewer):
     assert (tint["page"], tint["rects"]) == (2, [[60.5, 400, 320, 520.2, 2]])
     # PDF.js's highlights under it: removed (its tint in their place).
     assert "vrPdf.unhighlight([[60.5, 400, 320, 520.2, 2]], 2)" in scripts
+    # Filed already (its text selected again, or it clicked, nothing selected): edited.
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker="excerpt-edit-text")
+    assert user.find(marker="excerpt-edit-text").elements.pop().value == e.text
+    user.find("Cancel").click()
+    await user.should_not_see(marker="excerpt-edit-text")
+    selection["text"] = ""
+    user.find(kind=ui.label, content=e.text).click()  # (selected in the side panel)
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker="excerpt-edit-text")
 
 
 async def test_tag_from_a_list_in_the_pdf(user: User, fake_viewer):
@@ -1259,11 +1269,12 @@ async def test_excerpts_in_the_viewer(user: User, fake_viewer):
     research = categories.add(folder, "Research")
     doc = documents.add(period, "Application.pdf", PDF)
     documents.set_lines(doc, LINES)
-    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: {
+    selection = {
         "text": "Our ranking model beats sparse ones",
         "p": 1,
         "rects": [[72, 680, 300, 690]],
     }
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
     await user.open(f"/doc/{doc}")
     await user.should_see(marker="pdf-excerpt")
     user.find(marker="pdf-excerpt").click()
@@ -1278,7 +1289,9 @@ async def test_excerpts_in_the_viewer(user: User, fake_viewer):
     assert e.colour == categories.tree(folder)[0].colour  # (its category's)
     await user.should_see(marker=f"category-dot-{research}")
     await user.should_see(marker=f"excerpt-{e.id}")
-    # A new category, typed in the picker: created (the picker stays open), then picked.
+    # Another passage (the same one filed: edited instead), in a new category typed in the
+    # picker: created (the picker stays open), then picked.
+    selection = {**selection, "text": "Our ranking model beats sparse ones."}  # (not filed)
     user.find(marker="pdf-excerpt").click()
     await user.should_see(marker="category-search")
     user.find(marker="category-search").type("Impact").trigger("keydown.enter")
@@ -1322,7 +1335,7 @@ async def test_excerpts_in_the_viewer(user: User, fake_viewer):
     # Merged: its merge icon, then a click on the other one (confirmed).
     user.find(marker=f"excerpt-merge-{e.id}").click()
     await user.should_see(marker="excerpt-merge-cancel")
-    user.find(content="Our ranking model beats sparse ones").click()
+    user.find(content="Our ranking model beats sparse ones.").click()
     await user.should_see(marker="excerpt-merge-confirm")
     user.find(marker="excerpt-merge-confirm").click()
     await user.should_not_see(marker=f"excerpt-{e.id}")  # (now within the other's block)

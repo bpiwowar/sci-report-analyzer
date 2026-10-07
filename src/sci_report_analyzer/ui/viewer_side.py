@@ -83,6 +83,8 @@ class Side:
         # The excerpt selected (clicked: its tint on the PDF, or its entry), and the entries of
         # the categories' tab (by excerpt: highlighted when selected).
         self.excerpt: int | None = None
+        # (an excerpt's edit dialog, once the categories' tab is there: see _ExcerptsSection)
+        self.edit_excerpt: Callable[[categories.ExcerptView], None] | None = None
         self.excerpt_rows: dict[int, ui.element] = {}
         # A link from a selection to a paper (documents): (pub id, page, rects, text).
         self.link: Callable[[int, int, list, str], None] | None = None
@@ -205,7 +207,8 @@ class Side:
         ui.notify(_("Bookmarked: {name}").format(name=where))
 
     async def add_excerpt(self) -> None:
-        """File the selected text in one of the folder's categories."""
+        """File the selected text in one of the folder's categories; already filed (the
+        excerpt clicked, nothing selected; or its very text selected): edited instead."""
         if self.folder is None:
             ui.notify(
                 _("Excerpts are filed in a folder's categories: open the PDF from a folder"),
@@ -213,6 +216,10 @@ class Side:
             )
             return
         sel = await ui.run_javascript("vrPdf.excerpted()")
+        text = pdftext.clean_pdf_text((sel or {}).get("text") or "", one_paragraph=True)
+        if (filed := self._filed(text)) is not None and self.edit_excerpt is not None:
+            self.edit_excerpt(filed)
+            return
         if not sel or not (sel.get("text") or "").strip():
             ui.notify(
                 _("Select the text to file (or an area with text, or click a highlight) first"),
@@ -230,6 +237,21 @@ class Side:
                 lead, sel["text"], page, rects, ref_only=ref_only
             ),
         )
+
+    def _filed(self, text: str) -> categories.ExcerptView | None:
+        """The excerpt (its group's lead) of this PDF with that text (none: the one selected,
+        e.g. clicked on the page), if any."""
+        if self.period_id is None:
+            return None
+        kind, key = self.source
+        for e in categories.excerpts(self.period_id, grouped=True):
+            for x in [e, *e.members]:
+                here = (x.document_id if kind == "doc" else x.publication_id) == key
+                if (x.id == self.excerpt and not text) or (
+                    text and here and text in (x.text, x.original)
+                ):
+                    return e
+        return None
 
     def file_excerpt(
         self, category_id: int, text: str, page: int | None, rects: list, **props
@@ -1092,6 +1114,7 @@ class _ExcerptsSection:
     def __init__(self, side: Side) -> None:
         self.side = side
         self.merging: categories.ExcerptView | None = None  # (merged with the one clicked)
+        side.edit_excerpt = self.edit_excerpt  # (E on an excerpt filed already)
         self.listing()
 
     @ui.refreshable_method
