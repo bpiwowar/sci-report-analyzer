@@ -1033,7 +1033,8 @@ def _hosts_editor(row: venues.VenueRow, go) -> Callable[[], list[dict] | None]:
     """A workshop's main conferences (with years), which give its papers their rank; returns
     what gives them to save with the venue (``...``: unchanged)."""
     options = {vid: name for vid, name in venues.venue_choices().items() if vid != row.id}
-    hosts = [{"venue_id": h[0], "from": h[2], "to": h[3]} for h in row.hosts]
+    saved = [{"venue_id": h[0], "from": h[2], "to": h[3]} for h in row.hosts]
+    hosts = venues.merge_hosts(saved)  # (the same one listed twice: once, saved so)
     ui.label(_("Main conference")).classes("font-medium mt-2")
     ui.label(
         _(
@@ -1097,8 +1098,7 @@ def _hosts_editor(row: venues.VenueRow, go) -> Callable[[], list[dict] | None]:
             ).mark("venue-host-suggest")
 
     ui.label(_("Saved with the venue.")).classes("text-xs text-grey")
-    before = [dict(h) for h in hosts if h["venue_id"]]
-    return lambda: ... if (now := [h for h in hosts if h["venue_id"]]) == before else now
+    return lambda: ... if (now := [h for h in hosts if h["venue_id"]]) == saved else now
 
 
 def _levels_editor(state: venues.VenueEdit) -> Callable[[], list[dict]]:
@@ -1393,22 +1393,27 @@ def venue_dialog(
         related = (
             venues.related_conferences(row.id) if row.kind in venues.CONFERENCE_KINDS else None
         )
+        suggestions = venues.suggest_related(row, all_rows)
         with ui.tabs().classes("w-full").props("align=left dense") as tabs:
             t_rank = ui.tab("ranking", _("Name and ranking")).mark("venue-tab-ranking")
-            if related is not None:
-                n = len(related.workshops) + len(related.joint)
-                ui.tab("related", _("Related conferences ({n})").format(n=n)).mark(
-                    "venue-tab-related"
-                )
+            if related is not None or suggestions:
+                n = len(related.workshops) + len(related.joint) if related else 0
+                t_related = ui.tab(
+                    "related",
+                    _("Related conferences ({n})").format(n=n) if related else _("Related venues"),
+                ).mark("venue-tab-related")
+                if suggestions:  # (an icon draws attention to them)
+                    t_related.props("alert=primary alert-icon=update")
+                    t_related.tooltip(_("Suggested related venues"))
             ui.tab("matching", _("Matching (rules and variants)")).mark("venue-tab-matching")
             ui.tab("merge", _("Merge with other venues")).mark("venue-tab-merge")
         nav.tabs = tabs
         with ui.tab_panels(tabs, value=tab or t_rank).classes("w-full"):
             with ui.tab_panel("ranking").classes("q-px-none"):
                 ranking = _ranking_tab(row, state, nav)
-            if related is not None:
+            if related is not None or suggestions:
                 with ui.tab_panel("related").classes("q-px-none"):
-                    _related_tab(related, nav)
+                    _related_tab(row, related, suggestions, nav)
             with ui.tab_panel("matching").classes("q-px-none"):
                 matching = _matching_tab(row, state, nav)
             with ui.tab_panel("merge").classes("q-px-none"):
@@ -1426,12 +1431,16 @@ def venue_dialog(
             except ValueError as err:
                 ui.notify(_("Former names: {error}").format(error=err), type="negative")
                 return
-            venues.save_edit(
-                row.id,
-                venues.VenueEdit(**identity(), **edit, **matching()),
-                parts=parts,
-                hosts=hosts,
-            )
+            try:
+                venues.save_edit(
+                    row.id,
+                    venues.VenueEdit(**identity(), **edit, **matching()),
+                    parts=parts,
+                    hosts=hosts,
+                )
+            except ValueError as e:  # (two main conferences for the same years)
+                ui.notify(str(e), type="negative")
+                return
             nav.finish()
 
         with ui.row().classes("justify-end w-full"):
@@ -1460,9 +1469,18 @@ def _years(lo: int | None, hi: int | None) -> str:
     return f"{lo or '…'}–{hi or '…'}"
 
 
-def _related_tab(related: venues.RelatedConferences, nav: _VenueNav) -> None:
-    """A conference's workshops and the joint conferences including it (each set in their
-    own dialog)."""
+def _related_tab(
+    row: venues.VenueRow,
+    related: venues.RelatedConferences | None,
+    suggestions: list[tuple[list[venues.VenueRow], str]],
+    nav: _VenueNav,
+) -> None:
+    """The venues that look related (to record how), a conference's workshops and the
+    joint conferences including it (each set in their own dialog)."""
+    if suggestions:
+        _related_strip(row, suggestions, nav.merged)
+    if related is None:  # (not a conference)
+        return
     sections = [
         (
             _("Workshops"),
@@ -1495,7 +1513,7 @@ def _identity_fields(
     row: venues.VenueRow, all_rows: list[venues.VenueRow], state: venues.VenueEdit, nav: _VenueNav
 ) -> Callable[[], dict]:
     """The venue's name, short name and website (returns their values, to save), its rank,
-    counts and histories, the venues that look related."""
+    counts and histories."""
     if nav.back is not None:
         ui.button(_("Back"), icon="arrow_back", on_click=nav.go_back).props(
             "flat dense no-caps"
@@ -1577,8 +1595,6 @@ def _identity_fields(
     for vid, host, *_rest in row.hosts:  # (a workshop: its main conferences' ranks)
         r = next((r for r in all_rows if r.id == vid), None)
         _core_history(r.badge if r else None, host)
-    if suggestions := venues.suggest_related(row, all_rows):
-        _related_strip(row, suggestions, nav.merged)
 
     return lambda: {
         "name": name.value or "",
@@ -2088,6 +2104,16 @@ def _relation_sentence(row: venues.VenueRow, group: list[venues.VenueRow], relat
     return text
 
 
+def _relate(row_id: int, other_ids: list[int], relation: str) -> int | None:
+    """``venues.relate_venues``; None (told why) when it cannot be (a workshop with another
+    main conference for the same years)."""
+    try:
+        return venues.relate_venues(row_id, other_ids, relation)
+    except ValueError as e:
+        ui.notify(str(e), type="negative")
+        return None
+
+
 def _related_strip(
     row: venues.VenueRow,
     suggestions: list[tuple[list[venues.VenueRow], str]],
@@ -2101,8 +2127,10 @@ def _related_strip(
             _confirm_merge(row, group, finish)
             return
 
-        def ok() -> None:
-            finish(venues.relate_venues(row.id, [r.id for r in group], relation))
+        def ok() -> bool | None:
+            if (kept := _relate(row.id, [r.id for r in group], relation)) is None:
+                return False
+            finish(kept)
 
         confirm(
             _relation_sentence(row, group, relation),
@@ -2119,10 +2147,11 @@ def _related_strip(
             venues.set_not_same(row.id, r.id)
         line.delete()
 
-    with ui.column().classes("w-full gap-1 bg-blue-1 rounded p-2").mark("venue-suggestions"):
+    box = ui.column().classes("w-full gap-1 bg-blue-1 rounded p-2 q-mb-md")
+    with box.mark("venue-suggestions"):
         with ui.row().classes("items-center gap-2"):
-            ui.icon("merge", color="primary")
-            ui.label(_("Related venues?")).classes("text-sm font-medium")
+            ui.icon("update", color="primary")
+            ui.label(_("Suggested related venues")).classes("text-subtitle2")
         for i, (group, guess) in enumerate(suggestions):
             with ui.row().classes("w-full items-center gap-2 no-wrap pl-2") as line:
                 with ui.column().classes("grow gap-0"):
@@ -2149,6 +2178,16 @@ def _related_strip(
                 ).mark(f"venue-suggest-unrelated-{i}")
 
 
+def _merge_relation_label(relation: str, main: str) -> str:
+    """What venues merged into ``main`` are for it (see ``venues.merge_relations``)."""
+    kind, _sep, track = relation.partition(":")
+    return {
+        "same": _("The same venue as “{main}”"),
+        "workshop": _("A workshop of “{main}” (kept, its papers take its rank)"),
+        "track": _("The {track} track of “{main}”"),
+    }[kind].format(main=main, track=tracks.name(track))
+
+
 def _confirm_merge(
     row: venues.VenueRow,
     others: list[venues.VenueRow],
@@ -2156,41 +2195,73 @@ def _confirm_merge(
     *,
     swappable: bool = False,
 ) -> None:
-    """Confirm merging ``others`` into ``row``; ``swappable``: the other way round too;
-    ``finish``: called with the venue kept."""
+    """Confirm merging ``others`` into ``row``, or making them its workshops or one of its
+    tracks (guessed from their texts to start with); ``swappable``: the other way round
+    too; ``finish``: called with the venue kept."""
     state = {"target": row, "others": others}
 
     def label(r: venues.VenueRow) -> str:
         short = f" [{r.short_name}]" if r.short_name else ""
         return f"{r.name}{short} — {KINDS[r.kind]} ({_papers(r.publications)})"
 
+    def choices() -> dict[str, str]:
+        main = state["target"].name
+        return {k: _merge_relation_label(k, main) for k in venues.merge_relations()}
+
     with transient_dialog(_("Merge venues"), width="min-w-96") as (dlg, _card):
         view = ui.column().classes("w-full")
+        relation = (
+            ui.select(
+                choices(),
+                value=venues.merge_relation(row, others),
+                label=ngettext("This venue is", "These venues are", len(others)),
+            )
+            .props("dense outlined options-dense")
+            .classes("w-full")
+            .mark("venue-merge-relation")
+        )
+        what = ui.label().classes("text-xs text-grey").mark("venue-merge-what")
+        with ui.column().classes("w-full") as names_box:
+            names = _MergeNames([row, *others], "venue-merge")
+
+        def explain() -> None:
+            target, same = state["target"], relation.value == "same"
+            what.text = (
+                _(
+                    "Their texts, rules, ISSNs and papers move to “{name}”; "
+                    "its own decisions win, the others' fill what it lacks."
+                ).format(name=target.name)
+                if same
+                else _relation_sentence(target, state["others"], relation.value)
+            )
+            # (the merged venue's name and kind: a workshop keeps its own)
+            names_box.set_visibility(same)
+            ok_btn.text = _("Merge") if same else _("Apply")
 
         def show() -> None:
             view.clear()
             with view:
                 merge_direction(label(state["target"]), [label(r) for r in state["others"]])
-                ui.label(
-                    _(
-                        "Their texts, rules, ISSNs and papers move to “{name}”; "
-                        "its own decisions win, the others' fill what it lacks."
-                    ).format(name=state["target"].name)
-                ).classes("text-xs text-grey")
-
-        names = _MergeNames([row, *others], "venue-merge")
 
         def swap() -> None:
             (other,) = state["others"]
             state["target"], state["others"] = other, [state["target"]]
             names.set_target(other)
+            relation.set_options(choices(), value=venues.merge_relation(other, state["others"]))
             show()
+            explain()
 
-        def ok() -> None:
-            target = state["target"]
+        def ok() -> bool | None:
+            target, ids = state["target"], [r.id for r in state["others"]]
+            if relation.value != "same":
+                if (kept := _relate(target.id, ids, relation.value)) is None:
+                    return False
+                finish(kept)
+                return None
             name, short, kind = names.values(target)
-            venues.merge_venues(target.id, [r.id for r in state["others"]], name, short, kind)
+            venues.merge_venues(target.id, ids, name, short, kind)
             finish(target.id)
+            return None
 
         show()
         with ui.row().classes("w-full justify-end"):
@@ -2200,9 +2271,11 @@ def _confirm_merge(
                 ).mark("venue-merge-swap")
             ui.space()
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
-            ui.button(_("Merge"), icon="merge", on_click=ok_handler(dlg, ok)).mark(
+            ok_btn = ui.button(_("Merge"), icon="merge", on_click=ok_handler(dlg, ok)).mark(
                 "venue-merge-confirm"
             )
+        relation.on_value_change(lambda _e: explain())
+        explain()
 
 
 class _MergeNames:
@@ -2309,8 +2382,8 @@ def _relate_dialog(row: venues.VenueRow, other: venues.VenueRow, merged) -> None
         def ok() -> None:
             if rel.value == "same":
                 close_then(dlg, lambda: _confirm_merge(row, [other], merged, swappable=True))
-            else:
-                close_then(dlg, lambda: merged(venues.relate_venues(row.id, [other.id], rel.value)))
+            elif (kept := _relate(row.id, [other.id], rel.value)) is not None:
+                close_then(dlg, lambda: merged(kept))
 
         rel.on_value_change(lambda _e: show())
         show()

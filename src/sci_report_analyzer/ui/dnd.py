@@ -8,7 +8,7 @@ from typing import Any
 
 from nicegui import ui
 
-# (window.vrDnd: also used by the Vue templates, e.g. the venues table's rows)
+# (window.vrDnd: also used by the Vue templates, e.g. the venues table's rows, as e.view.vrDnd)
 ui.add_head_html(
     """<script>
 window.vrDnd = {
@@ -76,8 +76,11 @@ def drop_zone(
 def vue_attrs(kind: str, item_id: str, on_drop: str) -> str:
     """The same, in a Vue template: ``item_id`` (an expression) dragged and dropped onto
     (anywhere), ``on_drop`` (a statement) run with ``d``: the item dropped, ``{id}``."""
+    # (e.view.vrDnd: a template sees only its component's names, not window's: vrDnd alone
+    # is undefined there)
     return (
-        f'draggable="true" @dragstart="e => vrDnd.start(e, \'{kind}:\' + {item_id})" '
-        '@dragover="e => vrDnd.over(e, false)" @dragleave="e => vrDnd.clear(e)" '
-        f"@drop=\"e => {{ const d = vrDnd.drop(e, '{kind}', false); if (d) {{ {on_drop} }} }}\""
+        f'draggable="true" @dragstart="e => e.view.vrDnd.start(e, \'{kind}:\' + {item_id})" '
+        '@dragover="e => e.view.vrDnd.over(e, false)" @dragleave="e => e.view.vrDnd.clear(e)" '
+        f"@drop=\"e => {{ const d = e.view.vrDnd.drop(e, '{kind}', false); "
+        f'if (d) {{ {on_drop} }} }}"'
     )
