@@ -335,6 +335,64 @@ async def test_venue_not_ranked_checked(user: User) -> None:
     await user.should_not_see("A workshop contribution")
 
 
+async def test_fuzzy_match_validated_then_removed(user: User) -> None:
+    """A fuzzy match is to check, the paper says why; validated, it is the venue's record
+    (removable from the paper or the venue); a venue in no ranking, marked from the paper."""
+    from sci_report_analyzer.db.models import Publication, Venue
+    from sci_report_analyzer.db.session import session_scope
+    from sci_report_analyzer.ranking.levels import NONE
+
+    pid = make_person("Jane Doe")
+    add_source(
+        pid,
+        "dblp",
+        "x/1",
+        [pub("a", "A fuzzy paper", 2021, "Journal of Neural Computation", authors=["Jane Doe"])],
+    )
+    pub_id = _pub_id("A fuzzy paper")
+
+    async def open_rank() -> None:
+        await user.open(f"/person/{pid}")
+        await user.should_see("A fuzzy paper")
+        user.find(f"pub-{pub_id}").click()
+        user.find("tab-matching").click()
+        await user.should_see("Venue from the sources")
+
+    await open_rank()
+    await user.should_see(marker="rank-problem")
+    await user.should_see("Approximate match", marker="rank-problem")
+    user.find("rank-validate-match").click()
+    with session_scope() as s:
+        vid = s.get(Publication, pub_id).venue_id
+        assert s.get(Venue, vid).record_key
+    await open_rank()
+    await user.should_not_see(marker="rank-problem")
+    user.find("rank-remove-record").click()
+    with session_scope() as s:
+        assert s.get(Venue, vid).record_key is None
+    await open_rank()
+    user.find("rank-not-ranked").click()
+    with session_scope() as s:
+        assert [lv["rank"] for lv in s.get(Venue, vid).levels] == [NONE]
+    # The venue dialog: validate the match, then remove it.
+    with session_scope() as s:
+        s.get(Venue, vid).levels = None
+    await user.open(f"/venues?focus={vid}")
+    await user.should_see(marker="venue-validate-match")
+    user.find("venue-validate-match").click()
+    await user.should_see(marker="venue-record-auto")
+    user.find("venue-save").click()
+    with session_scope() as s:
+        assert s.get(Venue, vid).record_key
+    await user.open(f"/venues?focus={vid}")
+    await user.should_see(marker="venue-record-auto")
+    user.find("venue-record-auto").click()
+    await user.should_not_see(marker="venue-record-auto")
+    user.find("venue-save").click()
+    with session_scope() as s:
+        assert s.get(Venue, vid).record_key is None
+
+
 async def test_venue_dialog_no_acronym_or_validated(user: User) -> None:
     from sqlalchemy import select
 
@@ -384,7 +442,7 @@ async def test_venue_dialog_search_and_use_record(user: User) -> None:
     user.find("venue-use-0").click()
     # Using a record closes the search and shows the chosen record.
     await user.should_not_see(marker="venue-use-0")
-    await user.should_see("Automatic")
+    await user.should_see("Remove this record")
     user.find("venue-save").click()
     await user.should_see("Test a venue string")
     with session_scope() as s:

@@ -16,6 +16,7 @@ from ..ranking.badge import (
     UNRANKED_COLOUR,
     category_of,
     core_periods,
+    fuzzy_match,
     sjr_periods,
 )
 from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
@@ -1742,9 +1743,22 @@ def _ranking_tab(
                 on_click=lambda: open_search(True),
             ).props("dense flat").mark("venue-search-open")
             if chosen["key"]:
-                ui.button(_("Automatic"), on_click=lambda: pick(None)).props("dense flat").tooltip(
-                    _("Forget the chosen record: match automatically")
-                )
+                ui.button(
+                    _("Remove this record"), icon="link_off", on_click=lambda: pick(None)
+                ).props("dense flat").tooltip(
+                    _("Forget the chosen record: match automatically (once saved)")
+                ).mark("venue-record-auto")
+            elif fuzzy_match(row.badge):
+                ui.button(
+                    _("Validate this match"),
+                    icon="check",
+                    on_click=lambda k=row.badge.recordKey: pick(k),
+                ).props("dense flat color=primary").tooltip(
+                    _(
+                        "It is this venue: use this record (its ranks over the years); "
+                        "“Remove this record” undoes it"
+                    )
+                ).mark("venue-validate-match")
         # A joint venue: its level is one of its conferences', to choose here.
         if not b and row.badge and row.badge.extra.get("joint") and row.parts:
             with ui.column().classes("gap-1 pl-4 w-full").mark("venue-joint-use"):

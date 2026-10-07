@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 12:50+0200\n"
+"POT-Creation-Date: 2026-10-07 13:28+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -651,6 +651,18 @@ msgstr "Toutes langues"
 
 msgid "Apply"
 msgstr "Appliquer"
+
+#, python-brace-format
+msgid ""
+"Approximate match ({score}%): no ranking record has the name of the venue"
+" “{venue}”; the closest one, “{record}”, may be another venue. Check it, "
+"then validate it, mark the venue as in no ranking, or pick another record"
+" (✎)."
+msgstr ""
+"Correspondance approchée ({score} %) : aucune entrée de classement ne "
+"porte le nom du canal « {venue} » ; la plus proche, « {record} », est "
+"peut-être un autre canal. Vérifiez-la, puis validez-la, marquez le canal "
+"comme absent des classements, ou choisissez une autre entrée (✎)."
 
 msgid "Archival"
 msgstr "Archive"
@@ -1673,8 +1685,15 @@ msgstr "Dossiers"
 msgid "Folders within it:"
 msgstr "Dossiers qu'il contient :"
 
-msgid "Forget the chosen record: match automatically"
-msgstr "Oublier l'entrée choisie : correspondance automatique"
+msgid "Forget the chosen record, for all the venue's papers: match automatically"
+msgstr ""
+"Oublier l'entrée choisie, pour tous les articles du canal : "
+"correspondance automatique"
+
+msgid "Forget the chosen record: match automatically (once saved)"
+msgstr ""
+"Oublier l'entrée choisie : correspondance automatique (une fois "
+"enregistré)"
 
 msgid "Former names"
 msgstr "Anciens noms"
@@ -2030,6 +2049,16 @@ msgstr ""
 "Il est stocké dans le répertoire de données, et s'ouvre dans une nouvelle"
 " fenêtre où vous pouvez le surligner et l'annoter."
 
+msgid "It is this venue"
+msgstr "C'est bien ce canal"
+
+msgid ""
+"It is this venue: use this record (its ranks over the years); “Remove "
+"this record” undoes it"
+msgstr ""
+"C'est bien ce canal : utiliser cette entrée (ses rangs au fil des années)"
+" ; « Retirer cette entrée » l'annule"
+
 msgid "Italic (⌘/Ctrl-I)"
 msgstr "Italique (⌘/Ctrl-I)"
 
@@ -2368,6 +2397,10 @@ msgstr "Appariement"
 
 msgid "Match cache"
 msgstr "Cache des appariements"
+
+#, python-brace-format
+msgid "Match validated on the venue: “{record}”"
+msgstr "Correspondance validée sur le canal : « {record} »"
 
 msgid ""
 "Matched a venue without a usable rank (e.g. a Scimago entry without "
@@ -2839,6 +2872,16 @@ msgstr "Pas une personne dans un dossier"
 
 msgid "Not an ORCID (e.g. 0000-0002-1825-0097)"
 msgstr "Ce n'est pas un ORCID (p. ex. 0000-0002-1825-0097)"
+
+#, python-brace-format
+msgid ""
+"Not checked: no ranking record found for the venue “{venue}”, and no "
+"decision by hand. Mark it as in no ranking once checked, or pick a record"
+" (✎)."
+msgstr ""
+"Non vérifié : aucune entrée de classement trouvée pour le canal « {venue}"
+" », et aucune décision manuelle. Marquez-le comme absent des classements "
+"une fois vérifié, ou choisissez une entrée (✎)."
 
 msgid "Not fetched yet (on the next sync)"
 msgstr "Pas encore récupéré (à la prochaine synchronisation)"
@@ -3504,6 +3547,9 @@ msgstr ""
 msgid "Re-sync all"
 msgstr "Tout resynchroniser"
 
+msgid "Record removed from the venue: matched automatically"
+msgstr "Entrée retirée du canal : correspondance automatique"
+
 msgid "Records with one of these ISSNs belong to this venue, whatever text"
 msgstr ""
 "Les notices ayant l'un de ces ISSN appartiennent à ce canal, quel que "
@@ -3577,6 +3623,9 @@ msgstr "Retirer leurs numéros (l’étiquette reste)"
 
 msgid "Remove them"
 msgstr "Les supprimer"
+
+msgid "Remove this record"
+msgstr "Retirer cette entrée"
 
 #, python-brace-format
 msgid "Removed from {category}"
@@ -4661,6 +4710,9 @@ msgstr "L'identifiant de la session (dans les paramètres exportés)"
 msgid "The validated profiles give the ORCID {orcid}."
 msgstr "Les profils validés donnent l'ORCID {orcid}."
 
+msgid "The venue is marked as in no ranking"
+msgstr "Le canal est marqué comme absent des classements"
+
 msgid ""
 "The venue kept gets the others' variants (with their tracks), rules, "
 "ISSNs and papers; its own decisions win, the others' fill what it lacks."
@@ -4668,6 +4720,9 @@ msgstr ""
 "Le canal conservé reçoit les variantes (avec leurs sessions), règles, "
 "ISSN et articles des autres ; ses propres décisions l'emportent, celles "
 "des autres complètent ce qui lui manque."
+
+msgid "The venue was checked: it is in no ranking"
+msgstr "Le canal a été vérifié : il n'est dans aucun classement"
 
 msgid ""
 "The venues whose rank is to check: none found, or a fuzzy match, and no "
@@ -5022,6 +5077,13 @@ msgstr "Utiliser ce niveau"
 msgid "Use this name (and edit it)"
 msgstr "Utiliser ce nom (et le modifier)"
 
+msgid ""
+"Use this record for the venue (its ranks over the years), for all its "
+"papers"
+msgstr ""
+"Utiliser cette entrée pour le canal (ses rangs au fil des années), pour "
+"tous ses articles"
+
 msgid "Use this venue"
 msgstr "Utiliser ce canal"
 
@@ -5059,6 +5121,9 @@ msgstr "Valider pour cet article"
 
 msgid "Validate the inferred acronym (set it by hand)"
 msgstr "Valider l'acronyme déduit (le fixer à la main)"
+
+msgid "Validate this match"
+msgstr "Valider cette correspondance"
 
 msgid "Validated sources"
 msgstr "Sources validées"
@@ -5959,6 +6024,10 @@ msgstr "entrée de classement"
 #, python-brace-format
 msgid "rate limited by {url} (retry in {wait}s)"
 msgstr "trop de requêtes pour {url} (réessayez dans {wait} s)"
+
+#, python-brace-format
+msgid "record chosen by hand on the venue “{venue}”"
+msgstr "entrée choisie à la main sur le canal « {venue} »"
 
 msgid "record picked for this paper"
 msgstr "fiche choisie pour cet article"

@@ -18,7 +18,7 @@ from ..pubview import (
     pick_venue_member,
 )
 from ..ranking import tracks
-from ..ranking.badge import Badge
+from ..ranking.badge import TO_CHECK, Badge, fuzzy_match
 from ..ranking.kinds import (
     CONFERENCE_LIKE,
     KINDS,
@@ -26,6 +26,7 @@ from ..ranking.kinds import (
     VENUE_KINDS,
     WORKSHOP_KINDS,
 )
+from ..ranking.levels import NONE
 from ..ranking.service import VenuePattern, paren_acronym, service
 from ..sources import ADAPTERS
 from ..sources.base import normalize_doi
@@ -1629,6 +1630,18 @@ def _rank_step(s: PubStat, done, scope: _Scope) -> None:
                     else _("the level its conferences share"),
                 )
             ).classes("text-sm").mark("joint-venue")
+        if s.review == TO_CHECK and not s.rank_override:
+            _rank_problem(s, done, scope.venue_name)
+        elif (
+            b
+            and b.manual
+            and b.recordKey
+            and not b.extra.get("joint")
+            and not s.rank_override
+            and s.venue_id is not None
+            and not s.host_name
+        ):
+            _venue_record_line(s, done, scope.venue_name)
         if b and not b.extra.get("kind_default"):
             with ui.row().classes("items-center gap-2"):
                 ui.label(badge_details(b).split("\n", 1)[-1].replace("\n", " · ")).classes(
@@ -1646,6 +1659,73 @@ def _rank_step(s: PubStat, done, scope: _Scope) -> None:
             ).classes("text-xs text-primary").mark("rank-note")
     with step.editor:
         _rank_editor(s, done, scope.box, scope.for_venue, s.venue_id, step)
+
+
+def _venue_record_line(s: PubStat, done, venue_name: str | None) -> None:
+    """The ranking record chosen by hand on the venue, and a button to remove it."""
+    vid = s.venue_id
+
+    def remove() -> None:
+        venues.update_venue(vid, record_key=None)
+        done(_("Record removed from the venue: matched automatically"))
+
+    with ui.row().classes("items-center gap-2").mark("venue-record-line"):
+        ui.label(
+            _("record chosen by hand on the venue “{venue}”").format(venue=venue_name or "?")
+        ).classes("text-xs text-primary")
+        ui.button(_("Remove this record"), icon="link_off", on_click=remove).props(
+            "dense flat size=sm no-caps"
+        ).tooltip(
+            _("Forget the chosen record, for all the venue's papers: match automatically")
+        ).mark("rank-remove-record")
+
+
+def _rank_problem(s: PubStat, done, venue_name: str | None) -> None:
+    """Why the rank is to check (an approximate match, or no record and no decision), and
+    the decisions to take on its venue: the match is right, or the venue is in no ranking."""
+    b = s.badge
+    venue = venue_name or s.venue or "?"
+    if fuzzy_match(b):
+        text = _(
+            "Approximate match ({score}%): no ranking record has the name of the venue "
+            "“{venue}”; the closest one, “{record}”, may be another venue. Check it, then "
+            "validate it, mark the venue as in no ranking, or pick another record (✎)."
+        ).format(score=round(b.score * 100), venue=venue, record=b.name)
+    else:
+        text = _(
+            "Not checked: no ranking record found for the venue “{venue}”, and no decision "
+            "by hand. Mark it as in no ranking once checked, or pick a record (✎)."
+        ).format(venue=venue)
+    with ui.column().classes("w-full gap-1 rounded p-2 bg-orange-1").mark("rank-problem"):
+        with ui.row().classes("items-start gap-1 no-wrap w-full"):
+            ui.icon("help_outline", size="xs", color="orange-9")
+            ui.label(text).classes("text-xs text-orange-10 min-w-0 grow")
+        if s.venue_id is None:
+            return
+        vid = s.venue_id
+
+        def validate() -> None:
+            venues.update_venue(vid, record_key=b.recordKey)
+            done(_("Match validated on the venue: “{record}”").format(record=b.name))
+
+        def not_ranked() -> None:
+            vtype = "journal" if s.kind.endswith("journal") else "conference"
+            venues.update_venue(vid, levels=[{"type": vtype, "rank": NONE}], record_key=None)
+            done(_("The venue is marked as in no ranking"))
+
+        with ui.row().classes("gap-2 pl-5"):
+            if fuzzy_match(b):
+                ui.button(_("It is this venue"), icon="check", on_click=validate).props(
+                    "dense flat size=sm no-caps color=primary"
+                ).tooltip(
+                    _(
+                        "Use this record for the venue (its ranks over the years), for all its "
+                        "papers"
+                    )
+                ).mark("rank-validate-match")
+            ui.button(_("Not ranked (checked)"), icon="block", on_click=not_ranked).props(
+                "dense flat size=sm no-caps"
+            ).tooltip(_("The venue was checked: it is in no ranking")).mark("rank-not-ranked")
 
 
 def _explain_box(m: MemberView, names: dict[int, str], used: set[int], done) -> None:

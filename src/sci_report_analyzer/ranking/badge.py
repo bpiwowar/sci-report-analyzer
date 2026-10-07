@@ -302,6 +302,17 @@ def badge_archival(key: str) -> Badge:
 CHECKED, AUTO, TO_CHECK = "checked", "auto", "to_check"
 
 
+def fuzzy_match(badge: Badge | None) -> bool:
+    """Whether ``badge`` is an approximate automatic match with a ranking record (maybe
+    another venue's), to validate by hand."""
+    return bool(
+        badge
+        and badge.recordKey
+        and not (badge.exact or badge.manual or badge.forced or badge.unranked)
+        and not badge.extra.get("joint")
+    )
+
+
 def review(badge: Badge | None, kind: str | None) -> str | None:
     """Whether the rank of a venue (or a paper) of ``kind`` was checked: ``CHECKED``,
     ``AUTO`` or ``TO_CHECK``; None for a kind never ranked (a preprint, a book...)."""
