@@ -780,10 +780,15 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
     return [v for v in views if v.group_id not in by_id]
 
 
+# An excerpt's markers as shown on a PDF, next to it (as the copy filters do by default).
+MARKER_SYMBOLS = {"salient": "⭐", "influence": "🌍", "caveat": "⚠️"}
+
+
 def tints(period_id: int, document_id: int, names: dict[int, str]) -> list[dict]:
     """The excerpts of a document, to tint on its pages: each part of a group (even one
     cited as a reference only, or under the group's text), in its category's colour (its
-    id: to select it, clicked); ``names``: the paths of the categories."""
+    id: to select it, clicked), with the icons of its group's markers (see MARKER_SYMBOLS:
+    after its text, else before it); ``names``: the paths of the categories."""
     return [
         {
             "id": x.id,
@@ -791,6 +796,7 @@ def tints(period_id: int, document_id: int, names: dict[int, str]) -> list[dict]
             "rects": x.rects,
             "category": names.get(e.category_id, ""),
             "colour": e.colour,
+            "marks": [icon for k, icon in MARKER_SYMBOLS.items() if getattr(e, k)],
         }
         for e in excerpts(period_id, grouped=True)
         for x in e.parts

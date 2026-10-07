@@ -934,6 +934,9 @@ def test_excerpt_markers():
         "- #caveat Peu d'encadrement. %% Dossier, p. 2 %%\n"
         "- Projet Comète. %% Dossier, p. 1 %%\n"
     )
+    # On the PDF, next to them: their icons.
+    marks = {t["id"]: t["marks"] for t in categories.tints(period, doc, {})}
+    assert marks == {best: ["⭐"], prize: ["🌍"], weak: ["⚠️"], plain: []}
     # Moved as one likes: kept so.
     categories.place_excerpt(plain, best, "before")
     order = [e.id for e in categories.excerpts(period)]

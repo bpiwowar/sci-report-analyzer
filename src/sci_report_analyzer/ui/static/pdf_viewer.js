@@ -603,6 +603,24 @@ window.vrDoc = {
       return [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)];
     };
     for (const x of this.excerpts) {  // (filed in a category: tinted, in its colour)
+      const here = x.rects.filter(r => (r[4] ?? x.page) === pv.id);
+      if (here.length && x.marks && x.marks.length) {
+        // Its markers' icons: just after its last character if there is room before the
+        // page's edge, else just before its first one.
+        const [l0, t0, , h0] = box(here[0]), [l1, t1, w1, h1] = box(here[here.length - 1]);
+        const size = Math.max(9, Math.min(16, h1 * 0.9)), wide = size * 1.3 * x.marks.length;
+        const after = l1 + w1 + 2 + wide <= pv.viewport.width;
+        const icon = doc.createElement('div');
+        icon.className = 'vr-doc';
+        icon.style.userSelect = 'none';  // (never copied with the text)
+        icon.textContent = x.marks.join('');
+        Object.assign(icon.style, {
+          position: 'absolute', left: (after ? l1 + w1 + 2 : Math.max(0, l0 - wide - 2)) + 'px',
+          top: (after ? t1 : t0) + 'px', pointerEvents: 'none', zIndex: 4, whiteSpace: 'nowrap',
+          fontSize: size + 'px', lineHeight: (after ? h1 : h0) + 'px',
+        });
+        pv.div.appendChild(icon);
+      }
       for (const r of x.rects) {
         if ((r[4] ?? x.page) !== pv.id) continue;
         const [left, top, w, h] = box(r);
