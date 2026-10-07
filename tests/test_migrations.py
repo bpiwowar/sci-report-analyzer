@@ -139,3 +139,24 @@ def test_shared_primary_source_4a8c1f3e7d52(tmp_path):
     assert settings[10] == "hal"
     assert set(uses) == {5, 6} and settings[uses[6]] == "none"
     assert "primary_source" not in columns
+
+
+def test_shared_settings_c3e8a1f5d7b9(tmp_path):
+    """A venue's single level becomes a level for every year."""
+    db = tmp_path / "db.sqlite"
+    _upgrade(db, "9b5d3f7a2c61")
+    with sqlite3.connect(db) as c:
+        for vid, ltype, rank in ((1, "journal", "Q1"), (2, None, "A"), (3, None, None)):
+            c.execute(
+                "INSERT INTO venue (id, name, short_manual, kind_manual, level_type, level_rank,"
+                " created_at) VALUES (?, 'V', 0, 0, ?, ?, '2026-01-01')",
+                (vid, ltype, rank),
+            )
+    _upgrade(db, "c3e8a1f5d7b9")
+    with sqlite3.connect(db) as c:
+        rows = dict(c.execute("SELECT id, levels FROM venue"))
+        cols = {r[1] for r in c.execute("PRAGMA table_info(venue_key)")}
+    assert json.loads(rows[1]) == [{"type": "journal", "rank": "Q1"}]
+    assert json.loads(rows[2]) == [{"type": "conference", "rank": "A"}]
+    assert rows[3] is None
+    assert {"decided_by", "decided_on"} <= cols

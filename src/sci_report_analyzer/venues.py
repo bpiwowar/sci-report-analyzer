@@ -36,6 +36,7 @@ from .ranking.kinds import (
     host_text,
     is_edited_volume,
 )
+from .ranking.levels import normalized
 from .ranking.matcher import issn_key
 from .ranking.normalize import normalize, tokenize
 from .ranking.service import (
@@ -215,8 +216,7 @@ def merge_venues(
                 pub.venue_id = target.id
             # Keep manual decisions the target doesn't have.
             for attr in (
-                "level_type",
-                "level_rank",
+                "levels",
                 "record_key",
                 "match_text",
                 "url",
@@ -707,20 +707,26 @@ async def venue_badge(
     *,
     venues: dict[int, Venue] | None = None,
     joint: bool = True,
+    use_levels: bool = True,
 ) -> Badge | None:
     """Badge of a venue from its manual decisions, else that of its parts for a joint venue
     (``venues``: where to find them, else loaded; ``joint``: False ignores the parts), else
-    by matching its texts.
+    by matching its texts. Levels by year range: each paper's year picks its level, the years
+    none covers take the venue's other ranking (``use_levels``: False ignores them).
 
     ``samples`` are (text, ISSN, conference/journal hint) of its source records, most
     common first; they are matched like the papers' venues (with the acronym and type
     hints: "Conference on Neural Information Processing Systems (NeurIPS)" is CORE
     NeurIPS, while the bare name would match a Scimago journal), and the best is kept.
     """
-    from .ranking.badge import badge_from_level
+    from .ranking.badge import badge_from_levels
+    from .ranking.levels import covers_all
 
-    if v.level:
-        return badge_from_level(v.level)
+    if v.levels and use_levels:
+        fallback = None
+        if not covers_all(v.levels):  # (the years no range covers)
+            fallback = await venue_badge(v, samples, venues=venues, joint=joint, use_levels=False)
+        return badge_from_levels(v.levels, v.name, fallback)
     if v.record_key and (b := service.badge_for_record(v.record_key)):
         return b.copy(manual=True)
     if v.match_text:
@@ -1441,8 +1447,9 @@ class VenueEdit:
     no_short: bool = False  # it has no acronym (none inferred)
     url: str = ""
     kind: str = ""
-    level_type: str = "conference"
-    level_rank: str = ""
+    # Its levels by year range (``ranking.levels``; empty: automatic).
+    levels: list[dict[str, Any]] = field(default_factory=list)
+    level_type: str = "conference"  # (of a new level)
     record_key: str | None = None
     match_text: str = ""
     issns: str = ""  # comma-separated
@@ -1463,8 +1470,8 @@ def edit_state(venue_id: int, kind: str) -> VenueEdit | None:
             no_short=v.short_manual and not v.short_name,
             url=v.url or "",
             kind=v.kind if v.kind_manual else "",
-            level_type=v.level_type or ("journal" if kind.endswith("journal") else "conference"),
-            level_rank=v.level_rank or "",
+            levels=[dict(lv) for lv in v.levels or []],
+            level_type="journal" if kind.endswith("journal") else "conference",
             record_key=v.record_key,
             match_text=v.match_text or "",
             issns=", ".join((v.identifiers or {}).get("issn") or []),
@@ -1499,8 +1506,7 @@ def save_edit(venue_id: int, edit: VenueEdit, *, parts: Any = ..., hosts: Any = 
         short_manual=edit.no_short or bool(short),
         url=normalize_url(edit.url),
         kind=edit.kind or None,
-        level_type=edit.level_type if edit.level_rank else None,
-        level_rank=edit.level_rank or None,
+        levels=normalized(edit.levels),
         record_key=edit.record_key,
         match_text=edit.match_text.strip() or None,
     )

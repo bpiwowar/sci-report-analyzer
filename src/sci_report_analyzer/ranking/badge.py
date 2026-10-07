@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import quote
 
 from ..i18n import N_, Labels, _
+from . import levels as level_ranges
 from . import tracks
 from .matcher import Record, record_key
 
@@ -52,6 +53,10 @@ class Badge:
     manual: bool = False
     archival: bool = False
     forced: bool = False
+    # Levels set by hand by year range (``ranking.levels``): the badge is that of this year
+    # (``at_year`` gives a paper's); ``fallback``: the badge (a dict) of the years none covers.
+    levels: list[dict[str, Any]] | None = None
+    fallback: dict[str, Any] | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,9 +74,16 @@ class Badge:
         d.update(changes)
         return Badge(**d)
 
-    def at_year(self, year: int | None) -> Badge:
+    def at_year(self, year: int | None) -> Badge | None:
         """The badge with the CORE rank of the edition in force in ``year``, or the Scimago
-        quartile of the journal that year."""
+        quartile of the journal that year; levels set by hand: that of ``year``'s range
+        (none covering it: the fallback's, if any)."""
+        if self.levels and year is not None:
+            if (lv := level_ranges.at(self.levels, year)) is not None:
+                extra = {**self.extra, "levelRange": level_ranges.range_label(lv)}
+                return badge_from_level({**lv, "name": self.name}).copy(extra=extra)
+            fallback = Badge.from_dict(self.fallback)
+            return fallback.at_year(year) if fallback else None
         if self.sjrHistory and year is not None:
             y, q = sjr_quartile_at(self.sjrHistory, year)
             if (y, q) == (self.sjrYear, self.quartile):
@@ -223,6 +235,20 @@ def badge_from_level(level: dict[str, Any]) -> Badge:
         coreRank=None if is_journal else level["rank"],
         manual=True,
     )
+
+
+def badge_from_levels(
+    levels: list[dict[str, Any]], name: str, fallback: Badge | None = None
+) -> Badge:
+    """The badge of a venue's levels by year range: this year's (or the latest), each
+    paper's by its year; ``fallback``: that of the years no range covers."""
+    lv = level_ranges.current(levels) or levels[-1]
+    b = badge_from_level({**lv, "name": name})
+    if len(levels) > 1 or lv.get("from") is not None or lv.get("to") is not None:
+        b.levels = [dict(x) for x in levels]
+        if fallback is not None and not level_ranges.covers_all(levels):
+            b.fallback = fallback.to_dict()
+    return b
 
 
 ARCHIVAL_LABELS = {

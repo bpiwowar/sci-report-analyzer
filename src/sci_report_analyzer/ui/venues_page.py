@@ -18,16 +18,19 @@ from ..ranking.badge import (
     sjr_periods,
 )
 from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORKSHOP_KINDS
+from ..ranking.levels import normalized
 from ..ranking.service import VenuePattern, service
 from ..sources import ADAPTERS
 from . import dnd
 from .dialogs import actions, close, close_then, confirm, ok_handler, transient_dialog
 from .pub_details import MIN_SEARCH, VIA_LABEL, record_results, venue_rule_dialog
 from .theme import (
+    CORE_RANKS,
+    QUARTILES,
     badge_details,
     chip_html,
     frame,
-    level_picker,
+    level_options,
     merge_direction,
     rank_chip,
     source_tag,
@@ -1098,6 +1101,91 @@ def _hosts_editor(row: venues.VenueRow, go) -> Callable[[], list[dict] | None]:
     return lambda: ... if (now := [h for h in hosts if h["venue_id"]]) == before else now
 
 
+def _levels_editor(state: venues.VenueEdit) -> Callable[[], list[dict]]:
+    """A venue's levels set by hand, by year range (none: automatic); returns them."""
+    levels = [dict(lv) for lv in state.levels]
+    ui.label(_("Level (by hand)")).classes("font-medium mt-2")
+    ui.label(
+        _(
+            "A level for every year, or one per period (e.g. B until 2017, A from 2018): a "
+            "paper takes the level of its year; the years no period covers keep the "
+            "ranking below (record or automatic)."
+        )
+    ).classes("text-xs text-grey")
+
+    def options(t: str, current: str | None) -> dict[str, str]:
+        known = CORE_RANKS if t == "conference" else QUARTILES
+        return level_options([*known, *([current] if current and current not in known else [])])
+
+    @ui.refreshable
+    def lines() -> None:
+        if not levels:
+            ui.label(_("None: the level is automatic.")).classes("text-sm text-grey")
+        for i, lv in enumerate(levels):
+            with ui.row().classes("items-center gap-2 no-wrap w-full").mark(f"venue-level-{i}"):
+
+                def type_changed(e, lv=lv) -> None:
+                    lv.update(type=e.value, rank="A" if e.value == "conference" else "Q1")
+                    lines.refresh()
+
+                ui.select(
+                    {"conference": _("CORE"), "journal": _("Quartile")},
+                    value=lv.get("type") or "conference",
+                    on_change=type_changed,
+                ).props("dense outlined").classes("w-28")
+                (
+                    ui.select(
+                        options(lv.get("type") or "conference", lv.get("rank")),
+                        value=lv.get("rank"),
+                        new_value_mode="add-unique",
+                        with_input=True,
+                        on_change=lambda e, lv=lv: lv.update(rank=e.value),
+                    )
+                    .props("dense outlined")
+                    .classes("w-56")
+                    .mark(f"venue-level-rank-{i}")
+                )
+                for end, label in (("from", _("from")), ("to", _("to"))):
+                    ui.number(
+                        label,
+                        value=lv.get(end),
+                        format="%d",
+                        on_change=lambda e, lv=lv, end=end: lv.update(
+                            {end: int(e.value) if e.value else None}
+                        ),
+                    ).props("dense outlined").classes("w-24").mark(f"venue-level-{end}-{i}")
+                ui.input(
+                    _("Why (shared with the group)"),
+                    value=lv.get("note") or "",
+                    on_change=lambda e, lv=lv: lv.update(note=e.value or None),
+                ).props("dense").classes("grow").mark(f"venue-level-note-{i}")
+                if who := decided_by(lv):
+                    ui.label(who).classes("text-xs text-grey whitespace-nowrap")
+                ui.button(
+                    icon="delete", on_click=lambda i=i: (levels.pop(i), lines.refresh())
+                ).props("flat round dense size=sm").mark(f"venue-level-delete-{i}")
+
+    lines()
+
+    def add() -> None:
+        last = levels[-1] if levels else {}
+        ltype = last.get("type") or state.level_type
+        levels.append({"type": ltype, "rank": "A" if ltype == "conference" else "Q1"})
+        lines.refresh()
+
+    ui.button(
+        _("Add a level") if not levels else _("Add a period"), icon="add", on_click=add
+    ).props("dense flat size=sm").mark("venue-level-add")
+    return lambda: [dict(lv) for lv in levels if lv.get("rank")]
+
+
+def decided_by(decision: dict | None) -> str:
+    """Who made a decision and when ("jdoe, 2026-10-01"), if known."""
+    if not decision:
+        return ""
+    return ", ".join(x for x in (decision.get("by"), decision.get("on")) if x)
+
+
 def _open_button(go, venue_id: int, mark: str) -> None:
     """Opens a related venue (main conference, conference of a joint venue) in place of the
     current one, which its Back button reopens."""
@@ -1250,6 +1338,11 @@ def venue_dialog(
 
         def save() -> None:
             edit, parts, hosts = ranking()
+            try:
+                normalized(edit["levels"])
+            except ValueError as err:
+                ui.notify(_("Levels: {error}").format(error=err), type="negative")
+                return
             venues.save_edit(
                 row.id,
                 venues.VenueEdit(**identity(), **edit, **matching()),
@@ -1443,8 +1536,7 @@ def _ranking_tab(
         lambda k: k not in WORKSHOP_KINDS and (k or row.kind not in WORKSHOP_KINDS),
     )
 
-    ui.label(_("Level (by hand)")).classes("font-medium mt-2")
-    ltype, lrank = level_picker(state.level_type, state.level_rank, allow_auto=True)
+    levels_value = _levels_editor(state)
 
     ui.label(_("Ranking record (by hand)")).classes("font-medium mt-2")
     chosen = {"key": state.record_key}
@@ -1559,8 +1651,7 @@ def _ranking_tab(
     return lambda: (
         {
             "kind": kind.value or "",
-            "level_type": ltype.value,
-            "level_rank": lrank.value or "",
+            "levels": levels_value(),
             "record_key": chosen["key"],
         },
         parts_value(),

@@ -1893,7 +1893,9 @@ def _rank_editor(s: PubStat, done, venue_scope, for_venue, venue_id, step: _Step
 
             def save_level() -> None:
                 if for_venue(lvl_box):
-                    venues.update_venue(venue_id, level_type=vtype.value, level_rank=rank.value)
+                    venues.update_venue(
+                        venue_id, levels=[{"type": vtype.value, "rank": rank.value}]
+                    )
                     annotations.set_rank_override(s.id, None)
                     done(_("Level saved on the venue"))
                 else:

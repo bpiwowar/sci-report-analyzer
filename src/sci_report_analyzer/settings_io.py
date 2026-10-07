@@ -15,11 +15,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import delete, select
 from sqlalchemy.orm import object_session, selectinload
 
-from . import annotations, venue_match
+from . import annotations, authorship, venue_match
 from .db.models import JcrRecord, Venue, VenueKey
 from .db.session import session_scope
 from .i18n import _
@@ -33,8 +33,8 @@ from .ranking.service import (
 )
 
 FORMAT = "sci-report-analyzer-settings"
-VERSION = 6
-MIN_VERSION = 6  # (older files had flags, tracks without name rules)
+VERSION = 7
+MIN_VERSION = 6  # (older files had flags, tracks without name rules; 6: a single level)
 
 
 class VariantIO(BaseModel):
@@ -42,6 +42,8 @@ class VariantIO(BaseModel):
     source: str | None = None
     manual: bool = True
     track: str | None = None
+    by: str | None = None
+    on: str | None = None
 
     @property
     def key(self) -> str:
@@ -65,18 +67,30 @@ class JointIO(BaseModel):
 
 class VenueIO(BaseModel):
     name: str
+    id: str | None = None  # its id in shared settings (``Venue.share_id``)
     variants: list[VariantIO] = Field(default_factory=list)
     short_name: str | None = None  # set by hand only ("": the venue has no acronym)
     url: str | None = None
     kind: str | None = None  # manual kind only
-    level_type: str | None = None
-    level_rank: str | None = None
+    levels: list[dict[str, Any]] | None = None  # by year range (``ranking.levels``)
     record_key: str | None = None
     match_text: str | None = None
     patterns: list[VenuePattern] | None = None
     identifiers: dict[str, Any] | None = None
     hosts: list[HostIO] | None = None
     joint: JointIO | None = None
+    decisions: dict[str, Any] | None = None  # who made them (``Venue.decisions``)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _single_level(cls, data: Any) -> Any:
+        """A file of format 6: its single level, for every year."""
+        if isinstance(data, dict) and data.get("level_rank") and not data.get("levels"):
+            data = {
+                **data,
+                "levels": [{"type": data.get("level_type"), "rank": data["level_rank"]}],
+            }
+        return data
 
     @property
     def keys(self) -> list[str]:
@@ -101,17 +115,22 @@ def export_settings(*, include_jcr: bool = False) -> SettingsFile:
             venues.append(
                 VenueIO(
                     name=v.name,
+                    id=v.share_id,
                     variants=[
                         VariantIO(
-                            raw=k.example or k.key, source=k.source, manual=k.manual, track=k.track
+                            raw=k.example or k.key,
+                            source=k.source,
+                            manual=k.manual,
+                            track=k.track,
+                            by=k.decided_by,
+                            on=k.decided_on,
                         )
                         for k in v.keys
                     ],
                     short_name=_short(v),
                     url=v.url,
                     kind=v.kind if v.kind_manual else None,
-                    level_type=v.level_type,
-                    level_rank=v.level_rank,
+                    levels=v.levels,
                     record_key=v.record_key,
                     match_text=v.match_text,
                     patterns=[VenuePattern.model_validate(p) for p in v.patterns]
@@ -120,6 +139,7 @@ def export_settings(*, include_jcr: bool = False) -> SettingsFile:
                     identifiers=v.identifiers,
                     hosts=_host_ios(s, v),
                     joint=_joint_io(s, v),
+                    decisions=v.decisions,
                 )
             )
         return SettingsFile(
@@ -276,7 +296,7 @@ def track_mapping(data: SettingsFile) -> TrackMapping:
 # A venue's manual decisions as exported (``Venue.MANUAL_FIELDS``, the level as one field).
 _VENUE_FIELDS = (
     "kind",
-    "level",
+    "levels",
     "record_key",
     "match_text",
     "short_name",
@@ -333,10 +353,9 @@ def _short(v: Venue) -> str | None:
 
 def _venue_values(v: Venue | VenueIO) -> dict[str, Any]:
     kind = v.kind if isinstance(v, VenueIO) or v.kind_manual else None
-    level = f"{v.level_type} {v.level_rank}" if v.level_rank else None
     return {
         "kind": kind,
-        "level": level,
+        "levels": authorship.without_meta(v.levels) or None,
         "record_key": v.record_key,
         "match_text": v.match_text,
         "short_name": v.short_name if isinstance(v, VenueIO) else _short(v),
@@ -422,10 +441,13 @@ def _import_venue(s, vio: VenueIO, *, force: bool, take: set[str]) -> tuple[Venu
                     example=var.raw,
                     source=var.source,
                     track=var.track,
+                    decided_by=var.by if var.manual else None,
+                    decided_on=var.on if var.manual else None,
                 )
             )
         elif vk.venue_id != venue.id and (force or f"variant:{key}" in take):
             vk.venue_id, vk.manual, vk.track = venue.id, True, var.track
+            vk.decided_by, vk.decided_on = var.by, var.on
     local, imported = _venue_values(venue), _venue_values(vio)
 
     def wanted(f: str) -> bool:
@@ -435,8 +457,8 @@ def _import_venue(s, vio: VenueIO, *, force: bool, take: set[str]) -> tuple[Venu
 
     if wanted("kind"):
         venue.kind, venue.kind_manual = vio.kind, True
-    if wanted("level"):
-        venue.level_type, venue.level_rank = vio.level_type, vio.level_rank
+    if wanted("levels"):
+        venue.levels = [dict(lv) for lv in vio.levels or []] or None
     if wanted("record_key"):
         venue.record_key = vio.record_key
     if wanted("match_text"):
@@ -449,6 +471,20 @@ def _import_venue(s, vio: VenueIO, *, force: bool, take: set[str]) -> tuple[Venu
         venue.patterns = imported["patterns"]
     if wanted("identifiers"):
         venue.identifiers = vio.identifiers
+    decisions = dict(venue.decisions or {})
+    for f in Venue.DECIDED:
+        if wanted(f):
+            if who := (vio.decisions or {}).get(f):
+                decisions[f] = who
+            else:
+                decisions.pop(f, None)
+    venue.decisions = decisions or None
+    if (
+        vio.id
+        and not venue.share_id
+        and s.scalar(select(Venue).where(Venue.share_id == vio.id)) is None
+    ):
+        venue.share_id = vio.id
     s.flush()
     return venue, {f for f in ("hosts", "joint") if wanted(f)}
 
@@ -480,14 +516,23 @@ def import_settings(
     The local tracks added by hand that the file lacks are kept, but those in
     ``remove_tracks`` (``TrackMapping.local``): no paper, variant or rule is of them then.
     """
-    take = take_imported or set()
+    with authorship.keeping():  # (the file's authors kept)
+        return _import_settings(data, mode, take_imported or set(), remove_tracks or set())
+
+
+def _import_settings(
+    data: SettingsFile,
+    mode: Literal["replace", "merge"],
+    take: set[str],
+    remove_tracks: set[str],
+) -> dict[str, int]:
     counts = {"venues": 0, "jcr": 0}
     replace = mode == "replace"
     with session_scope() as s:
         if replace:
             for v in s.scalars(select(Venue)):
                 v.kind_manual = False
-                v.level_type = v.level_rank = v.record_key = v.match_text = None
+                v.levels = v.record_key = v.match_text = v.decisions = None
                 v.short_name = v.url = v.patterns = v.identifiers = v.hosts = None
                 v.short_manual = False
                 if v.joint and (v.joint.get("manual") or v.joint.get("use")):
@@ -522,7 +567,7 @@ def import_settings(
         new = _apply_matching(
             load_settings(), data.matching, {t.removeprefix("matching:") for t in take}
         )
-    gone = {t.id for t in track_mapping(data).local} & (remove_tracks or set())
+    gone = {t.id for t in track_mapping(data).local} & remove_tracks
     new.tracks = [t for t in new.tracks if t.id not in gone]
     save_settings(new)
     annotations.forget_tracks(gone)

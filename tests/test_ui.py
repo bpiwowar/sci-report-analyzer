@@ -983,7 +983,7 @@ async def test_reset_automatic_settings(user: User) -> None:
     await user.should_see("Automatic settings cleared", retries=40)
     with session_scope() as s:
         assert s.scalar(select(func.count()).select_from(VenueText))  # matched again
-        v = s.scalar(select(Venue).where(Venue.level_rank == "B"))
+        v = s.scalar(select(Venue).where(Venue.levels.is_not(None)))
         assert v is not None  # the manual decision is kept
         assert (
             s.scalar(select(func.count()).select_from(Publication).where(Publication.hidden)) == 0
@@ -2279,7 +2279,9 @@ async def test_joint_venue_with_different_levels(user: User) -> None:
         }
     alpha, beta, joint = ids.values()
     for vid, rank in ((alpha, "B"), (beta, "A")):
-        venues.update_venue(vid, kind="natl_conference", level_type="conference", level_rank=rank)
+        venues.update_venue(
+            vid, kind="natl_conference", levels=[{"type": "conference", "rank": rank}]
+        )
 
     await user.open("/venues?tab=joint")
     await user.should_see(marker=f"joint-{joint}")
@@ -2325,7 +2327,9 @@ async def test_joint_venue_level_explained_and_chosen(user: User) -> None:
         }
     alpha, beta, joint = ids.values()
     for vid, rank in ((alpha, "B"), (beta, "A")):
-        venues.update_venue(vid, kind="natl_conference", level_type="conference", level_rank=rank)
+        venues.update_venue(
+            vid, kind="natl_conference", levels=[{"type": "conference", "rank": rank}]
+        )
 
     await user.open(f"/venues?focus={joint}")
     await user.should_see("the lowest is used", marker="venue-record")

@@ -77,7 +77,7 @@ def set_correction(raw: str, text: str | None) -> None:
 
 
 def set_level(raw: str, type_: str | None, rank: str | None) -> None:
-    set_venue(raw, level_type=type_ if rank else None, level_rank=rank or None)
+    set_venue(raw, levels=[{"type": type_, "rank": rank}] if rank else None)
 
 
 def set_kind(raw: str, kind: str | None) -> None:

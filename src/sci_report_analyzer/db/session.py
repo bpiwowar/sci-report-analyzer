@@ -41,6 +41,9 @@ def _sqlite_pragmas(dbapi_conn, _record) -> None:
 def init_engine(url: str | None = None, *, migrate: bool = True) -> Engine:
     """Create the global engine and bring the schema up to date."""
     global _engine, _factory
+    from .. import authorship  # (stamps the manual decisions on flush)
+
+    authorship.forget_identity()
     url = url or config.db_url()
     if url.startswith("sqlite:///") and not url.endswith(":memory:"):
         Path(url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)

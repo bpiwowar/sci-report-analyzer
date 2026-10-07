@@ -638,9 +638,9 @@ class Venue(Base):
     # Kind (first level): detected automatically unless kind_manual.
     kind: Mapped[str | None] = mapped_column(String(32))
     kind_manual: Mapped[bool] = mapped_column(default=False)
-    # Manual level (second level), e.g. conference/A or journal/Q1.
-    level_type: Mapped[str | None] = mapped_column(String(16))
-    level_rank: Mapped[str | None]
+    # Manual levels (second level), by year range (``ranking.levels``): [{"type":
+    # "conference", "rank": "A", "from": 2018, "to": None, "by", "on", "note"}, ...].
+    levels: Mapped[list[Any] | None] = mapped_column(JSON(none_as_null=True))
     # Manually picked ranking record (Matcher.record_key).
     record_key: Mapped[str | None]
     # "Search rankings as": the text the automatic ranking lookup searches for.
@@ -657,6 +657,11 @@ class Venue(Base):
     # an empty list then says it is not joint); "use": the part whose level it takes.
     joint: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
     notes: Mapped[str | None]
+    # Who made its manual decisions, when and why: {field: {"by", "on", "note"}} (fields of
+    # ``DECIDED``; a level's are on the level).
+    decisions: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
+    # Its id in shared settings (a group's folder: ``venues/<share_id>.json``).
+    share_id: Mapped[str | None] = mapped_column(unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     keys: Mapped[list[VenueKey]] = relationship(
@@ -665,9 +670,12 @@ class Venue(Base):
 
     @property
     def level(self) -> dict[str, Any] | None:
-        if not self.level_rank:
+        """The level shown for the venue (this year's range, else the latest one)."""
+        from ..ranking.levels import current
+
+        if (lv := current(self.levels)) is None:
             return None
-        return {"type": self.level_type or "conference", "rank": self.level_rank, "name": self.name}
+        return {"type": lv.get("type") or "conference", "rank": lv["rank"], "name": self.name}
 
     def host_at(self, year: int | None) -> int | None:
         """The main conference of a workshop for a paper of ``year``."""
@@ -682,8 +690,7 @@ class Venue(Base):
     MANUAL_FIELDS: ClassVar[dict[str, Any]] = {
         "kind": None,
         "kind_manual": False,
-        "level_type": None,
-        "level_rank": None,
+        "levels": None,
         "record_key": None,
         "match_text": None,
         "short_name": None,
@@ -693,9 +700,22 @@ class Venue(Base):
         "identifiers": None,
         "hosts": None,
         "joint": None,
+        "decisions": None,
     }
-    # (found automatically too: only their flag says they were set by hand)
-    _INFERRED: ClassVar[frozenset[str]] = frozenset({"kind", "level_type", "short_name", "joint"})
+    # (found automatically too: only their flag says they were set by hand; or not one)
+    _INFERRED: ClassVar[frozenset[str]] = frozenset({"kind", "short_name", "joint", "decisions"})
+    # The decisions whose author is kept in ``decisions`` (a level's: on the level).
+    DECIDED: ClassVar[tuple[str, ...]] = (
+        "kind",
+        "short_name",
+        "url",
+        "record_key",
+        "match_text",
+        "patterns",
+        "identifiers",
+        "hosts",
+        "joint",
+    )
 
     @property
     def has_manual(self) -> bool:
@@ -731,6 +751,9 @@ class VenueKey(Base):
     source: Mapped[str | None] = mapped_column(String(32))
     # Track (demo, findings, short...) of the publications with this variant.
     track: Mapped[str | None]
+    # Who assigned it by hand, and when (ISO date).
+    decided_by: Mapped[str | None]
+    decided_on: Mapped[str | None] = mapped_column(String(10))
 
     venue: Mapped[Venue] = relationship(back_populates="keys")
 

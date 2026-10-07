@@ -82,6 +82,10 @@ class Track(BaseModel):
     colour: str = FALLBACK_COLOUR
     rules: list[TrackRule] = Field(default_factory=list)
     name_rules: list[NameRule] = Field(default_factory=list)
+    # Who set it, when (ISO date) and why (shared settings; none: a built-in default).
+    by: str | None = None
+    on: str | None = None
+    note: str | None = None
 
     def name(self, lang: str | None = None) -> str:
         """Its name in ``lang`` (that of the moment by default), else in English."""

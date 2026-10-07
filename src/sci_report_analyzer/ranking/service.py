@@ -229,7 +229,9 @@ class MatchSettings(BaseModel):
     @property
     def rules_hash(self) -> str:
         """Changes when the normalization rules do (the venue keys are then recomputed)."""
-        dump = json.dumps([r.model_dump() for r in self.norm_rules], sort_keys=True)
+        dump = json.dumps(
+            [r.model_dump(exclude={"by", "on", "note"}) for r in self.norm_rules], sort_keys=True
+        )
         return hashlib.sha1(dump.encode()).hexdigest()[:16]
 
 
@@ -239,6 +241,23 @@ def load_settings() -> MatchSettings:
 
 
 def save_settings(settings: MatchSettings) -> None:
+    """Save the matching settings, the rules added or changed stamped with their author."""
+    from .. import authorship
+
+    old = load_settings()
+    settings = settings.model_copy(
+        update={
+            "norm_rules": authorship.stamp_rules(
+                old.norm_rules, settings.norm_rules, {r.id: r for r in default_rules()}
+            ),
+            "detection_rules": authorship.stamp_rules(
+                old.detection_rules,
+                settings.detection_rules,
+                {r.id: r for r in default_detection_rules()},
+            ),
+            "tracks": authorship.stamp_rules(old.tracks, settings.tracks, tracks.DEFAULTS),
+        }
+    )
     set_setting(MATCHING_KEY, settings.model_dump())
     service.invalidate(clear_cache=True)
 

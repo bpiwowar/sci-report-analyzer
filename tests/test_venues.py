@@ -289,7 +289,7 @@ def test_clear_manual_decisions_by_level():
     pid = make_person()
     add_source(pid, "hal", "idhal:x", [pub("a", "Paper A", 2020, "Venue One")])
     a = stats(pid)["Paper A"]
-    venues.update_venue(a.venue_id, level_type="conference", level_rank="A")
+    venues.update_venue(a.venue_id, levels=[{"type": "conference", "rank": "A"}])
     venues.add_variant(a.venue_id, "Other Text")
     annotations.set_overrides(a.id, year_override=2019)
     assert venue_match.manual_counts() == {"venues": 1, "variants": 1, "papers": 1}
@@ -315,8 +315,7 @@ def _set_every_manual_field(pid):
     venues.update_venue(
         a.venue_id,
         kind="intl_workshop",
-        level_type="conference",
-        level_rank="A",
+        levels=[{"type": "conference", "rank": "A"}],
         record_key="core:x",
         match_text="Venue",
         short_name="VO",
@@ -750,7 +749,9 @@ def _joint_setup():
     _stats(pid)
     alpha, beta, joint = (_venue_of(t) for t in ("Alpha paper", "Beta paper", "Joint paper"))
     for vid in (alpha, beta):
-        venues.update_venue(vid, kind="natl_conference", level_type="conference", level_rank="B")
+        venues.update_venue(
+            vid, kind="natl_conference", levels=[{"type": "conference", "rank": "B"}]
+        )
     return pid, alpha, beta, joint
 
 
@@ -766,7 +767,7 @@ def test_joint_venue_takes_the_level_of_its_conferences():
     assert st.category.base_key == "b" and st.badge.extra["joint"]
 
     # Different levels: the lowest, until one is chosen.
-    venues.update_venue(beta, level_rank="A")
+    venues.update_venue(beta, levels=[{"type": "conference", "rank": "A"}])
     assert _rows()[joint].joint_differ
     st = _stats(pid)["Joint paper"]
     assert st.category.base_key == "b" and st.badge.extra["joint_differ"]
@@ -774,7 +775,7 @@ def test_joint_venue_takes_the_level_of_its_conferences():
     assert _stats(pid)["Joint paper"].category.base_key == "a"
 
     # A level set by hand wins.
-    venues.update_venue(joint, level_type="conference", level_rank="C")
+    venues.update_venue(joint, levels=[{"type": "conference", "rank": "C"}])
     assert _stats(pid)["Joint paper"].category.base_key == "c"
 
 

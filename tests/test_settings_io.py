@@ -13,7 +13,11 @@ def _venue_attrs():
         out = {}
         for vk in s.scalars(select(VenueKey)):
             v = vk.venue
-            out[vk.key] = (v.match_text, v.level_rank, v.kind if v.kind_manual else None)
+            out[vk.key] = (
+                v.match_text,
+                (v.level or {}).get("rank"),
+                v.kind if v.kind_manual else None,
+            )
         return out
 
 

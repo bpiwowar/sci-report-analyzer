@@ -169,6 +169,10 @@ class NormRule(BaseModel):
     # none: a general rule.
     language: str | None = None
     example: str | None = None
+    # Who set it, when (ISO date) and why (shared settings; none: a built-in default).
+    by: str | None = None
+    on: str | None = None
+    note: str | None = None
 
     def compiled(self) -> re.Pattern[str] | None:
         return _compile(self.pattern, self.replacement, self.ignore_case)

@@ -29,6 +29,10 @@ class DetectionRule(BaseModel):
     id: str
     pattern: str
     ignore_case: bool = True
+    # Who set it, when (ISO date) and why (shared settings; none: a built-in default).
+    by: str | None = None
+    on: str | None = None
+    note: str | None = None
 
 
 @dataclass(frozen=True)
