@@ -283,8 +283,8 @@ l'emplacement des citations), encadrés, tâches, étiquettes et lignes étiquet
 #to-check sont retirés, les tableaux aussi. Une étiquette peut à la place devenir un texte
 (Paramètres → Filtres de copie → Étiquettes changées en texte) : un avant le texte de la ligne
 (par ex. une icône, 🌍) et un après, d'une couleur (ou surlignés), en gras, aussi le texte de la
-ligne si coché, par ex. #influence (par défaut : 🌍), l'étiquette des extraits de rayonnement
-marqués dans leurs catégories. Marmotte garde le gras, l'italique, le soulignement, les couleurs
+ligne si coché, par ex. les étiquettes des marqueurs des extraits (par défaut : 🌍 pour
+#rayonnement ou #influence, ⭐ pour #saillant ou #salient, ⚠️ pour #bemol ou #caveat). Marmotte garde le gras, l'italique, le soulignement, les couleurs
 de texte, le surlignage, les emojis (🌍 ⭐ 📣) et les symboles (★ ✦ ◆ ➤) ; il retire les
 exposants, les tailles de police et le texte barré.
 
@@ -339,16 +339,17 @@ catégorie » (en-tête, ou touche E) : cliquez sur une catégorie, ou tapez p
 un nouveau nom la crée, la boîte de dialogue restant ouverte), avec les années concernées (celles trouvées
 dans le passage, par exemple « 2026-32 » : 2026–2032, et retirées de son texte quand elles le commencent
 suivies de deux-points ou le terminent après eux ; son calendrier barré les efface, le texte redevenant celui
-sélectionné) et, le cas échéant, si
-elle témoigne du rayonnement de la personne (« rayonnement ») ; lorsqu'il pourrait déjà s'agir d'un extrait
+sélectionné) et, le cas échéant, ses marqueurs : saillant (un point fort), rayonnement ou
+bémol (une réserve) ; lorsqu'il pourrait déjà s'agir d'un extrait
 existant (mots similaires, signalé par un avertissement ; ou trouvé en tapant ses mots), fusionnez-le plutôt avec
 celui-ci, en conservant son texte ou seulement son emplacement (une référence). L'onglet des catégories liste
-les extraits de la personne (clic : aller au passage), pour les modifier (texte, années, rayonnement, couleur :
+les extraits de la personne (clic : aller au passage), pour les modifier (texte, années, marqueurs, couleur :
 sa teinte sur le PDF ; les passages tels que sélectionnés sont affichés, pour y revenir ou les ajouter au texte),
 les déplacer (avec le même sélecteur), les fusionner (en faisant glisser l'un sur l'autre, ou avec son icône de fusion puis un clic sur
 l'autre : regroupés, chacun avec sa propre citation ou seulement son emplacement, son icône lien / citation basculant de l'un à l'autre,
 sur un seul élément avec la catégorie, les années… de l'autre ; le crayon du groupe modifie son texte d'ensemble,
-ses extraits étant alors cités uniquement par leurs emplacements, tous toujours teintés sur le PDF ; à nouveau sortis
+par ex. une phrase qui les résume, ses extraits étant alors cités dans le commentaire qui le suit, avec leurs
+emplacements, tous toujours teintés sur le PDF ; à nouveau sortis
 avec son icône de séparation), les réordonner (en les faisant glisser sur le bord supérieur ou inférieur d'un autre), les supprimer,
 ou les copier en Markdown (sans guillemets, leurs emplacements dans des commentaires Obsidian : `%% Application, p. 4;
 p. 12 %%`, puis leurs années ; ceux qui témoignent du rayonnement sont aussi listés, par catégorie, dans une dernière
@@ -361,15 +362,19 @@ Rayonnement (la catégorie « rayonnement », sinon la dernière section), comme
 (`[]{.excerpts .copy-influence}`) ; seulement là, sous des sous-sections au nom de leurs
 catégories (imbriquées comme elles, un niveau plus bas), retirés de leurs catégories (une
 catégorie restée vide disparaît) (`[]{.excerpts .move-influence}`) ; ou seulement dans leurs
-catégories, avec l'étiquette #influence (`[]{.excerpts .mark-influence}`), par ex. changée en
-icône par les filtres de copie.
+catégories, avec leur étiquette (`[]{.excerpts .mark-influence}`), par ex. changée en icône
+par les filtres de copie. Les extraits saillants et les bémols ont toujours leur étiquette.
+Les réglages du dossier fixent l'étiquette de chaque marqueur (par défaut dans la langue de
+ses rapports : #saillant, #rayonnement, #bemol ; en anglais #salient, #influence, #caveat) et
+si ses extraits viennent en premier dans leurs catégories (« En premier » : par défaut, les
+saillants d'abord, puis le rayonnement, puis les bémols).
 Chaque catégorie peut avoir un texte propre à la personne (Markdown, par exemple un résumé de
 ses éléments ; son crayon, au survol, dans l'onglet des catégories, ou un clic sur le texte) :
 placé après son titre, avant ses éléments (en mode imbriqué, celui d'une catégorie restée
 vide va sous sa sous-section de la section Rayonnement). Avec « Ce texte seul, sans lister
-ses extraits », la section est résumée par son texte : ses extraits ne sont plus listés (ni
-dans l'onglet des catégories), mais ajoutés au texte entre `%% … %%` (un commentaire, jamais
-affiché) pour référence.
+ses extraits », la section est résumée par son texte : dans les notes et la copie, ses
+extraits ne sont pas listés mais suivent le texte entre `%% … %%` (un commentaire, jamais
+affiché) pour référence ; l'onglet des catégories les liste toujours.
 
 Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers

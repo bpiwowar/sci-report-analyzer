@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Callable
 from datetime import date
 from html import escape
 
@@ -553,6 +554,37 @@ INFLUENCE_MODES = {
 }
 
 
+def markers_section(folder_id: int) -> Callable[[], dict[str, reports.Marker]]:
+    """The tags of an excerpt's markers in the reports (blank: the default, in their
+    language), and whether the excerpts marked are first in their categories; returns them."""
+    from .viewer_side import MARKER_ICONS
+
+    current = reports.markers(folder_id)
+    fields = {}
+    with ui.row().classes("items-center gap-4"):
+        for key, m in current.items():
+            label, _tip, icon, colour = MARKER_ICONS[key]
+            with ui.row().classes("items-center gap-1 no-wrap"):
+                ui.icon(icon, size="xs", color=colour)
+                tag = (
+                    ui.input(_(label), value=m.tag)
+                    .props('dense prefix="#"')
+                    .classes("w-32")
+                    .tooltip(_("Its tag in the reports (e.g. turned into an icon when copied)"))
+                    .mark(f"folder-marker-tag-{key}")
+                )
+                first = (
+                    ui.checkbox(_("First"), value=m.first)
+                    .tooltip(_("The excerpts marked first in their categories"))
+                    .mark(f"folder-marker-first-{key}")
+                )
+                fields[key] = (tag, first)
+    return lambda: {
+        k: reports.Marker((t.value or "").strip("# "), bool(f.value))
+        for k, (t, f) in fields.items()
+    }
+
+
 ARCHIVED_TIP = N_(
     "Greyed in the folders, its periods no longer offered when choosing a person's period"
 )
@@ -608,7 +640,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 hidden = ui.checkbox(_("Archived"), value=f.hidden if f else False).tooltip(
                     _(ARCHIVED_TIP)
                 )
-            influence = lang = primary = None
+            influence = lang = primary = marker_fields = None
             if f is not None:
                 with ui.tab_panel("notes").classes("p-0 gap-2"):
                     from .citations import folder_citations_section
@@ -633,6 +665,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                         .tooltip(_(INFLUENCE_TIP))
                         .mark("folder-influence-mode")
                     )
+                    marker_fields = markers_section(f.id)
                     default = source_settings.default_primary()
                     primary = (
                         ui.select(
@@ -673,6 +706,8 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 return False
             if influence is not None:
                 reports.save_influence_mode(f.id, influence.value)
+            if marker_fields is not None:
+                reports.save_markers(f.id, marker_fields())
             if lang is not None:
                 reports.save_language(f.id, lang.value or None)
             if primary is not None:

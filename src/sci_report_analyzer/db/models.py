@@ -321,7 +321,8 @@ class FolderSettings(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     # How the notes cite papers: {"cite": the template of [@key], "format": the number of a
     # paper in no star list (see Tag), "templates": [{"name", "attrs"}] (over the general
-    # ones), "skeleton": the starting notes, "influence_mode"}; see reports.py.
+    # ones), "skeleton": the starting notes, "influence_mode",
+    # "markers": {marker: {"tag", "first"}}}; see reports.py.
     citations: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
     # The source a paper must be in to count ("none": no such source; None: the default
     # one, see source_settings).
@@ -368,8 +369,9 @@ class Category(Base):
 
 class Excerpt(Base):
     """A passage of a PDF (a document's, or a paper's) of a person in a folder, filed in one
-    of the categories of the folder's settings; the years it is about (optional), and whether
-    it shows the person's influence ("rayonnement": invited talks, prizes, committees…)."""
+    of the categories of the folder's settings; the years it is about (optional), and its
+    markers: whether it shows the person's influence ("rayonnement": invited talks, prizes,
+    committees…), is salient ("saillant"), or a caveat ("bémol")."""
 
     __tablename__ = "excerpt"
 
@@ -393,6 +395,8 @@ class Excerpt(Base):
     start_year: Mapped[int | None]
     end_year: Mapped[int | None]
     influence: Mapped[bool] = mapped_column(default=False, server_default="0")
+    salient: Mapped[bool] = mapped_column(default=False, server_default="0")
+    caveat: Mapped[bool] = mapped_column(default=False, server_default="0")
     position: Mapped[int] = mapped_column(default=0, server_default="0")  # (in its category)
     # Merged with others: the excerpt leading the group (its category, years… are the
     # group's), else none.

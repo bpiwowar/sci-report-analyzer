@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 15:48+0200\n"
+"POT-Creation-Date: 2026-10-07 15:58+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -170,6 +170,9 @@ msgstr ""
 "Une URL git (SSH ou HTTPS, avec vos identifiants git habituels) ou le "
 "chemin d'un dépôt"
 
+msgid "A highlight of the file (“saillant”)"
+msgstr "Un point fort du dossier"
+
 msgid "A joint conference"
 msgstr "Une conférence conjointe"
 
@@ -280,6 +283,9 @@ msgstr "Un pourcentage se compare à p"
 
 msgid "A report template needs a name"
 msgstr "Un modèle de rapport doit avoir un nom"
+
+msgid "A reservation (“bémol”)"
+msgstr "Une réserve"
 
 msgid "A role has no name"
 msgstr "Un rôle n'a pas de nom"
@@ -884,6 +890,9 @@ msgstr "Catégorie « {name} » créée"
 
 msgid "Category…"
 msgstr "Catégorie…"
+
+msgid "Caveat"
+msgstr "Bémol"
 
 msgid "Change location…"
 msgstr "Changer d’emplacement…"
@@ -1682,6 +1691,9 @@ msgstr "Trouvez d'abord les articles"
 msgid "Findings track (host conference rank)"
 msgstr "Session Findings (rang de la conférence hôte)"
 
+msgid "First"
+msgstr "En premier"
+
 #, python-brace-format
 msgid "First, {names} are merged into “{name}”."
 msgstr "D'abord, {names} sont fusionnés dans « {name} »."
@@ -1963,6 +1975,12 @@ msgstr ""
 msgid "In folders"
 msgstr "Dans les dossiers"
 
+#, python-format
+msgid "In the notes and the copy, they follow the text in a comment (%% … %%)"
+msgstr ""
+"Dans les notes et la copie, ils suivent le texte dans un commentaire (%% "
+"… %%)"
+
 msgid "In the order of the list"
 msgstr "Dans l'ordre de la liste"
 
@@ -2137,6 +2155,9 @@ msgid ""
 msgstr ""
 "Sa notice est récupérée et fusionnée avec celles des autres sources "
 "(listée dans l'onglet Sources, où elle peut être retirée)."
+
+msgid "Its tag in the reports (e.g. turned into an icon when copied)"
+msgstr "Son étiquette dans les rapports (par ex. changée en icône à la copie)"
 
 #, python-brace-format
 msgid "Its {track} track (merged into it, its texts marked as such)"
@@ -3807,6 +3828,9 @@ msgstr "Règle {n} : {error}"
 msgid "Rules"
 msgstr "Règles"
 
+msgid "Salient"
+msgstr "Saillant"
+
 msgid "Same paper as… (merge into this one)"
 msgstr "Même article que… (le fusionner dans celui-ci)"
 
@@ -4454,6 +4478,9 @@ msgstr "La couleur de ses extraits (leur teinte dans les PDF)"
 msgid "The conferences found in its texts (on saving)."
 msgstr "Les conférences trouvées dans ses textes (à l'enregistrement)."
 
+msgid "The excerpts marked first in their categories"
+msgstr "Les extraits marqués en premier dans leurs catégories"
+
 msgid "The excerpts, as selected"
 msgstr "Les extraits, tels que sélectionnés"
 
@@ -4689,11 +4716,11 @@ msgstr "Le score donné à un canal trouvé par OpenAlex"
 
 #, python-format
 msgid ""
-"The section summarised by its text: its excerpts hidden, kept in the text"
-" between %% … %% for reference (not shown)"
+"The section summarised by its text: in the notes and the copy, its "
+"excerpts follow it between %% … %% for reference (not shown)"
 msgstr ""
-"La section résumée par son texte : ses extraits masqués, conservés dans "
-"le texte entre %% … %% pour référence (non affichés)"
+"La section résumée par son texte : dans les notes et la copie, ses "
+"extraits le suivent entre %% … %% pour référence (non affichés)"
 
 msgid "The selection's place is unknown"
 msgstr "L'emplacement de la sélection est inconnu"
@@ -4884,12 +4911,6 @@ msgstr "Thèse"
 
 msgid "Thesis (PhD & other)"
 msgstr "Thèse (doctorat et autres)"
-
-#, python-format
-msgid "They are kept in a comment of the text (%% … %%); click to edit it"
-msgstr ""
-"Ils sont conservés dans un commentaire du texte (%% … %%) ; cliquez pour "
-"le modifier"
 
 msgid ""
 "They are on one item (in the order of their PDFs), with the second one's "
@@ -6800,6 +6821,10 @@ msgid "“{tag}” put on {n} paper (not shown: {hidden})"
 msgid_plural "“{tag}” put on {n} papers (not shown: {hidden})"
 msgstr[0] "« {tag} » posée sur {n} article (non affiché : {hidden})"
 msgstr[1] "« {tag} » posée sur {n} articles (non affichés : {hidden})"
+
+#, python-brace-format
+msgid "“{text}”"
+msgstr "« {text} »"
 
 #, python-brace-format
 msgid "“{text}” now belongs to “{name}” (a variant set by hand)"

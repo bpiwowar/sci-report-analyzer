@@ -818,17 +818,33 @@ def find_dialog(side: Side, text: str, page: int | None, rects: list) -> None:
         actions(dlg, cancel=_("Close"))
 
 
+# An excerpt's markers: (label, tip, icon, colour); their tags in the reports: see
+# reports.markers.
+MARKER_ICONS = {
+    "salient": (N_("Salient"), N_("A highlight of the file (“saillant”)"), "star", "amber-8"),
+    "influence": (
+        N_("Influence"),
+        N_("Shows the person's influence (“rayonnement”: invited talks, prizes…)"),
+        "public",
+        "teal",
+    ),
+    "caveat": (N_("Caveat"), N_("A reservation (“bémol”)"), "report", "deep-orange"),
+}
+
+
 def excerpt_properties(
     start: int | None = None,
     end: int | None = None,
     influence: bool = False,
     tags: list[str] | None = None,
     *,
+    salient: bool = False,
+    caveat: bool = False,
     cleared: Callable[[], None] | None = None,
 ) -> Callable[[], dict]:
     """The fields of an excerpt's years (a button clears them, then calls ``cleared``),
-    influence flag and tags (those of papers and excerpts, or new ones typed); returns their
-    values (the keywords of categories.add_excerpt / update_excerpt)."""
+    markers (see MARKER_ICONS) and tags (those of papers and excerpts, or new ones typed);
+    returns their values (the keywords of categories.add_excerpt / update_excerpt)."""
 
     def clear() -> None:
         start_in.set_value(None)
@@ -844,9 +860,12 @@ def excerpt_properties(
         ui.button(icon="event_busy", on_click=clear).props("flat dense round size=sm").classes(
             "-ml-1"
         ).tooltip(_("Clear the years")).mark("excerpt-years-clear")
-        flag = ui.checkbox(_("Influence"), value=influence).mark("excerpt-influence")
-        flag.tooltip(_("Shows the person's influence (“rayonnement”: invited talks, prizes…)"))
-        ui.icon("public", size="xs", color="teal").classes("-ml-2")
+    flags = {}
+    with ui.row().classes("items-center gap-2 -mt-2"):
+        for key, value in (("salient", salient), ("influence", influence), ("caveat", caveat)):
+            label, tip, icon, colour = MARKER_ICONS[key]
+            flags[key] = ui.checkbox(_(label), value=value).tooltip(_(tip)).mark(f"excerpt-{key}")
+            ui.icon(icon, size="xs", color=colour).classes("-ml-2")
     tags_in = (
         ui.select(
             sorted(set(categories.tag_names()) | set(tags or []), key=str.lower),
@@ -865,7 +884,7 @@ def excerpt_properties(
     return lambda: {
         "start": int_or_none(start_in.value),
         "end": int_or_none(end_in.value),
-        "influence": bool(flag.value),
+        **{k: bool(f.value) for k, f in flags.items()},
         "tags": list(tags_in.value or []),
     }
 
@@ -1156,11 +1175,9 @@ class _ExcerptsSection:
                 if items:
                     ui.badge(str(len(items))).props("rounded color=amber-8")
                 section_text.edit_button(self.side, n)
-            # (summarised by its text only: its excerpts not listed)
+            # (summarised by its text only: its excerpts not listed in the notes, here yes)
             hidden = len(items) if n.id in summarised else None
             section_text.show(self.side, n, texts.get(n.id, ""), hidden)
-            if hidden is not None:
-                items = []
             if n.influence:  # (after its own: those flagged elsewhere, as copied)
                 paths = {c.id: c.path for c in nodes}
                 flagged = [
@@ -1252,10 +1269,11 @@ class _ExcerptsSection:
                         ui.label(lead.years).classes("text-xs text-grey-8 shrink-0").mark(
                             f"excerpt-years-{x.id}"
                         )
-                    if not member and lead.influence:
-                        ui.icon("public", size="xs", color="teal").classes("shrink-0").tooltip(
-                            _("Influence")
-                        ).mark(f"excerpt-influence-{x.id}")
+                    for key, (label, _tip, icon, colour) in MARKER_ICONS.items():
+                        if not member and getattr(lead, key):
+                            ui.icon(icon, size="xs", color=colour).classes("shrink-0").tooltip(
+                                _(label)
+                            ).mark(f"excerpt-{key}-{x.id}")
                     if not member and lead.tags:
                         with (
                             ui.row()
@@ -1500,7 +1518,14 @@ class _ExcerptsSection:
                     )
                 ).classes("text-xs text-grey")
             self.originals(e, text)
-            props = excerpt_properties(e.start_year, e.end_year, e.influence, e.tag_names)
+            props = excerpt_properties(
+                e.start_year,
+                e.end_year,
+                e.influence,
+                e.tag_names,
+                salient=e.salient,
+                caveat=e.caveat,
+            )
 
             def save() -> None:
                 if e.members:
