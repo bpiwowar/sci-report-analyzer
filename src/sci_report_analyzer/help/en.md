@@ -282,7 +282,8 @@ tasks, tags and the lines tagged #question or #to-check are left out, tables too
 instead be turned into a text (Settings → Copy filters → Tags turned into a text): one before
 the line's text (e.g. an icon, 🌍) and one after, in a colour (or highlighted), in bold, the
 line's text too if checked, e.g. the tags of the excerpts' markers (by default: 🌍 for
-#influence or #rayonnement, ⭐ for #salient or #saillant, ⚠️ for #caveat or #bemol). Marmotte keeps bold, italics, underlining, text colours,
+#influence or #rayonnement, ⭐ for #salient or #saillant, ⚠️ for #caveat or #bemol; the
+levels' #local, #national, #international as “(national)”… after the line's text). Marmotte keeps bold, italics, underlining, text colours,
 highlights, emojis (🌍 ⭐ 📣) and symbols (★ ✦ ◆ ➤); it drops superscripts, font sizes and
 strikethroughs.
 
@@ -374,7 +375,12 @@ default in the language of its reports: #salient, #influence, #caveat; in French
 #saillant, #rayonnement, #bemol) and whether an excerpt moves when marked (“First”, by
 default): marked, it moves to the top of its category, among those marked so (salient ones
 first, then influence, then caveats); unmarked, after them; it can then be moved as one
-likes, the report following that order. Each category can
+likes, the report following that order. An excerpt can also have a level (its edit dialog:
+“Level”), e.g. local, national or international, tagged after its markers (#national); the
+folder's settings set its levels (their tags, by default in the language of its reports; one
+added with +, removed with its ×) and the default level of the excerpts without one (shown in
+italics on their rows, in the categories tab, where the search finds them by their level too).
+Each category can
 have a text of its own for the person (Markdown, e.g. a summary of its items; its pencil, on
 hover, in the categories tab, or a click on the text): put after its heading, before its
 items (nested, that of a category left empty goes under its subsection of the Rayonnement

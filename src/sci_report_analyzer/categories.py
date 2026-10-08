@@ -640,6 +640,7 @@ class ExcerptView:
     salient: bool = False
     caveat: bool = False
     discarded: bool = False  # (left out of the generated text: see set_discarded)
+    level: str | None = None  # (its level's key, see reports.levels; none: the folder's default)
 
     @property
     def tag_names(self) -> list[str]:
@@ -723,8 +724,9 @@ def add_excerpt(
     salient: bool = False,
     caveat: bool = False,
     tags: list[str] | None = None,
+    level: str | None = None,
 ) -> int:
-    """File a passage (its years, markers and tags: see update_excerpt); one filed
+    """File a passage (its years, markers, tags and level: see update_excerpt); one filed
     there already is kept."""
     text = " ".join(text.split())
     with session_scope() as s:
@@ -759,6 +761,7 @@ def add_excerpt(
             influence=influence,
             salient=salient,
             caveat=caveat,
+            level=level or None,
         )
         s.add(e)
         _set_tags(s, e, tags or [])
@@ -825,6 +828,7 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
                 salient=e.salient,
                 caveat=e.caveat,
                 discarded=e.discarded,
+                level=e.level,
             )
             for e, doc, title, colour in rows
         ]
@@ -965,7 +969,7 @@ def remove_excerpt(excerpt_id: int) -> None:
                 lead.group_id = None
                 lead.start_year, lead.end_year = e.start_year, e.end_year
                 lead.influence, lead.salient, lead.caveat = e.influence, e.salient, e.caveat
-                lead.discarded = e.discarded
+                lead.discarded, lead.level = e.discarded, e.level
                 lead.group_text = e.group_text
                 lead.tags = list(e.tags)
                 for x in others[1:]:
@@ -983,9 +987,11 @@ def update_excerpt(
     salient: bool = False,
     caveat: bool = False,
     tags: list[str] | None = None,
+    level: str | None = None,
 ) -> None:
-    """Its text (unless None or blank), years, markers ("influence", "salient", "caveat")
-    and tags (by name; None: unchanged)."""
+    """Its text (unless None or blank), years, markers ("influence", "salient", "caveat"),
+    tags (by name; None: unchanged) and level (its key, see reports.levels; none: the
+    folder's default)."""
     with session_scope() as s:
         if e := s.get(Excerpt, excerpt_id):
             if text is not None and text.strip():
@@ -993,7 +999,7 @@ def update_excerpt(
             firsts = _firsts(e.period_id)
             before = _rank(e, firsts)
             e.start_year, e.end_year, e.influence = start, end, influence
-            e.salient, e.caveat = salient, caveat
+            e.salient, e.caveat, e.level = salient, caveat, level or None
             if _rank(e, firsts) != before:  # (checked or unchecked: moved, see _place_by_rank)
                 s.flush()
                 _place_by_rank(s, e, firsts)
@@ -1132,7 +1138,8 @@ def markdown(
     instead, under subsections named after their categories (as nested as these, one level
     below), taken out of their categories ("nested" below); "mark": them only in their
     categories, tagged as the folder says (see reports.markers: also the tags of the
-    excerpts salient or caveats). The categories with no excerpt (nor below) are left out,
+    excerpts salient or caveats; and, after these, that of their level, else of the folder's
+    default one: see reports.levels). The categories with no excerpt (nor below) are left out,
     as are the excerpts discarded (see set_discarded). A section's text (see section_texts)
     follows its heading; nested, that of a section left out (all its excerpts taken out) follows the
     heading of its subsection in the Rayonnement section; a section summarised by its text
@@ -1149,7 +1156,14 @@ def markdown(
     mode = mode or reports.influence_mode(folder_id)
     with i18n.using(reports.language(folder_id)):
         return _markdown(
-            folder_id, period_id, level, mode, reports.markers(folder_id), root, exclude
+            folder_id,
+            period_id,
+            level,
+            mode,
+            reports.markers(folder_id),
+            root,
+            exclude,
+            reports.level_tags(folder_id),
         )
 
 
@@ -1161,12 +1175,17 @@ def _markdown(
     markers: dict,
     root: int | None = None,
     exclude: Collection[int] = (),
+    levels: tuple[dict[str, str], str | None] = ({}, None),
 ) -> str:
     nested, marked = mode == "move", mode == "mark"
+    level_tags, default_level = levels
 
     def marks(e: ExcerptView) -> list[str]:
         on = {"salient": e.salient, "caveat": e.caveat, "influence": marked and e.influence}
-        return [m.tag for k, m in markers.items() if on[k]]
+        out = [m.tag for k, m in markers.items() if on[k]]
+        if tag := level_tags.get(e.level or default_level or ""):
+            out.append(tag)
+        return out
 
     nodes = tree(folder_id)
     by_id = {n.id: n for n in nodes}

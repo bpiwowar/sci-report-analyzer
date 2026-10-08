@@ -373,8 +373,9 @@ class Excerpt(Base):
     """A passage of a PDF (a document's, or a paper's) of a person in a folder, filed in one
     of the categories of the folder's settings; the years it is about (optional), and its
     markers: whether it shows the person's influence ("rayonnement": invited talks, prizes,
-    committees…), is salient ("saillant"), or a caveat ("bémol"); whether it is discarded
-    from the generated text."""
+    committees…), is salient ("saillant"), or a caveat ("bémol"); its level (e.g. national:
+    one of the folder's, see reports.levels; none: the folder's default); whether it is
+    discarded from the generated text."""
 
     __tablename__ = "excerpt"
 
@@ -400,6 +401,7 @@ class Excerpt(Base):
     influence: Mapped[bool] = mapped_column(default=False, server_default="0")
     salient: Mapped[bool] = mapped_column(default=False, server_default="0")
     caveat: Mapped[bool] = mapped_column(default=False, server_default="0")
+    level: Mapped[str | None] = mapped_column(String(32))  # (the key of one of the folder's)
     position: Mapped[int] = mapped_column(default=0, server_default="0")  # (in its category)
     # Left out of the generated text (the notes, the reports), still kept and listed; that of
     # the group it leads.

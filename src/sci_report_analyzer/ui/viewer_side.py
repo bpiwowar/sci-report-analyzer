@@ -868,10 +868,13 @@ def excerpt_properties(
     salient: bool = False,
     caveat: bool = False,
     cleared: Callable[[], None] | None = None,
+    folder_id: int | None = None,
+    level: str | None = None,
 ) -> Callable[[], dict]:
     """The fields of an excerpt's years (a button clears them, then calls ``cleared``),
-    markers (see MARKER_ICONS) and tags (those of papers and excerpts, or new ones typed);
-    returns their values (the keywords of categories.add_excerpt / update_excerpt)."""
+    markers (see MARKER_ICONS), level (one of the folder's, see reports.levels; none: its
+    default) and tags (those of papers and excerpts, or new ones typed); returns their values
+    (the keywords of categories.add_excerpt / update_excerpt)."""
 
     def clear() -> None:
         start_in.set_value(None)
@@ -893,6 +896,7 @@ def excerpt_properties(
             label, tip, icon, colour = MARKER_ICONS[key]
             flags[key] = ui.checkbox(_(label), value=value).tooltip(_(tip)).mark(f"excerpt-{key}")
             ui.icon(icon, size="xs", color=colour).classes("-ml-2")
+        level_in = level_select(folder_id, level)
     tags_in = (
         ui.select(
             sorted(set(categories.tag_names()) | set(tags or []), key=str.lower),
@@ -913,7 +917,30 @@ def excerpt_properties(
         "end": int_or_none(end_in.value),
         **{k: bool(f.value) for k, f in flags.items()},
         "tags": list(tags_in.value or []),
+        "level": level_in.value or None,
     }
+
+
+def level_select(folder_id: int | None, level: str | None) -> ui.select:
+    """An excerpt's level: one of the folder's (by its tag; a level no longer among them:
+    kept), or none (the folder's default, named)."""
+    shown = {lv.key: f"#{lv.tag}" for lv in reports.levels(folder_id)}
+    if level and level not in shown:
+        shown[level] = f"#{level}"
+    default = reports.default_level(folder_id)
+    none = _("Default ({level})").format(level=shown[default]) if default else _("No level")
+    return (
+        ui.select({"": none, **shown}, value=level or "", label=_("Level"))
+        .props("dense outlined options-dense")
+        .classes("w-44")
+        .tooltip(
+            _(
+                "Its level (e.g. national), written as a #tag in the Markdown; the folder's "
+                "levels and default one: in its reports' settings"
+            )
+        )
+        .mark("excerpt-level")
+    )
 
 
 def similar_excerpts(
@@ -1024,7 +1051,9 @@ def category_picker(
         if merge is not None and side.period_id is not None:
             similar_excerpts(side, text, lambda lead, ref_only: (merge(lead, ref_only), close(dlg)))
         props = (
-            excerpt_properties(*(years or (None, None)), cleared=lambda: show(text))
+            excerpt_properties(
+                *(years or (None, None)), cleared=lambda: show(text), folder_id=folder_id
+            )
             if properties
             else dict
         )
@@ -1148,6 +1177,8 @@ class _ExcerptsSection:
         self.merging: categories.ExcerptView | None = None  # (merged with the one clicked)
         self.collapsed: set[int] = set(annotations.ui_state(COLLAPSED) or [])
         self.query = ""  # (the excerpts searched: only those matching shown)
+        # (the folder's levels: their tags by key, and its default one; see reports.level_tags)
+        self.levels: tuple[dict[str, str], str | None] = ({}, None)
         side.edit_excerpt = self.edit_excerpt  # (E on an excerpt filed already)
         side.reveal_excerpt = self.reveal
         self.listing()
@@ -1216,6 +1247,7 @@ class _ExcerptsSection:
             by_cat.setdefault(e.category_id, []).append(e)
         texts = categories.section_texts(self.side.period_id)
         summarised = categories.summarised(self.side.period_id)
+        self.levels = reports.level_tags(self.side.folder[0])
         query = self.query.strip().casefold()
         found: set[int] = set()  # (searched: the categories shown, with those above them)
         if query:
@@ -1338,11 +1370,19 @@ class _ExcerptsSection:
                     for x in e.parts:
                         self.quote(x, e, merging)
 
-    @staticmethod
-    def matches(e: categories.ExcerptView, query: str) -> bool:
+    def level(self, e: categories.ExcerptView) -> tuple[str, bool] | None:
+        """An excerpt's level: its tag, and whether it is the folder's default (none: no
+        level, or one no longer among the folder's)."""
+        tags, default = self.levels
+        if e.level:
+            return (tags[e.level], False) if e.level in tags else None
+        return (tags[default], True) if default in tags else None
+
+    def matches(self, e: categories.ExcerptView, query: str) -> bool:
         """Whether an excerpt (a group) has the text searched: in its text (as edited, or
-        selected; that of the group, of the others), or a tag."""
-        words = [e.group_text or "", *e.tag_names]
+        selected; that of the group, of the others), a tag, or its level's."""
+        level = self.level(e)
+        words = [e.group_text or "", *e.tag_names, *([level[0]] if level else [])]
         words += [t for x in e.parts for t in (x.text, x.original or "")]
         return any(query in w.casefold() for w in words)
 
@@ -1450,6 +1490,12 @@ class _ExcerptsSection:
                         ):
                             for name, colour in lead.tags:
                                 span(chip_html(name, colour, title=_("tag")))
+                    if not member and (level := self.level(lead)):
+                        ui.label(f"#{level[0]}").classes(
+                            "text-xs text-blue-grey-7 shrink-0" + (" italic" if level[1] else "")
+                        ).tooltip(
+                            _("Its level (the folder's default)") if level[1] else _("Its level")
+                        ).mark(f"excerpt-level-{x.id}")
                     cite = (  # (in a group, its text not edited: quote it, or only cite it)
                         [
                             (
@@ -1708,6 +1754,8 @@ class _ExcerptsSection:
                 e.tag_names,
                 salient=e.salient,
                 caveat=e.caveat,
+                folder_id=self.side.folder[0] if self.side.folder else None,
+                level=e.level,
             )
 
             def save() -> None:
