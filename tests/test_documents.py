@@ -1016,6 +1016,104 @@ def test_excerpt_markers():
     assert {e.id: e for e in categories.excerpts(period)}[plain].salient
 
 
+def test_excerpt_levels():
+    """An excerpt's level (one of the folder's; none: its default one) tagged after its
+    markers; the folder's levels (local, national, international by default) and their tags
+    (by default in its language), turned into a text when copied."""
+    from sci_report_analyzer import categories, copy_filters
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    talk = categories.add_excerpt(
+        research, period, "Keynote at SIGIR.", 1, [], document_id=doc, level="international"
+    )
+    seminar = categories.add_excerpt(research, period, "Seminar in Lyon.", 2, [], document_id=doc)
+    assert [lv.key for lv in reports.levels(folder)] == ["local", "national", "international"]
+    assert reports.default_level(folder) is None
+    assert categories.markdown(folder, period) == (
+        "## Research\n\n"
+        "- #international Keynote at SIGIR. %% Dossier, p. 1 %%\n"
+        "- Seminar in Lyon. %% Dossier, p. 2 %%\n"
+    )
+    # A default level; another tag, a new level; then, salient: after its marker's tag.
+    levels = reports.levels(folder)
+    reports.save_levels(
+        folder,
+        [*levels[:2], reports.Level("international", "#intl"), reports.Level("", "regional")],
+        "national",
+    )
+    assert reports.levels(folder)[2:] == [
+        reports.Level("international", "intl"),
+        reports.Level("regional", "regional"),
+    ]
+    categories.update_excerpt(talk, salient=True, level="international")
+    md = categories.markdown(folder, period)
+    assert "- #salient #intl Keynote at SIGIR." in md
+    assert "- #national Seminar in Lyon." in md
+    # A level removed: its excerpts with none (nor the default one), the default with it.
+    reports.save_levels(folder, reports.levels(folder)[:2], "regional")
+    assert reports.default_level(folder) is None
+    md = categories.markdown(folder, period)
+    assert "- #salient Keynote at SIGIR." in md and "- Seminar in Lyon." in md
+    assert {e.id: e.level for e in categories.excerpts(period)}[talk] == "international"
+    # In French by default (the same words); copied: after the line's text.
+    reports.save_language(folder, "fr")
+    assert reports.levels(folder)[1] == reports.Level("national", "national")
+    categories.update_excerpt(seminar, level="national")
+    _html, plain = copy_filters.marmotte(categories.markdown(folder, period))
+    assert "• Seminar in Lyon. (national)" in plain
+    # Passed on to the next one of a group.
+    assert categories.merge_excerpts(talk, seminar) is None
+    categories.remove_excerpt(seminar)
+    assert categories.excerpts(period)[0].level == "national"
+
+
+async def test_excerpt_levels_in_the_viewer(user: User, fake_viewer):
+    """A level chosen when editing an excerpt, shown on its row (the folder's default one, in
+    italics), searched; the folder's levels in its reports' settings."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    doc = documents.add(period, "Application.pdf", PDF)
+    e = categories.add_excerpt(research, period, "Led the Quokka project", 1, [], document_id=doc)
+    other = categories.add_excerpt(research, period, "Taught IR", 2, [], document_id=doc)
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker=f"excerpt-edit-{e}")
+    await user.should_not_see(marker=f"excerpt-level-{e}")
+    user.find(marker=f"excerpt-edit-{e}").click()
+    await user.should_see(marker="excerpt-level")
+    level = user.find(marker="excerpt-level").elements.pop()
+    assert list(level.options) == ["", "local", "national", "international"]
+    level.value = "national"
+    user.find(marker="excerpt-edit-save").click()
+    await user.should_not_see(marker="excerpt-edit-save")
+    assert {x.id: x.level for x in categories.excerpts(period)}[e] == "national"
+    await user.should_see(marker=f"excerpt-level-{e}")
+    user.find(marker="excerpts-search").type("nation")
+    await user.should_not_see(marker=f"excerpt-{other}")
+    await user.should_see(marker=f"excerpt-{e}")
+    # The folder's levels: one added, a default one.
+    await user.open(f"/?folder={folder}")
+    user.find(marker="folder-edit").click()
+    await user.should_see(marker="folder-tab-notes")
+    user.find(marker="folder-tab-notes").click()
+    await user.should_see(marker="folder-level-tag-2")
+    user.find(marker="folder-level-add").click()
+    await user.should_see(marker="folder-level-tag-3")
+    user.find(marker="folder-level-tag-3").type("regional")
+    user.find(marker="folder-level-remove-0").click()
+    await user.should_not_see(marker="folder-level-tag-3")
+    user.find(marker="folder-level-default").elements.pop().value = "international"
+    user.find(marker="folder-save").click()
+    await user.should_not_see(marker="folder-save")
+    assert [lv.tag for lv in reports.levels(folder)] == ["national", "international", "regional"]
+    assert reports.default_level(folder) == "international"
+
+
 def test_section_texts():
     """A text per category and person (Markdown, e.g. a summary): after the heading of its
     section; nested, that of a section left out in the Rayonnement section."""

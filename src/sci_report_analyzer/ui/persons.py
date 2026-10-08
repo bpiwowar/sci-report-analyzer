@@ -587,6 +587,77 @@ def markers_section(folder_id: int) -> Callable[[], dict[str, reports.Marker]]:
     }
 
 
+def levels_section(folder_id: int) -> Callable[[], tuple[list[reports.Level], str | None]]:
+    """The levels an excerpt can have (e.g. local, national, international), in order: their
+    tags in the reports (blank: the default, in their language; a new one: added below,
+    removed with its button), and the default level of the excerpts without one; returns
+    them."""
+    rows = [{"key": lv.key, "tag": lv.tag} for lv in reports.levels(folder_id)]
+    state = {"default": reports.default_level(folder_id) or ""}
+    fields: dict[str, ui.select] = {}
+
+    def options() -> dict[str, str]:
+        return {
+            "": _("No level"),
+            **{r["key"] or r["tag"]: f"#{r['tag']}" for r in rows if (r["key"] or r["tag"])},
+        }
+
+    @ui.refreshable
+    def listing() -> None:
+        with ui.row().classes("items-center gap-2"):
+            ui.label(_("Levels")).classes("text-sm").tooltip(
+                _(
+                    "An excerpt's level (e.g. national; none: the default one), written as "
+                    "a #tag in the reports (e.g. turned into a text when copied)"
+                )
+            )
+            for i, r in enumerate(rows):
+                with ui.row().classes("items-center gap-0 no-wrap"):
+                    ui.input(value=r["tag"]).props('dense prefix="#"').classes("w-28").on(
+                        "blur", renamed
+                    ).bind_value(r, "tag").mark(f"folder-level-tag-{i}")
+                    ui.button(icon="close", on_click=lambda i=i: drop(i)).props(
+                        "flat dense round size=xs color=grey-7"
+                    ).tooltip(_("Remove this level")).mark(f"folder-level-remove-{i}")
+            ui.button(icon="add", on_click=add).props("flat dense round size=sm").tooltip(
+                _("Add a level")
+            ).mark("folder-level-add")
+            fields["default"] = (
+                ui.select(options(), label=_("Default level"))
+                .bind_value(state, "default")
+                .props("dense")
+                .classes("w-40")
+                .tooltip(_("That of the excerpts without one"))
+                .mark("folder-level-default")
+            )
+
+    def renamed() -> None:
+        """(the default's options: the tags as typed; a new level's, its tag)"""
+        shown, default = options(), fields["default"]
+        default.set_options(shown, value=default.value if default.value in shown else "")
+
+    def add() -> None:
+        rows.append({"key": "", "tag": ""})
+        listing.refresh()
+
+    def drop(i: int) -> None:
+        if rows[i]["key"] and state["default"] == rows[i]["key"]:
+            state["default"] = ""
+        del rows[i]
+        listing.refresh()
+
+    listing()
+
+    def values() -> tuple[list[reports.Level], str | None]:
+        kept = [r for r in rows if (r["tag"] or "").strip("# ") or r["key"]]
+        return (
+            [reports.Level(r["key"], (r["tag"] or "").strip("# ")) for r in kept],
+            state["default"] or None,
+        )
+
+    return values
+
+
 ARCHIVED_TIP = N_(
     "Greyed in the folders, its periods no longer offered when choosing a person's period"
 )
@@ -642,7 +713,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 hidden = ui.checkbox(_("Archived"), value=f.hidden if f else False).tooltip(
                     _(ARCHIVED_TIP)
                 )
-            influence = lang = primary = marker_fields = None
+            influence = lang = primary = marker_fields = level_fields = None
             if f is not None:
                 with ui.tab_panel("notes").classes("p-0 gap-2"):
                     from .citations import folder_citations_section
@@ -668,6 +739,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                         .mark("folder-influence-mode")
                     )
                     marker_fields = markers_section(f.id)
+                    level_fields = levels_section(f.id)
                     default = source_settings.default_primary()
                     primary = (
                         ui.select(
@@ -710,6 +782,8 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 reports.save_influence_mode(f.id, influence.value)
             if marker_fields is not None:
                 reports.save_markers(f.id, marker_fields())
+            if level_fields is not None:
+                reports.save_levels(f.id, *level_fields())
             if lang is not None:
                 reports.save_language(f.id, lang.value or None)
             if primary is not None:

@@ -285,7 +285,8 @@ l'emplacement des citations), encadrés, tâches, étiquettes et lignes étiquet
 (Paramètres → Filtres de copie → Étiquettes changées en texte) : un avant le texte de la ligne
 (par ex. une icône, 🌍) et un après, d'une couleur (ou surlignés), en gras, aussi le texte de la
 ligne si coché, par ex. les étiquettes des marqueurs des extraits (par défaut : 🌍 pour
-#rayonnement ou #influence, ⭐ pour #saillant ou #salient, ⚠️ pour #bemol ou #caveat). Marmotte garde le gras, l'italique, le soulignement, les couleurs
+#rayonnement ou #influence, ⭐ pour #saillant ou #salient, ⚠️ pour #bemol ou #caveat ;
+#local, #national, #international, les niveaux, en « (national) »… après le texte de la ligne). Marmotte garde le gras, l'italique, le soulignement, les couleurs
 de texte, le surlignage, les emojis (🌍 ⭐ 📣) et les symboles (★ ✦ ◆ ➤) ; il retire les
 exposants, les tailles de police et le texte barré.
 
@@ -378,6 +379,12 @@ si un extrait se déplace quand on le marque (« En premier », par défaut) : m
 tête de sa catégorie, parmi ceux marqués ainsi (les saillants d'abord, puis le rayonnement,
 puis les bémols) ; démarqué, après eux ; on peut ensuite le déplacer à son gré, le rapport
 suivant cet ordre.
+Un extrait peut aussi avoir un niveau (sa fenêtre d'édition : « Niveau »), par ex. local,
+national ou international, en étiquette après celles de ses marqueurs (#national) ; les
+réglages du dossier fixent ses niveaux (leurs étiquettes, par défaut dans la langue de ses
+rapports ; un ajouté avec +, retiré avec son ×) et le niveau par défaut des extraits qui n'en
+ont pas (en italique sur leurs lignes, dans l'onglet des catégories, où la recherche les trouve
+aussi par leur niveau).
 Chaque catégorie peut avoir un texte propre à la personne (Markdown, par exemple un résumé de
 ses éléments ; son crayon, au survol, dans l'onglet des catégories, ou un clic sur le texte) :
 placé après son titre, avant ses éléments (en mode imbriqué, celui d'une catégorie restée

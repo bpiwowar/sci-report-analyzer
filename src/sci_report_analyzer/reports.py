@@ -749,6 +749,65 @@ def save_markers(folder_id: int, values: dict[str, Marker]) -> None:
     )
 
 
+# An excerpt's levels by default (e.g. of an invited talk: see categories.ExcerptView.level),
+# their tags in the language of the reports.
+DEFAULT_LEVELS = ("local", "national", "international")
+DEFAULT_LEVEL_TAGS = {
+    "en": {"local": "local", "national": "national", "international": "international"},
+    "fr": {"local": "local", "national": "national", "international": "international"},
+}
+
+
+@dataclass(frozen=True)
+class Level:
+    """A level an excerpt can have (e.g. national): its key (kept on the excerpts) and its
+    tag in the reports (turned into a text when copied, see copy_filters.TagRule)."""
+
+    key: str
+    tag: str
+
+
+def levels(folder_id: int | None) -> list[Level]:
+    """The folder's levels, in their order (until some are set: DEFAULT_LEVELS); a tag left
+    blank (or one of the defaults): that of the language of its reports."""
+    saved = _citations(folder_id).get("levels")
+    lang = language(folder_id) or i18n.language()
+    defaults = DEFAULT_LEVEL_TAGS.get(lang, DEFAULT_LEVEL_TAGS["en"])
+    if saved is None:
+        return [Level(k, defaults[k]) for k in DEFAULT_LEVELS]
+    out = []
+    for v in saved:
+        if key := (v.get("key") or "").strip():
+            out.append(Level(key, (v.get("tag") or "").strip("# ") or defaults.get(key, key)))
+    return out
+
+
+def default_level(folder_id: int | None) -> str | None:
+    """The level of the folder's excerpts without one (its key; none: no level)."""
+    key = _citations(folder_id).get("default_level")
+    return key if key in {lv.key for lv in levels(folder_id)} else None
+
+
+def save_levels(folder_id: int, values: list[Level], default: str | None = None) -> None:
+    """(a tag left as the default one: not saved, following the language; a new level's key:
+    its tag)"""
+    lang = language(folder_id) or i18n.language()
+    defaults = DEFAULT_LEVEL_TAGS.get(lang, DEFAULT_LEVEL_TAGS["en"])
+    rows = []
+    for v in values:
+        tag = v.tag.strip("# ")
+        key = v.key or tag
+        if key and key not in {r["key"] for r in rows}:
+            rows.append({"key": key, "tag": "" if tag == defaults.get(key) else tag})
+    keys = {r["key"] for r in rows}
+    _save_citations(folder_id, levels=rows, default_level=default if default in keys else None)
+
+
+def level_tags(folder_id: int | None) -> tuple[dict[str, str], str | None]:
+    """The tags of the folder's levels by key, and its default level (see default_level)."""
+    return {lv.key: lv.tag for lv in levels(folder_id)}, default_level(folder_id)
+
+
 def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
     """For the notes of the folder of a period (the person's in it): its star lists (their
     papers numbered there), its numbering and its templates; the papers to discuss, those

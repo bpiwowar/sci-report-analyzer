@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-07 18:06+0200\n"
+"POT-Creation-Date: 2026-10-08 09:18+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -662,6 +662,11 @@ msgstr ""
 "Un extrait marqué passe en tête de sa catégorie (démarqué : après ceux "
 "marqués)"
 
+msgid ""
+"An excerpt's level (e.g. national; none: the default one), written as a "
+"#tag in the reports (e.g. turned into a text when copied)"
+msgstr "Le niveau d'un extrait (par ex. national ; aucun : celui par défaut), écrit en #étiquette dans les rapports (par ex. changée en texte à la copie)"
+
 msgid "Annotations"
 msgstr "Annotations"
 
@@ -1270,8 +1275,15 @@ msgid "Declared by"
 msgstr "Déclaré par"
 
 #, python-brace-format
+msgid "Default ({level})"
+msgstr "Par défaut ({level})"
+
+#, python-brace-format
 msgid "Default ({source})"
 msgstr "Par défaut ({source})"
+
+msgid "Default level"
+msgstr "Niveau par défaut"
 
 #, python-brace-format
 msgid "Default level of {name}"
@@ -2146,6 +2158,17 @@ msgstr ""
 msgid "Its identifier: {id} (it cannot be changed later)"
 msgstr "Son identifiant : {id} (il ne pourra plus être changé)"
 
+msgid "Its level"
+msgstr "Son niveau"
+
+msgid ""
+"Its level (e.g. national), written as a #tag in the Markdown; the "
+"folder's levels and default one: in its reports' settings"
+msgstr "Son niveau (par ex. national), écrit en #étiquette dans le Markdown ; les niveaux du dossier et celui par défaut : dans les réglages de ses rapports"
+
+msgid "Its level (the folder's default)"
+msgstr "Son niveau (celui par défaut du dossier)"
+
 msgid "Its main conference (it is a workshop of this venue)"
 msgstr "Sa conférence principale (c'est un atelier de ce canal)"
 
@@ -2352,6 +2375,9 @@ msgstr ""
 msgid "Left out of the generated text (the notes, the reports)"
 msgstr "Laissé hors du texte généré (les notes, les rapports)"
 
+msgid "Level"
+msgstr "Niveau"
+
 msgid "Level (by hand)"
 msgstr "Niveau (à la main)"
 
@@ -2360,6 +2386,9 @@ msgstr "Niveau enregistré"
 
 msgid "Level saved on the venue"
 msgstr "Niveau enregistré sur le canal de publication"
+
+msgid "Levels"
+msgstr "Niveaux"
 
 #, python-brace-format
 msgid "Levels: {error}"
@@ -2816,6 +2845,9 @@ msgstr "Aucun titre ni bloc à garder dans un modèle"
 
 msgid "No item in the text"
 msgstr "Aucun élément dans le texte"
+
+msgid "No level"
+msgstr "Aucun niveau"
 
 msgid "No main conference: its papers are not ranked."
 msgstr "Pas de conférence principale : ses articles ne sont pas classés."
@@ -3739,6 +3771,9 @@ msgstr "Retirer leurs numéros (l’étiquette reste)"
 msgid "Remove them"
 msgstr "Les supprimer"
 
+msgid "Remove this level"
+msgstr "Retirer ce niveau"
+
 msgid "Remove this record"
 msgstr "Retirer cette entrée"
 
@@ -4504,6 +4539,9 @@ msgstr ""
 "Texte recherché par la correspondance automatique avec les classements, à"
 " la place des textes du canal (cela ne change pas les textes qui "
 "appartiennent au canal)"
+
+msgid "That of the excerpts without one"
+msgstr "Celui des extraits qui n'en ont pas"
 
 msgid "That of the interface"
 msgstr "Celle de l'interface"
