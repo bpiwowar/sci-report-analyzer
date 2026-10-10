@@ -65,7 +65,12 @@ def _stopped_page(text: str) -> str:
 
 def stop() -> None:
     logger.info("Quit from the app")
-    ui.run_javascript(_stopped_page(_("SciReport Analyzer has stopped. You can close this tab.")))
+    # Stops reconnecting: NiceGUI reloads the page when that fails, which would start the
+    # app again under webapp-manager
+    ui.run_javascript(
+        _stopped_page(_("SciReport Analyzer has stopped. You can close this tab."))
+        + "; window.socket?.disconnect()"
+    )
     ui.timer(0.3, app.shutdown, once=True)
 
 
