@@ -3994,6 +3994,9 @@ msgstr "Profil Scholar {id} introuvable"
 msgid "SciReport Analyzer has stopped. You can close this tab."
 msgstr "SciReport Analyzer est arrêté. Vous pouvez fermer cet onglet."
 
+msgid "SciReport Analyzer was stopped. Reload the page to start it again."
+msgstr "SciReport Analyzer a été arrêté. Rechargez la page pour le relancer."
+
 msgid "Scimago CSV"
 msgstr "CSV Scimago"
 
