@@ -86,7 +86,7 @@ def main() -> None:
             port=args.port,
             reload=False,
             show=not args.no_browser,
-            favicon="📊",
+            favicon=Path(__file__).parent / "ui" / "static" / "favicon.svg",
             timeout_graceful_shutdown=3,
         )
 
