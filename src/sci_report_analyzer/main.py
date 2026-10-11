@@ -77,6 +77,7 @@ def main() -> None:
     if args.live_reload:
         app.on_startup(livereload.start)
     stop.install_interrupt_handler()
+    stop.install_webapps_protocol()
     # uvicorn re-raises the Ctrl-C once shut down
     with contextlib.suppress(KeyboardInterrupt):
         ui.run(
