@@ -4,13 +4,15 @@ toolbar (bold, lists, links, LaTeX…), and a rendered preview (beside or instea
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 
 from nicegui import ui
 
+from .. import categories
 from ..copy_filters import strip_comments
 from ..i18n import N_, _
-from .theme import NOTE_EXTRAS
+from .theme import NOTE_EXTRAS, chip_html
 
 # (icon, tooltip, kind, args): kind "wrap" (before, after, placeholder) or "line" (prefix).
 TOOLS = [
@@ -134,6 +136,25 @@ document.addEventListener('click', (ev) => {
 </script>""",
     shared=True,
 )
+
+# A #tag (Obsidian's: not "#1", nor a heading's "#"; also right after a tag, e.g. an
+# excerpt's anchor), shown as a chip in the preview.
+_TAG_RE = re.compile(r"(?<![^\s>])#([\w/-]*[^\W\d][\w/-]*)")
+# Code (fenced blocks, inline spans): its #tags kept as typed.
+_CODE_RE = re.compile(r"(?m)(^\s*(?:```|~~~).*$(?:.|\n)*?^\s*(?:```|~~~).*$|`[^`\n]*`)")
+_TAG_GREY = "#8c959f"  # (a tag without a colour, e.g. a marker's or a level's)
+
+
+def tags_as_chips(text: str) -> str:
+    """The #tags of a Markdown text (but in code) as chips, in their tags' colours."""
+    colours = categories.tag_colours()
+
+    def chip(m: re.Match) -> str:
+        return chip_html(m[1], colours.get(m[1]) or _TAG_GREY, title=f"#{m[1]}")
+
+    parts = _CODE_RE.split(text)
+    return "".join(p if i % 2 else _TAG_RE.sub(chip, p) for i, p in enumerate(parts))
+
 
 _SHARE = "; flex:1 1 0; min-height:6rem"  # (a stacked editor and preview, sharing the height)
 
@@ -305,8 +326,9 @@ class MarkdownEditor:
             self._on_change(text or "")
 
     def refresh_preview(self) -> None:
-        """The rendered text, without its Obsidian comments (``%% … %%``)."""
-        self.preview.content = strip_comments(self._render(self.value))
+        """The rendered text, without its Obsidian comments (``%% … %%``), its #tags as
+        chips."""
+        self.preview.content = tags_as_chips(strip_comments(self._render(self.value)))
 
     def _layout(self) -> None:
         mode = self.mode.value or "edit"

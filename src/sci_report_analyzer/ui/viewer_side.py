@@ -27,7 +27,12 @@ from .theme import chip_html, int_or_none, span
 
 ui.add_css(
     ".vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
-    " box-shadow: 0 0 0 2px #ffa000; }",
+    " box-shadow: 0 0 0 2px #ffa000; }"
+    # (an excerpt in the preview of the folder's notes: its dialog when clicked)
+    " .vr-report-preview li:is(:has(> [data-vr-excerpt]), :has(> p > [data-vr-excerpt]))"
+    " { cursor: pointer; border-radius: 4px; }"
+    " .vr-report-preview li:is(:has(> [data-vr-excerpt]), :has(> p > [data-vr-excerpt]))"
+    ":hover { background: rgba(255, 160, 0, 0.1); }",
     shared=True,
 )
 
@@ -311,9 +316,12 @@ class Side:
         self.refresh_excerpts()
 
     def refresh_excerpts(self) -> None:
-        """The categories' tab, and the excerpts of this PDF tinted on its pages."""
+        """The categories' tab, the preview of the folder's notes (its excerpts), and the
+        excerpts of this PDF tinted on its pages."""
         if self.categories:
             self.categories()
+        if self.folder_refresh is not None:
+            self.folder_refresh()
         kind, key = self.source
         if self.period_id is None or kind != "doc":
             return
@@ -356,8 +364,8 @@ class Side:
         folder_id, name = self.folder
         tip = _("Notes of the folder {folder} on this person (all their documents and papers)")
 
-        def render(text: str) -> str:
-            ctx = reports.folder_context(self.stats, self.period_id)
+        def render(text: str) -> str:  # (the excerpts marked: opened when clicked)
+            ctx = reports.folder_context(self.stats, self.period_id, anchors=True)
             out = reports.render(text, ctx)
             if (editor := getattr(self, "folder_editor", None)) is not None:
                 citation_hint(editor, ctx, out)
@@ -409,6 +417,43 @@ class Side:
             )
         self.folder_refresh = refresh
         self.on_render.append(refresh)  # (the papers edited: their tags, notes…)
+        self._excerpt_clicks(self.folder_editor)
+
+    def _excerpt_clicks(self, editor: MarkdownEditor) -> None:
+        """A click on an excerpt in the preview of the folder's notes (its item, marked: see
+        categories.EXCERPT_ANCHOR): its dialog, to edit it. Not on a link, nor when selecting."""
+        preview = editor.preview
+        ui.on(
+            "vr-report-excerpt",
+            lambda e: (
+                self._edit_excerpt_of(int(e.args["excerpt"]))
+                if (e.args or {}).get("id") == preview.id
+                else None
+            ),
+        )
+        preview.client.run_javascript(
+            "(() => { let n = 0; const t = setInterval(() => {"
+            f" const p = getHtmlElement({preview.id});"
+            " if (++n > 50) clearInterval(t); if (!p) return; clearInterval(t);"
+            " p.addEventListener('click', (ev) => {"
+            " if (ev.target.closest('a') || String(getSelection() || '').trim()) return;"
+            " const li = ev.target.closest('li'); if (!li || !p.contains(li)) return;"
+            " const a = [...li.querySelectorAll('[data-vr-excerpt]')]"
+            ".find((x) => x.closest('li') === li); if (!a) return;"
+            f" emitEvent('vr-report-excerpt', {{id: {preview.id}, excerpt: a.dataset.vrExcerpt}});"
+            " }); }, 100); })()"
+        )
+        preview.classes("vr-report-preview")
+
+    def _edit_excerpt_of(self, excerpt_id: int) -> None:
+        """The dialog of an excerpt (that of its group, for one merged)."""
+        if self.period_id is None or self.edit_excerpt is None:
+            return
+        for e in categories.excerpts(self.period_id, grouped=True):
+            if excerpt_id in (e.id, *(m.id for m in e.members)):
+                self.edit_excerpt(e)
+                return
+        ui.notify(_("This excerpt is no longer there"), type="warning")
 
     def folder_tools(self) -> None:
         """The toolbar of the folder's notes: quote, cite a paper, copy with the references
@@ -1688,7 +1733,8 @@ class _ExcerptsSection:
 
     def originals(self, e: categories.ExcerptView, text: ui.textarea) -> None:
         """The passages as selected (of each excerpt of a group): where, how edited since; to
-        copy into the text (that of a group: added to it)."""
+        copy into the text (that of a group: added to it), or to open (their PDF, at their
+        page, in a new tab)."""
         ui.label(_("As selected") if not e.members else _("The excerpts, as selected")).classes(
             "text-sm font-medium"
         )
@@ -1723,6 +1769,12 @@ class _ExcerptsSection:
                     ).tooltip(
                         _("Add it to the text") if e.members else _("Back to it (as selected)")
                     ).mark(f"excerpt-original-use-{x.id}")
+                    ui.button(
+                        icon="open_in_new",
+                        on_click=lambda x=x: ui.navigate.to(excerpt_url(x), new_tab=True),
+                    ).props("flat dense round size=xs color=grey-7").tooltip(
+                        _("Open its document (at its page)")
+                    ).mark(f"excerpt-original-open-{x.id}")
 
     def edit_excerpt(self, e: categories.ExcerptView) -> None:
         """Its text (that of a group), years, "influence" flag and tags; the passages as

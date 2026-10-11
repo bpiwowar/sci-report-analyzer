@@ -792,6 +792,14 @@ def tag_names() -> list[str]:
         return list(s.scalars(select(Tag.name).distinct().order_by(Tag.name)))
 
 
+def tag_colours() -> dict[str, str | None]:
+    """The colours of the tags, by their #tag (see pubview.hashtag; without the "#")."""
+    from .pubview import hashtag
+
+    with session_scope() as s:
+        return {hashtag(n)[1:]: c for n, c in s.execute(select(Tag.name, Tag.colour))}
+
+
 def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
     """The excerpts of a person in a folder (their period), in their order (as placed, else
     as filed);
@@ -1119,6 +1127,10 @@ def _markdown_item(e: ExcerptView, *, comments: bool = True, marks: list[str] = 
     return tags + " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
 
 
+# Before an excerpt's item in a preview (see markdown's ``anchors``): its id, found there.
+EXCERPT_ANCHOR = '<span data-vr-excerpt="{id}"></span>'
+
+
 def markdown(
     folder_id: int,
     period_id: int,
@@ -1127,6 +1139,7 @@ def markdown(
     mode: str | None = None,
     root: int | None = None,
     exclude: Collection[int] = (),
+    anchors: bool = False,
 ) -> str:
     """The excerpts by category (headings; a category's years in its heading), as Markdown
     (unquoted, their places between Obsidian comments: ``%% Application, p. 4; p. 12 %%``),
@@ -1164,6 +1177,7 @@ def markdown(
             root,
             exclude,
             reports.level_tags(folder_id),
+            anchors,
         )
 
 
@@ -1176,9 +1190,14 @@ def _markdown(
     root: int | None = None,
     exclude: Collection[int] = (),
     levels: tuple[dict[str, str], str | None] = ({}, None),
+    anchors: bool = False,
 ) -> str:
     nested, marked = mode == "move", mode == "mark"
     level_tags, default_level = levels
+
+    def item(e: ExcerptView) -> str:
+        anchor = EXCERPT_ANCHOR.format(id=e.id) if anchors else ""
+        return anchor + _markdown_item(e, marks=marks(e))
 
     def marks(e: ExcerptView) -> list[str]:
         on = {"salient": e.salient, "caveat": e.caveat, "influence": marked and e.influence}
@@ -1256,7 +1275,7 @@ def _markdown(
         """The flagged excerpts: items (by path), or subsections below the ``base`` level."""
         out: list[str] = []
         for n in apart:
-            items = [_markdown_item(e, marks=marks(e)) for e in flagged.get(n.id, [])]
+            items = [item(e) for e in flagged.get(n.id, [])]
             if nested and n.id in summary_only and left_out(n):  # (its text instead)
                 items = []
             if not nested:
@@ -1286,7 +1305,7 @@ def _markdown(
         out += text(n)
         listed = [] if n.id in summary_only else shown.get(n.id, [])
         for e in listed:  # (a group: its quotes, on one item)
-            out.append("- " + _markdown_item(e, marks=marks(e)))
+            out.append("- " + item(e))
         if listed and (n is not gather or nested or not gathered):
             out.append("")
         if n is gather:

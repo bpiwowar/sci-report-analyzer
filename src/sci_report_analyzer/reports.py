@@ -808,10 +808,13 @@ def level_tags(folder_id: int | None) -> tuple[dict[str, str], str | None]:
     return {lv.key: lv.tag for lv in levels(folder_id)}, default_level(folder_id)
 
 
-def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
+def folder_context(
+    stats: list[PubStat], period_id: int | None, *, anchors: bool = False
+) -> Context:
     """For the notes of the folder of a period (the person's in it): its star lists (their
     papers numbered there), its numbering and its templates; the papers to discuss, those
-    of the lists to cite (none: those of the period's years)."""
+    of the lists to cite (none: those of the period's years). ``anchors``: the excerpts'
+    items marked with their ids (for a preview, see categories.markdown)."""
     from . import annotations, source_settings
 
     keys = citation_keys(stats)
@@ -845,6 +848,7 @@ def folder_context(stats: list[PubStat], period_id: int | None) -> Context:
             level=block.level,
             root=keys.get(block.target) if block.target else None,
             exclude=[keys[k] for k in block.others if k in keys],
+            anchors=anchors,
         )
 
     n = numbering(folder_id)
