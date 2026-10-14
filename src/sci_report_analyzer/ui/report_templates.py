@@ -16,10 +16,10 @@ HELP = N_(
     "The texts a report can start from: its headings, the blocks `[[publications]]` (the "
     "summary of the publications), `[[excerpts]]` (the excerpts by category; "
     "`[[excerpts#id]]`: those of the category of that id, then left out of the others), "
-    "`[[references]]` (the papers cited), and guidance as comments `%% … %%` (left out when "
-    "shown or copied). A folder's starting notes are copied from one (its settings: Reports), "
-    "and a report from one (its toolbar), which also makes one from a report: its headings "
-    "and blocks."
+    "`[[cv]]` (the person's career), `[[references]]` (the papers cited), and guidance as "
+    "comments `%% … %%` (left out when shown or copied). A folder's starting notes are copied "
+    "from one (its settings: Reports), and a report from one (its toolbar), which also makes "
+    "one from a report: its headings and blocks."
 )
 
 

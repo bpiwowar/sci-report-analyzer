@@ -815,7 +815,7 @@ def folder_context(
     papers numbered there), its numbering and its templates; the papers to discuss, those
     of the lists to cite (none: those of the period's years). ``anchors``: the excerpts'
     items marked with their ids (for a preview, see categories.markdown)."""
-    from . import annotations, source_settings
+    from . import annotations, career, source_settings
 
     keys = citation_keys(stats)
     with session_scope() as s:
@@ -871,7 +871,11 @@ def folder_context(
         number_format=n.format,
         templates=load_templates(folder_id).names,
         discuss=discuss,
-        blocks={"publications": publications, "excerpts": excerpts},
+        blocks={
+            "publications": publications,
+            "excerpts": excerpts,
+            "cv": lambda _block: career.markdown(person_id),
+        },
         lists=lists,
         cite_default=n.cite,
         lang=lang,
