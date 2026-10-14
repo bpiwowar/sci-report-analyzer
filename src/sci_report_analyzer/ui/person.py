@@ -1,4 +1,5 @@
-"""Person page: publications panel, sources (auto-match validation), periods, theses."""
+"""Person page: publications panel, sources (auto-match validation), career, periods,
+theses."""
 
 from __future__ import annotations
 
@@ -8,7 +9,7 @@ from html import escape
 from fastapi import Request
 from nicegui import background_tasks, ui
 
-from .. import annotations, folders, manual, persons, source_settings, theses
+from .. import annotations, career, folders, manual, persons, source_settings, theses
 from ..db.models import Person, SourceLink, Thesis
 from ..i18n import _, ngettext
 from ..sources import ADAPTERS
@@ -109,6 +110,7 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
                 panel.build()
             with ui.tab_panel("sources"):
                 _person_actions(person)
+                career_view(person_id)
                 panel.names_box = ui.column().classes("w-full").mark("name-variants")
                 panel.render_names()
                 sources_view(person_id, on_change=panel.reload)
@@ -161,7 +163,11 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
                         )
             with ui.row().classes("items-baseline gap-x-2 gap-y-0"):
                 ui.label(person.name).classes("text-xl font-medium")
-                if person.affiliation:
+                if now := career.current(person.id):
+                    ui.label(now.line()).classes("text-sm text-grey").tooltip(
+                        _("Current position (Profile → Career)")
+                    ).mark("current-position")
+                elif person.affiliation:
                     ui.label(person.affiliation).classes("text-sm text-grey")
         with ui.tabs(value=tab).props("inline-label dense").classes("grow") as tabs:
             ui.tab("publications", _("Publications"), icon="article")
@@ -193,6 +199,163 @@ def _person_actions(person: Person) -> None:
         ui.button(
             _("Delete the person"), icon="delete", on_click=lambda: _delete_dialog(person)
         ).props("flat color=negative").mark("delete-person")
+
+
+def career_view(person_id: int) -> None:
+    """The person's CV: their positions and diplomas, dated, the most recent first."""
+    with ui.row().classes("w-full items-center gap-2 mt-2"):
+        ui.label(_("Career")).classes("text-lg")
+        ui.button(
+            _("Add"), icon="add", on_click=lambda: _career_dialog(person_id, None, listing.refresh)
+        ).props("flat dense").mark("career-add")
+
+    @ui.refreshable
+    def listing() -> None:
+        rows = career.entries(person_id)
+        found = career.own_theses(person_id)
+        if not rows and not found:
+            ui.label(
+                _(
+                    "No position or diploma yet: their CV (e.g. “2019–2023 Postdoc, Inria”, "
+                    "“2018 PhD” and its thesis), the current position being that without an "
+                    "end; a report shows it with the block [[cv]]."
+                )
+            ).classes("text-sm text-grey")
+        with ui.column().classes("w-full gap-0").mark("career"):
+            for e in rows:
+                with ui.row().classes("w-full items-start gap-2 no-wrap"):
+                    ui.icon(
+                        "school" if e.kind == "diploma" else "work",
+                        color="primary" if e.current else "grey",
+                    ).classes("mt-1")
+                    ui.label(e.when()).classes("w-32 shrink-0 text-grey")
+                    with ui.column().classes("gap-0 grow"):
+                        with ui.row().classes("items-center gap-2"):
+                            ui.label(e.line()).classes("font-medium" if e.current else "")
+                            if e.current:
+                                ui.badge(_("current"), color="primary").props("outline")
+                        if e.details:
+                            ui.label(e.details).classes(
+                                "text-sm text-grey" + (" italic" if e.kind == "diploma" else "")
+                            )
+                    ui.button(
+                        icon="edit",
+                        on_click=lambda e=e: _career_dialog(person_id, e, listing.refresh),
+                    ).props("flat round dense size=sm").mark(f"career-edit-{e.id}")
+        for t in found:  # (their own thesis on theses.fr, to add)
+            with ui.row().classes("items-center gap-2 text-sm text-grey"):
+                ui.icon("school")
+                ui.label(
+                    _("Own thesis on theses.fr: {title} ({year})").format(
+                        title=t.details or "?", year=t.end or _("in progress")
+                    )
+                )
+                ui.button(
+                    _("Add to the career"),
+                    on_click=lambda t=t: _career_dialog(person_id, t, listing.refresh),
+                ).props("flat dense size=sm").mark("career-add-thesis")
+
+    listing()
+
+
+def _career_dialog(person_id: int, entry: career.Entry | None, on_change) -> None:
+    """A line of the CV to add (``entry`` without id: a suggested one) or edit."""
+    e = entry or career.Entry("position", "")
+    with transient_dialog(
+        _("Edit the line") if e.id else _("Add to the career"), width="w-full max-w-lg"
+    ) as (dlg, _card):
+        kind = ui.toggle({k: _(v) for k, v in career.KINDS.items()}, value=e.kind).mark(
+            "career-kind"
+        )
+        title = (
+            ui.input(_("Title"), value=e.title)
+            .classes("w-full")
+            .mark("career-title")
+            .bind_label_from(
+                kind,
+                "value",
+                lambda k: (
+                    _("Diploma (e.g. PhD in computer science, HDR)")
+                    if k == "diploma"
+                    else _("Position (e.g. Associate professor)")
+                ),
+            )
+        )
+        institution = (
+            ui.input(_("Institution"), value=e.institution or "")
+            .classes("w-full")
+            .mark("career-institution")
+        )
+        with ui.row().classes("w-full gap-2 no-wrap"):
+            start = (
+                ui.input(_("From"), value=e.start or "", placeholder="2019, 2019-09")
+                .classes("grow")
+                .mark("career-start")
+            )
+            end = (
+                ui.input(_("To"), value=e.end or "", placeholder="2023-08")
+                .classes("grow")
+                .mark("career-end")
+                .tooltip(_("A position without an end: the current one; a diploma: when obtained"))
+            )
+        details = (
+            ui.textarea(_("Details"), value=e.details or "")
+            .props("autogrow")
+            .classes("w-full")
+            .mark("career-details")
+            .bind_label_from(
+                kind,
+                "value",
+                lambda k: (
+                    _("Thesis (its title, supervisors…)")
+                    if k == "diploma"
+                    else _("Details (team, subject…)")
+                ),
+            )
+        )
+
+        before = career.current(person_id)
+
+        def changed() -> None:
+            on_change()
+            if career.current(person_id) != before:
+                ui.navigate.reload()  # (the current position, in the header)
+
+        def save() -> bool | None:
+            if not (title.value or "").strip():
+                ui.notify(_("A title is needed"), type="warning")
+                return False
+            if not (career.valid_date(start.value) and career.valid_date(end.value)):
+                ui.notify(_("Dates as 2019, 2019-09 or 2019-09-01"), type="warning")
+                return False
+            career.save(
+                person_id,
+                career.Entry(
+                    kind.value,
+                    title.value,
+                    start.value,
+                    end.value,
+                    institution.value,
+                    details.value,
+                    e.thesis_id,
+                    id=e.id,
+                ),
+            )
+            changed()
+
+        def remove() -> None:
+            career.delete(e.id)
+            dlg.close()
+            changed()
+
+        with ui.row().classes("w-full items-center"):
+            if e.id:
+                ui.button(_("Delete"), on_click=remove).props("flat color=negative").mark(
+                    "career-delete"
+                )
+            ui.space()
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Save"), on_click=ok_handler(dlg, save)).mark("career-save")
 
 
 def _edit_dialog(person: Person) -> None:

@@ -52,6 +52,30 @@ class Person(Base):
     periods: Mapped[list[Period]] = relationship(
         back_populates="person", cascade="all, delete-orphan", order_by="Period.id"
     )
+    career: Mapped[list[CareerEntry]] = relationship(
+        back_populates="person", cascade="all, delete-orphan", order_by="CareerEntry.id"
+    )
+
+
+class CareerEntry(Base):
+    """A line of a person's CV: a position held, or a diploma (e.g. a PhD and its thesis)."""
+
+    __tablename__ = "career_entry"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[int] = mapped_column(ForeignKey("person.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # position | diploma
+    # Dates as typed: a year, YYYY-MM or YYYY-MM-DD. A position without an end: the current
+    # one; a diploma: when obtained (its end; its start, that of the PhD, if known).
+    start: Mapped[str | None] = mapped_column(String(10))
+    end: Mapped[str | None] = mapped_column(String(10))
+    title: Mapped[str]  # "Associate professor", "PhD in computer science"…
+    institution: Mapped[str | None]
+    # A diploma's thesis (its title), else details (team, subject, supervisors…).
+    details: Mapped[str | None]
+    thesis_id: Mapped[str | None]  # (the own thesis on theses.fr it was made from)
+
+    person: Mapped[Person] = relationship(back_populates="career")
 
 
 class SourceLink(Base):

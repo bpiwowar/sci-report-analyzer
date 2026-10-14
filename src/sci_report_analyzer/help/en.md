@@ -9,6 +9,10 @@ and reports, to prepare an evaluation.
 
 1. **Add a person** (name, optional affiliation). Every source is searched and the possible
    profiles are listed as *candidates* in the **Profile** tab (also where the person is edited, purged or deleted).
+   Their **career** (their CV) is built there too: positions and diplomas, dated (a year,
+   `2019-09` or `2019-09-01`), a diploma with its thesis; the position without an end is the
+   current one, shown under their name. Their own thesis on theses.fr (once validated) is
+   offered as a PhD to add. A report shows the CV with the block `[[cv]]`.
 2. **Validate** the right profiles and **reject** the others. Only validated profiles are used.
    You can also paste a profile URL or id (DBLP, HAL, ORCID, Semantic Scholar, Google Scholar,
    theses.fr, OpenAlex). Once a source is validated, a candidate's papers can be **checked
@@ -266,7 +270,7 @@ with their notes, their tags). Blocks are written `[[name]]` (formerly `[]{.name
 read).
 
 **Report templates** (Settings → Report templates): the texts a report starts from, their
-headings, blocks (`[[publications]]`, `[[excerpts]]`, `[[references]]`) and guidance as
+headings, blocks (`[[publications]]`, `[[excerpts]]`, `[[cv]]`, `[[references]]`) and guidance as
 comments (`%% … %%`, left out when shown or copied); one is shipped. A folder's starting
 notes (its settings, Reports tab: “From a template”) are copied from one; the toolbar's 📄
 button of the folder notes starts them from one (asked first when they are written), or

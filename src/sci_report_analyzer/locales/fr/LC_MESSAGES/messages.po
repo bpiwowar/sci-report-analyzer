@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-12 10:35+0200\n"
+"POT-Creation-Date: 2026-10-14 08:59+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -281,6 +281,9 @@ msgstr "Une composante de cette conférence commune"
 msgid "A percentage is compared with p"
 msgstr "Un pourcentage se compare à p"
 
+msgid "A position without an end: the current one; a diploma: when obtained"
+msgstr "Un poste sans fin : le poste actuel ; un diplôme : quand il a été obtenu"
+
 msgid "A report template needs a name"
 msgstr "Un modèle de rapport doit avoir un nom"
 
@@ -307,6 +310,9 @@ msgstr "Une synchronisation est déjà en cours"
 
 msgid "A sync is running and would be interrupted."
 msgstr "Une synchronisation est en cours et serait interrompue."
+
+msgid "A title is needed"
+msgstr "Il faut un intitulé"
 
 msgid "A track added by hand"
 msgstr "Une session ajoutée à la main"
@@ -551,6 +557,9 @@ msgstr "Ajouter à un dossier"
 
 msgid "Add to folder"
 msgstr "Ajouter au dossier"
+
+msgid "Add to the career"
+msgstr "Ajouter au parcours"
 
 #, python-brace-format
 msgid "Add {ref}"
@@ -895,6 +904,9 @@ msgstr ""
 msgid "Candidates to review"
 msgstr "Candidats à examiner"
 
+msgid "Career"
+msgstr "Parcours"
+
 msgid "Categories (where excerpts of the people's documents are filed)"
 msgstr "Catégories (où sont classés les extraits des documents des personnes)"
 
@@ -1225,6 +1237,9 @@ msgstr "Créer une catégorie nommée comme saisi ci-dessus"
 msgid "Create under"
 msgstr "Créer sous"
 
+msgid "Current position (Profile → Career)"
+msgstr "Poste actuel (Profil → Parcours)"
+
 msgid "Custom level."
 msgstr "Niveau personnalisé."
 
@@ -1273,6 +1288,9 @@ msgstr "Jeu de données"
 
 msgid "Date"
 msgstr "Date"
+
+msgid "Dates as 2019, 2019-09 or 2019-09-01"
+msgstr "Des dates comme 2019, 2019-09 ou 2019-09-01"
 
 msgid "Declared by"
 msgstr "Déclaré par"
@@ -1376,6 +1394,9 @@ msgstr "Supprime le dossier et ses périodes (les personnes sont conservées)"
 msgid "Details"
 msgstr "Détails"
 
+msgid "Details (team, subject…)"
+msgstr "Détails (équipe, sujet…)"
+
 #, python-brace-format
 msgid "Detection rule {name}"
 msgstr "Règle de détection {name}"
@@ -1385,6 +1406,12 @@ msgstr "Règles de détection"
 
 msgid "Detection rules saved"
 msgstr "Règles de détection enregistrées"
+
+msgid "Diploma"
+msgstr "Diplôme"
+
+msgid "Diploma (e.g. PhD in computer science, HDR)"
+msgstr "Diplôme (p. ex. doctorat en informatique, HDR)"
 
 msgid "Discard"
 msgstr "Abandonner"
@@ -1520,6 +1547,9 @@ msgstr "Modifier les catégories"
 
 msgid "Edit the folder"
 msgstr "Modifier le dossier"
+
+msgid "Edit the line"
+msgstr "Modifier la ligne"
 
 msgid "Edit the person"
 msgstr "Modifier la personne"
@@ -2905,6 +2935,15 @@ msgstr ""
 " nommés (p. ex. « HDR 2015–2024 ») ; dans chaque période, les articles "
 "peuvent recevoir une étoile, des étiquettes et des notes."
 
+msgid ""
+"No position or diploma yet: their CV (e.g. “2019–2023 Postdoc, Inria”, "
+"“2018 PhD” and its thesis), the current position being that without an "
+"end; a report shows it with the block [[cv]]."
+msgstr ""
+"Aucun poste ni diplôme pour l'instant : son CV (p. ex. « 2019–2023 "
+"Postdoc, Inria », « 2018 Doctorat » et sa thèse), le poste actuel étant "
+"celui sans fin ; un rapport l'affiche avec le bloc [[cv]]."
+
 msgid "No publication yet: validate and sync sources in the Sources tab."
 msgstr ""
 "Aucune publication pour l'instant : validez et synchronisez des sources "
@@ -3299,6 +3338,10 @@ msgid "Own thesis"
 msgstr "Thèse personnelle"
 
 #, python-brace-format
+msgid "Own thesis on theses.fr: {title} ({year})"
+msgstr "Sa thèse sur theses.fr : {title} ({year})"
+
+#, python-brace-format
 msgid "PDF from {source}: {url}"
 msgstr "PDF de {source} : {url}"
 
@@ -3412,6 +3455,9 @@ msgstr "Période enregistrée"
 msgid "Periods"
 msgstr "Périodes"
 
+msgid "PhD"
+msgstr "Doctorat"
+
 msgid "PhD student"
 msgstr "Doctorant"
 
@@ -3429,6 +3475,12 @@ msgstr "Doctorant…"
 
 msgid "Pick a ranking record"
 msgstr "Choisir une fiche de classement"
+
+msgid "Position"
+msgstr "Poste"
+
+msgid "Position (e.g. Associate professor)"
+msgstr "Poste (p. ex. maître de conférences)"
 
 msgid "Predatory list"
 msgstr "Liste des prédateurs"
@@ -4876,11 +4928,12 @@ msgstr "Les notes de départ copiées d'un modèle de rapport (Paramètres)"
 msgid ""
 "The text a person's notes start with, while empty (e.g. headings and the "
 "blocks [[publications]]: the summary of their publications, [[excerpts]]:"
-" their excerpts by category)"
+" their excerpts by category, [[cv]]: their career)"
 msgstr ""
 "Le texte par lequel commencent les notes d'une personne, tant qu'elles "
 "sont vides (p. ex. des titres et les blocs [[publications]] : le résumé "
-"de ses publications, [[excerpts]] : ses extraits par catégorie)"
+"de ses publications, [[excerpts]] : ses extraits par catégorie, [[cv]] : "
+"son parcours)"
 
 msgid "The text of the group (edit it with its pencil)"
 msgstr "Le texte du groupe (modifiez-le avec son crayon)"
@@ -4896,20 +4949,21 @@ msgid ""
 "The texts a report can start from: its headings, the blocks "
 "`[[publications]]` (the summary of the publications), `[[excerpts]]` (the"
 " excerpts by category; `[[excerpts#id]]`: those of the category of that "
-"id, then left out of the others), `[[references]]` (the papers cited), "
-"and guidance as comments `%% … %%` (left out when shown or copied). A "
-"folder's starting notes are copied from one (its settings: Reports), and "
-"a report from one (its toolbar), which also makes one from a report: its "
-"headings and blocks."
+"id, then left out of the others), `[[cv]]` (the person's career), "
+"`[[references]]` (the papers cited), and guidance as comments `%% … %%` "
+"(left out when shown or copied). A folder's starting notes are copied "
+"from one (its settings: Reports), and a report from one (its toolbar), "
+"which also makes one from a report: its headings and blocks."
 msgstr ""
 "Les textes dont un rapport peut partir : ses titres, les blocs "
 "`[[publications]]` (le résumé des publications), `[[excerpts]]` (les "
 "extraits par catégorie ; `[[excerpts#id]]` : ceux de la catégorie de cet "
-"identifiant, alors omis des autres), `[[references]]` (les articles "
-"cités), et des consignes en commentaires `%% … %%` (omis à l'affichage et"
-" à la copie). Les notes de départ d'un dossier sont copiées de l'un d'eux"
-" (ses paramètres : Rapports), et un rapport aussi (sa barre d'outils), "
-"qui en fait également un à partir d'un rapport : ses titres et ses blocs."
+"identifiant, alors omis des autres), `[[cv]]` (le parcours de la "
+"personne), `[[references]]` (les articles cités), et des consignes en "
+"commentaires `%% … %%` (omis à l'affichage et à la copie). Les notes de "
+"départ d'un dossier sont copiées de l'un d'eux (ses paramètres : "
+"Rapports), et un rapport aussi (sa barre d'outils), qui en fait également"
+" un à partir d'un rapport : ses titres et ses blocs."
 
 msgid "The track's identifier (in the exported settings)"
 msgstr "L'identifiant de la session (dans les paramètres exportés)"
@@ -5020,6 +5074,9 @@ msgstr "Thèse"
 
 msgid "Thesis (PhD & other)"
 msgstr "Thèse (doctorat et autres)"
+
+msgid "Thesis (its title, supervisors…)"
+msgstr "Thèse (son titre, ses directeurs…)"
 
 msgid ""
 "They are on one item (in the order of their PDFs), with the second one's "
@@ -5714,6 +5771,9 @@ msgstr "conflit : la règle d'un autre canal de publication correspond aussi"
 msgid "corrected"
 msgstr "corrigé"
 
+msgid "current"
+msgstr "actuel"
+
 msgid "default"
 msgstr "par défaut"
 
@@ -6318,6 +6378,10 @@ msgstr "afficher les masqués ({n})"
 
 msgid "similar name"
 msgstr "nom proche"
+
+#, python-brace-format
+msgid "since {start}"
+msgstr "depuis {start}"
 
 #, python-brace-format
 msgid "since {year}"

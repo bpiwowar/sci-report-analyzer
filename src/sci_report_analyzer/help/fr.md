@@ -9,6 +9,10 @@ et des rapports, pour préparer une évaluation.
 
 1. **Ajoutez une personne** (nom, affiliation facultative). Chaque source est interrogée et les profils
    possibles sont listés comme *candidats* dans l'onglet **Profil** (où l'on modifie, purge ou supprime aussi la personne).
+   Son **parcours** (son CV) s'y construit aussi : postes et diplômes, datés (une année,
+   `2019-09` ou `2019-09-01`), un diplôme avec sa thèse ; le poste sans fin est le poste
+   actuel, affiché sous son nom. Sa propre thèse sur theses.fr (une fois validée) est proposée
+   comme doctorat à ajouter. Un rapport affiche le CV avec le bloc `[[cv]]`.
 2. **Validez** les bons profils et **rejetez** les autres. Seuls les profils validés sont utilisés.
    Vous pouvez aussi coller l'URL ou l'identifiant d'un profil (DBLP, HAL, ORCID, Semantic Scholar, Google Scholar,
    theses.fr, OpenAlex). Une fois une source validée, les articles d'un candidat peuvent être **confrontés
@@ -268,7 +272,7 @@ d'outils ; `[[references notes tags]]` : avec leurs notes, leurs étiquettes). L
 s'écrivent `[[nom]]` (autrefois `[]{.nom}`, toujours lu).
 
 **Modèles de rapport** (Paramètres → Modèles de rapport) : les textes dont un rapport part,
-ses titres, ses blocs (`[[publications]]`, `[[excerpts]]`, `[[references]]`) et des
+ses titres, ses blocs (`[[publications]]`, `[[excerpts]]`, `[[cv]]`, `[[references]]`) et des
 consignes en commentaires (`%% … %%`, omis à l'affichage et à la copie) ; un est fourni. Les
 notes de départ d'un dossier (ses réglages, onglet Rapports : « D'un modèle ») sont copiées
 de l'un d'eux ; le bouton 📄 de la barre d'outils des notes du dossier les fait partir de l'un

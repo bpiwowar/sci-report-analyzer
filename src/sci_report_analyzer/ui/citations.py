@@ -354,7 +354,7 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
                 _(
                     "The text a person's notes start with, while empty (e.g. headings and the "
                     "blocks [[publications]]: the summary of their publications, "
-                    "[[excerpts]]: their excerpts by category)"
+                    "[[excerpts]]: their excerpts by category, [[cv]]: their career)"
                 )
             )
             .mark("folder-skeleton")
