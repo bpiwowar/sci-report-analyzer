@@ -7,8 +7,11 @@ et des rapports, pour préparer une évaluation.
 
 ## Personnes et sources
 
-1. **Ajoutez une personne** (nom, affiliation facultative). Chaque source est interrogée et les profils
-   possibles sont listés comme *candidats* dans l'onglet **Profil** (où l'on modifie, purge ou supprime aussi la personne).
+1. **Ajoutez une personne** (nom, affiliation et ORCID facultatifs, les sources à interroger ;
+   dans un dossier, sa période et ses étiquettes). Les sources sont interrogées et les profils
+   possibles listés dans la fenêtre : cochez les bons (les plus probables le sont) pour les
+   valider tout de suite. Les autres restent *candidats* dans l'onglet **Profil** (où l'on
+   modifie, purge ou supprime aussi la personne).
    Son **parcours** (son CV) s'y construit aussi : postes et diplômes, datés (une année,
    `2019-09` ou `2019-09-01`), un diplôme avec sa thèse ; le poste sans fin est le poste
    actuel, affiché sous son nom. Sa propre thèse sur theses.fr (une fois validée) est proposée

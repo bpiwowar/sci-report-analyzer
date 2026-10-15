@@ -3075,3 +3075,62 @@ async def test_related_conferences_of_a_conference(user: User) -> None:
     user.find(f"venue-related-workshop-{ids['ws']}").click()
     await user.should_see(marker="venue-back")  # the workshop's dialog
     await user.should_not_see(marker="venue-tab-related")  # (not a conference)
+
+
+async def test_add_person_picks_profiles_in_the_dialog(user: User, monkeypatch) -> None:
+    from sci_report_analyzer import folders, persons, sync
+    from sci_report_analyzer.sources import ADAPTERS
+    from sci_report_analyzer.sources.base import AuthorCandidate
+
+    searched = []
+
+    async def fake_search(self, name, affiliation=None):
+        searched.append(self.name)
+        return [  # the person (their ORCID), and a namesake (another one)
+            AuthorCandidate("dblp", "x/1", "Ann Smith", orcid="0000-0002-1825-0097"),
+            AuthorCandidate("dblp", "x/2", "Ann Smith", orcid="0000-0001-5109-3700"),
+        ]
+
+    synced = []
+
+    async def fake_sync(pid, **kw):
+        synced.append(pid)
+
+    monkeypatch.setattr(type(ADAPTERS["dblp"]), "search", fake_search)
+    monkeypatch.setattr(sync, "sync_person", fake_sync)
+    monkeypatch.setattr(sync, "_running", {})
+    fid = folders.save_folder(None, "Hiring committee")
+    await user.open(f"/?folder={fid}")
+    user.find("add-person").click()
+    await user.should_see("Full name")
+    user.find("Full name").type("Ann Smith")
+    user.find("add-person-orcid").type("0000-0002-1825-0097")
+    user.find("add-person-sources").elements.pop().value = ["dblp"]
+    user.find("add-person-start").elements.pop().value = 2020
+    user.find("add-person-end").elements.pop().value = 2024
+    user.find("add-person-tags").elements.pop().value = ["shortlisted"]
+    user.find("add-person-ok").click()
+    await user.should_see("Tick the person's profiles:")
+    assert searched == ["dblp"]
+    pid = _pid("Ann Smith")
+    links = {ln.external_id: ln for ln in persons.load(pid).links}
+    # The likely profile is ticked, the other not; the ticked one is validated.
+    assert user.find(f"add-person-pick-{links['x/1'].id}").elements.pop().value
+    assert not user.find(f"add-person-pick-{links['x/2'].id}").elements.pop().value
+    user.find("add-person-validate").click()
+    await asyncio.sleep(0.1)  # (the sync started)
+    person = persons.load(pid)
+    assert {ln.external_id for ln in person.links if ln.status == "validated"} == {"x/1"}
+    assert person.orcid == "0000-0002-1825-0097" and synced == [pid]
+    member = folders.folders()[0].members[0]
+    assert (member.start_year, member.end_year, member.tags) == (2020, 2024, ["shortlisted"])
+
+
+def _pid(name: str) -> int:
+    from sqlalchemy import select
+
+    from sci_report_analyzer.db.models import Person
+    from sci_report_analyzer.db.session import session_scope
+
+    with session_scope() as s:
+        return s.scalar(select(Person.id).where(Person.name == name))

@@ -587,7 +587,7 @@ async def _sync_one(
     await sync_link(link_id)
 
 
-def _link_url(ln: SourceLink) -> str | None:
+def link_url(ln: SourceLink) -> str | None:
     return ln.url or ADAPTERS[ln.source].profile_url(ln.external_id)
 
 
@@ -643,7 +643,7 @@ def sources_list(person_id: int) -> None:
         with ui.expansion(_("Rejected ({n})").format(n=len(rejected))).classes("w-full"):
             for ln in rejected:
                 with ui.row().classes("items-center gap-2"):
-                    source_tag(ln.source, url=_link_url(ln))
+                    source_tag(ln.source, url=link_url(ln))
                     ui.link(ln.display_name or ln.external_id, ln.url or "#", new_tab=True)
                     ui.button(
                         _("restore"), on_click=lambda i=ln.id: _set(person_id, i, "candidate")
@@ -684,7 +684,7 @@ def _set(person_id: int, link_id: int, status: str) -> None:
 def _validated_card(person_id: int, ln: SourceLink) -> None:
     adapter = ADAPTERS[ln.source]
     with ui.card().classes("w-full py-2"), ui.row().classes("w-full items-center gap-3"):
-        source_tag(ln.source, url=_link_url(ln))
+        source_tag(ln.source, url=link_url(ln))
         ui.link(
             ln.display_name or ln.external_id,
             ln.url or adapter.profile_url(ln.external_id),
@@ -767,7 +767,7 @@ def _candidate_card(
     ev = ln.evidence or {}
     with ui.card().classes("w-full"):
         with ui.row().classes("items-center gap-2 w-full"):
-            source_tag(ln.source, url=_link_url(ln))
+            source_tag(ln.source, url=link_url(ln))
             ui.link(ln.display_name or ln.external_id, ln.url or "#", new_tab=True).classes(
                 "font-medium"
             )
@@ -775,32 +775,8 @@ def _candidate_card(
             ui.badge(f"{ln.score:.2f}", color="positive" if ln.score >= 0.9 else "grey").tooltip(
                 _("match score (name, ORCID, affiliation, known titles, papers in common)")
             )
-        details = []
-        if ev.get("affiliation"):
-            details.append(ev["affiliation"])
-        if ev.get("works_count") is not None:
-            details.append(
-                ngettext("{n} work", "{n} works", ev["works_count"]).format(n=ev["works_count"])
-            )
-        own_id = ln.external_id if ln.source == "orcid" else ""
-        theirs = normalize_orcid(ev.get("orcid") or own_id)
-        if theirs:
-            same = orcid is not None and theirs == orcid
-            ui.badge(
-                f"ORCID {theirs}" + (" ✓" if same else " ≠" if orcid else ""),
-                color="positive" if same else "negative" if orcid else "grey-6",
-            ).props("outline" if not orcid else "").tooltip(
-                _("the person's ORCID")
-                if same
-                else _("not the person's ORCID ({orcid})").format(orcid=orcid)
-                if orcid
-                else _("set the person's ORCID (edit) to check it")
-            ).mark(f"candidate-orcid-{ln.id}")
-        if ev.get("topics"):
-            details.append(", ".join(t for t in ev["topics"] if t))
-        if ev.get("roles"):
-            details.append(", ".join(f"{k.split(' /')[0]}: {v}" for k, v in ev["roles"].items()))
-        for d in details:
+        orcid_badge(ln, orcid)
+        for d in candidate_details(ln):
             ui.label(d).classes("text-sm text-grey")
         for t in ev.get("sample_titles") or []:
             ui.label(f"• {t}").classes("text-xs")
@@ -827,6 +803,42 @@ def _candidate_card(
                 ).tooltip(_("Fetch its papers and check how many the validated sources have")).mark(
                     f"candidate-probe-{ln.id}"
                 )
+
+
+def candidate_details(ln: SourceLink) -> list[str]:
+    """What a candidate profile says of the person (affiliation, works, topics, roles)."""
+    ev = ln.evidence or {}
+    details = []
+    if ev.get("affiliation"):
+        details.append(ev["affiliation"])
+    if ev.get("works_count") is not None:
+        details.append(
+            ngettext("{n} work", "{n} works", ev["works_count"]).format(n=ev["works_count"])
+        )
+    if ev.get("topics"):
+        details.append(", ".join(t for t in ev["topics"] if t))
+    if ev.get("roles"):
+        details.append(", ".join(f"{k.split(' /')[0]}: {v}" for k, v in ev["roles"].items()))
+    return details
+
+
+def orcid_badge(ln: SourceLink, orcid: str | None) -> None:
+    """The candidate's ORCID, if any: green if the person's (``orcid``), red if another."""
+    own_id = ln.external_id if ln.source == "orcid" else ""
+    theirs = normalize_orcid((ln.evidence or {}).get("orcid") or own_id)
+    if not theirs:
+        return
+    same = orcid is not None and theirs == orcid
+    ui.badge(
+        f"ORCID {theirs}" + (" ✓" if same else " ≠" if orcid else ""),
+        color="positive" if same else "negative" if orcid else "grey-6",
+    ).props("outline" if not orcid else "").tooltip(
+        _("the person's ORCID")
+        if same
+        else _("not the person's ORCID ({orcid})").format(orcid=orcid)
+        if orcid
+        else _("set the person's ORCID (edit) to check it")
+    ).mark(f"candidate-orcid-{ln.id}")
 
 
 async def _probe(person_id: int, link_id: int) -> None:

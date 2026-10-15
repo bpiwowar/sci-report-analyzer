@@ -890,17 +890,6 @@ msgstr "Annuler"
 msgid "Cancel changes"
 msgstr "Annuler les modifications"
 
-msgid "Candidate profiles found — validate them in the Sources tab."
-msgstr "Profils candidats trouvés — validez-les dans l'onglet Sources."
-
-#, python-brace-format
-msgid ""
-"Candidate profiles found — validate them in the Sources tab. Some sources"
-" failed: {sources}"
-msgstr ""
-"Profils candidats trouvés — validez-les dans l'onglet Sources. Certaines "
-"sources ont échoué : {sources}"
-
 msgid "Candidates to review"
 msgstr "Candidats à examiner"
 
@@ -2418,6 +2407,9 @@ msgstr "Dernière synchronisation des sources de la personne"
 msgid "Later"
 msgstr "Plus tard"
 
+msgid "Later, in the Sources tab"
+msgstr "Plus tard, dans l'onglet Sources"
+
 #, python-brace-format
 msgid "Latest ({year}): {quartile}"
 msgstr "Dernier ({year}) : {quartile}"
@@ -2864,6 +2856,9 @@ msgstr "Aucun PDF stocké pour cet article."
 msgid "No acronym"
 msgstr "Pas d'acronyme"
 
+msgid "No candidate profile found: add their profiles by URL in the Sources tab."
+msgstr "Aucun profil candidat trouvé : ajoutez ses profils par URL dans l'onglet Sources."
+
 #, python-brace-format
 msgid "No category with the id “{key}”"
 msgstr "Aucune catégorie n'a l'identifiant « {key} »"
@@ -3215,6 +3210,9 @@ msgstr "Liste numérotée"
 msgid "OK"
 msgstr "OK"
 
+msgid "ORCID (optional)"
+msgstr "ORCID (facultatif)"
+
 #, python-brace-format
 msgid "ORCID {orcid} set: candidates with it are shown in green"
 msgstr "ORCID {orcid} défini : les candidats qui l'ont sont affichés en vert"
@@ -3470,6 +3468,9 @@ msgstr "Liste de références collée"
 
 msgid "People"
 msgstr "Personnes"
+
+msgid "Period in the folder"
+msgstr "Période dans le dossier"
 
 msgid "Period of interest"
 msgstr "Période d'intérêt"
@@ -4142,6 +4143,9 @@ msgstr "Rechercher un canal de publication"
 msgid "Search for another venue"
 msgstr "Rechercher un autre canal de publication"
 
+msgid "Search in"
+msgstr "Chercher dans"
+
 msgid "Search rankings as (empty: the venue's texts)"
 msgstr "Rechercher dans les classements avec (vide : les textes du canal)"
 
@@ -4409,6 +4413,10 @@ msgstr ""
 #, python-brace-format
 msgid "Some sources are not up to date: {names}"
 msgstr "Certaines sources ne sont pas à jour : {names}"
+
+#, python-brace-format
+msgid "Some sources failed: {sources}"
+msgstr "Certaines sources ont échoué : {sources}"
 
 #, python-brace-format
 msgid "Source texts ({n})"
@@ -5161,6 +5169,9 @@ msgstr "Ce canal est…"
 msgid "This venue's {track} track"
 msgstr "La session {track} de ce canal"
 
+msgid "Tick the person's profiles:"
+msgstr "Cochez les profils de la personne :"
+
 msgid "Title"
 msgstr "Titre"
 
@@ -5408,6 +5419,9 @@ msgstr "Valider pour cet article"
 
 msgid "Validate the inferred acronym (set it by hand)"
 msgstr "Valider l'acronyme déduit (le fixer à la main)"
+
+msgid "Validate the ticked ones"
+msgstr "Valider les profils cochés"
 
 msgid "Validate this match"
 msgstr "Valider cette correspondance"
@@ -6755,6 +6769,12 @@ msgstr[0] "{n} problème"
 msgstr[1] "{n} problèmes"
 
 #, python-brace-format
+msgid "{n} profile validated — syncing"
+msgid_plural "{n} profiles validated — syncing"
+msgstr[0] "{n} profil validé — synchronisation"
+msgstr[1] "{n} profils validés — synchronisation"
+
+#, python-brace-format
 msgid "{n} publication"
 msgid_plural "{n} publications"
 msgstr[0] "{n} publication"
@@ -7096,4 +7116,3 @@ msgstr "✓ C'est {name}"
 #, python-brace-format
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
-

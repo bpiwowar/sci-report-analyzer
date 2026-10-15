@@ -7,8 +7,11 @@ and reports, to prepare an evaluation.
 
 ## People and sources
 
-1. **Add a person** (name, optional affiliation). Every source is searched and the possible
-   profiles are listed as *candidates* in the **Profile** tab (also where the person is edited, purged or deleted).
+1. **Add a person** (name, optional affiliation and ORCID, the sources to search; in a
+   folder, their period and tags in it). The sources are searched and the possible profiles
+   are listed in the dialog: tick the right ones (the likely ones are) to validate them right
+   away. The others stay *candidates* in the **Profile** tab (also where the person is
+   edited, purged or deleted).
    Their **career** (their CV) is built there too: positions and diplomas, dated (a year,
    `2019-09` or `2019-09-01`), a diploma with its thesis; the position without an end is the
    current one, shown under their name. Their own thesis on theses.fr (once validated) is

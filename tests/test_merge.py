@@ -189,12 +189,14 @@ async def test_discover_searches_in_natural_name_order(monkeypatch):
 
     seen = []
 
-    async def fake_search(name, affiliation=None):
+    async def fake_search(self, name, affiliation=None):
         seen.append(name)
         return []
 
+    # (on the classes: patched on an instance, its method would be left on it afterwards,
+    # hiding later patches of its class)
     for a in ADAPTERS.values():
-        monkeypatch.setattr(a, "search", fake_search)
+        monkeypatch.setattr(type(a), "search", fake_search)
     pid = make_person("LEFEVRE Hélène")
     await sync.discover(pid)
     assert seen and set(seen) == {"Hélène LEFEVRE"}

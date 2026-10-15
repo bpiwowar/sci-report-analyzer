@@ -2,48 +2,38 @@
 
 from __future__ import annotations
 
-import contextlib
 from collections.abc import Callable
 from datetime import date
 from html import escape
 
-from nicegui import background_tasks, ui
+from nicegui import ui
 
 from .. import annotations, folders, i18n, manual, persons, pubview, reports, source_settings
 from ..db.models import Person
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
-from ..sync import any_running, discover, is_syncing, start_sync
+from ..sync import (
+    any_running,
+    default_search_sources,
+    discover,
+    is_syncing,
+    normalize_orcid,
+    set_link_status,
+    set_orcid,
+    start_sync,
+)
 from .categories_editor import categories_dialog
-from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
+from .dialogs import close_then, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
 from .folders_editor import ALL, folders_tree
-from .person import purge_dialog, remove_from_folder_dialog
+from .person import (
+    candidate_details,
+    link_url,
+    orcid_badge,
+    purge_dialog,
+    remove_from_folder_dialog,
+)
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
-
-
-async def _create(name: str, affiliation: str, folder_id: int | None = None) -> None:
-    pid = persons.create(name, affiliation)
-    if folder_id:
-        folders.add_person(folder_id, pid)
-    ui.notify(_("Searching sources for {name}…").format(name=name))
-
-    async def run() -> None:
-        errors = await discover(pid)
-        msg = (
-            _(
-                "Candidate profiles found — validate them in the Sources tab. "
-                "Some sources failed: {sources}"
-            ).format(sources=", ".join(errors))
-            if errors
-            else _("Candidate profiles found — validate them in the Sources tab.")
-        )
-        with contextlib.suppress(RuntimeError):  # the page may have been left
-            ui.notify(msg, type="warning" if errors else "positive", multi_line=True)
-
-    background_tasks.create(run())
-    ui.navigate.to(f"/person/{pid}?tab=sources")
-
 
 LAST_FOLDER = "ui.people.folder"  # the folder shown on the Reports page (sticky)
 
@@ -167,23 +157,188 @@ def _sync(person_ids: list[int] | None) -> None:
 
 
 def _add_dialog(current: folders.FolderView | None) -> None:
+    """Add a person: their name and a few settings, then their profiles searched and the
+    right ones ticked, all in the dialog."""
     title = (
         _("Add a person to “{folder}”").format(folder=current.name)
         if current
         else _("Add a person")
     )
-    with transient_dialog(title, width="w-96") as (dialog, _card):
-        name = ui.input(_("Full name")).classes("w-full").props("autofocus")
-        aff = ui.input(_("Affiliation (optional, helps matching)")).classes("w-full")
+    with transient_dialog(title, width="w-[40rem] max-w-full") as (dialog, _card):
+        with ui.column().classes("w-full gap-1") as form:
+            name = ui.input(_("Full name")).classes("w-full").props("autofocus")
+            aff = ui.input(_("Affiliation (optional, helps matching)")).classes("w-full")
+            orcid = (
+                ui.input(_("ORCID (optional)"), placeholder="0000-0002-1825-0097")
+                .classes("w-full")
+                .tooltip(_("Helps matching: profiles with this ORCID are shown in green"))
+                .mark("add-person-orcid")
+            )
+            where = (
+                ui.select(
+                    {
+                        n: a.label
+                        for n, a in ADAPTERS.items()
+                        if a.linkable and source_settings.enabled(n)
+                    },
+                    value=default_search_sources(),
+                    multiple=True,
+                    label=_("Search in"),
+                )
+                .props("dense use-chips")
+                .classes("w-full")
+                .mark("add-person-sources")
+            )
+            if current:
+                with ui.row().classes("items-center gap-2 no-wrap w-full"):
+                    ui.label(_("Period in the folder")).classes("text-sm")
+                    start = (
+                        ui.number(_("from"), format="%d")
+                        .props("dense outlined")
+                        .classes("w-24")
+                        .mark("add-person-start")
+                    )
+                    end = (
+                        ui.number(_("to"), format="%d")
+                        .props("dense outlined")
+                        .classes("w-24")
+                        .mark("add-person-end")
+                    )
+                tags = (
+                    ui.select(
+                        folders.tags_of(current),
+                        value=[],
+                        label=_("Tags"),
+                        multiple=True,
+                        new_value_mode="add-unique",
+                        with_input=True,
+                    )
+                    .props("dense use-chips")
+                    .classes("w-full")
+                    .mark("add-person-tags")
+                )
+        found = ui.column().classes("w-full gap-2")
+        buttons = ui.row().classes("w-full justify-end")
 
-        async def ok() -> bool:
+        async def search() -> None:
             if not name.value.strip():
-                return False
-            await _create(name.value, aff.value, current.id if current else None)
-            return True
+                return
+            given = normalize_orcid(orcid.value)
+            if orcid.value.strip() and given is None:
+                ui.notify(_("Not an ORCID (e.g. 0000-0002-1825-0097)"), type="warning")
+                return
+            pid = persons.create(name.value, aff.value)
+            if given:
+                set_orcid(pid, given)
+            if current:
+                period = folders.add_person(
+                    current.id, pid, int_or_none(start.value), int_or_none(end.value)
+                )
+                if tags.value:
+                    folders.set_tags(period, tags.value)
+            # The person exists now: closing the dialog goes to their page.
+            dialog.props("persistent")
+            form.set_visibility(False)
+            buttons.clear()
+            with found, ui.row().classes("items-center gap-2"):
+                ui.spinner()
+                ui.label(_("Searching sources for {name}…").format(name=name.value))
+            errors = await discover(pid, where.value or [])
+            if dialog.is_deleted:
+                return
+            _candidates(pid, given, errors, found, buttons, dialog)
 
-        name.on("keydown.enter", ok_handler(dialog, ok))
-        actions(dialog, _("Add & search sources"), ok)
+        name.on("keydown.enter", search)
+        with buttons:
+            ui.button(_("Cancel"), on_click=dialog.close).props("flat")
+            ui.button(_("Add & search sources"), icon="search", on_click=search).mark(
+                "add-person-ok"
+            )
+
+
+def _candidates(
+    pid: int,
+    orcid: str | None,
+    errors: dict[str, str],
+    found: ui.column,
+    buttons: ui.row,
+    dialog: ui.dialog,
+) -> None:
+    """The profiles found for a new person, to tick (the likely ones are)."""
+    links = sorted(
+        (ln for ln in persons.load(pid).links if ln.status == "candidate"),
+        key=lambda ln: (-ln.score, ln.source),
+    )
+    picked: dict[int, ui.checkbox] = {}
+    found.clear()
+    with found:
+        if errors:
+            ui.label(
+                _("Some sources failed: {sources}").format(
+                    sources="; ".join(f"{k}: {v}" for k, v in errors.items())
+                )
+            ).classes("text-sm text-orange-9")
+        if not links:
+            ui.label(
+                _("No candidate profile found: add their profiles by URL in the Sources tab.")
+            ).classes("text-grey")
+        else:
+            ui.label(_("Tick the person's profiles:")).classes("text-sm")
+        with ui.column().classes("w-full gap-1 max-h-[60vh] overflow-auto"):
+            for ln in links:
+                with ui.row().classes("w-full items-start gap-2 no-wrap"):
+                    picked[ln.id] = ui.checkbox(value=ln.score >= 0.9).mark(
+                        f"add-person-pick-{ln.id}"
+                    )
+                    with ui.column().classes("gap-0 grow"):
+                        with ui.row().classes("items-center gap-2"):
+                            source_tag(ln.source, url=link_url(ln))
+                            ui.link(
+                                ln.display_name or ln.external_id, ln.url or "#", new_tab=True
+                            ).classes("font-medium")
+                            ui.badge(
+                                f"{ln.score:.2f}",
+                                color="positive" if ln.score >= 0.9 else "grey",
+                            ).tooltip(
+                                _(
+                                    "match score (name, ORCID, affiliation, known titles, "
+                                    "papers in common)"
+                                )
+                            )
+                            orcid_badge(ln, orcid)
+                        if details := candidate_details(ln):
+                            ui.label(" · ".join(details)).classes("text-xs text-grey")
+
+    def done() -> None:
+        chosen = [i for i, box in picked.items() if box.value]
+        for i in chosen:
+            set_link_status(i, "validated")
+        if chosen:
+            start_sync(pid)
+            ui.notify(
+                ngettext(
+                    "{n} profile validated — syncing",
+                    "{n} profiles validated — syncing",
+                    len(chosen),
+                ).format(n=len(chosen)),
+                type="positive",
+            )
+        ui.navigate.to(f"/person/{pid}" if chosen else f"/person/{pid}?tab=sources")
+        dialog.close()
+
+    buttons.clear()
+    with buttons:
+        ui.button(_("Later, in the Sources tab"), on_click=lambda: _later(pid, dialog)).props(
+            "flat"
+        ).mark("add-person-later")
+        ui.button(_("Validate the ticked ones"), icon="check", on_click=done).mark(
+            "add-person-validate"
+        )
+
+
+def _later(pid: int, dialog: ui.dialog) -> None:
+    ui.navigate.to(f"/person/{pid}?tab=sources")
+    dialog.close()
 
 
 # ---- a folder ------------------------------------------------------------------------------
