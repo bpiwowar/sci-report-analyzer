@@ -399,7 +399,7 @@ class Excerpt(Base):
     markers: whether it shows the person's influence ("rayonnement": invited talks, prizes,
     committees…), is salient ("saillant"), or a caveat ("bémol"); its level (e.g. national:
     one of the folder's, see reports.levels; none: the folder's default); whether it is
-    discarded from the generated text."""
+    discarded from the generated text; a commentary on it."""
 
     __tablename__ = "excerpt"
 
@@ -440,6 +440,9 @@ class Excerpt(Base):
     # Leading a group: the group's text, as edited (none: the quotes of its excerpts).
     group_text: Mapped[str | None] = mapped_column(Text)
     original: Mapped[str | None] = mapped_column(Text)  # (its text as selected, if edited since)
+    # A commentary on it (Markdown; that of the group it leads): an Obsidian comment after its
+    # item in the notes (``%% … %%``, not shown).
+    comment: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     # Its tags (those of the group it leads; the others of a group: none).
     tags: Mapped[list[Tag]] = relationship(

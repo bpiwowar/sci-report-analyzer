@@ -641,6 +641,7 @@ class ExcerptView:
     caveat: bool = False
     discarded: bool = False  # (left out of the generated text: see set_discarded)
     level: str | None = None  # (its level's key, see reports.levels; none: the folder's default)
+    comment: str | None = None  # (a commentary, Markdown; leading a group: the group's)
 
     @property
     def tag_names(self) -> list[str]:
@@ -697,6 +698,7 @@ def similar_excerpts(
             hay = " ".join(
                 [
                     e.group_text or "",
+                    e.comment or "",
                     *(f"{x.text} {x.source}" for x in e.parts),
                     *(f"#{t}" for t in e.tag_names),
                 ]
@@ -837,6 +839,7 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
                 caveat=e.caveat,
                 discarded=e.discarded,
                 level=e.level,
+                comment=e.comment,
             )
             for e, doc, title, colour in rows
         ]
@@ -978,7 +981,7 @@ def remove_excerpt(excerpt_id: int) -> None:
                 lead.start_year, lead.end_year = e.start_year, e.end_year
                 lead.influence, lead.salient, lead.caveat = e.influence, e.salient, e.caveat
                 lead.discarded, lead.level = e.discarded, e.level
-                lead.group_text = e.group_text
+                lead.group_text, lead.comment = e.group_text, e.comment
                 lead.tags = list(e.tags)
                 for x in others[1:]:
                     x.group_id = lead.id
@@ -1018,8 +1021,8 @@ def update_excerpt(
 def merge_excerpts(source_id: int, target_id: int, *, ref_only: bool = False) -> str | None:
     """Group an excerpt (with its group, if any) with another one: each keeps its text and
     place (``ref_only``: only its place is cited); the group takes the target group's
-    category, years, markers and text, and the tags of both. Returns why it cannot be
-    done, if so."""
+    category, years, markers and text, the tags of both, and their commentaries (the
+    target's first). Returns why it cannot be done, if so."""
     with session_scope() as s:
         a, b = s.get(Excerpt, source_id), s.get(Excerpt, target_id)
         if a is None or b is None:
@@ -1029,6 +1032,8 @@ def merge_excerpts(source_id: int, target_id: int, *, ref_only: bool = False) ->
         if source.id == lead.id:
             return _("Already together")
         source.group_text = None
+        lead.comment = "\n\n".join(c for c in (lead.comment, source.comment) if c) or None
+        source.comment = None
         lead.tags = sorted({*lead.tags, *source.tags}, key=lambda t: t.name)
         for x in [source, *_members(s, source.id)]:
             x.group_id, x.category_id = lead.id, lead.category_id
@@ -1057,6 +1062,13 @@ def set_group_text(excerpt_id: int, text: str | None) -> None:
     with session_scope() as s:
         if e := s.get(Excerpt, excerpt_id):
             e.group_text = " ".join(text.split()) if text and text.strip() else None
+
+
+def set_comment(excerpt_id: int, text: str | None) -> None:
+    """The commentary on an excerpt (Markdown; that of the group it leads; blank: none)."""
+    with session_scope() as s:
+        if e := s.get(Excerpt, excerpt_id):
+            e.comment = text.strip() if text and text.strip() else None
 
 
 def split_excerpt(excerpt_id: int) -> None:
@@ -1099,7 +1111,8 @@ def _markdown_item(e: ExcerptView, *, comments: bool = True, marks: list[str] = 
     its markers), its quotes (a group: on one item; summarised, as one text if edited, its
     quotes kept in the comment with their places; those merged as references only: their
     places), each with its places between Obsidian comments (``%% Application, p. 4; p. 12
-    %%``; without ``comments``: in parentheses), then its years."""
+    %%``; without ``comments``: in parentheses), then its years, then its commentary in an
+    Obsidian comment (without ``comments``: none; over lines: see _bullet)."""
     from .pubview import hashtag
 
     chunks: list[tuple[str | None, list[str]]] = []  # (a quote, its places)
@@ -1124,7 +1137,15 @@ def _markdown_item(e: ExcerptView, *, comments: bool = True, marks: list[str] = 
     wrap = "%% {} %%" if comments else "({})"
     quotes = [(f"{t} " if t else "") + wrap.format("; ".join(places)) for t, places in chunks]
     tags = "".join(f"{t} " for t in dict.fromkeys(map(hashtag, [*e.tag_names, *marks])))
-    return tags + " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
+    out = tags + " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
+    if comments and e.comment:
+        out += f" %% {e.comment} %%"
+    return out
+
+
+def _bullet(item: str, prefix: str = "- ") -> str:
+    """A list item: its lines after the first (a commentary's) indented as its text."""
+    return prefix + re.sub(r"\n(?=.)", "\n" + " " * len(prefix), item)
 
 
 # Before an excerpt's item in a preview (see markdown's ``anchors``): its id, found there.
@@ -1280,11 +1301,11 @@ def _markdown(
                 items = []
             if not nested:
                 if items:
-                    out += [f"- **{n.path}**", *(f"  - {x}" for x in items)]
+                    out += [f"- **{n.path}**", *(_bullet(x, "  - ") for x in items)]
             elif counted(n, lambda m: len(flagged.get(m.id, []))):
                 out.append(heading(n, base + 1 + n.depth))
                 out += text(n) if left_out(n) else []
-                out += [*(f"- {x}" for x in items), *([""] if items else [])]
+                out += [*(_bullet(x) for x in items), *([""] if items else [])]
         return out
 
     if gather is not None:
@@ -1305,7 +1326,7 @@ def _markdown(
         out += text(n)
         listed = [] if n.id in summary_only else shown.get(n.id, [])
         for e in listed:  # (a group: its quotes, on one item)
-            out.append("- " + item(e))
+            out.append(_bullet(item(e)))
         if listed and (n is not gather or nested or not gathered):
             out.append("")
         if n is gather:

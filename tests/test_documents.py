@@ -2042,6 +2042,64 @@ def test_excerpt_discarded():
     assert "Two courses." in categories.markdown(folder, period)
 
 
+def test_excerpt_comment():
+    """A commentary on an excerpt (Markdown; a group's: its lead's): an Obsidian comment
+    after its item in the notes (over lines: indented as the item's text), none in a
+    section's excerpts (in a comment already); merged, both kept; the lead removed, passed
+    on."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    a = categories.add_excerpt(research, period, "Ten papers.", 1, [], document_id=doc)
+    b = categories.add_excerpt(research, period, "A prize.", 2, [], document_id=doc)
+    categories.set_comment(a, "  Mostly *workshops*.\n\nAsk them.  ")
+    assert categories.excerpts(period)[0].comment == "Mostly *workshops*.\n\nAsk them."
+    assert categories.markdown(folder, period) == (
+        "## Research\n\n- Ten papers. %% Dossier, p. 1 %% %% Mostly *workshops*.\n\n"
+        "  Ask them. %%\n- A prize. %% Dossier, p. 2 %%\n"
+    )
+    assert "workshops" not in categories.section_excerpts(period, research)
+    assert [v.id for v in categories.similar_excerpts(period, "x", "workshops")] == [a]
+    categories.set_comment(b, "Minor.")
+    assert categories.merge_excerpts(a, b) is None
+    [g] = categories.excerpts(period, grouped=True)
+    assert (g.id, g.comment, g.members[0].comment) == (
+        b,
+        "Minor.\n\nMostly *workshops*.\n\nAsk them.",
+        None,
+    )
+    categories.remove_excerpt(b)
+    assert categories.excerpts(period)[0].comment.startswith("Minor.")
+    categories.set_comment(a, " ")
+    assert categories.excerpts(period)[0].comment is None
+
+
+async def test_excerpt_comment_in_the_viewer(user: User, fake_viewer):
+    """An excerpt's commentary edited from its row (Markdown), shown under it, searched."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    doc = documents.add(period, "Application.pdf", PDF)
+    x = categories.add_excerpt(research, period, "Ten papers.", 1, [], document_id=doc)
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker=f"excerpt-comment-{x}")
+    await user.should_not_see(marker=f"excerpt-comment-text-{x}")
+    user.find(marker=f"excerpt-comment-{x}").click()
+    await user.should_see(marker="excerpt-comment-input")
+    user.find(marker="excerpt-comment-input").elements.pop().value = "Mostly *Zorglub*."
+    user.find(marker="excerpt-comment-save").click()
+    await user.should_see(marker=f"excerpt-comment-text-{x}")
+    assert categories.excerpts(period)[0].comment == "Mostly *Zorglub*."
+    assert "%% Mostly *Zorglub*. %%" in categories.markdown(folder, period)
+    user.find(marker="excerpts-search").type("zorglub")
+    await user.should_see(marker=f"excerpt-{x}")
+
+
 async def test_excerpts_collapsed_searched_discarded(user: User, fake_viewer):
     """In the categories' tab: a category collapsed (its excerpts and subcategories hidden;
     sticky), all of them collapsed or expanded; the excerpts searched (their text, a

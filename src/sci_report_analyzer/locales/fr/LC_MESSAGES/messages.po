@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-14 08:59+0200\n"
+"POT-Creation-Date: 2026-10-15 07:14+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -1128,6 +1128,12 @@ msgstr "Replier toutes les catégories"
 msgid "Colour"
 msgstr "Couleur"
 
+msgid "Commentary"
+msgstr "Commentaire"
+
+msgid "Commentary on the merged excerpts"
+msgstr "Commentaire sur les extraits fusionnés"
+
 msgid "Conference"
 msgstr "Conférence"
 
@@ -2041,6 +2047,14 @@ msgid "In folders"
 msgstr "Dans les dossiers"
 
 #, python-format
+msgid ""
+"In the notes and the copy, a comment after the excerpt (%% … %%): kept "
+"for reference, not shown. Empty: none."
+msgstr ""
+"Dans les notes et la copie, un commentaire après l'extrait (%% … %%) : "
+"gardé pour référence, non affiché. Vide : aucun."
+
+#, python-format
 msgid "In the notes and the copy, they follow the text in a comment (%% … %%)"
 msgstr ""
 "Dans les notes et la copie, ils suivent le texte dans un commentaire (%% "
@@ -2159,6 +2173,17 @@ msgstr ""
 
 msgid "Italic (⌘/Ctrl-I)"
 msgstr "Italique (⌘/Ctrl-I)"
+
+#, python-format
+msgid ""
+"Its commentary (Markdown): in the notes, a comment after it (%% … %%, not"
+" shown)"
+msgstr ""
+"Son commentaire (Markdown) : dans les notes, un commentaire après lui "
+"(%% … %%, non affiché)"
+
+msgid "Its commentary (click to edit it)"
+msgstr "Son commentaire (cliquer pour le modifier)"
 
 msgid ""
 "Its conferences, in order: without a name, it is named after them (its "

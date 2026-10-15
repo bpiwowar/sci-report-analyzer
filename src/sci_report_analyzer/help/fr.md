@@ -361,7 +361,9 @@ par ex. une phrase qui les résume, ses extraits étant alors cités dans le com
 emplacements, tous toujours teintés sur le PDF ; à nouveau sortis
 avec son icône de séparation), les réordonner (en les faisant glisser sur le bord supérieur ou inférieur d'un autre), les écarter
 (son ✕ : laissés hors du texte généré, les notes et rapports, toujours conservés et listés, barrés ;
-rétablis avec le même bouton), les supprimer,
+rétablis avec le même bouton), les commenter (sa bulle : un commentaire en Markdown sur l'extrait,
+ou sur un groupe, affiché dessous et placé après son élément dans les notes en commentaire
+`%% … %%`, non affiché), les supprimer,
 ou les copier en Markdown (sans guillemets, leurs emplacements dans des commentaires Obsidian : `%% Application, p. 4;
 p. 12 %%`, puis leurs années ; ceux qui témoignent du rayonnement sont aussi listés, par catégorie, dans une dernière
 section « Rayonnement » ; l'icône de badge nomme les documents, par exemple un long nom de fichier sous la forme
