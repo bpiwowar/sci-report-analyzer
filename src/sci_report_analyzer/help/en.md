@@ -359,7 +359,9 @@ e.g. one sentence summarising them, its excerpts then quoted in the comment afte
 their places, all still tinted on the PDF; taken out again
 with its split icon), reorder (dragged onto the top or bottom edge of another one), discard
 (its ✕: left out of the generated text, the notes and reports, still kept and listed, struck
-through; back with the same button), remove,
+through; back with the same button), annotate (its speech bubble: a commentary in Markdown on
+it, or on a group, shown under it and put after its item in the notes as a comment
+`%% … %%`, not shown), remove,
 or copy as Markdown (unquoted, their places in Obsidian comments: `%% Application, p. 4;
 p. 12 %%`, then their years; those showing influence also listed, by category, in a last
 “Rayonnement” section; the badge icon names the documents, e.g. a long file name as

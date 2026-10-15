@@ -23,7 +23,7 @@ from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
 from .pub_details import show_details
 from .reflist import tag_from_list
-from .theme import chip_html, int_or_none, span
+from .theme import NOTE_EXTRAS, chip_html, int_or_none, span
 
 ui.add_css(
     ".vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
@@ -1414,6 +1414,18 @@ class _ExcerptsSection:
                         ).mark(f"excerpt-group-text-{e.id}")
                     for x in e.parts:
                         self.quote(x, e, merging)
+                    if e.comment:
+                        with (
+                            ui.row()
+                            .classes("w-full items-start no-wrap gap-1 cursor-pointer")
+                            .on("click", lambda e=e: self.comment(e))
+                            .tooltip(_("Its commentary (click to edit it)"))
+                            .mark(f"excerpt-comment-text-{e.id}")
+                        ):
+                            ui.icon("comment", size="xs", color="grey-6").classes("mt-1")
+                            ui.markdown(e.comment, extras=NOTE_EXTRAS).classes(
+                                "vr-note text-xs text-grey-8 italic grow min-w-0"
+                            )
 
     def level(self, e: categories.ExcerptView) -> tuple[str, bool] | None:
         """An excerpt's level: its tag, and whether it is the folder's default (none: no
@@ -1425,9 +1437,10 @@ class _ExcerptsSection:
 
     def matches(self, e: categories.ExcerptView, query: str) -> bool:
         """Whether an excerpt (a group) has the text searched: in its text (as edited, or
-        selected; that of the group, of the others), a tag, or its level's."""
+        selected; that of the group, of the others), its commentary, a tag, or its level's."""
         level = self.level(e)
-        words = [e.group_text or "", *e.tag_names, *([level[0]] if level else [])]
+        words = [e.group_text or "", e.comment or "", *e.tag_names]
+        words += [level[0]] if level else []
         words += [t for x in e.parts for t in (x.text, x.original or "")]
         return any(query in w.casefold() for w in words)
 
@@ -1571,6 +1584,15 @@ class _ExcerptsSection:
                                 "edit",
                                 _("Edit (text, years, influence, tags…)"),
                                 self.edit_excerpt,
+                            ),
+                            (
+                                "comment",
+                                "comment" if lead.comment else "add_comment",
+                                _(
+                                    "Its commentary (Markdown): in the notes, a comment after "
+                                    "it (%% … %%, not shown)"
+                                ),
+                                lambda x: self.comment(lead),
                             ),
                             *cite,
                             ("move", "drive_file_move", _("Move to another category"), self.move),
@@ -1775,6 +1797,37 @@ class _ExcerptsSection:
                     ).props("flat dense round size=xs color=grey-7").tooltip(
                         _("Open its document (at its page)")
                     ).mark(f"excerpt-original-open-{x.id}")
+
+    def comment(self, e: categories.ExcerptView) -> None:
+        """A dialog: the commentary on an excerpt (that of the group it leads), in Markdown
+        (empty: none)."""
+        side = self.side
+        title = _("Commentary on the merged excerpts") if e.members else _("Commentary")
+        with side.host.dialogs, transient_dialog(title, width="w-[48rem] max-w-full") as (dlg, _c):
+            ui.label(e.quoted).classes("text-sm text-grey-8 italic line-clamp-3")
+            editor = MarkdownEditor(
+                e.comment or "",
+                render=lambda t: (
+                    reports.render(t, reports.folder_context(side.stats, side.period_id)).text
+                ),
+                mode="split",
+                mark="excerpt-comment-input",
+                height="10rem",
+            )
+            editor.open_cited = side.open_cited
+            ui.label(
+                _(
+                    "In the notes and the copy, a comment after the excerpt (%% … %%): kept "
+                    "for reference, not shown. Empty: none."
+                )
+            ).classes("text-xs text-grey")
+
+            def save() -> None:
+                categories.set_comment(e.id, editor.value)
+                side.refresh_excerpts()
+
+            actions(dlg, _("Save"), save, mark="excerpt-comment-save")
+        editor.focus()
 
     def edit_excerpt(self, e: categories.ExcerptView) -> None:
         """Its text (that of a group), years, "influence" flag and tags; the passages as
