@@ -385,7 +385,9 @@ async def test_folder_notes(user: User, monkeypatch, fake_viewer):
     await user.open(f"/pdf/{ids['a']}?period={period}")
     await user.should_see(marker="folder-note")
     # (the paper's own notes shown first, the folder's in the last tab)
-    tabs = user.find(kind=ui.tabs).elements.pop()
+    tabs = next(  # (not the person's tabs, in the header)
+        t for t in user.find(kind=ui.tabs).elements if t.value != "publications"
+    )
     assert tabs.value == "notes"
     assert [t._props["name"] for t in tabs.default_slot.children if isinstance(t, ui.tab)][
         -1

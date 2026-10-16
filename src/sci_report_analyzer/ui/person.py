@@ -34,6 +34,8 @@ from .folder_notes import NOTES_TIP
 from .panel import PublicationsPanel, period_label
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
+PROFILE_TABS = ("career", "periods", "sources")  # (the Profile tab's, in order)
+
 
 def register() -> None:
     @ui.page("/person/{person_id}")
@@ -72,6 +74,10 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
             folder = None
     if tab == "documents":  # (its former name)
         tab = "report"
+    # The profile's sub-tabs are named in the address (``tab=profile``: its first one).
+    profile_tab = tab if tab in PROFILE_TABS else PROFILE_TABS[0]
+    if tab in PROFILE_TABS:
+        tab = "profile"
     with frame(person.name):
         tabs = _header(person, tab, folder)
         stale_banner(person_id)
@@ -95,7 +101,8 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
                     report_view(person_id, shown)
 
         def tab_changed(e) -> None:
-            panel.url_extra = {} if e.value == "publications" else {"tab": e.value}
+            shown = profile_tabs.value if e.value == "profile" else e.value
+            panel.url_extra = {} if e.value == "publications" else {"tab": shown}
             panel.push_url()
             if e.value == "report":
                 report()
@@ -106,16 +113,33 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
             with ui.tab_panel("publications"):
                 panel = PublicationsPanel(person_id, period, dict(request.query_params))
                 if tab != "publications":
-                    panel.url_extra = {"tab": tab}
+                    panel.url_extra = {"tab": profile_tab if tab == "profile" else tab}
                 panel.build()
-            with ui.tab_panel("sources"):
+            with ui.tab_panel("profile"):
                 _person_actions(person)
-                career_view(person_id)
-                panel.names_box = ui.column().classes("w-full").mark("name-variants")
-                panel.render_names()
-                sources_view(person_id, on_change=panel.reload)
-            with ui.tab_panel("periods"):
-                periods_view(person_id, on_change=panel.reload_periods)
+                with (
+                    ui.tabs(value=profile_tab)
+                    .props("inline-label dense align=left")
+                    .classes("w-full") as profile_tabs
+                ):
+                    ui.tab("career", _("Career"), icon="work_history").mark("tab-career")
+                    ui.tab("periods", _("Periods"), icon="date_range").mark("tab-periods")
+                    ui.tab("sources", _("Sources"), icon="travel_explore").mark("tab-sources")
+
+                def profile_tab_changed(e) -> None:
+                    panel.url_extra = {"tab": e.value}
+                    panel.push_url()
+
+                profile_tabs.on_value_change(profile_tab_changed)
+                with ui.tab_panels(profile_tabs, value=profile_tab).classes("w-full"):
+                    with ui.tab_panel("career").classes("px-0"):
+                        career_view(person_id)
+                    with ui.tab_panel("periods").classes("px-0").mark("periods"):
+                        periods_view(person_id, on_change=panel.reload_periods)
+                    with ui.tab_panel("sources").classes("px-0"):
+                        panel.names_box = ui.column().classes("w-full").mark("name-variants")
+                        panel.render_names()
+                        sources_view(person_id, on_change=panel.reload)
             with ui.tab_panel("theses"):
                 ThesesView(person_id, panel)
             with ui.tab_panel("report").classes("px-0 py-1"):
@@ -171,8 +195,7 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
                     ui.label(person.affiliation).classes("text-sm text-grey")
         with ui.tabs(value=tab).props("inline-label dense").classes("grow") as tabs:
             ui.tab("publications", _("Publications"), icon="article")
-            ui.tab("sources", _("Profile"), icon="manage_accounts").mark("tab-profile")
-            ui.tab("periods", _("Periods"), icon="date_range")
+            ui.tab("profile", _("Profile"), icon="manage_accounts").mark("tab-profile")
             ui.tab("theses", _("Theses"), icon="school")
             ui.tab("report", _("Report"), icon="description").mark("tab-report")
     return tabs
@@ -1004,6 +1027,14 @@ def folders_section(person_id: int, on_change) -> None:
 
                 ui.button(icon="save", on_click=save).props("flat round dense")
                 ui.button(
+                    icon="drive_file_move",
+                    on_click=lambda fid=p.folder_id: move_to_folder_dialog(
+                        fid, person_id, lambda _to: left()
+                    ),
+                ).props("flat round dense").tooltip(_("Move to another folder")).mark(
+                    f"move-{p.folder_id}"
+                )
+                ui.button(
                     icon="folder_off",
                     on_click=lambda fid=p.folder_id: remove_from_folder_dialog(
                         fid, person_id, left
@@ -1044,7 +1075,7 @@ def remove_from_folder_dialog(folder_id: int, person_id: int, done) -> None:
         ui.label(
             _(
                 "Remove from the folder: keep the person's stars, tags, notes, documents and "
-                "report there as one of their own periods (Periods tab), or delete them?"
+                "report there as one of their own periods (Profile tab), or delete them?"
             )
         )
         with ui.row().classes("justify-end w-full"):
@@ -1057,6 +1088,55 @@ def remove_from_folder_dialog(folder_id: int, person_id: int, done) -> None:
             ui.button(_("Keep as a period"), on_click=ok_handler(dlg, lambda: remove(True))).mark(
                 "remove-keep"
             )
+
+
+def move_to_folder_dialog(folder_id: int, person_id: int, done) -> None:
+    """Move a person to another folder, with their data in this one; then ``done(to_id)``."""
+    mine = {
+        p.folder_id
+        for p in annotations.periods(person_id, include_hidden_folders=True)
+        if p.folder_id is not None
+    }
+    options = {
+        n.id: n.path + (_(" (archived)") if n.hidden else "")
+        for n in folders.tree()
+        if n.id not in mine
+    }
+    with transient_dialog(_("Move to another folder"), width="w-[32rem]") as (dlg, _card):
+        ui.label(
+            _(
+                "The person's period in this folder goes with them: its years, tags, stars, "
+                "notes, documents, report and excerpts."
+            )
+        ).classes("text-sm")
+        if not options:
+            ui.label(_("They are already in every folder.")).classes("text-grey")
+        target = (
+            ui.select(options, label=_("Folder"), with_input=True)
+            .props("dense outlined")
+            .classes("w-full")
+            .mark("move-target")
+        )
+
+        def move() -> bool | None:
+            if target.value is None:
+                return False
+            try:
+                added = folders.move_person(person_id, folder_id, target.value)
+            except ValueError as e:
+                ui.notify(str(e), type="warning")
+                return False
+            if added:
+                ui.notify(
+                    ngettext(
+                        "{n} category added to the folder's settings for their excerpts",
+                        "{n} categories added to the folder's settings for their excerpts",
+                        added,
+                    ).format(n=added)
+                )
+            done(target.value)
+
+        actions(dlg, _("Move"), move, mark="move-ok", icon="drive_file_move")
 
 
 # ---- theses --------------------------------------------------------------------------------

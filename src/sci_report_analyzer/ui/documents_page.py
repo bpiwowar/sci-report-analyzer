@@ -467,7 +467,7 @@ def report_view(person_id: int, period_id: int | None = None) -> None:
     )
     if not periods:
         ui.label(
-            _("Put the person in a folder, or add a period (Periods tab), to write a report.")
+            _("Put the person in a folder, or add a period (Profile tab), to write a report.")
         ).classes("text-grey").mark("documents-no-period")
         return
     full = ui.column().classes("w-full gap-2")

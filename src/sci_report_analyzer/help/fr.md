@@ -10,8 +10,9 @@ et des rapports, pour préparer une évaluation.
 1. **Ajoutez une personne** (nom, affiliation et ORCID facultatifs, les sources à interroger ;
    dans un dossier, sa période et ses étiquettes). Les sources sont interrogées et les profils
    possibles listés dans la fenêtre : cochez les bons (les plus probables le sont) pour les
-   valider tout de suite. Les autres restent *candidats* dans l'onglet **Profil** (où l'on
-   modifie, purge ou supprime aussi la personne).
+   valider tout de suite. Les autres restent *candidats* dans l'onglet **Profil**, sous **Sources** (ses
+   sous-onglets : **Parcours**, **Périodes** et **Sources** ; on modifie, purge ou supprime
+   la personne au-dessus).
    Son **parcours** (son CV) s'y construit aussi : postes et diplômes, datés (une année,
    `2019-09` ou `2019-09-01`), un diplôme avec sa thèse ; le poste sans fin est le poste
    actuel, affiché sous son nom. Sa propre thèse sur theses.fr (une fois validée) est proposée
@@ -406,9 +407,12 @@ affiché) pour référence ; l'onglet des catégories les liste toujours.
 
 Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers
-(définie dans son onglet Périodes), avec ses propres étoiles, étiquettes et notes ; ouvrir une personne depuis un
-dossier sélectionne celle-ci. Retirer une personne d'un dossier (✕ sur sa carte, ou dans son onglet Périodes)
+(définie dans son onglet Profil, sous Périodes), avec ses propres étoiles, étiquettes et notes ; ouvrir une personne depuis un
+dossier sélectionne celle-ci. Retirer une personne d'un dossier (✕ sur sa carte, ou dans son onglet Profil)
 garde cette période, avec ses données, comme l'une de ses propres périodes, ou la supprime.
+La **déplacer** vers un autre dossier (le bouton dossier avec une flèche, aux mêmes endroits)
+emporte cette période, avec toutes ses données ; ses extraits sont classés dans les catégories
+de l'autre dossier (ajoutées s'il le faut).
 Le bouton 📝 de la carte d'une personne (aussi à côté du nom du dossier sur sa page, et dans son onglet Documents)
 ouvre ses **notes et extraits dans le dossier** sur une page à part, comme à côté de ses PDF : pour les écrire, ou
 voir ses extraits par catégorie, sans ouvrir de document (par exemple quand elle n'en a aucun).

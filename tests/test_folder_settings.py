@@ -176,3 +176,40 @@ def test_settings_copied_to_another_folder():
     assert folders.sharing(b) == ["B › Within B"] and _cats(a) == ["Research"]
     categories.add(b, "Projects")
     assert "Projects" not in _cats(a)
+
+
+def test_moving_a_person_to_another_folder():
+    from helpers import add_source, pub, toggle_star
+
+    from sci_report_analyzer.db.models import Publication
+
+    ann = make_person("Ann Example")
+    add_source(ann, "dblp", "x/1", [pub("a", "A paper", 2021, "Some Venue")])
+    with db_session.session_scope() as s:
+        paper = s.query(Publication.id).scalar()
+    a = folders.save_folder(None, "Committee A")
+    b = folders.save_folder(None, "Committee B")
+    categories.add(a, "Research")
+    categories.add(b, "Activities")
+    period = folders.add_person(a, ann, 2020, 2024)
+    folders.set_tags(period, ["shortlisted"])
+    categories.add_excerpt(categories.tree(a)[0].id, period, "A grant.", 1, [])
+    toggle_star(period, paper)
+    # Moved with their period (years, tags, stars), their excerpts filed in B's categories.
+    assert folders.move_person(ann, a, b) == 1
+    [fa] = [f for f in folders.folders() if f.id == a]
+    [fb] = [f for f in folders.folders() if f.id == b]
+    assert not fa.members
+    [m] = fb.members
+    assert (m.period_id, m.start_year, m.end_year, m.tags, m.stars) == (
+        period,
+        2020,
+        2024,
+        ["shortlisted"],
+        1,
+    )
+    assert _cats(b) == ["Activities", "Research"] and _filed(period) == [("Research", "A grant.")]
+    # Not into a folder they are in already.
+    folders.add_person(a, ann)
+    with pytest.raises(ValueError):
+        folders.move_person(ann, a, b)

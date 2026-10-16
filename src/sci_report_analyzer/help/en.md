@@ -10,8 +10,8 @@ and reports, to prepare an evaluation.
 1. **Add a person** (name, optional affiliation and ORCID, the sources to search; in a
    folder, their period and tags in it). The sources are searched and the possible profiles
    are listed in the dialog: tick the right ones (the likely ones are) to validate them right
-   away. The others stay *candidates* in the **Profile** tab (also where the person is
-   edited, purged or deleted).
+   away. The others stay *candidates* in the **Profile** tab, under **Sources** (its sub-tabs:
+   **Career**, **Periods** and **Sources**; the person is edited, purged or deleted above them).
    Their **career** (their CV) is built there too: positions and diplomas, dated (a year,
    `2019-09` or `2019-09-01`), a diploma with its thesis; the position without an end is the
    current one, shown under their name. Their own thesis on theses.fr (once validated) is
@@ -401,9 +401,12 @@ text: in the notes and the copy, its excerpts are not listed but follow the text
 
 **Folders** (Reports page) group people, e.g. for a hiring committee: a folder has a name,
 a date and can be hidden. Each person has their **own period** in each of their folders
-(set in their Periods tab), with its own stars, tags and notes; opening a person from a
-folder selects it. Removing a person from a folder (✕ on their card, or in their Periods
+(set in their Profile tab, under Periods), with its own stars, tags and notes; opening a person from a
+folder selects it. Removing a person from a folder (✕ on their card, or in their Profile
 tab) either keeps that period, with its data, as one of their own periods, or deletes it.
+**Moving** them to another folder (the folder-with-an-arrow button, same places) takes
+that period with them, with all its data; their excerpts are filed in the other folder's
+categories (added if missing).
 The 📝 button of a person's card (also next to the folder's name on their page, and in their
 Documents tab) opens their **notes and excerpts in the folder** on a page of their own, as
 next to their PDFs: to write them, or see their excerpts by category, without opening any

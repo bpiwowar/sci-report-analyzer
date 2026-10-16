@@ -36,6 +36,9 @@ def test_folder_membership_and_periods():
     assert [(p.id, p.name, p.start_year, p.folder_id) for p in annotations.periods(b)] == [
         (pb, "Hiring committee", 2021, None)
     ]
+    sub = folders.save_folder(None, "Session", parent_id=fid)
+    assert folders.contents(fid) == folders.Contents(1, 1, False)
+    assert folders.contents(sub).empty
     folders.delete_folder(fid)
     assert [p.name for p in annotations.periods(a, include_hidden_folders=True)] == ["HDR"]
 

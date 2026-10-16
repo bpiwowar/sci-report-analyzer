@@ -25,10 +25,11 @@ from ..sync import (
 from .categories_editor import categories_dialog
 from .dialogs import close_then, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
-from .folders_editor import ALL, folders_tree
+from .folders_editor import ALL, delete_dialog, folders_tree
 from .person import (
     candidate_details,
     link_url,
+    move_to_folder_dialog,
     orcid_badge,
     purge_dialog,
     remove_from_folder_dialog,
@@ -375,7 +376,7 @@ def _folder_view(f: folders.FolderView) -> None:
                 f"folder-add-btn-{f.id}"
             )
     ui.label(
-        _("Each person has their own period in the folder (set it in their Periods tab).")
+        _("Each person has their own period in the folder (set it in their Profile tab).")
     ).classes("text-xs text-grey")
 
 
@@ -664,6 +665,15 @@ def _card(
                 ).props("flat round dense size=sm").tooltip(_(NOTES_TIP)).mark(
                     f"notes-{member.period_id}"
                 )
+
+                ui.button(
+                    icon="drive_file_move",
+                    on_click=lambda: move_to_folder_dialog(
+                        folder_id, person.id, lambda _to: ui.navigate.reload()
+                    ),
+                ).props("flat round dense size=sm").on("click.stop", lambda: None).tooltip(
+                    _("Move to another folder")
+                ).mark(f"move-{person.id}")
 
                 def remove() -> None:
                     remove_from_folder_dialog(folder_id, person.id, ui.navigate.reload)
@@ -955,20 +965,18 @@ def folder_dialog(f: folders.FolderView | None) -> None:
         def delete() -> None:
             close_then(
                 dlg,
-                lambda: confirm(
-                    _("Delete the folder “{folder}” and its periods? Its people are kept.").format(
-                        folder=f.name
-                    ),
-                    _("Delete"),
-                    lambda: (folders.delete_folder(f.id), _goto(ALL)),
-                    mark="folder-delete-ok",
+                lambda: delete_dialog(
+                    f.id, f.name, f.hidden, lambda: _goto(ALL), lambda: _goto(f.id)
                 ),
             )
 
         with ui.row().classes("justify-end w-full"):
             if f is not None:
                 ui.button(_("Delete"), on_click=delete).props("flat color=negative").tooltip(
-                    _("Deletes the folder and its periods (people are kept)")
+                    _(
+                        "Deletes the folder and its periods (people are kept); to keep them, "
+                        "better archive it"
+                    )
                 ).mark("folder-delete")
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(_("Save"), on_click=ok_handler(dlg, save)).mark("folder-save")

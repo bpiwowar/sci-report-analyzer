@@ -1,4 +1,4 @@
-"""Settings: matching, tracks, tags, data, API keys, import/export."""
+"""Settings: matching, tracks, tags, data, API keys, local LLM, import/export."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from .. import (
     datadir,
     i18n,
     keys,
+    llm,
     pdfs,
     settings_io,
     source_settings,
@@ -67,6 +68,7 @@ NAV = (
             ("copy", N_("Copy filters")),
         ),
     ),
+    (N_("AI"), (("llm", N_("Local LLM (Ollama)")),)),
     (
         N_("Data"),
         (
@@ -89,6 +91,7 @@ PANELS = {
     "skeletons": lambda: skeletons_tab(),
     "reports": lambda: report_templates_tab(),
     "copy": lambda: copy_filters_tab(),
+    "llm": lambda: llm_tab(),
     "data": lambda: data_tab(),
     "io": lambda: io_tab(),
     "shared": lambda: shared_settings.shared_tab(),
@@ -1286,6 +1289,87 @@ def keys_tab() -> None:
         ui.notify(_("Saved"), type="positive")
 
     save = unsaved.track(lambda: {k: i.value for k, i in inputs.items()}, save)
+    with ui.row().classes("gap-2"):
+        unsaved.cancel_button()
+        ui.button(_("Save"), on_click=save)
+
+
+def llm_tab() -> None:
+    st = llm.stored_settings()
+    ui.label(
+        _("A local LLM served by Ollama (https://ollama.com), for the features that will use one.")
+    ).classes("text-sm text-grey-8 max-w-[48rem]")
+    enabled = ui.switch(_("Use the local LLM"), value=st.enabled).mark("llm-enabled")
+    url = (
+        ui.input(_("Ollama server URL"), value=st.url, placeholder=llm.DEFAULT_URL)
+        .classes("w-[32rem]")
+        .mark("llm-url")
+    )
+    ui.label(_("(or set the {env} environment variable)").format(env=llm.URL_ENV)).classes(
+        "text-xs text-grey"
+    )
+    local_only = ui.switch(_("Local models only"), value=st.local_only).mark("llm-local-only")
+    ui.label(
+        _(
+            "Ollama's cloud models (e.g. gpt-oss:120b-cloud) send the text to ollama.com: "
+            "they are never listed nor used. To turn them off in Ollama itself, start it "
+            "with {env}=1."
+        ).format(env=llm.NO_CLOUD_ENV)
+    ).classes("text-xs text-grey max-w-[48rem]")
+    with ui.row().classes("items-center gap-2"):
+        model = (
+            ui.select([st.model] if st.model else [], value=st.model or None, label=_("Model"))
+            .classes("w-[32rem]")
+            .mark("llm-model")
+        )
+        refresh = ui.button(icon="refresh").props("flat round dense").mark("llm-refresh")
+        refresh.tooltip(_("Reload the models from the server"))
+    ui.label(_("(or set the {env} environment variable)").format(env=llm.MODEL_ENV)).classes(
+        "text-xs text-grey"
+    )
+    status = ui.label().classes("text-xs")
+
+    async def load(notify: bool = False) -> None:
+        try:
+            models = await llm.list_models(
+                url.value or llm.DEFAULT_URL, local_only=bool(local_only.value)
+            )
+        except Exception as e:
+            message = _("Cannot reach Ollama: {error}").format(error=e)
+            status.set_text(message)
+            status.classes(replace="text-xs text-negative")
+            if notify:
+                ui.notify(message, type="negative")
+            return
+        model.set_options(models, value=model.value if model.value in models else None)
+        if models:
+            message = ngettext(
+                "Ollama is running: {n} model", "Ollama is running: {n} models", len(models)
+            ).format(n=len(models))
+        else:
+            message = _("Ollama is running but has no model (ollama pull <model>)")
+        status.set_text(message)
+        status.classes(replace="text-xs text-grey" if models else "text-xs text-warning")
+        if notify:
+            ui.notify(message, type="positive" if models else "warning")
+
+    refresh.on_click(lambda: load(notify=True))
+    local_only.on_value_change(lambda: load())
+    ui.timer(0.1, load, once=True)
+
+    def values() -> llm.OllamaSettings:
+        return llm.OllamaSettings(
+            enabled=bool(enabled.value),
+            url=(url.value or "").strip() or llm.DEFAULT_URL,
+            model=model.value or "",
+            local_only=bool(local_only.value),
+        )
+
+    def save() -> None:
+        llm.save_settings(values())
+        ui.notify(_("Saved"), type="positive")
+
+    save = unsaved.track(values, save)
     with ui.row().classes("gap-2"):
         unsaved.cancel_button()
         ui.button(_("Save"), on_click=save)

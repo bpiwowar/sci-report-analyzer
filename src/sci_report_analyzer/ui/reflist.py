@@ -25,7 +25,7 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
     period = panel.period
     pid = period.id if period else None
     tags = {t.id: ("★ " if t.per_period else "") + t.name for t in panel.usable_tags()}
-    state: dict = {"matches": [], "chosen": {}, "found": {}}
+    state: dict = {"matches": [], "chosen": {}, "found": {}, "editing": set()}
 
     with panel.dialogs, transient_dialog(width="w-full max-w-5xl") as (dlg, _card):
         with ui.row().classes("w-full items-center justify-between"):
@@ -92,7 +92,14 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
                     color="positive" if chosen != NONE else "orange-8",
                 ).classes("mt-2")
                 with ui.column().classes("gap-0 w-1/2 min-w-0"):
-                    ui.label(reflist.label(m.item)).classes("text-sm")
+                    if i in state["editing"]:
+                        _edit_item(i, m)
+                    else:
+                        with ui.row().classes("w-full items-start no-wrap gap-1"):
+                            ui.label(reflist.label(m.item)).classes("text-sm grow min-w-0")
+                            ui.button(icon="edit", on_click=lambda i=i: edit(i)).props(
+                                "flat round dense size=sm"
+                            ).tooltip(_("Edit the text to match")).mark(f"reflist-edit-{i}")
                     if m.item.url:
                         ui.link(m.item.url, m.item.url, new_tab=True).classes("text-xs")
                 with ui.column().classes("gap-1 w-1/2 min-w-0"):
@@ -110,6 +117,20 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
                     ).classes("w-full").mark(f"reflist-choice-{i}")
                     if chosen == NONE:
                         _missing(i, m)
+
+        def _edit_item(i: int, m: Match) -> None:
+            """The item's text, to correct (e.g. a title cut by the copy) and match again."""
+            box = (
+                ui.textarea(value=m.item.text)
+                .props("outlined dense autogrow autofocus")
+                .classes("w-full text-sm")
+                .mark(f"reflist-item-text-{i}")
+            )
+            with ui.row().classes("items-center gap-1"):
+                ui.button(
+                    _("Match again"), icon="search", on_click=lambda: rematch(i, box.value)
+                ).props("dense flat").mark(f"reflist-rematch-{i}")
+                ui.button(_("Cancel"), on_click=lambda: edit(i, False)).props("dense flat")
 
         def _missing(i: int, m: Match) -> None:
             """An item matching none of the papers: add it by its id, or search for it."""
@@ -154,6 +175,24 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
             i: m.best.pub_id for i, m in enumerate(state["matches"]) if m.best is not None
         }
         state["found"] = {}
+        state["editing"] = set()
+        review.refresh()
+
+    def edit(i: int, on: bool = True) -> None:
+        (state["editing"].add if on else state["editing"].discard)(i)
+        review.refresh()
+
+    def rematch(i: int, text: str) -> None:
+        """Match item ``i`` again, from its corrected ``text`` (its number kept)."""
+        if not (text or "").strip():
+            ui.notify(_("No item in the text"), type="warning")
+            return
+        item = reflist.item_of(state["matches"][i].item.number, text.strip())
+        again = reflist.match([item], panel.stats)[0]
+        state["matches"][i] = again
+        state["chosen"][i] = again.best.pub_id if again.best else NONE
+        state["found"].pop(i, None)
+        state["editing"].discard(i)
         review.refresh()
 
     async def search(i: int) -> None:

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-15 07:14+0200\n"
+"POT-Creation-Date: 2026-10-16 19:28+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -14,6 +14,9 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
+
+msgid " (archived)"
+msgstr " (archivé)"
 
 msgid " · in the document"
 msgstr " · dans le document"
@@ -216,6 +219,13 @@ msgstr ""
 " années qu'aucune période ne couvre gardent le classement ci-dessous "
 "(entrée de classement ou automatique). « Non classé » : vérifié, dans "
 "aucun classement (à la différence d'un canal que personne n'a vérifié)."
+
+msgid ""
+"A local LLM served by Ollama (https://ollama.com), for the features that "
+"will use one."
+msgstr ""
+"Un LLM local servi par Ollama (https://ollama.com), pour les fonctions "
+"qui l’utiliseront."
 
 msgid "A manual variant or a more specific rule wins"
 msgstr "Une variante manuelle ou une règle plus spécifique prime"
@@ -433,6 +443,9 @@ msgstr ""
 "Une publication de type « {kind} » n'a pas de canal de publication : "
 "changez son type s'il s'agit d'un article de conférence ou de revue."
 
+msgid "AI"
+msgstr "IA"
+
 msgid "API keys"
 msgstr "Clés d’API"
 
@@ -637,6 +650,9 @@ msgstr "Les {total} thèses (période : {where})"
 msgid "Already a field or a class: .{name}"
 msgstr "Déjà un champ ou une classe : .{name}"
 
+msgid "Already in this folder"
+msgstr "Déjà dans ce dossier"
+
 msgid "Already together"
 msgstr "Déjà regroupés"
 
@@ -708,6 +724,9 @@ msgstr "Archive"
 
 msgid "Archive"
 msgstr "Archiver"
+
+msgid "Archive instead"
+msgstr "Archiver plutôt"
 
 msgid "Archived"
 msgstr "Archivé"
@@ -892,6 +911,10 @@ msgstr "Annuler les modifications"
 
 msgid "Candidates to review"
 msgstr "Candidats à examiner"
+
+#, python-brace-format
+msgid "Cannot reach Ollama: {error}"
+msgstr "Ollama est injoignable : {error}"
 
 msgid "Career"
 msgstr "Parcours"
@@ -1324,6 +1347,10 @@ msgstr "Supprimer la catégorie de co-auteurs « {name} » ?"
 msgid "Delete the data"
 msgstr "Supprimer les données"
 
+#, python-brace-format
+msgid "Delete the empty folder “{folder}”?"
+msgstr "Supprimer le dossier vide « {folder} » ?"
+
 msgid ""
 "Delete the files of papers no longer in the database, and forget the PDFs"
 " whose file was deleted by hand"
@@ -1332,10 +1359,8 @@ msgstr ""
 "oublier les PDF dont le fichier a été supprimé à la main"
 
 #, python-brace-format
-msgid "Delete the folder “{folder}” and its periods? Its people are kept."
-msgstr ""
-"Supprimer le dossier « {folder} » et ses périodes ? Ses personnes sont "
-"conservées."
+msgid "Delete the folder “{folder}”"
+msgstr "Supprimer le dossier « {folder} »"
 
 msgid "Delete the person"
 msgstr "Supprimer la personne"
@@ -1383,8 +1408,18 @@ msgstr "Supprimer « {name} », avec ses annotations et notes ?"
 msgid "Delete “{name}”?"
 msgstr "Supprimer « {name} » ?"
 
-msgid "Deletes the folder and its periods (people are kept)"
-msgstr "Supprime le dossier et ses périodes (les personnes sont conservées)"
+msgid "Deleted with it (the people themselves are kept):"
+msgstr "Supprimé avec lui (les personnes elles-mêmes sont conservées) :"
+
+msgid ""
+"Deletes the folder and its periods (people are kept); to keep them, "
+"better archive it"
+msgstr ""
+"Supprime le dossier et ses périodes (les personnes sont conservées) ; "
+"pour les garder, mieux vaut l’archiver"
+
+msgid "Delete…"
+msgstr "Supprimer…"
 
 msgid "Details"
 msgstr "Détails"
@@ -1522,11 +1557,11 @@ msgstr ""
 "place du modèle général de ce nom (Réglages → Modèles de citation)."
 
 msgid ""
-"Each person has their own period in the folder (set it in their Periods "
+"Each person has their own period in the folder (set it in their Profile "
 "tab)."
 msgstr ""
 "Chaque personne a sa propre période dans le dossier (à définir dans son "
-"onglet Périodes)."
+"onglet Profil)."
 
 msgid "Edit"
 msgstr "Édition"
@@ -1551,6 +1586,9 @@ msgstr "Modifier la personne"
 
 msgid "Edit the regex"
 msgstr "Modifier la regex"
+
+msgid "Edit the text to match"
+msgstr "Modifier le texte à apparier"
 
 msgid "Edit, edit beside the preview, or the preview only"
 msgstr "Édition, édition à côté de l'aperçu, ou aperçu seul"
@@ -2486,6 +2524,12 @@ msgstr "Liste + années"
 msgid "Listed as similar"
 msgstr "Listés comme similaires"
 
+msgid "Local LLM (Ollama)"
+msgstr "LLM local (Ollama)"
+
+msgid "Local models only"
+msgstr "Modèles locaux uniquement"
+
 msgid "Look up on…"
 msgstr "Rechercher sur…"
 
@@ -2554,6 +2598,9 @@ msgstr "Marmotte (CNRS)"
 
 msgid "Match"
 msgstr "Appariement"
+
+msgid "Match again"
+msgstr "Apparier à nouveau"
 
 msgid "Match cache"
 msgstr "Cache des appariements"
@@ -2702,6 +2749,9 @@ msgstr ""
 msgid "Minimum score of a match in the list of predatory venues"
 msgstr "Score minimal d'un appariement dans la liste des canaux prédateurs"
 
+msgid "Model"
+msgstr "Modèle"
+
 msgid "Move"
 msgstr "Déplacer"
 
@@ -2720,6 +2770,9 @@ msgstr "Déplacer vers une catégorie"
 
 msgid "Move to another category"
 msgstr "Déplacer vers une autre catégorie"
+
+msgid "Move to another folder"
+msgstr "Déplacer vers un autre dossier"
 
 msgid "Move to…"
 msgstr "Déplacer vers…"
@@ -3238,6 +3291,28 @@ msgstr ""
 "d'articles · Liste : leurs canaux de publication · Liste + années : avec "
 "les années"
 
+msgid "Ollama is running but has no model (ollama pull <model>)"
+msgstr "Ollama fonctionne mais n’a aucun modèle (ollama pull <modèle>)"
+
+#, python-brace-format
+msgid "Ollama is running: {n} model"
+msgid_plural "Ollama is running: {n} models"
+msgstr[0] "Ollama fonctionne : {n} modèle"
+msgstr[1] "Ollama fonctionne : {n} modèles"
+
+msgid "Ollama server URL"
+msgstr "URL du serveur Ollama"
+
+#, python-brace-format
+msgid ""
+"Ollama's cloud models (e.g. gpt-oss:120b-cloud) send the text to "
+"ollama.com: they are never listed nor used. To turn them off in Ollama "
+"itself, start it with {env}=1."
+msgstr ""
+"Les modèles cloud d’Ollama (p. ex. gpt-oss:120b-cloud) envoient le texte "
+"à ollama.com : ils ne sont ni listés ni utilisés. Pour les désactiver "
+"dans Ollama lui-même, lancez-le avec {env}=1."
+
 msgid "One of its workshops"
 msgstr "Un de ses ateliers"
 
@@ -3653,11 +3728,11 @@ msgid "Put the cursor on a citation ([@key]) first"
 msgstr "Placez d'abord le curseur sur une citation ([@key])"
 
 msgid ""
-"Put the person in a folder, or add a period (Periods tab), to write a "
+"Put the person in a folder, or add a period (Profile tab), to write a "
 "report."
 msgstr ""
 "Mettez la personne dans un dossier, ou ajoutez une période (onglet "
-"Périodes), pour rédiger un rapport."
+"Profil), pour rédiger un rapport."
 
 msgid "Put the tag"
 msgstr "Poser l'étiquette"
@@ -3818,6 +3893,9 @@ msgstr "Relation enregistrée"
 msgid "Reload"
 msgstr "Recharger"
 
+msgid "Reload the models from the server"
+msgstr "Recharger les modèles depuis le serveur"
+
 msgid "Remove"
 msgstr "Supprimer"
 
@@ -3829,12 +3907,12 @@ msgstr "Retirer du dossier"
 
 msgid ""
 "Remove from the folder: keep the person's stars, tags, notes, documents "
-"and report there as one of their own periods (Periods tab), or delete "
+"and report there as one of their own periods (Profile tab), or delete "
 "them?"
 msgstr ""
 "Retirer du dossier : garder les étoiles, étiquettes, notes, documents et "
 "rapport de la personne comme l'une de ses propres périodes (onglet "
-"Périodes), ou les supprimer ?"
+"Profil), ou les supprimer ?"
 
 msgid "Remove from this folder"
 msgstr "Retirer de ce dossier"
@@ -4730,6 +4808,12 @@ msgstr ""
 "les catégories de mêmes noms (ajoutées si elles manquent)."
 
 #, python-brace-format
+msgid "The folder within it goes up a level."
+msgid_plural "The {n} folders within it go up a level."
+msgstr[0] "Le dossier qu’il contient remonte d’un niveau."
+msgstr[1] "Les {n} dossiers qu’il contient remontent d’un niveau."
+
+#, python-brace-format
 msgid "The folder's ({source})"
 msgstr "Celle du dossier ({source})"
 
@@ -4874,6 +4958,13 @@ msgstr "La personne en quelques lignes : son profil, ses points forts."
 
 msgid "The person's name"
 msgstr "Le nom de la personne"
+
+msgid ""
+"The person's period in this folder goes with them: its years, tags, "
+"stars, notes, documents, report and excerpts."
+msgstr ""
+"La période de la personne dans ce dossier la suit : ses années, "
+"étiquettes, étoiles, notes, documents, rapport et extraits."
 
 #, python-brace-format
 msgid ""
@@ -5147,6 +5238,9 @@ msgstr "Thèse (doctorat et autres)"
 msgid "Thesis (its title, supervisors…)"
 msgstr "Thèse (son titre, ses directeurs…)"
 
+msgid "They are already in every folder."
+msgstr "Elle est déjà dans tous les dossiers."
+
 msgid ""
 "They are on one item (in the order of their PDFs), with the second one's "
 "category, years, influence and text (its pencil edits the text of the "
@@ -5229,6 +5323,13 @@ msgstr ""
 "À vérifier : aucun rang trouvé, ou une correspondance approchée, et "
 "aucune décision manuelle"
 
+msgid ""
+"To put it out of the way while keeping everything, better archive it "
+"(greyed, its periods no longer offered; unarchived at any time)."
+msgstr ""
+"Pour le ranger tout en gardant tout, mieux vaut l’archiver (grisé, ses "
+"périodes ne sont plus proposées ; désarchivable à tout moment)."
+
 msgid "Track"
 msgstr "Session"
 
@@ -5303,6 +5404,10 @@ msgstr "Type redevenu automatique"
 
 msgid "Type to find an excerpt"
 msgstr "Tapez pour trouver un extrait"
+
+#, python-brace-format
+msgid "Type “{folder}” to confirm"
+msgstr "Tapez « {folder} » pour confirmer"
 
 #, python-brace-format
 msgid "Type: {kind}"
@@ -5382,6 +5487,9 @@ msgstr "Utiliser ses propres réglages (une copie)"
 
 msgid "Use the conferences found in its texts"
 msgstr "Utiliser les conférences trouvées dans ses textes"
+
+msgid "Use the local LLM"
+msgstr "Utiliser le LLM local"
 
 msgid "Use the parent's"
 msgstr "Utiliser ceux du parent"
@@ -6041,6 +6149,9 @@ msgstr "son identifiant doit être le nom de son fichier ({id})"
 
 msgid "its level is used"
 msgstr "son niveau est utilisé"
+
+msgid "its notes"
+msgstr "ses notes"
 
 msgid "its papers found in the validated sources"
 msgstr "ses articles trouvés dans les sources validées"
@@ -6723,6 +6834,12 @@ msgstr[0] "{n} catégorie ajoutée là, pour les extraits qui y sont classés"
 msgstr[1] "{n} catégories ajoutées là, pour les extraits qui y sont classés"
 
 #, python-brace-format
+msgid "{n} category added to the folder's settings for their excerpts"
+msgid_plural "{n} categories added to the folder's settings for their excerpts"
+msgstr[0] "{n} catégorie ajoutée aux réglages du dossier pour ses extraits"
+msgstr[1] "{n} catégories ajoutées aux réglages du dossier pour ses extraits"
+
+#, python-brace-format
 msgid "{n} category copied"
 msgid_plural "{n} categories copied"
 msgstr[0] "{n} catégorie copiée"
@@ -6801,6 +6918,18 @@ msgid "{n} person"
 msgid_plural "{n} people"
 msgstr[0] "{n} personne"
 msgstr[1] "{n} personnes"
+
+#, python-brace-format
+msgid "{n} person, with their period in it (paper tags, notes, documents, report)"
+msgid_plural ""
+"{n} people, with their periods in it (paper tags, notes, documents, "
+"reports)"
+msgstr[0] ""
+"{n} personne, avec sa période dedans (étiquettes d’articles, notes, "
+"documents, rapport)"
+msgstr[1] ""
+"{n} personnes, avec leurs périodes dedans (étiquettes d’articles, notes, "
+"documents, rapports)"
 
 #, python-brace-format
 msgid "{n} preprint record ignored"

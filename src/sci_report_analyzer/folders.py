@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from types import EllipsisType
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import selectinload
 
 from .db.models import (
@@ -146,6 +146,28 @@ def rename(folder_id: int, name: str) -> None:
 def set_hidden(folder_id: int, hidden: bool) -> None:
     with session_scope() as s:
         s.get(Folder, folder_id).hidden = hidden
+
+
+@dataclass
+class Contents:
+    people: int
+    folders: int  # (directly within it)
+    notes: bool
+
+    @property
+    def empty(self) -> bool:
+        return not (self.people or self.folders or self.notes)
+
+
+def contents(folder_id: int) -> Contents:
+    """What a folder holds (what deleting it loses, or moves up: see delete_folder)."""
+    with session_scope() as s:
+        f = s.get(Folder, folder_id)
+        return Contents(
+            s.scalar(select(func.count()).where(Period.folder_id == folder_id)) or 0,
+            s.scalar(select(func.count()).where(Folder.parent_id == folder_id)) or 0,
+            bool(f is not None and (f.notes or "").strip()),
+        )
 
 
 def delete_folder(folder_id: int) -> None:
@@ -524,6 +546,37 @@ def remove_person(folder_id: int, person_id: int, *, keep: bool = False) -> None
                 p.folder_id = None
             else:
                 s.delete(p)
+
+
+def move_person(person_id: int, from_id: int, to_id: int) -> int:
+    """Move a person from a folder to another, with their period in it (its years, tags,
+    notes, documents, starred papers and report): their excerpts are filed in the
+    categories of the other folder's settings (see categories.remap), their stars in its
+    star lists. Refused (``ValueError``) if they are in it already. Returns how many
+    categories were added for them."""
+    from . import annotations, categories
+
+    with session_scope() as s:
+        p = s.scalar(
+            select(Period).where(Period.folder_id == from_id, Period.person_id == person_id)
+        )
+        if p is None or from_id == to_id:
+            return 0
+        if s.scalar(
+            select(Period.id).where(Period.folder_id == to_id, Period.person_id == person_id)
+        ):
+            raise ValueError(_("Already in this folder"))
+        effective = _effective(s)
+        was, now = effective.get(from_id), effective.get(to_id)
+        target = s.get(Folder, to_id)
+        if p.name == p.folder.name:  # (named after the folder)
+            p.name = target.name
+        p.folder_id = to_id
+        s.flush()
+        if was is None or now is None or was == now:
+            return 0
+        annotations.remap_lists(s, [p.id], was, now)
+        return categories.remap(s, [p.id], was, now)
 
 
 def set_period(period_id: int, start: int | None, end: int | None) -> None:

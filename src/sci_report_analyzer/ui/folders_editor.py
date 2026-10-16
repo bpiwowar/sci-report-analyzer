@@ -1,6 +1,7 @@
 """The tree of folders (collapsible), on the Reports page: a click shows a folder; drag them
 to nest and move them; each one's menu renames it, adds a folder within it, chooses its
-settings (its parent's, or its own) and moves or copies them to another folder."""
+settings (its parent's, or its own), moves or copies them to another folder, and deletes
+it."""
 
 from __future__ import annotations
 
@@ -64,6 +65,12 @@ def folders_tree(current: int, select: Callable[[int], None], changed: Callable[
         if parent in collapsed:
             toggle(parent)
         select(new)
+
+    def deleted(folder_id: int) -> None:
+        if folder_id == current:
+            select(ALL)
+        else:
+            changed()
 
     nodes = folders.tree()
     host = ui.element("div")  # (the dialogs: not in a menu, gone once closed)
@@ -145,7 +152,7 @@ def folders_tree(current: int, select: Callable[[int], None], changed: Callable[
                     .mark(f"folder-menu-{n.id}"),
                     ui.menu().props("auto-close"),
                 ):
-                    _menu(host, n, nodes, move, subfolder, changed)
+                    _menu(host, n, nodes, move, subfolder, deleted, changed)
         if nodes:  # (dropped here: at the top level)
             end_zone = (
                 ui.label(_("Drop here: at the top level"))
@@ -180,6 +187,7 @@ def _menu(
     nodes: list[folders.FolderNode],
     move: Callable[..., None],
     subfolder: Callable[[int], None],
+    deleted: Callable[[int], None],
     changed: Callable[[], None],
 ) -> None:
     """A folder's menu (in the tree; closed on a click, in the browser); its dialogs in
@@ -195,7 +203,8 @@ def _menu(
     item(_("Rename…"), "folder-rename", _rename_dialog, n, changed)
     item(_("Add a folder within it"), "folder-sub", subfolder, n.id)
     item(_("Move to…"), "folder-move", _move_dialog, n, nodes, move)
-    ui.separator()
+    if n.parent_id is not None or len(nodes) > 1:
+        ui.separator()
     if n.parent_id is not None:
         if n.own:
             item(_("Use its parent's settings"), "folder-settings", _parent_settings, n, changed)
@@ -222,6 +231,102 @@ def _menu(
             changed,
             copy=True,
         )
+    ui.separator()
+    item(
+        _("Delete…"),
+        "folder-delete",
+        delete_dialog,
+        n.id,
+        n.name,
+        n.hidden,
+        lambda: deleted(n.id),
+        changed,
+    )
+
+
+def delete_dialog(
+    folder_id: int,
+    name: str,
+    hidden: bool,
+    deleted: Callable[[], None],
+    archived: Callable[[], None],
+) -> None:
+    """Delete a folder: an empty one once confirmed; else once its name is typed, archiving
+    it offered instead (``deleted``, ``archived``: once done)."""
+    what = folders.contents(folder_id)
+
+    def delete() -> None:
+        folders.delete_folder(folder_id)
+        deleted()
+
+    if what.empty:
+        confirm(
+            _("Delete the empty folder “{folder}”?").format(folder=name),
+            _("Delete"),
+            delete,
+            mark="folder-delete-ok",
+        )
+        return
+    lost = []
+    if what.people:
+        lost.append(
+            ngettext(
+                "{n} person, with their period in it (paper tags, notes, documents, report)",
+                "{n} people, with their periods in it (paper tags, notes, documents, reports)",
+                what.people,
+            ).format(n=what.people)
+        )
+    if what.notes:
+        lost.append(_("its notes"))
+    with transient_dialog(
+        _("Delete the folder “{folder}”").format(folder=name), width="w-[32rem] max-w-full"
+    ) as (dlg, _card):
+        if lost:
+            ui.label(_("Deleted with it (the people themselves are kept):")).classes("text-sm")
+            with ui.column().classes("gap-0 pl-4"):
+                for x in lost:
+                    ui.label(f"• {x}").classes("text-sm")
+        if what.folders:
+            ui.label(
+                ngettext(
+                    "The folder within it goes up a level.",
+                    "The {n} folders within it go up a level.",
+                    what.folders,
+                ).format(n=what.folders)
+            ).classes("text-sm")
+        if not hidden:
+            ui.label(
+                _(
+                    "To put it out of the way while keeping everything, better archive it "
+                    "(greyed, its periods no longer offered; unarchived at any time)."
+                )
+            ).classes("text-sm text-grey")
+        typed = (
+            ui.input(_("Type “{folder}” to confirm").format(folder=name))
+            .classes("w-full")
+            .props("autofocus")
+            .mark("folder-delete-name")
+        )
+
+        def ok() -> bool | None:
+            if typed.value.strip() != name.strip():
+                return False
+            delete()
+
+        with ui.row().classes("w-full justify-end"):
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            if not hidden:
+                ui.button(
+                    _("Archive instead"),
+                    icon="visibility_off",
+                    on_click=ok_handler(
+                        dlg, lambda: (folders.set_hidden(folder_id, True), archived())
+                    ),
+                ).props("outline").mark("folder-archive-instead")
+            go = ui.button(_("Delete"), on_click=ok_handler(dlg, ok), color="negative").mark(
+                "folder-delete-ok"
+            )
+            go.bind_enabled_from(typed, "value", lambda v: (v or "").strip() == name.strip())
 
 
 def _rename_dialog(n: folders.FolderNode, changed: Callable[[], None]) -> None:

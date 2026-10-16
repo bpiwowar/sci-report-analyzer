@@ -162,6 +162,7 @@ async def test_period_filter(user: User) -> None:
         "tags",
         "data",
         "keys",
+        "llm",
         "io",
     ],
 )
@@ -756,9 +757,7 @@ async def test_deleting_a_folder_or_a_tag_is_confirmed(user: User) -> None:
     await user.open(f"/?folder={fid}")
     user.find(marker="folder-edit").click()
     user.find(marker="folder-delete").click()
-    await user.should_see(
-        "Delete the folder “Prize committee” and its periods? Its people are kept."
-    )
+    await user.should_see("Delete the empty folder “Prize committee”?")
     assert folders.folders()
     user.find(marker="folder-delete-ok").click()
     await user.should_not_see(marker="folder-delete-ok")
@@ -772,6 +771,32 @@ async def test_deleting_a_folder_or_a_tag_is_confirmed(user: User) -> None:
     user.find(marker="tag-delete-ok").click()
     await user.should_not_see(marker=f"tag-delete-{tid}")
     assert not any(t.id == tid for t in annotations.all_tags())
+
+
+async def test_deleting_a_folder_not_empty_needs_its_name(user: User) -> None:
+    """From the tree: a folder with people is deleted only once its name is typed; archiving
+    it is offered instead."""
+    from sci_report_analyzer import folders
+
+    fid = folders.save_folder(None, "Hiring committee")
+    folders.add_person(fid, make_person("Ann"))
+    await user.open(f"/?folder={fid}")
+    user.find(marker=f"folder-delete-{fid}").click()
+    await user.should_see(
+        "• 1 person, with their period in it (paper tags, notes, documents, report)"
+    )
+    user.find(marker="folder-delete-ok").click()
+    assert folders.folders()  # (the name not typed)
+    user.find(marker="folder-archive-instead").click()
+    await user.should_see("archived")  # (the page shown again)
+    assert [f.hidden for f in folders.folders()] == [True]
+    user.find(marker=f"folder-delete-{fid}").click()
+    await user.should_see(marker="folder-delete-name")
+    await user.should_not_see(marker="folder-archive-instead")  # (already archived)
+    user.find(marker="folder-delete-name").type("Hiring committee")
+    user.find(marker="folder-delete-ok").click()
+    await user.should_see(marker="people-title", content="All people")
+    assert not folders.folders()
 
 
 async def test_folders_tree_editor(user: User) -> None:
@@ -966,8 +991,8 @@ async def test_remove_from_folder_keeping_or_deleting_data(user: User) -> None:
     assert [(p.id, p.name, p.folder_id) for p in annotations.periods(pid)] == [
         (period, "Hiring committee", None)
     ]
-    # From the person's Periods tab: deleted.
-    await user.open(f"/person/{other}?tab=periods")
+    # From the person's Profile tab: deleted.
+    await user.open(f"/person/{other}?tab=sources")
     user.find(f"leave-{fid}").click()
     user.find("remove-delete").click()
     assert folders.folders()[0].members == [] and annotations.periods(other) == []
@@ -2669,6 +2694,29 @@ async def test_tag_from_a_pasted_list(user: User) -> None:
     await user.should_see("In the order of the list")
 
 
+async def test_tag_from_a_list_edit_an_item(user: User) -> None:
+    """An item's text corrected (e.g. a garbled title) and matched again."""
+    from sci_report_analyzer import annotations
+
+    pid = _seed()
+    period = annotations.save_period(pid, "Report", 2018, 2024)
+    await user.open(f"/person/{pid}/{period}")
+    await user.should_see("Deep ranking for search")
+    user.find("tag-from-list").click()
+    await user.should_see("reflist-text")
+    user.find("reflist-text").elements.pop().value = "1- Dxxp rxnkxng fxr sxxrch. J. Doe.\n"
+    user.find("reflist-find").click()
+    await user.should_see("0 of 1 items matched")
+    user.find("reflist-edit-0").click()
+    await user.should_see(marker="reflist-item-text-0")
+    box = user.find("reflist-item-text-0").elements.pop()
+    assert box.value == "Dxxp rxnkxng fxr sxxrch. J. Doe."
+    box.value = "Deep ranking for search. J. Doe, 2021."
+    user.find("reflist-rematch-0").click()
+    await user.should_see("1 of 1 items matched")
+    await user.should_not_see(marker="reflist-item-text-0")
+
+
 async def test_tag_from_a_list_outside_the_period(user: User) -> None:
     """Papers of the list outside the period's years: tagged, and said not shown."""
     from test_reflist import REPORT, REPORT_PAPERS
@@ -3139,3 +3187,30 @@ def _pid(name: str) -> int:
 
     with session_scope() as s:
         return s.scalar(select(Person.id).where(Person.name == name))
+
+
+async def test_move_a_person_to_another_folder(user: User) -> None:
+    from sci_report_analyzer import folders
+
+    pid = make_person("Ann Smith")
+    a = folders.save_folder(None, "Committee A")
+    b = folders.save_folder(None, "Committee B")
+    folders.add_person(a, pid, 2020, 2024)
+    # From their card in the folder.
+    await user.open(f"/?folder={a}")
+    user.find(f"move-{pid}").click()
+    await user.should_see(marker="move-target")
+    user.find("move-target").elements.pop().value = b
+    user.find("move-ok").click()
+    await user.should_see("No one in this folder yet.")
+    [m] = next(f for f in folders.folders() if f.id == b).members
+    assert (m.person_id, m.start_year, m.end_year) == (pid, 2020, 2024)
+    # From their Profile tab: back to A.
+    await user.open(f"/person/{pid}?tab=periods")
+    user.find(f"move-{b}").click()
+    await user.should_see(marker="move-target")
+    assert set(user.find("move-target").elements.pop().options) == {a}
+    user.find("move-target").elements.pop().value = a
+    user.find("move-ok").click()
+    await user.should_see(marker=f"move-{a}")
+    assert [f.id for f in folders.folders() if f.members] == [a]
