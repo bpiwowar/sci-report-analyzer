@@ -20,6 +20,8 @@ class FakeRequest:
 def shutdowns(monkeypatch):
     calls = []
     monkeypatch.setattr(stop.app, "shutdown", lambda: calls.append(True))
+    # Clients left by the UI tests would get JavaScript through their closed event loop
+    monkeypatch.setattr(stop.Client, "instances", {})
     return calls
 
 
