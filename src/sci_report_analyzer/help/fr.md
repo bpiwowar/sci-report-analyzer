@@ -409,19 +409,22 @@ affiché) pour référence ; l'onglet des catégories les liste toujours.
 
 Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un comité de sélection : un dossier a un nom,
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers
-(définie dans son onglet Profil, sous Périodes), avec ses propres étoiles, étiquettes et notes ; ouvrir une personne depuis un
-dossier sélectionne celle-ci. Retirer une personne d'un dossier (✕ sur sa carte, ou dans son onglet Profil)
+(définie en cliquant dessus sur sa ligne dans le dossier, ou dans son onglet Profil, sous Périodes), avec ses propres étoiles, étiquettes et notes ; ouvrir une personne depuis un
+dossier sélectionne celle-ci. Retirer une personne d'un dossier (✕ sur sa ligne, ou dans son onglet Profil)
 garde cette période, avec ses données, comme l'une de ses propres périodes, ou la supprime.
 La **déplacer** vers un autre dossier (le bouton dossier avec une flèche, aux mêmes endroits)
 emporte cette période, avec toutes ses données ; ses extraits sont classés dans les catégories
 de l'autre dossier (ajoutées s'il le faut).
-Le bouton 📝 de la carte d'une personne (aussi à côté du nom du dossier sur sa page, et dans son onglet Documents)
+Le bouton 📝 de la ligne d'une personne (aussi à côté du nom du dossier sur sa page, et dans son onglet Documents)
 ouvre ses **notes et extraits dans le dossier** sur une page à part, comme à côté de ses PDF : pour les écrire, ou
 voir ses extraits par catégorie, sans ouvrir de document (par exemple quand elle n'en a aucun).
 
-Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre** à sa gauche
-(au-dessus, sur un écran étroit), repliable ; un clic sur un dossier l'affiche (ses personnes, les dossiers qu'il
-contient), « Toutes les personnes (nettoyage) » chaque personne. Glissez un dossier sur un autre pour le mettre
+Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre**, chaque dossier
+déplié montrant les dossiers qu'il contient puis ses personnes, une ligne chacune (sa période, ses étoiles, ses
+étiquettes, ses sources, ce qui demande un coup d'œil) ; replié, son nombre de personnes. Les dossiers dépliés ou
+repliés (aussi tous à la fois, avec les boutons au-dessus de l'arbre) et celui sélectionné sont mémorisés. Un clic
+sur un dossier le sélectionne (déplié) : ses actions et son filtre par étiquette sont dans la barre au-dessus, qui
+reste en haut ; « Toutes les personnes (nettoyage) » liste chaque personne. Glissez un dossier sur un autre pour le mettre
 dedans (sur son haut ou son bas : à côté), ou sur « Déposer ici » pour le premier niveau. Le menu ⋮ de chaque
 dossier le renomme, ajoute un dossier dedans, le déplace (« Déplacer vers… ») et choisit ses réglages. Un dossier
 utilise les **réglages** du dossier où il est, ou les siens (une icône dans l'arbre) : tous, ses catégories, ses listes

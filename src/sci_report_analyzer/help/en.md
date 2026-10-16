@@ -403,20 +403,23 @@ text: in the notes and the copy, its excerpts are not listed but follow the text
 
 **Folders** (Reports page) group people, e.g. for a hiring committee: a folder has a name,
 a date and can be hidden. Each person has their **own period** in each of their folders
-(set in their Profile tab, under Periods), with its own stars, tags and notes; opening a person from a
-folder selects it. Removing a person from a folder (✕ on their card, or in their Profile
+(click it on their line in the folder, or set it in their Profile tab, under Periods), with its own stars, tags and notes; opening a person from a
+folder selects it. Removing a person from a folder (✕ on their line, or in their Profile
 tab) either keeps that period, with its data, as one of their own periods, or deletes it.
 **Moving** them to another folder (the folder-with-an-arrow button, same places) takes
 that period with them, with all its data; their excerpts are filed in the other folder's
 categories (added if missing).
-The 📝 button of a person's card (also next to the folder's name on their page, and in their
+The 📝 button of a person's line (also next to the folder's name on their page, and in their
 Documents tab) opens their **notes and excerpts in the folder** on a page of their own, as
 next to their PDFs: to write them, or see their excerpts by category, without opening any
 document (e.g. when they have none).
 
-Folders can be **within other folders**: the Reports page shows them as a **tree** on its
-left (above, on a narrow screen), collapsible; a click on a folder shows it (its people, the
-folders within it), "All people (cleanup)" every person. Drag a folder onto another one to
+Folders can be **within other folders**: the Reports page shows them as a **tree**, each
+folder expanded showing the folders within it then its people, one line each (their period,
+stars, tags, sources, what needs a look); collapsed, its number of people. The folders
+expanded or collapsed (also all at once, with the buttons above the tree) and the one
+selected are remembered. A click on a folder selects it (expanded): its actions and its tag
+filter are in the bar above, staying on top; "All people (cleanup)" lists every person. Drag a folder onto another one to
 put it within it (onto its top or bottom: next to it), or onto "Drop here" for the top level.
 Each folder's ⋮ menu renames it, adds a folder within it, moves it ("Move to…") and chooses
 its settings. A folder uses the **settings** of the folder it is in, or its own ones (an icon in

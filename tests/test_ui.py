@@ -690,12 +690,12 @@ async def test_folders_on_people_page(user: User) -> None:
     await user.open(f"/?folder={fid}")
     await user.should_see("Hiring committee")
     await user.should_see("Jane Doe")
-    await user.should_see("period 2020–2024")
+    await user.should_see(marker=f"period-{period}", content="2020–2024")
     # The period is set in place.
     user.find(f"period-{period}").click()
     user.find(f"period-start-{period}").elements.pop().value = 2021
     user.find(f"period-save-{period}").click()
-    await user.should_see("period 2021–2024")
+    await user.should_see(marker=f"period-{period}", content="2021–2024")
     # Tags are set on the card, and the folder can be filtered by tag.
     user.find(f"tags-{period}").elements.pop().value = ["shortlisted"]
     assert folders.folders()[0].members[0].tags == ["shortlisted"]
@@ -856,12 +856,48 @@ async def test_folders_tree_editor(user: User) -> None:
     # A folder within another one, added: shown.
     await user.should_see(marker=f"folder-sub-{prize}")
     user.find(marker=f"folder-sub-{prize}").click()
-    await user.should_see(marker="people-title", content="Prize › New folder")
+    await user.should_see(marker="people-title", content="Prize › New folder", retries=50)
     assert [(n.path, n.own) for n in folders.tree() if n.id == 4] == [("Prize › New folder", False)]
-    # The folder's page lists those within it.
+    # Within its folder in the tree.
     await user.open(f"/?folder={prize}")
-    user.find(marker="subfolder-4").click()
+    user.find(marker="folder-node-4").trigger("click")
     await user.should_see(marker="people-title", content="Prize › New folder")
+
+
+async def test_people_in_the_folders_tree(user: User) -> None:
+    """The people within each folder expanded (the selected one is, where it is), a count
+    once collapsed; expanded or collapsed: sticky; all expanded or collapsed at once."""
+    from sci_report_analyzer import folders
+
+    top = folders.save_folder(None, "Hiring")
+    sub = folders.save_folder(None, "Session", parent_id=top)
+    prize = folders.save_folder(None, "Prize")
+    ann = folders.add_person(sub, make_person("Ann Smith"), 2020, 2024)
+    bob = folders.add_person(prize, make_person("Bob Jones"))
+    await user.open(f"/?folder={sub}")
+    await user.should_see(marker=f"person-row-{ann}")
+    await user.should_see("Ann Smith")
+    await user.should_not_see(marker=f"person-row-{bob}")
+    await user.should_see(marker=f"folder-count-{prize}", content="1")
+    # Expanded: its people, in the tree; a click opens the person in the folder.
+    user.find(marker=f"folder-toggle-{prize}").click()
+    await user.should_see("Bob Jones")
+    await user.should_not_see(marker=f"folder-count-{prize}")
+    await user.open(f"/?folder={sub}")
+    await user.should_see(marker=f"person-row-{bob}")
+    user.find(marker="folders-collapse-all").click()
+    await user.should_not_see(marker=f"folder-node-{sub}")
+    await user.should_not_see(marker=f"person-row-{bob}")
+    await user.open(f"/?folder={sub}")  # (already selected: kept collapsed)
+    await user.should_not_see(marker=f"folder-node-{sub}")
+    user.find(marker="folders-expand-all").click()
+    await user.should_see(marker=f"person-row-{ann}")
+    await user.should_see(marker=f"person-row-{bob}")
+    # All people, then back to the folder last selected.
+    await user.open("/?folder=0")
+    await user.should_see(marker="people-table")
+    user.find(marker="folders-back").click()
+    await user.should_see(marker="people-title", content="Hiring › Session", retries=20)
 
 
 async def test_folder_settings_moved_and_copied_from_the_tree(user: User) -> None:

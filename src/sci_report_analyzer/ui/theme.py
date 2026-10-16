@@ -89,6 +89,8 @@ CSS = """
 .vr-drop-on, .vr-drop-on > td { background: rgba(25,118,210,.12) !important; }
 .vr-drop-on { outline: 1px dashed var(--q-primary); outline-offset: -1px; }
 .vr-row:hover { background: rgba(127,127,127,.08); }
+.vr-toolbar { background: #fff; border-bottom: 1px solid rgba(127,127,127,.2); }
+body.body--dark .vr-toolbar { background: var(--q-dark-page); }
 .vr-track { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.35) 0 3px,
             transparent 3px 7px); }
 """

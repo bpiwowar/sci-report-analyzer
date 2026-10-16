@@ -25,7 +25,7 @@ from ..sync import (
 from .categories_editor import categories_dialog
 from .dialogs import close_then, confirm, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
-from .folders_editor import ALL, delete_dialog, folders_tree
+from .folders_editor import ALL, delete_dialog, expand_to, folders_tree
 from .person import (
     candidate_details,
     link_url,
@@ -37,17 +37,23 @@ from .person import (
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
 LAST_FOLDER = "ui.people.folder"  # the folder shown on the Reports page (sticky)
+LAST_IN_TREE = "ui.people.tree"  # the last folder selected in the tree (sticky)
 
 
 def register() -> None:
     @ui.page("/")
     def index(folder: int | None = None) -> None:
         known = {f.id: f for f in folders.folders()}
+        last = annotations.ui_state(LAST_FOLDER)
         if folder is None:
-            folder = annotations.ui_state(LAST_FOLDER)
+            folder = last
         if folder not in known:
             folder = ALL
-        annotations.save_ui_state(LAST_FOLDER, folder)
+        if folder != last:
+            annotations.save_ui_state(LAST_FOLDER, folder)
+            if folder != ALL:  # (newly selected: shown expanded, where it is)
+                annotations.save_ui_state(LAST_IN_TREE, folder)
+                expand_to(folder)
         title = known[folder].name if folder in known else _("All people")
         with frame(title):
 
@@ -60,31 +66,30 @@ def register() -> None:
 
 
 def _reports(folder: int, changed) -> None:
-    """The tree of folders (on the left; above, on narrow screens), and the folder selected
-    (else All people)."""
+    """The folder selected (its actions, in a bar staying on top) and the tree of folders with
+    their people; else All people."""
     known = {f.id: f for f in folders.folders()}
     current = known.get(folder)
-    with ui.element("div").classes("w-full flex flex-col md:flex-row md:flex-nowrap gap-4"):
-        with (
-            ui.column()
-            .classes(
-                "w-full md:w-72 shrink-0 gap-1 self-start md:sticky md:top-16"
-                " md:max-h-[calc(100vh-5rem)] md:overflow-auto"
-            )
-            .mark("folders-pane")
-        ):
-            folders_tree(current.id if current else ALL, _goto, changed)
-        with ui.column().classes("w-full min-w-0 grow gap-3"):
-            _header(current, known)
-            if current is None:
-                _cleanup_view(known)
-            else:
-                _folder_view(current)
+    view = {"only": ()}  # (the selected folder's people: those having all these tags)
+    with (
+        ui.column()
+        .classes("w-full gap-1 sticky top-12 z-10 py-2 vr-toolbar")
+        .mark("folder-toolbar")
+    ):
+        _header(current, known)
+        if current is not None:
+            if current.notes:
+                ui.label(current.notes).classes("text-sm text-grey")
+            _tag_filter(current, view)
+    if current is None:
+        _cleanup_view(known)
+    else:
+        _tree(current.id, changed, view)
 
 
 def _refresh_if_running() -> None:
     if any_running():
-        refresh_alive(_folder_cards)
+        refresh_alive(_tree)
 
 
 def _goto(folder_id: int) -> None:
@@ -97,6 +102,15 @@ def _header(current: folders.FolderView | None, known: dict[int, folders.FolderV
         ui.label(current.path if current else _("All people")).classes("text-2xl").mark(
             "people-title"
         )
+        if current is None and folders.folders():
+            back = annotations.ui_state(LAST_IN_TREE)
+            ui.button(
+                _("Folders"),
+                icon="account_tree",
+                on_click=lambda: _goto(back if back in known else next(iter(known))),
+            ).props("flat dense no-caps").tooltip(_("Back to the folders and their people")).mark(
+                "folders-back"
+            )
         if current and current.date:
             ui.label(current.date.isoformat()).classes("text-grey")
         if current and current.hidden:
@@ -342,90 +356,100 @@ def _later(pid: int, dialog: ui.dialog) -> None:
     dialog.close()
 
 
-# ---- a folder ------------------------------------------------------------------------------
+# ---- a folder: the tree, with the people --------------------------------------------------
 
 
-def _folder_view(f: folders.FolderView) -> None:
-    if f.notes:
-        ui.label(f.notes).classes("text-sm text-grey")
-    if within := [n for n in folders.tree() if n.parent_id == f.id]:
-        with ui.row().classes("items-center gap-2"):
-            ui.label(_("Folders within it:")).classes("text-sm text-grey")
-            for n in within:
-                ui.button(n.name, icon="folder", on_click=lambda n=n: _goto(n.id)).props(
-                    "flat dense no-caps color=amber-9"
-                ).mark(f"subfolder-{n.id}")
-    _folder_cards(f.id)
-    members = {m.person_id for m in f.members}
-    others = {pid: n for pid, n in folders.all_people().items() if pid not in members}
-    if others:
-        with ui.row().classes("items-center gap-2"):
-            pick = (
-                ui.select(others, multiple=True, with_input=True, label=_("Add people"))
-                .props("dense outlined use-chips")
-                .classes("w-80")
-                .mark(f"folder-add-{f.id}")
-            )
-
-            def add() -> None:
-                for pid in pick.value or []:
-                    folders.add_person(f.id, pid)
-                ui.navigate.reload()
-
-            ui.button(_("Add"), icon="person_add", on_click=add).props("dense").mark(
-                f"folder-add-btn-{f.id}"
-            )
-    ui.label(
-        _("Each person has their own period in the folder (set it in their Profile tab).")
-    ).classes("text-xs text-grey")
+def _tag_filter(f: folders.FolderView, view: dict) -> None:
+    if tags := folders.tags_of(f):
+        ui.select(
+            tags,
+            value=[],
+            multiple=True,
+            label=_("Only people tagged"),
+            on_change=lambda e: (view.update(only=tuple(e.value or ())), refresh_alive(_tree)),
+        ).props("dense outlined use-chips clearable").classes("w-80").mark(
+            f"folder-tag-filter-{f.id}"
+        )
 
 
 @ui.refreshable
-def _folder_cards(folder_id: int, only: tuple[str, ...] = ()) -> None:
-    """The folder's people; with `only`, those having all these tags."""
-    f = next((x for x in folders.folders() if x.id == folder_id), None)
-    if f is None:
-        return
-    if not f.members:
-        ui.label(_("No one in this folder yet.")).classes("text-grey")
-        return
-    tags = folders.tags_of(f)
-    only = tuple(t for t in only if t in tags)
-    if tags:
-        ui.select(
-            tags,
-            value=list(only),
-            multiple=True,
-            label=_("Only people tagged"),
-            on_change=lambda e: refresh_alive(_folder_cards, folder_id, tuple(e.value or ())),
-        ).props("dense outlined use-chips clearable").classes("w-80").mark(
-            f"folder-tag-filter-{folder_id}"
-        )
+def _tree(current: int, changed: Callable[[], None], view: dict) -> None:
+    """The folders, with the people of those expanded (of the ``current`` one, those having
+    all the tags ``view["only"]``)."""
+    known = {f.id: f for f in folders.folders()}
     everyone = {p.id: (p, n) for p, n in persons.people_with_counts()}
-    years = pubview.problem_years(m.person_id for m in f.members)
+    members = [m for f in known.values() for m in f.members]
+    years = pubview.problem_years({m.person_id for m in members})
     problems = {
-        m.person_id: pubview.count_in_period(years[m.person_id], m.start_year, m.end_year)
-        for m in f.members
+        m.period_id: pubview.count_in_period(years[m.person_id], m.start_year, m.end_year)
+        for m in members
         if m.person_id in years
     }
-    if total := sum(problems.values()):
-        ui.label(
-            ngettext(
-                "{n} paper with problems in the people's periods",
-                "{n} papers with problems in the people's periods",
-                total,
-            ).format(n=total)
-        ).classes("text-sm text-orange-9").tooltip(_(_PROBLEMS_TIP)).mark("folder-problems")
-    with ui.grid(columns="repeat(auto-fill, minmax(340px, 1fr))").classes("w-full"):
+
+    def people(n: folders.FolderNode, depth: int) -> None:
+        f = known[n.id]
+        indent = f"padding-left:{1.1 * depth + 1.5}rem"
+        if not f.members and (f.id == current or not n.children):
+            ui.label(_("No one in this folder yet.")).classes("text-sm text-grey").style(indent)
+        tags = folders.tags_of(f)
+        only = set(view["only"]) if f.id == current else set()
+        if total := sum(problems.get(m.period_id, 0) for m in f.members):
+            ui.label(
+                ngettext(
+                    "{n} paper with problems in the people's periods",
+                    "{n} papers with problems in the people's periods",
+                    total,
+                ).format(n=total)
+            ).classes("text-xs text-orange-9").style(indent).tooltip(_(_PROBLEMS_TIP)).mark(
+                "folder-problems"
+            )
         for m in f.members:
-            if m.person_id in everyone and set(only) <= set(m.tags):
-                _card(
+            if m.person_id in everyone and only <= set(m.tags):
+                _person_row(
                     *everyone[m.person_id],
                     member=m,
                     folder_id=f.id,
-                    problems=problems.get(m.person_id),
+                    problems=problems.get(m.period_id),
                     folder_tags=tags,
+                    depth=depth,
                 )
+        if f.id == current:
+            _add_people(f, indent)
+
+    folders_tree(
+        current,
+        _goto,
+        changed,
+        people=people,
+        counts={f.id: len(f.members) for f in known.values()},
+    )
+    ui.label(_("Each person has their own period in the folder (click it to set it).")).classes(
+        "text-xs text-grey"
+    )
+
+
+def _add_people(f: folders.FolderView, indent: str) -> None:
+    """People already known, added to the folder."""
+    members = {m.person_id for m in f.members}
+    others = {pid: n for pid, n in folders.all_people().items() if pid not in members}
+    if not others:
+        return
+    with ui.row().classes("items-center gap-2 py-1").style(indent):
+        pick = (
+            ui.select(others, multiple=True, with_input=True, label=_("Add people"))
+            .props("dense outlined use-chips")
+            .classes("w-80")
+            .mark(f"folder-add-{f.id}")
+        )
+
+        def add() -> None:
+            for pid in pick.value or []:
+                folders.add_person(f.id, pid)
+            ui.navigate.reload()
+
+        ui.button(_("Add"), icon="person_add", on_click=add).props("dense flat").mark(
+            f"folder-add-btn-{f.id}"
+        )
 
 
 _PROBLEMS_TIP = N_(
@@ -437,13 +461,15 @@ _PROBLEMS_TIP = N_(
 def _period_editor(member: folders.Member) -> None:
     """The member's period in the folder; click to edit it in place."""
     text = (
-        _("period {start}–{end}").format(start=member.start_year or "…", end=member.end_year or "…")
+        _("{start}–{end}").format(start=member.start_year or "…", end=member.end_year or "…")
         if member.start_year or member.end_year
         else _("no period set")
     )
     with (
         ui.label(text)
-        .classes("text-sm text-primary cursor-pointer border-b border-dashed")
+        .classes(
+            "text-xs text-primary cursor-pointer border-b border-dashed whitespace-nowrap shrink-0"
+        )
         .on("click.stop", lambda: None)
         .tooltip(_("Click to set the period"))
         .mark(f"period-{member.period_id}"),
@@ -470,7 +496,7 @@ def _period_editor(member: folders.Member) -> None:
                 int_or_none(end.value),
             )
             menu.close()
-            refresh_alive(_folder_cards)
+            refresh_alive(_tree)
 
         for el in (start, end):
             el.on("keydown.enter", save)
@@ -577,38 +603,51 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
     del_btn.on_click(delete)
 
 
-def _card(
+def _person_row(
     person: Person,
     n_pubs: int,
     *,
-    member: folders.Member | None = None,
-    folder_id: int | None = None,
-    problems: int | None = None,
-    folder_tags: list[str] | None = None,
+    member: folders.Member,
+    folder_id: int,
+    problems: int | None,
+    folder_tags: list[str],
+    depth: int,
 ) -> None:
+    """A person in the tree (one line; two on narrow screens): their name, period, stars and
+    tags in the folder, their sources, what needs a look, and their actions."""
     validated = [
         ln for ln in person.links if ln.status == "validated" and not manual.is_hal_document(ln)
     ]
     pending = [ln for ln in person.links if ln.status == "candidate"]
     stale = [ln for ln in validated if ln.is_stale or ln.sync_state == "error"]
-    url = f"/person/{person.id}" + (f"/{member.period_id}" if member else "")
+    url = f"/person/{person.id}/{member.period_id}"
     with (
-        ui.card()
-        .classes("cursor-pointer")
+        ui.row()
+        .classes("w-full items-center gap-x-3 gap-y-0 rounded cursor-pointer vr-row py-0.5 pr-1")
+        .style(f"padding-left:{1.1 * depth + 1.5}rem")
         .on(
             "click",
             lambda: ui.navigate.to(url),
-            js_handler="(e) => { if (!e.target.closest('a, button, .q-btn')) emit(); }",
+            js_handler=(
+                "(e) => { if (!e.target.closest('a, button, .q-btn, .q-field, .q-menu')) emit(); }"
+            ),
         )
+        .mark(f"person-row-{member.period_id}")
     ):
-        with ui.row().classes("items-center justify-between w-full"):
-            ui.label(person.name).classes("text-lg font-medium")
-            ui.label(
-                ngettext("{n} publication", "{n} publications", n_pubs).format(n=n_pubs)
-            ).classes("text-grey text-sm")
-        if person.affiliation:
-            ui.label(person.affiliation).classes("text-sm text-grey -mt-2")
-        with ui.row().classes("gap-1 items-center"):
+        with ui.row().classes("items-center gap-x-2 gap-y-0 min-w-0 grow"):
+            ui.icon("person", color="grey-7").classes("shrink-0")
+            ui.label(person.name).classes("text-sm font-medium whitespace-nowrap")
+            if person.affiliation:
+                ui.label(person.affiliation).classes(
+                    "text-xs text-grey ellipsis min-w-0 max-w-xs"
+                ).tooltip(person.affiliation)
+            _period_editor(member)
+            if member.stars:
+                ui.label(f"★ {member.stars}").classes(
+                    "text-amber-8 text-xs whitespace-nowrap"
+                ).tooltip(_("Starred papers"))
+            _tags_editor(member, folder_tags)
+        with ui.row().classes("items-center gap-1 no-wrap ml-auto"):
             for ln in validated:
                 with source_tag(
                     ln.source, url=ln.url or ADAPTERS[ln.source].profile_url(ln.external_id)
@@ -623,28 +662,28 @@ def _card(
                 colour = STATUS_COLOUR.get(ln.status_label, "grey")
                 ui.icon("circle", size="8px", color=colour).classes("-ml-1 mr-1")
             if not validated:
-                ui.label(_("no validated source")).classes("text-sm text-grey")
+                ui.label(_("no validated source")).classes("text-xs text-grey")
             elif synced := persons.last_sync(person):
-                ui.label(_("last sync {when}").format(when=fmt_dt(synced))).classes(
-                    "text-xs text-grey ml-1"
+                ui.icon("schedule", size="xs", color="grey").tooltip(
+                    _("last sync {when}").format(when=fmt_dt(synced))
                 ).mark(f"last-sync-{person.id}")
-        with ui.row().classes("gap-2"):
+            ui.label(str(n_pubs)).classes("text-xs text-grey ml-1").tooltip(
+                ngettext("{n} publication", "{n} publications", n_pubs).format(n=n_pubs)
+            )
             if pending:
-                ui.badge(
+                ui.badge(str(len(pending)), color="orange").tooltip(
                     ngettext(
                         "{n} candidate to review", "{n} candidates to review", len(pending)
-                    ).format(n=len(pending)),
-                    color="orange",
+                    ).format(n=len(pending))
                 )
             if stale:
-                ui.badge(
+                ui.icon("sync_problem", size="xs", color="warning").tooltip(
                     ngettext(
                         "{n} source not up to date", "{n} sources not up to date", len(stale)
-                    ).format(n=len(stale)),
-                    color="warning",
+                    ).format(n=len(stale))
                 )
             if is_syncing(person.id):
-                ui.badge(_("syncing…"), color="info")
+                ui.spinner(size="xs").tooltip(_("syncing…"))
             if problems:
                 ui.badge(
                     ngettext("{n} problem", "{n} problems", problems).format(n=problems),
@@ -654,34 +693,27 @@ def _card(
                 ).tooltip(_("{tip} — click to list them").format(tip=_(_PROBLEMS_TIP))).mark(
                     f"problems-{person.id}"
                 )
-        if member is not None:
-            with ui.row().classes("items-center gap-2 w-full"):
-                _period_editor(member)
-                if member.stars:
-                    ui.label(f"★ {member.stars}").classes("text-amber-8 text-sm")
-                ui.space()
-                ui.button(
-                    icon="edit_note", on_click=lambda: ui.navigate.to(notes_url(member.period_id))
-                ).props("flat round dense size=sm").tooltip(_(NOTES_TIP)).mark(
-                    f"notes-{member.period_id}"
-                )
-
-                ui.button(
-                    icon="drive_file_move",
-                    on_click=lambda: move_to_folder_dialog(
-                        folder_id, person.id, lambda _to: ui.navigate.reload()
-                    ),
-                ).props("flat round dense size=sm").on("click.stop", lambda: None).tooltip(
-                    _("Move to another folder")
-                ).mark(f"move-{person.id}")
-
-                def remove() -> None:
-                    remove_from_folder_dialog(folder_id, person.id, ui.navigate.reload)
-
-                ui.button(icon="close", on_click=remove).props("flat round dense size=sm").on(
-                    "click.stop", lambda: None
-                ).tooltip(_("Remove from the folder")).mark(f"remove-{person.id}")
-            _tags_editor(member, folder_tags or [])
+            ui.button(
+                icon="edit_note", on_click=lambda: ui.navigate.to(notes_url(member.period_id))
+            ).props("flat round dense size=sm").tooltip(_(NOTES_TIP)).mark(
+                f"notes-{member.period_id}"
+            )
+            ui.button(
+                icon="drive_file_move",
+                on_click=lambda: move_to_folder_dialog(
+                    folder_id, person.id, lambda _to: ui.navigate.reload()
+                ),
+            ).props("flat round dense size=sm").tooltip(_("Move to another folder")).mark(
+                f"move-{person.id}"
+            )
+            ui.button(
+                icon="close",
+                on_click=lambda: remove_from_folder_dialog(
+                    folder_id, person.id, ui.navigate.reload
+                ),
+            ).props("flat round dense size=sm").tooltip(_("Remove from the folder")).mark(
+                f"remove-{person.id}"
+            )
 
 
 def _tags_editor(member: folders.Member, options: list[str]) -> None:
@@ -699,11 +731,11 @@ def _tags_editor(member: folders.Member, options: list[str]) -> None:
         with_input=True,
         on_change=save,
     ).props(
-        f'dense borderless use-chips placeholder="{escape(_("+ tag"), quote=True)}" '
+        f'dense borderless use-chips options-dense placeholder="{escape(_("+ tag"), quote=True)}" '
         "hide-dropdown-icon"
-    ).classes("w-full -mt-2").on("click.stop", lambda: None).tooltip(
-        _("Tags of the person in this folder")
-    ).mark(f"tags-{member.period_id}")
+    ).classes("min-w-16 shrink").tooltip(_("Tags of the person in this folder")).mark(
+        f"tags-{member.period_id}"
+    )
 
 
 # ---- folders -------------------------------------------------------------------------------

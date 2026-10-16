@@ -838,6 +838,9 @@ msgstr "Y revenir (tel que sélectionné)"
 msgid "Back to the default"
 msgstr "Revenir à l’emplacement par défaut"
 
+msgid "Back to the folders and their people"
+msgstr "Revenir aux dossiers et à leurs personnes"
+
 msgid "Back to the sources' DOI"
 msgstr "Retour au DOI des sources"
 
@@ -1137,6 +1140,9 @@ msgstr "Co-auteurs par article · moy. {avg} ({n})"
 
 msgid "Code"
 msgstr "Code"
+
+msgid "Collapse all"
+msgstr "Tout replier"
 
 msgid "Collapse all the categories"
 msgstr "Replier toutes les catégories"
@@ -1560,12 +1566,10 @@ msgstr ""
 "Chacun nommé : il s'utilise comme `.nom` dans les notes du dossier, à la "
 "place du modèle général de ce nom (Réglages → Modèles de citation)."
 
-msgid ""
-"Each person has their own period in the folder (set it in their Profile "
-"tab)."
+msgid "Each person has their own period in the folder (click it to set it)."
 msgstr ""
-"Chaque personne a sa propre période dans le dossier (à définir dans son "
-"onglet Profil)."
+"Chaque personne a sa propre période dans le dossier (cliquez dessus pour "
+"la modifier)."
 
 msgid "Edit"
 msgstr "Édition"
@@ -1733,6 +1737,9 @@ msgstr "Des extraits y ont été classés entre-temps"
 msgid "Excerpts, by category"
 msgstr "Extraits, par catégorie"
 
+msgid "Expand all"
+msgstr "Tout déplier"
+
 msgid "Expand all the categories"
 msgstr "Déplier toutes les catégories"
 
@@ -1809,9 +1816,6 @@ msgstr "Dossier"
 
 msgid "Folders"
 msgstr "Dossiers"
-
-msgid "Folders within it:"
-msgstr "Dossiers qu'il contient :"
 
 msgid "Forget the chosen record, for all the venue's papers: match automatically"
 msgstr ""
@@ -1967,8 +1971,8 @@ msgstr "Masquer"
 msgid "Hide a misattributed / irrelevant record"
 msgstr "Masquer une notice mal attribuée / non pertinente"
 
-msgid "Hide the folders within it"
-msgstr "Masquer les dossiers qu'il contient"
+msgid "Hide its folders and people"
+msgstr "Masquer ses dossiers et ses personnes"
 
 msgid "Hide this paper?"
 msgstr "Masquer cet article ?"
@@ -4437,8 +4441,8 @@ msgstr "Afficher toutes les années"
 msgid "Show how the text was cleaned and matched"
 msgstr "Montrer comment le texte a été nettoyé et rapproché"
 
-msgid "Show the folders within it"
-msgstr "Afficher les dossiers qu'il contient"
+msgid "Show its folders and people"
+msgstr "Afficher ses dossiers et ses personnes"
 
 msgid "Show the notes as saved (the text typed here is lost: copy it first)"
 msgstr ""
@@ -4566,6 +4570,9 @@ msgstr "Séparer en un canal distinct"
 
 msgid "Star lists"
 msgstr "Listes étoilées"
+
+msgid "Starred papers"
+msgstr "Articles étoilés"
 
 msgid "Start"
 msgstr "Début"
@@ -6477,10 +6484,6 @@ msgid "pattern"
 msgstr "motif"
 
 #, python-brace-format
-msgid "period {start}–{end}"
-msgstr "période {start}–{end}"
-
-#, python-brace-format
 msgid "position {n}"
 msgstr "position {n}"
 
@@ -7104,6 +7107,10 @@ msgstr "{source} — chargement…"
 #, python-brace-format
 msgid "{source}, p. {page}"
 msgstr "{source}, p. {page}"
+
+#, python-brace-format
+msgid "{start}–{end}"
+msgstr "{start}–{end}"
 
 #, python-brace-format
 msgid "{tag}, number {number} in its list"
