@@ -14,7 +14,7 @@ from ..i18n import _
 from ..pubview import tag_order
 from .colours import ColourInput
 from .dialogs import confirm, transient_dialog
-from .mdedit import MarkdownEditor
+from .mdedit import MarkdownEditor, tool_group
 from .theme import DEFAULT_COLOUR, chip_html, chip_style, span
 
 if TYPE_CHECKING:
@@ -554,7 +554,14 @@ def paper_tags_and_notes(
     editors: dict[str, MarkdownEditor] = {}
 
     def tools(name: str) -> Callable[[], None] | None:
-        return (lambda: quote_tool(lambda: editors.get(name))) if quote_tool else None
+        if not quote_tool:
+            return None
+
+        def tool() -> None:
+            with tool_group():
+                quote_tool(lambda: editors.get(name))
+
+        return tool
 
     ui.label(_("Tags")).classes("font-medium")
     pid = period.id if period else None

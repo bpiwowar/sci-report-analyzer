@@ -2077,18 +2077,11 @@ msgstr "Condition incomplète"
 msgid "Influence"
 msgstr "Rayonnement"
 
-msgid "Insert the excerpts (kept up to date)"
-msgstr "Insérer les extraits (tenus à jour)"
+msgid "Insert a block (kept up to date)"
+msgstr "Insérer un bloc (tenu à jour)"
 
 msgid "Insert the papers not cited yet, at the cursor (as a list of citations)"
 msgstr "Insérer les articles pas encore cités, au curseur (en liste de citations)"
-
-msgid ""
-"Insert the summary of the period’s publications (kept up to date, as set "
-"in the Summary)"
-msgstr ""
-"Insérer le résumé des publications de la période (tenu à jour, réglé "
-"comme dans le Résumé)"
 
 msgid "Installing the PDF viewer (PDF.js, once)…"
 msgstr "Installation de la visionneuse PDF (PDF.js, une seule fois)…"
@@ -3645,9 +3638,6 @@ msgstr "Le remettre dans le texte généré"
 msgid "Put the cursor on a citation ([@key]) first"
 msgstr "Placez d'abord le curseur sur une citation ([@key])"
 
-msgid "Put the papers cited here (else at the end, when copied)"
-msgstr "Placer ici les articles cités (sinon à la fin, à la copie)"
-
 msgid ""
 "Put the person in a folder, or add a period (Periods tab), to write a "
 "report."
@@ -3729,17 +3719,12 @@ msgstr "Citer aussi son texte"
 
 msgid ""
 "Quote the text selected in the PDF (or the highlight clicked), with its "
-"page (Q)"
+"page (Q) · Shift+click: at the cursor, in quotation marks, with a link "
+"back to its page in a comment (Shift+Q)"
 msgstr ""
 "Citer le texte sélectionné dans le PDF (ou le surlignage cliqué), avec sa"
-" page (Q)"
-
-msgid ""
-"Quote the text selected in the PDF at the cursor, in quotation marks, "
-"with a link back to its page in a comment (Shift+Q)"
-msgstr ""
-"Citer le texte sélectionné dans le PDF au curseur, entre guillemets, avec"
-" un lien vers sa page dans un commentaire (Maj+Q)"
+" page (Q) · Maj+clic : au curseur, entre guillemets, avec un lien vers sa"
+" page dans un commentaire (Maj+Q)"
 
 msgid "Rank"
 msgstr "Rang"
@@ -4656,6 +4641,9 @@ msgstr "Le PDF n'est pas encore affiché"
 msgid "The PDF window is closed"
 msgstr "La fenêtre du PDF est fermée"
 
+msgid "The career (CV)"
+msgstr "Le parcours (CV)"
+
 msgid "The catch-all role is unknown"
 msgstr "Le rôle par défaut est inconnu"
 
@@ -4673,6 +4661,9 @@ msgstr "Les conférences trouvées dans ses textes (à l'enregistrement)."
 
 msgid "The excerpts, as selected"
 msgstr "Les extraits, tels que sélectionnés"
+
+msgid "The excerpts, by category"
+msgstr "Les extraits, par catégorie"
 
 msgid ""
 "The first rule that matches gives the role, else the catch-all. A "
@@ -4794,6 +4785,9 @@ msgstr ""
 "La session de l'article (p. ex. une démo) : comptée à part dans la "
 "répartition ; automatique : d'après les variantes, les règles de canal et"
 " les textes de canal"
+
+msgid "The papers cited (else at the end, when copied)"
+msgstr "Les articles cités (sinon à la fin, à la copie)"
 
 msgid "The papers in no list"
 msgstr "Les articles d'aucune liste"
@@ -4957,6 +4951,9 @@ msgstr ""
 
 msgid "The starting notes copied from a report template (Settings)"
 msgstr "Les notes de départ copiées d'un modèle de rapport (Paramètres)"
+
+msgid "The summary of the period’s publications (as set in the Summary)"
+msgstr "Le résumé des publications de la période (réglé comme dans le Résumé)"
 
 msgid ""
 "The text a person's notes start with, while empty (e.g. headings and the "
@@ -6639,6 +6636,10 @@ msgstr "{matched}/{total} articles déjà connus ({share})"
 #, python-brace-format
 msgid "{message} (applied everywhere)"
 msgstr "{message} (appliqué partout)"
+
+#, python-brace-format
+msgid "{mode} · click: {next}"
+msgstr "{mode} · clic : {next}"
 
 #, python-brace-format
 msgid "{name} — {status} (last sync {when})"

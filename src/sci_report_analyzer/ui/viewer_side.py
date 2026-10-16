@@ -18,7 +18,7 @@ from .categories_editor import categories_dialog
 from .copying import copy_button
 from .dialogs import actions, close, confirm, ok_handler, transient_dialog
 from .dnd import draggable, drop_zone
-from .mdedit import MarkdownEditor, inline_quote, quote
+from .mdedit import MarkdownEditor, inline_quote, quote, tool_group
 from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
 from .pub_details import show_details
@@ -458,34 +458,42 @@ class Side:
     def folder_tools(self) -> None:
         """The toolbar of the folder's notes: quote, cite a paper, copy with the references
         (numbered as the folder says), insert a block (the publications, the excerpts)."""
-        if self.has_pdf:
-            self.quote_tool(lambda: self.folder_editor, first=True)
-        self.cite_tools(
-            lambda: self.folder_editor,
-            "folder-note",
-            lambda: reports.folder_context(self.stats, self.period_id),
-        )
-        for name, icon, tip in (
-            (
-                "publications",
-                "summarize",
-                _(
-                    "Insert the summary of the period’s publications (kept up to date, as set "
-                    "in the Summary)"
-                ),
-            ),
-            ("excerpts", "format_list_bulleted", _("Insert the excerpts (kept up to date)")),
-            (
-                "references",
-                "library_books",
-                _("Put the papers cited here (else at the end, when copied)"),
-            ),
+        with tool_group():
+            if self.has_pdf:
+                self.quote_tool(lambda: self.folder_editor, first=True)
+            self.cite_tools(lambda: self.folder_editor, "folder-note")
+        with tool_group():
+            self.insert_tools()
+            self.template_tools()
+        with tool_group():
+            self.copy_tool(
+                lambda: self.folder_editor,
+                "folder-note",
+                lambda: reports.folder_context(self.stats, self.period_id),
+            )
+
+    def insert_tools(self) -> None:
+        """In the toolbar of the folder's notes: insert a block (kept up to date)."""
+        with (
+            ui.button(icon="playlist_add")
+            .props("flat dense round size=sm")
+            .tooltip(_("Insert a block (kept up to date)"))
+            .mark("folder-note-insert"),
+            ui.menu(),
         ):
-            ui.button(
-                icon=icon,
-                on_click=lambda name=name: self.folder_editor.insert_block(f"[[{name}]]"),
-            ).props("flat dense round size=sm").tooltip(tip).mark(f"folder-note-{name}")
-        self.template_tools()
+            for name, label in (
+                (
+                    "publications",
+                    _("The summary of the period’s publications (as set in the Summary)"),
+                ),
+                ("excerpts", _("The excerpts, by category")),
+                ("cv", _("The career (CV)")),
+                ("references", _("The papers cited (else at the end, when copied)")),
+            ):
+                ui.menu_item(
+                    label,
+                    on_click=lambda name=name: self.folder_editor.insert_block(f"[[{name}]]"),
+                ).mark(f"folder-note-{name}")
 
     def template_tools(self) -> None:
         """In the toolbar of the folder's notes: start them from a report template (asked
@@ -523,17 +531,9 @@ class Side:
         """The papers a note cites, by their keys (for the preview and the copy)."""
         return reports.note_context(self.stats, reports.citation_keys(self.stats))
 
-    def cite_tools(
-        self,
-        editor: Callable[[], MarkdownEditor | None],
-        mark: str,
-        context: Callable[[], reports.Context] | None = None,
-    ) -> None:
-        """In the toolbar of a note's ``editor``: cite a paper (``[@key]`` at the cursor), and
-        copy the note with its citations numbered and the papers cited listed (``context``: of
-        its citations, by default ``note_context``). The buttons are marked ``{mark}-cite`` and
-        ``{mark}-copy``."""
-        context = context or self.note_context
+    def cite_tools(self, editor: Callable[[], MarkdownEditor | None], mark: str) -> None:
+        """In the toolbar of a note's ``editor``: cite a paper (``[@key]`` at the cursor,
+        marked ``{mark}-cite``), see the one cited at the cursor."""
 
         async def see() -> None:
             if (e := editor()) is not None:
@@ -543,7 +543,7 @@ class Side:
                 else:
                     ui.notify(_("Put the cursor on a citation ([@key]) first"), type="warning")
 
-        ui.button(icon="format_quote", on_click=lambda: self.cite_dialog(editor, mark)).props(
+        ui.button(icon="menu_book", on_click=lambda: self.cite_dialog(editor, mark)).props(
             "flat dense round size=sm"
         ).tooltip(_("Cite a paper ([@key], numbered when copied)")).mark(f"{mark}-cite")
         ui.button(icon="open_in_new", on_click=see).props("flat dense round size=sm").tooltip(
@@ -555,6 +555,17 @@ class Side:
                 e.open_cited = self.open_cited
 
         ui.timer(0, made, once=True)
+
+    def copy_tool(
+        self,
+        editor: Callable[[], MarkdownEditor | None],
+        mark: str,
+        context: Callable[[], reports.Context] | None = None,
+    ) -> None:
+        """In the toolbar of a note's ``editor``: copy the note with its citations numbered and
+        the papers cited listed (``context``: of its citations, by default ``note_context``),
+        marked ``{mark}-copy``."""
+        context = context or self.note_context
         copy_button(
             lambda: reports.with_references(e.value, context()) if (e := editor()) else None,
             _("Copy the note, its citations numbered and the papers cited listed"),
@@ -655,22 +666,20 @@ class Side:
             if (e := editor()) is not None:
                 self.notes[:] = [e, *(x for x in self.notes if x is not e)]
 
-        async def click(inline: bool = False) -> None:
+        async def click(e) -> None:  # (shift-clicked: inline, as Shift+Q)
             used()
-            if (e := editor()) is not None:
-                await self.quote(e, inline=inline)
+            if (ed := editor()) is not None:
+                await self.quote(ed, inline=bool((e.args or {}).get("shiftKey")))
 
-        ui.button(icon="post_add", on_click=click).props("flat dense round size=sm").tooltip(
-            _("Quote the text selected in the PDF (or the highlight clicked), with its page (Q)")
-        ).mark("note-quote")
-        ui.button(icon="format_quote", on_click=lambda: click(inline=True)).props(
-            "flat dense round size=sm"
-        ).tooltip(
+        button = ui.button(icon="post_add").props("flat dense round size=sm")
+        button.on("click", click, ["shiftKey"])
+        button.tooltip(
             _(
-                "Quote the text selected in the PDF at the cursor, in quotation marks, with a "
-                "link back to its page in a comment (Shift+Q)"
+                "Quote the text selected in the PDF (or the highlight clicked), with its page "
+                "(Q) · Shift+click: at the cursor, in quotation marks, with a link back to its "
+                "page in a comment (Shift+Q)"
             )
-        ).mark("note-quote-inline")
+        ).mark("note-quote")
 
         def made() -> None:  # (the note's editor: listed, last; first once used)
             if (e := editor()) is not None:

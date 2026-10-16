@@ -41,27 +41,60 @@ MODE_ICONS = {
 }
 
 
-class _ModeToggle(ui.toggle):
-    """The editor's modes, as icons (their name on hover)."""
+def tool_group() -> ui.row:
+    """A group of a toolbar's buttons (of one kind: formatting, quoting, inserting…), framed."""
+    return ui.row().classes("items-center no-wrap gap-0 rounded border border-gray-400/40 px-0.5")
 
-    def _update_options(self) -> None:
-        super()._update_options()
-        hints = getattr(self, "hints", {})
-        for option, key in zip(self._props["options"], self._values, strict=True):
-            colour, more = hints.get(key, (None, ""))
-            title = _(MODES[key]) + (f" · {more}" if more else "")
-            option.update(icon=MODE_ICONS[key], label="", attrs={"title": title})
-            if colour:
-                option.update(textColor=colour, toggleTextColor=colour)
+
+class _ModeCycle(ui.button):
+    """The editor's modes, as one icon (the mode shown): a click goes to the next one, its
+    name and the next one's on hover; a mode's hint (e.g. whether the notes cite the papers):
+    a dot of its colour."""
+
+    def __init__(
+        self, modes: list[str], value: str, on_change: Callable[[], None], tip: str = ""
+    ) -> None:
+        super().__init__(on_click=self.next)
+        self.modes, self._value, self._on_change, self.tip = modes, value, on_change, tip
+        self.hints: dict[str, tuple[str, str]] = {}
+        with self:
+            self.dot = ui.badge().props("floating rounded").classes("p-1")
+            self.tooltip_ = ui.tooltip()
+        self._show()
+
+    @property
+    def value(self) -> str:
+        return self._value
+
+    @value.setter
+    def value(self, value: str) -> None:
+        if value != self._value:
+            self._value = value
+            self._show()
+            self._on_change()
+
+    def next(self) -> None:
+        self.value = self.modes[(self.modes.index(self._value) + 1) % len(self.modes)]
+
+    def _show(self) -> None:
+        after = self.modes[(self.modes.index(self._value) + 1) % len(self.modes)]
+        lines = [
+            _("{mode} · click: {next}").format(mode=_(MODES[self._value]), next=_(MODES[after]))
+        ]
+        lines += [f"{_(MODES[k])}: {more}" for k, (_c, more) in self.hints.items() if more]
+        self.tooltip_.text = " · ".join([*lines, *([self.tip] if self.tip else [])])
+        self.props(f"icon={MODE_ICONS[self._value]}")
+        colours = [c for c, _m in self.hints.values() if c]
+        self.dot.props(f"color={colours[0]}" if colours else "color=transparent")
+        self.dot.set_visibility(bool(colours))
 
     def hint(self, key: str, colour: str, text: str) -> None:
-        """A mode's icon coloured (e.g. the papers: whether the notes cite them), ``text``
-        on hover."""
-        if getattr(self, "hints", {}).get(key) == (colour, text):
+        """A mode's hint (e.g. the papers: whether the notes cite them): a dot of ``colour``
+        on the icon, ``text`` on hover."""
+        if self.hints.get(key) == (colour, text):
             return
-        self.hints = {**getattr(self, "hints", {}), key: (colour, text)}
-        self._update_options()
-        self.update()
+        self.hints = {**self.hints, key: (colour, text)}
+        self._show()
 
 
 def quote(text: str, where: str = "") -> str:
@@ -191,28 +224,32 @@ class MarkdownEditor:
             # (stacked: the editor and the preview share the height; else both as high as it)
             height = "0" if stacked else "100%"
         with ui.column().classes("w-full gap-1" + (" grow min-h-0" if fill else "")) as self.box:
-            with ui.row().classes("w-full items-center gap-0 vr-tools"):
-                for icon, tip, kind, args in TOOLS:
-                    ui.button(
-                        icon=icon,
-                        on_click=lambda kind=kind, args=args: (
-                            self.wrap(*args[:2], _(args[2]))
-                            if kind == "wrap"
-                            else self.prefix_lines(*args)
-                        ),
-                    ).props("flat dense round size=sm").tooltip(_(tip))
+            with ui.row().classes("w-full items-center gap-1 vr-tools"):
+                for group in ("wrap", "line"):  # (within the line, then of whole lines)
+                    with tool_group():
+                        for icon, tip, kind, args in TOOLS:
+                            if kind != group:
+                                continue
+                            ui.button(
+                                icon=icon,
+                                on_click=lambda kind=kind, args=args: (
+                                    self.wrap(*args[:2], _(args[2]))
+                                    if kind == "wrap"
+                                    else self.prefix_lines(*args)
+                                ),
+                            ).props("flat dense round size=sm").tooltip(_(tip))
                 ui.space()
                 if toolbar:
                     toolbar()
                 modes = [m for m in MODES if m != "side" or side]
-                self.mode = (
-                    _ModeToggle(modes, value=mode, on_change=lambda: self._layout())
-                    .props("dense flat size=sm")
-                    .tooltip(
+                with tool_group():
+                    self.mode = _ModeCycle(
+                        modes,
+                        mode,
+                        self._layout,
                         _("Edit, edit beside the preview, or the preview only")
-                        + (f" · {side_tip}" if side_tip else "")
-                    )
-                )
+                        + (f" · {side_tip}" if side_tip else ""),
+                    ).props("flat dense round size=sm")
                 if mark:
                     self.mode.mark(f"{mark}-mode")
             panes = ui.column().classes("w-full gap-2") if stacked else ui.row()

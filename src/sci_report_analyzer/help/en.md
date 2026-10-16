@@ -268,7 +268,7 @@ list are reordered there too (dragged, their ↑ / ↓ arrows, or their number
 Alt-clicked and typed), the citations renumbered. ⌘/Ctrl-click on a citation (or the
 toolbar's ↗ button, the cursor on it) shows its paper's details in a new window. Copy
 substitutes the citations, followed by the references, numbered as cited (or where
-`[[references]]` is, alone on its line: the toolbar's 📚 button; `[[references notes tags]]`:
+`[[references]]` is, alone on its line: the toolbar's “Insert a block” menu; `[[references notes tags]]`:
 with their notes, their tags). Blocks are written `[[name]]` (formerly `[]{.name}`, still
 read).
 
@@ -314,7 +314,7 @@ image (on or off), **A** area, **B** bookmark, **F** find the paper, **E** add t
 category, **Q** quote into the note last used (a Markdown quote, with its page), **Shift+Q**
 quote there at the cursor, within the sentence (`"…" %% [Application, p. 4](link) %%`: the
 place in an Obsidian comment, linking back to the PDF's page, not shown in the preview; the
-note toolbars' ❝ button); PDF.js's own: ⌘F / Ctrl+F search, + / − zoom, N / P (or J / K) next and previous
+note toolbars' quote button, shift-clicked; clicked: as Q); PDF.js's own: ⌘F / Ctrl+F search, + / − zoom, N / P (or J / K) next and previous
 page, R rotate, Home / End, Delete removes the annotation selected. The panel's ⬇ button
 downloads the PDFs of all the papers shown; "Store a PDF" (details) uploads one. Settings →
 Data & cache shows the space used and cleans up the files of papers no longer in the database. A
@@ -369,7 +369,7 @@ or copy as Markdown (unquoted, their places in Obsidian comments: `%% Applicatio
 p. 12 %%`, then their years; those showing influence also listed, by category, in a last
 “Rayonnement” section; the badge icon names the documents, e.g. a long file name as
 “Application”);
-the report's ❝ button inserts them, by category (the block `[[excerpts]]`, kept up to
+the report's “Insert a block” menu inserts them, by category (the block `[[excerpts]]`, kept up to
 date); `[[excerpts#id]]` inserts those of the category of that id (and below it; its
 subcategories as headings below the block's heading), then left out of `[[excerpts]]`, e.g.
 `# Research` then `[[excerpts#research]]`, and `# Other activities` then `[[excerpts]]`.

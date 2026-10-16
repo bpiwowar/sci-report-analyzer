@@ -352,15 +352,12 @@ async def test_folder_notes_citation_status(user: User, fake_viewer):
     await user.should_see(marker="folder-note-mode")
     [mode] = user.find(marker="folder-note-mode").elements
 
-    def side() -> dict:
-        return dict(zip(mode._values, mode.props["options"], strict=True))["side"]
-
     async def hinted(colour: str, text: str) -> None:  # (once the papers are loaded)
         for _i in range(50):
-            if side().get("textColor") == colour:
+            if mode.hints.get("side", ("",))[0] == colour:
                 break
             await asyncio.sleep(0.05)
-        assert side()["textColor"] == colour and text in side()["attrs"]["title"]
+        assert mode.dot.props["color"] == colour and text in mode.tooltip_.text
 
     await hinted("negative", "0 of the 1 papers to discuss cited")
     user.find(marker="folder-note").elements.pop().value = f"Good: [@{keys[a]}]."

@@ -346,8 +346,10 @@ async def test_quote_into_the_notes(user: User, monkeypatch, fake_viewer):
     # Inline, at the cursor: in quotation marks, linked back in an Obsidian comment.
     monkeypatch.setattr(MarkdownEditor, "insert_inline", lambda self, text: inserted.append(text))
     inserted.clear()
-    assert len(user.find(marker="note-quote-inline").elements) == 2
-    user.find(marker="note-quote-inline").click()
+    button = user.find(marker="note-quote").elements.pop()  # (shift-clicked)
+    [listener] = [x for x in button._event_listeners.values() if x.type == "click"]
+    with user.client:
+        button._handle_event({"listener_id": listener.id, "args": {"shiftKey": True}})
     for _i in range(50):
         if inserted:
             break

@@ -270,7 +270,7 @@ recherche (Entrée cite le premier ; les autres articles de la personne aussi), 
 leurs flèches ↑ / ↓, ou leur numéro Alt-cliqué et saisi), les citations renumérotées. Un ⌘/Ctrl-clic sur une citation (ou le
 bouton ↗ de la barre d'outils, le curseur dessus) affiche les détails de son article dans une
 nouvelle fenêtre. Copier remplace les citations, suivies des références, numérotées
-comme citées (ou là où se trouve `[[references]]`, seul sur sa ligne : le bouton 📚 de la barre
+comme citées (ou là où se trouve `[[references]]`, seul sur sa ligne : le menu « Insérer un bloc » de la barre
 d'outils ; `[[references notes tags]]` : avec leurs notes, leurs étiquettes). Les blocs
 s'écrivent `[[nom]]` (autrefois `[]{.nom}`, toujours lu).
 
@@ -315,7 +315,7 @@ la sélection (sinon active ou désactive l'outil de surlignage), **T** texte, *
 image (activer ou désactiver), **A** zone, **B** signet, **F** trouver l'article, **E** ajouter à une
 catégorie, **Q** citer dans la dernière note utilisée (une citation Markdown, avec sa page), **Maj+Q**
 citer au curseur, dans la phrase (`"…" %% [Application, p. 4](lien) %%` : l'emplacement dans un
-commentaire Obsidian, renvoyant à la page du PDF, masqué dans l'aperçu ; le bouton ❝ des barres d'outils des notes) ; ceux de PDF.js : ⌘F / Ctrl+F recherche, + / − zoom, N / P (ou J / K) page suivante et
+commentaire Obsidian, renvoyant à la page du PDF, masqué dans l'aperçu ; le bouton de citation des barres d'outils des notes, avec Maj+clic ; cliqué : comme Q) ; ceux de PDF.js : ⌘F / Ctrl+F recherche, + / − zoom, N / P (ou J / K) page suivante et
 précédente, R rotation, Home / End, Delete supprime l'annotation sélectionnée. Le bouton ⬇ du panneau
 télécharge les PDF de tous les articles affichés ; « Stocker un PDF » (détails) en téléverse un. Paramètres →
 Données et cache affiche l'espace utilisé et supprime les fichiers des articles qui ne sont plus dans la base de données. Un
@@ -371,7 +371,7 @@ ou les copier en Markdown (sans guillemets, leurs emplacements dans des commenta
 p. 12 %%`, puis leurs années ; ceux qui témoignent du rayonnement sont aussi listés, par catégorie, dans une dernière
 section « Rayonnement » ; l'icône de badge nomme les documents, par exemple un long nom de fichier sous la forme
 « Application ») ;
-le bouton ❝ du rapport les insère, par catégorie (le bloc `[[excerpts]]`, tenu à jour) ;
+le menu « Insérer un bloc » du rapport les insère, par catégorie (le bloc `[[excerpts]]`, tenu à jour) ;
 `[[excerpts#id]]` insère ceux de la catégorie de cet identifiant (et en dessous ; ses
 sous-catégories en titres sous celui du bloc), alors omis de `[[excerpts]]`, par ex.
 `# Recherche` puis `[[excerpts#recherche]]`, et `# Autres activités` puis `[[excerpts]]`.

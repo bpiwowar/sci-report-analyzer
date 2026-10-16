@@ -15,6 +15,7 @@ from nicegui import app, ui
 from .. import annotations, documents, pdfs, reports
 from ..i18n import N_, Labels, _
 from .dialogs import actions, confirm, ok_handler, transient_dialog
+from .mdedit import MarkdownEditor, tool_group
 from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
 from .theme import DEFAULT_COLOUR, bare_page
@@ -268,8 +269,14 @@ class DocumentPage:
     # ---- The note's citations ([@key], as in reports) ----
 
     def _note_tools(self) -> None:
-        self.side.quote_tool(lambda: getattr(self, "note", None))
-        self.side.cite_tools(lambda: getattr(self, "note", None), "doc-note")
+        def note() -> MarkdownEditor | None:
+            return getattr(self, "note", None)
+
+        with tool_group():
+            self.side.quote_tool(note)
+            self.side.cite_tools(note, "doc-note")
+        with tool_group():
+            self.side.copy_tool(note, "doc-note")
 
     def update(self) -> None:
         """Find the papers again (in the text, once the viewer sent it), list and show them."""
