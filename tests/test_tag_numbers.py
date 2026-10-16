@@ -142,6 +142,46 @@ def test_moved():
     assert moved([1, 2, 3], 4, 2) == [1, 2, 3]
 
 
+async def test_star_filter_apart_from_the_tags(user: User) -> None:
+    """The star list filter and the tag filter both apply (earlier links: one filter)."""
+    pid, period, (a, b, c) = _setup()
+    star = annotations.starred_tag_id()
+    for p in (a, b):
+        annotations.toggle_tag(p, star, period)
+    tag = annotations.save_tag("neural")
+    annotations.put_tag(tag, [b, c])
+    await user.open(f"/person/{pid}/{period}?tags={tag},{star}")
+    await user.should_see(TITLES[1])  # starred and tagged
+    await user.should_not_see(TITLES[0])  # starred only
+    await user.should_not_see(TITLES[2])  # tagged only
+    # The ★ toggle off: the tagged papers, starred or not.
+    user.find("list-filter").click()
+    await user.should_see(TITLES[2])
+    await user.should_not_see(TITLES[0])
+    state = annotations.panel_state(pid)
+    assert state["tag_filter"] == [tag] and state["list_filter"] == []
+
+
+async def test_a_toggle_per_star_list(user: User) -> None:
+    """Several star lists: a ★ toggle each, the papers in one of those on."""
+    pid, period, (a, b, _c) = _setup()
+    star = annotations.starred_tag_id()
+    short = annotations.save_list(None, "shortlist")
+    annotations.toggle_tag(a, star, period)
+    annotations.toggle_tag(b, short, period)
+    await user.open(f"/person/{pid}/{period}")
+    await user.should_see(TITLES[2])
+    user.find(f"list-filter-{short}").click()
+    await user.should_see(TITLES[1])
+    await user.should_not_see(TITLES[0])
+    await user.should_not_see(TITLES[2])
+    user.find(f"list-filter-{star}").click()
+    await user.should_see(TITLES[0])
+    await user.should_see(TITLES[1])
+    await user.should_not_see(TITLES[2])
+    assert annotations.panel_state(pid)["list_filter"] == [short, star]
+
+
 async def test_order_dialog_from_the_panel(user: User) -> None:
     pid, period, (a, b, c) = _setup()
     star = annotations.starred_tag_id()

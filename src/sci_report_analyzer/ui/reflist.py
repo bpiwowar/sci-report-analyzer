@@ -251,7 +251,10 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
             annotations.put_tag(chosen.id, list(numbers))
         dlg.close()
         if show_tagged:
-            panel.tag_filter = [chosen.id]
+            if chosen.per_period:
+                panel.tag_filter, panel.list_filter = [], [chosen.id]
+            else:
+                panel.tag_filter, panel.list_filter = [chosen.id], []
             panel.sels = []
             panel._save_state()
         await panel.reload()

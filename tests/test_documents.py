@@ -1430,7 +1430,8 @@ async def test_tag_from_a_list_in_the_pdf(user: User, fake_viewer):
     starred = annotations.starred_tag_id()
     assert rows[ids["b"]].number_of(starred, period) == 1
     assert rows[ids["a"]].number_of(starred, period) == 2
-    assert not annotations.panel_state(pid).get("tag_filter")  # (the person's panel as it was)
+    state = annotations.panel_state(pid)
+    assert not state.get("tag_filter") and not state.get("list_filter")  # (the panel as it was)
 
 
 async def test_last_category_proposed(user: User, fake_viewer):

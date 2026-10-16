@@ -220,7 +220,9 @@ citations” tab: their names, their numbers' format, whether their papers are t
 their order). Rename and recolour tags with the 🏷 button or in Settings → Tags &
 categories. Each paper has a **note** (Markdown),
 plus a note within the selected period. The "tags" filter shows the papers having one of
-the chosen tags; to write about them, use the report editor (below).
+the chosen tags; the star list filter, apart from it (a ★ toggle per list of the folder),
+the papers in one of the lists turned on: a paper must pass both. To write
+about them, use the report editor (below).
 
 **Tag from a list** (the panel's list button): paste a list of publications, e.g. a report's
 numbered list copied from a PDF. Each item is matched with a paper by its HAL id or DOI, else

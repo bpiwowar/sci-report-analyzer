@@ -3008,7 +3008,7 @@ def test_earlier_ui_states_normalized() -> None:
     annotations.normalize_ui_state()  # (idempotent)
     assert annotations.panel_state(pid) == {
         "period_id": None,
-        "tag_filter": [annotations.starred_tag_id()],
+        "list_filter": [annotations.starred_tag_id()],
     }
     assert summary_settings() == {"details": {"q4": "off", "q1": "count"}, "years": True}
 

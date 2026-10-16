@@ -223,7 +223,9 @@ détails dans n'importe laquelle. Ce sont des réglages du dossier (l'onglet «�
 noms, le format de leurs numéros, si leurs articles sont à citer, leur ordre). Renommez et recolorez les étiquettes avec le
 bouton 🏷 ou dans Paramètres → Étiquettes et catégories. Chaque article a une **note** (Markdown),
 plus une note propre à la période sélectionnée. Le filtre « étiquettes » affiche les articles ayant l'une
-des étiquettes choisies ; pour écrire à leur sujet, utilisez l'éditeur de rapport (ci-dessous).
+des étiquettes choisies ; le filtre des listes étoilées, à part (un bouton ★ par liste du dossier),
+ceux de l'une des listes activées : un article doit passer les deux. Pour écrire à
+leur sujet, utilisez l'éditeur de rapport (ci-dessous).
 
 **Étiqueter à partir d'une liste** (le bouton liste du panneau) : collez une liste de publications, par exemple la liste
 numérotée d'un rapport copiée depuis un PDF. Chaque élément est apparié à un article par son identifiant HAL ou son DOI, sinon

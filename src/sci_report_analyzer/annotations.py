@@ -501,16 +501,22 @@ def set_author_category(person_id: int, name: str, category_id: int, on: bool = 
 
 def normalize_ui_state() -> None:
     """Earlier saved UI states in the current form (idempotent, at startup): a person's
-    "starred only" switch as their tag filter; the summary's unticked categories as their
-    detail level ("off")."""
+    "starred only" switch, and the star lists in their tag filter, as their star list
+    filter; the summary's unticked categories as their detail level ("off")."""
     with session_scope() as s:
         starred = s.scalar(select(Tag.id).where(Tag.key == STARRED))
+        lists = set(s.scalars(select(Tag.id).where(Tag.per_period)))
         for row in s.scalars(select(AppSetting).where(AppSetting.key.like("ui.person.%"))):
             state = dict(row.value or {})
             if "starred_only" in state:
                 only = state.pop("starred_only")
-                if "tag_filter" not in state:
-                    state["tag_filter"] = [starred] if only and starred is not None else []
+                if "list_filter" not in state:
+                    state["list_filter"] = [starred] if only and starred is not None else []
+            moved = [i for i in state.get("tag_filter", []) if i in lists]
+            if moved:
+                state["tag_filter"] = [i for i in state["tag_filter"] if i not in lists]
+                state["list_filter"] = [*state.get("list_filter", []), *moved]
+            if state != (row.value or {}):
                 row.value = state
         row = s.get(AppSetting, "summary")  # (pubview.SUMMARY_KEY)
         if row is not None and "off_categories" in (row.value or {}):

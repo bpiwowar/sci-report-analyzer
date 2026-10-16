@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-16 19:28+0200\n"
+"POT-Creation-Date: 2026-10-16 20:48+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -638,6 +638,10 @@ msgstr "Toutes les personnes"
 
 msgid "All people (cleanup)"
 msgstr "Toutes les personnes (nettoyage)"
+
+#, python-brace-format
+msgid "All the papers, in “{name}” or not"
+msgstr "Tous les articles, dans « {name} » ou non"
 
 msgid "All years"
 msgstr "Toutes les années"
@@ -3341,6 +3345,10 @@ msgstr "Seul son emplacement est cité (fusionné comme référence)"
 msgid "Only people tagged"
 msgstr "Seulement les personnes étiquetées"
 
+#, python-brace-format
+msgid "Only the papers in “{name}” (within the period)"
+msgstr "Seulement les articles de « {name} » (dans la période)"
+
 msgid "Only this text, its excerpts not listed"
 msgstr "Ce texte seul, sans lister ses extraits"
 
@@ -3519,10 +3527,8 @@ msgstr ""
 "Articles dont le canal de publication a été choisi ou validé, ou dont le "
 "rang ou le type a été fixé à la main"
 
-msgid "Papers with one of these tags (★: in a star list, within the period)"
-msgstr ""
-"Articles ayant l'une de ces étiquettes (★ : dans une liste étoilée, dans "
-"la période)"
+msgid "Papers with one of these tags"
+msgstr "Articles ayant l'une de ces étiquettes"
 
 #, python-brace-format
 msgid ""
