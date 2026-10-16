@@ -1,7 +1,10 @@
+import contextlib
+import functools
 import gc
 import json
 import os
 import shutil
+import sys
 import tempfile
 import weakref
 from pathlib import Path
@@ -83,14 +86,108 @@ _write_datasets(datasets.BUNDLED_DIR)
 datasets.SOURCE_JOURNALS = datasets.BUNDLED_DIR / "journals.json"
 
 
+def _make_template_db() -> Path:
+    """An empty database brought to the head revision, once per session (migrating takes
+    a second or two: each test gets a copy instead)."""
+    db = _TMP / "template.sqlite"
+    engine = db_session.init_engine(f"sqlite:///{db}")
+    # The ranking records too, loaded now (no JCR record: an empty database), rather than by
+    # the first test needing them, to be out of the garbage collector's way as well (below).
+    _ = service.matcher, service.predatory
+    with engine.connect() as conn:
+        # Everything in the file itself (no -wal next to it), so that a copy is complete.
+        conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.exec_driver_sql("PRAGMA journal_mode=DELETE")
+    engine.dispose()
+    return db
+
+
+_TEMPLATE_DB = _make_template_db()
+
+# All of the app's modules, imported now (the UI tests' main file imports them anyway), as
+# well as Alembic's (above): what is loaded by then stays for the whole session, so the
+# garbage collector is told to leave it alone. NiceGUI's user fixture runs a full collection
+# twice per test, which otherwise traverses those hundreds of thousands of objects each time.
+import sci_report_analyzer.main  # noqa: E402, F401
+
+gc.collect()
+gc.freeze()
+
+
+_APP_PACKAGE = "sci_report_analyzer"
+
+
+def _app_modules() -> dict:
+    return {
+        k: m
+        for k, m in sys.modules.items()
+        if k == _APP_PACKAGE or k.startswith(f"{_APP_PACKAGE}.")
+    }
+
+
+@pytest.fixture(autouse=True)
+def keep_app_modules():
+    """The app's modules stay imported across tests.
+
+    At teardown, NiceGUI's user fixture removes from ``sys.modules`` the module of each page
+    (and its parent packages), so that a main file declaring pages at import time declares
+    them again. Here the pages are declared by ``setup()``: they are put back instead of
+    being imported again by the next test (which took time, and left a new copy of those
+    modules, the package's ``__init__`` included, per test)."""
+    before = _app_modules()
+    yield
+    for name, module in before.items():
+        sys.modules.setdefault(name, module)
+
+
+# How long ``should_see`` / ``should_not_see`` wait at least for the page to be as expected
+# (NiceGUI's default: 3 tries, 0.1 s apart, which a busy machine misses now and then).
+PATIENCE = 5.0
+
+
+def _patient(method, interval: float):
+    """``method`` (should_see or should_not_see, which try every ``interval`` seconds),
+    trying for ``PATIENCE`` seconds at least: it still returns as soon as the page is as
+    expected, so only what would have failed takes longer."""
+
+    @functools.wraps(method)
+    async def patient(*args, retries: int = 3, **kwargs):
+        retries = max(retries, round(PATIENCE / interval))
+        return await method(*args, retries=retries, **kwargs)
+
+    return patient
+
+
+@pytest.fixture
+async def user(user):
+    """NiceGUI's simulated user; its pages are deleted at the end of the test.
+
+    NiceGUI's own fixture only forgets them (``Client.instances.clear()`` when the next test
+    starts): a refreshable declared at module level (``person.sources_list``…) then kept every
+    page of every earlier test as one of its targets, so that each refresh re-rendered them
+    all (against the database of the current test), a little slower each time; and they
+    were never freed, which made every full garbage collection slower too."""
+    from nicegui import Client
+
+    user.should_see = _patient(user.should_see, 0.1)
+    user.should_not_see = _patient(user.should_not_see, 0.05)
+    yield user
+    for client in list(Client.instances.values()):
+        with contextlib.suppress(KeyError):
+            client.delete()
+
+
 @pytest.fixture(autouse=True)
 def fresh_db(tmp_path, monkeypatch):
-    """Every test gets its own database; ranking data is shared (read-only)."""
-    url = f"sqlite:///{tmp_path / 'test.sqlite'}"
+    """Every test gets its own database (a copy of the migrated template); ranking data is
+    shared (read-only)."""
+    db = tmp_path / "test.sqlite"
+    shutil.copyfile(_TEMPLATE_DB, db)
+    url = f"sqlite:///{db}"
     monkeypatch.setenv("SCI_REPORT_ANALYZER_DB_URL", url)
     # Never touch the real saved data-directory location.
     monkeypatch.setattr(config, "LOCATION_FILE", tmp_path / "config" / "location.json")
-    db_session.init_engine(url)
+    engine = db_session.init_engine(url)
     from sci_report_analyzer import source_settings
 
     source_settings.reset_cache()
@@ -127,6 +224,10 @@ def fresh_db(tmp_path, monkeypatch):
     monkeypatch.setattr(tags, "NOTE_IDLE", 0.2)
     monkeypatch.setattr(tags, "NOTE_TICK", 0.05)
     yield
+    # Their connections closed now (not whenever the garbage collector gets to the engines).
+    for e in {engine, db_session._engine}:  # (a UI test's app makes its own)
+        if e is not None:
+            e.dispose()
 
 
 @pytest.fixture

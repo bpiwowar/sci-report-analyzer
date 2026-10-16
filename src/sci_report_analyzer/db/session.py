@@ -70,6 +70,8 @@ def run_migrations(engine: Engine) -> None:
     head = ScriptDirectory.from_config(cfg).get_current_head()
     with engine.connect() as conn:
         current = MigrationContext.configure(conn).get_current_revision()
+    if current == head:
+        return  # (up to date: nothing to run)
     saved = None
     if current is not None and current != head:
         if (db := backup.db_file(engine)) is None:
