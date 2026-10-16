@@ -52,7 +52,9 @@ Les notices de différentes sources sont fusionnées lorsqu'elles partagent un D
 (ou presque) et des années proches. Les **prépublications** (arXiv, prépublications HAL…) sont rattachées à la
 version publiée quelle que soit leur année. Si deux travaux différents ont été fusionnés, **séparez** une notice depuis les
 détails ; si un travail apparaît deux fois, **fusionnez**-le avec l'autre. Les notices attribuées à tort peuvent
-être **masquées**.
+être **masquées** (après confirmation) : elles quittent les listes, graphiques, décomptes, rapports et exports,
+mais restent dans la base ; le filtre « seulement les masqués » des articles les retrouve (pour les réafficher).
+Les prépublications qui ne sont pas (encore) publiées ne sont pas affichées par défaut (« masquer les prépublications »).
 
 ## Canaux : le type, puis le rang
 

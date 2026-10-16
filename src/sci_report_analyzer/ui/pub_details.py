@@ -873,16 +873,35 @@ def _publication_tab(panel: PublicationsPanel, s: PubStat, done) -> None:
                 ui.label("PDF")
         _stored_pdf(s, done)
         ui.space()
+
+        def toggle_hidden() -> None:
+            if s.hidden:
+                annotations.set_hidden(s.id, False)
+                done(_("Shown again"))
+                return
+
+            def ok() -> None:
+                annotations.set_hidden(s.id, True)
+                done(_("Hidden from lists and stats"), close_it=True)
+
+            confirm(
+                _(
+                    "The paper will no longer be in the person's list of papers, nor in the "
+                    "charts, counts, reports and exports, nor among the papers to cite in the "
+                    "notes. It stays in the database (with its tags, notes and PDF), and is "
+                    "kept hidden when the sources are fetched again. To find it again: the "
+                    '"only the hidden" filter of the papers, then "Unhide".'
+                ),
+                _("Hide"),
+                ok,
+                title=_("Hide this paper?"),
+                mark="hide-publication-ok",
+            )
+
         ui.button(
             _("Unhide") if s.hidden else _("Hide"),
             icon="visibility" if s.hidden else "visibility_off",
-            on_click=lambda: (
-                annotations.set_hidden(s.id, not s.hidden),
-                done(
-                    _("Shown again") if s.hidden else _("Hidden from lists and stats"),
-                    close_it=not s.hidden,
-                ),
-            ),
+            on_click=toggle_hidden,
         ).props("flat dense").tooltip(_("Hide a misattributed / irrelevant record")).mark(
             "hide-publication"
         )

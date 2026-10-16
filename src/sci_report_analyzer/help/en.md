@@ -52,7 +52,9 @@ Records from different sources are merged when they share a DOI, or have the sam
 (or nearly) and close years. **Preprints** (arXiv, HAL preprints…) fold into the published
 version whatever their year. If two different works were merged, **split** a record from the
 details; if one work appears twice, **merge** it into the other. Misattributed records can
-be **hidden**.
+be **hidden** (after a confirmation): they leave the lists, charts, counts, reports and exports,
+but stay in the database; the papers' "only the hidden" filter finds them again (to unhide
+them). Preprints that are not (yet) published are not shown by default ("hide preprints").
 
 ## Venues: kind, then rank
 

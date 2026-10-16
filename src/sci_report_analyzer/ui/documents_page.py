@@ -307,8 +307,42 @@ class DocumentPage:
         self.papers.client.run_javascript(f"vrDoc.show({json.dumps(links)})")
         with self.papers:
             self._listing(by_id)
+            self._rejected(by_id, lines)
+
+    def _rejected(self, by_id: dict[int, Any], lines: list[dict[str, Any]]) -> None:
+        """The papers rejected here ("Not this paper"): to find them there again."""
+        rejected = [(i, x) for i, x in documents.rejected(self.d.id) if x["pub"] in by_id]
+        if not rejected:
+            return
+        untitled = _("(untitled)")
+        with (
+            ui.expansion(_("Rejected here ({n})").format(n=len(rejected)), icon="link_off")
+            .props("dense")
+            .classes("w-full text-sm text-grey")
+            .mark("doc-rejected")
+        ):
+            for i, x in rejected:
+                s = by_id[x["pub"]]
+                line = x.get("line")
+                page = lines[line].get("p") if line is not None and line < len(lines) else None
+                with ui.row().classes("w-full items-center no-wrap gap-1"):
+                    ui.label(
+                        f"{s.title or untitled} ({s.year or '?'})"
+                        + (" · " + _("p. {page}").format(page=page) if page else "")
+                    ).classes("grow min-w-0 text-sm")
+                    ui.button(icon="undo", on_click=lambda i=i: self.restore(i)).props(
+                        "flat dense round size=sm"
+                    ).tooltip(_("Not wrongly found after all: find it here again")).mark(
+                        f"doc-restore-{s.id}"
+                    )
+
+    def restore(self, index: int) -> None:
+        documents.restore(self.d.id, index)
+        self.update()
+        ui.notify(_("Found here again"))
 
     def _listing(self, by_id: dict[int, Any]) -> None:
+        self.rows = []
         if not self.mentions:
             ui.label(
                 _(
@@ -317,7 +351,6 @@ class DocumentPage:
                 )
             ).classes("text-sm text-grey")
             return
-        self.rows = []
         untitled = _("(untitled)")
         order: dict[int, list[int]] = {}
         for i, m in enumerate(self.mentions):
@@ -409,6 +442,8 @@ class DocumentPage:
         documents.reject(self.d.id, m)
         self.side.back()
         self.update()
+        if m.kind != "manual":
+            ui.notify(_('Not found here any more (undo: "Rejected here", under the papers)'))
 
     def link(self, pub_id: int, page: int, rects: list, text: str) -> None:
         if not rects:

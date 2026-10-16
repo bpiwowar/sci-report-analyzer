@@ -137,8 +137,9 @@ class PublicationsPanel:
         # Tracks to show (any of them; tracks.MAIN: the main track).
         self.track_filter: list[str] = []
         self.text = ""
-        self.hide_preprints = False
-        self.show_hidden = False
+        self.hide_preprints = True  # by default, the preprints are not shown
+        # The papers hidden by hand: not shown ("no"), shown too ("with") or alone ("only").
+        self.hidden_filter = "no"
         # The source a paper must be in to count (None: any), and whether to show only the
         # papers it doesn't list (to fix them there).
         self.primary: str | None = None
@@ -212,8 +213,9 @@ class PublicationsPanel:
         if "to" in q:
             self.hi = int_or_none(q["to"])
         self.text = q.get("q", "")
-        self.hide_preprints = q.get("nopre") == "1"
-        self.show_hidden = q.get("hidden") == "1"
+        self.hide_preprints = q.get("pre") != "1"
+        hidden = q.get("hidden")
+        self.hidden_filter = "only" if hidden == "only" else "with" if hidden == "1" else "no"
         self.problems_only = q.get("problems") == "1"
         self.manual_only = q.get("manual") == "1"
         self.to_check_only = q.get("check") == "1"
@@ -238,9 +240,10 @@ class PublicationsPanel:
             out["to"] = ""
         if self.text:
             out["q"] = self.text
+        if self.hidden_filter != "no":
+            out["hidden"] = "only" if self.hidden_filter == "only" else "1"
         for key, on in (
-            ("nopre", self.hide_preprints),
-            ("hidden", self.show_hidden),
+            ("pre", not self.hide_preprints),
             ("problems", self.problems_only),
             ("manual", self.manual_only),
             ("check", self.to_check_only),
@@ -337,7 +340,9 @@ class PublicationsPanel:
                 continue
             if self.hide_preprints and s.archival_only:
                 continue
-            if s.hidden and not self.show_hidden:
+            if s.hidden and self.hidden_filter == "no":
+                continue
+            if not s.hidden and self.hidden_filter == "only":
                 continue
             if (
                 self.source_filter != "all"
@@ -405,7 +410,8 @@ class PublicationsPanel:
             or self.tag_filter
             or self.track_filter
             or self.text
-            or self.hide_preprints
+            or not self.hide_preprints
+            or self.hidden_filter != "no"
             or self.problems_only
             or self.manual_only
             or self.to_check_only
@@ -419,7 +425,9 @@ class PublicationsPanel:
         self.tag_filter = []
         self.track_filter = []
         self.text = ""
-        self.hide_preprints = self.problems_only = self.manual_only = False
+        self.hide_preprints = True
+        self.hidden_filter = "no"
+        self.problems_only = self.manual_only = False
         self.to_check_only = False
         self.source_filter = "all"
         self.venue_filter = None
@@ -675,18 +683,27 @@ class PublicationsPanel:
                     on_value_change=lambda e: clear_venue(),
                 ).props("dense color=primary text-color=white").mark("venue-filter")
             n_hidden = sum(s.hidden for s in self.stats)
-            if n_hidden:
+            if n_hidden or self.hidden_filter != "no":
 
-                def set_show_hidden(e) -> None:
-                    self.show_hidden = e.value
+                def set_hidden_filter(e) -> None:
+                    self.hidden_filter = e.value or "no"
                     self.sels = []
                     self.render()
 
-                ui.switch(
-                    _("show hidden ({n})").format(n=n_hidden),
-                    value=self.show_hidden,
-                    on_change=set_show_hidden,
-                )
+                ui.toggle(
+                    {
+                        "no": _("without the hidden"),
+                        "with": _("with the hidden ({n})").format(n=n_hidden),
+                        "only": _("only the hidden"),
+                    },
+                    value=self.hidden_filter,
+                    on_change=set_hidden_filter,
+                ).props("dense no-caps size=sm").tooltip(
+                    _(
+                        "The papers hidden by hand (misattributed, irrelevant): not shown, shown "
+                        "with the others, or alone (to review them)"
+                    )
+                ).mark("hidden-filter")
             n_outside = sum(
                 self.outside(s) for s in self.stats if not s.hidden and self.in_years(s)
             )

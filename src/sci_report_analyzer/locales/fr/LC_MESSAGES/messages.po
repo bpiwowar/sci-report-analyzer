@@ -1794,6 +1794,9 @@ msgstr "Ancien étudiant après (années)"
 msgid "Forward (also ⌥→ or ⌘])"
 msgstr "Avancer (aussi ⌥→ ou ⌘])"
 
+msgid "Found here again"
+msgstr "De nouveau trouvé ici"
+
 msgid "Found in the workshop's venue texts"
 msgstr "Trouvée dans les textes de canal de l'atelier"
 
@@ -1924,6 +1927,9 @@ msgstr "Masquer une notice mal attribuée / non pertinente"
 
 msgid "Hide the folders within it"
 msgstr "Masquer les dossiers qu'il contient"
+
+msgid "Hide this paper?"
+msgstr "Masquer cet article ?"
 
 msgid "Hide what is within it"
 msgstr "Masquer ce qu'elle contient"
@@ -2161,8 +2167,8 @@ msgid ""
 "Its commentary (Markdown): in the notes, a comment after it (%% … %%, not"
 " shown)"
 msgstr ""
-"Son commentaire (Markdown) : dans les notes, un commentaire après lui "
-"(%% … %%, non affiché)"
+"Son commentaire (Markdown) : dans les notes, un commentaire après lui (%%"
+" … %%, non affiché)"
 
 msgid "Its commentary (click to edit it)"
 msgstr "Son commentaire (cliquer pour le modifier)"
@@ -2850,7 +2856,9 @@ msgid "No acronym"
 msgstr "Pas d'acronyme"
 
 msgid "No candidate profile found: add their profiles by URL in the Sources tab."
-msgstr "Aucun profil candidat trouvé : ajoutez ses profils par URL dans l'onglet Sources."
+msgstr ""
+"Aucun profil candidat trouvé : ajoutez ses profils par URL dans l'onglet "
+"Sources."
 
 #, python-brace-format
 msgid "No category with the id “{key}”"
@@ -3084,6 +3092,9 @@ msgid_plural "Not found for {n} papers:"
 msgstr[0] "Introuvable pour {n} article :"
 msgstr[1] "Introuvables pour {n} articles :"
 
+msgid "Not found here any more (undo: \"Rejected here\", under the papers)"
+msgstr "N'est plus trouvé ici (annuler : « Rejetés ici », sous les articles)"
+
 #, python-brace-format
 msgid "Not in {edition} (dropped from CORE)"
 msgstr "Absent de {edition} (retiré de CORE)"
@@ -3135,6 +3146,9 @@ msgstr "Pas la personne :"
 
 msgid "Not this paper"
 msgstr "Pas cet article"
+
+msgid "Not wrongly found after all: find it here again"
+msgstr "Finalement pas une erreur : le retrouver ici"
 
 msgid "Note (on the document)"
 msgstr "Note (sur le document)"
@@ -3786,6 +3800,10 @@ msgstr "Rejeter"
 #, python-brace-format
 msgid "Rejected ({n})"
 msgstr "Rejetés ({n})"
+
+#, python-brace-format
+msgid "Rejected here ({n})"
+msgstr "Rejetés ici ({n})"
 
 #, python-brace-format
 msgid "Related conferences ({n})"
@@ -4779,6 +4797,20 @@ msgid "The overall opinion, and the points to raise."
 msgstr "L'avis d'ensemble, et les points à soulever."
 
 msgid ""
+"The paper will no longer be in the person's list of papers, nor in the "
+"charts, counts, reports and exports, nor among the papers to cite in the "
+"notes. It stays in the database (with its tags, notes and PDF), and is "
+"kept hidden when the sources are fetched again. To find it again: the "
+"\"only the hidden\" filter of the papers, then \"Unhide\"."
+msgstr ""
+"L'article ne sera plus dans la liste des articles de la personne, ni dans"
+" les graphiques, décomptes, rapports et exports, ni parmi les articles à "
+"citer dans les notes. Il reste dans la base (avec ses étiquettes, notes "
+"et PDF), et reste masqué quand les sources sont de nouveau récupérées. "
+"Pour le retrouver : le filtre « seulement les masqués » des articles, "
+"puis « Réafficher »."
+
+msgid ""
 "The paper's track (e.g. a demo): counted apart in the distribution; "
 "automatic: from the variants, the venue rules and the venue texts"
 msgstr ""
@@ -4788,6 +4820,13 @@ msgstr ""
 
 msgid "The papers cited (else at the end, when copied)"
 msgstr "Les articles cités (sinon à la fin, à la copie)"
+
+msgid ""
+"The papers hidden by hand (misattributed, irrelevant): not shown, shown "
+"with the others, or alone (to review them)"
+msgstr ""
+"Les articles masqués à la main (mal attribués, non pertinents) : non "
+"affichés, affichés avec les autres, ou seuls (pour les revoir)"
 
 msgid "The papers in no list"
 msgstr "Les articles d'aucune liste"
@@ -6254,6 +6293,9 @@ msgstr "uniquement pour"
 msgid "only for sources"
 msgstr "seulement pour les sources"
 
+msgid "only the hidden"
+msgstr "seulement les masqués"
+
 #, python-brace-format
 msgid "only {sources}"
 msgstr "seulement {sources}"
@@ -6407,10 +6449,6 @@ msgstr "sigle"
 
 msgid "show all"
 msgstr "tout afficher"
-
-#, python-brace-format
-msgid "show hidden ({n})"
-msgstr "afficher les masqués ({n})"
 
 msgid "similar name"
 msgstr "nom proche"
@@ -6593,12 +6631,19 @@ msgid "with a PhD student"
 msgstr "avec un doctorant"
 
 #, python-brace-format
+msgid "with the hidden ({n})"
+msgstr "avec les masqués ({n})"
+
+#, python-brace-format
 msgid "with {category}"
 msgstr "avec {category}"
 
 #, python-brace-format
 msgid "with {category} {pct}% ({n})"
 msgstr "avec {category} {pct} % ({n})"
+
+msgid "without the hidden"
+msgstr "sans les masqués"
 
 #, python-brace-format
 msgid "written by a newer version of the app (format {version})"
@@ -7117,3 +7162,4 @@ msgstr "✓ C'est {name}"
 #, python-brace-format
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
+

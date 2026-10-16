@@ -195,7 +195,8 @@ async def test_viewer_details(user: User, fake_viewer):
     # Tags and notes: in their own tab; always there: no close button.
     await user.should_not_see(marker="tab-notes")
     await user.should_not_see(marker="details-close")
-    user.find(marker="hide-publication").click()  # (stays, refreshed)
+    user.find(marker="hide-publication").click()
+    user.find(marker="hide-publication-ok").click()  # (stays, refreshed)
     await user.should_see("Unhide")
     with session_scope() as s:
         assert s.get(Publication, a).hidden

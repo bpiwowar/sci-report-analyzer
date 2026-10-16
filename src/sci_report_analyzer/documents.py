@@ -608,6 +608,21 @@ def reject(doc_id: int, m: Mention) -> None:
         doc.links = links
 
 
+def rejected(doc_id: int) -> list[tuple[int, dict[str, Any]]]:
+    """The papers rejected where they were found (index in the links, link)."""
+    return [(i, x) for i, x in enumerate(links_of(doc_id)) if x.get("reject")]
+
+
+def restore(doc_id: int, index: int) -> None:
+    """Undo a rejection (``index`` in the links): the paper is found there again."""
+    with session_scope() as s:
+        doc = s.get(PeriodDocument, doc_id)
+        links = list((doc and doc.links) or [])
+        if 0 <= index < len(links) and links[index].get("reject"):
+            links.pop(index)
+            doc.links = links
+
+
 def selection_item(text: str):
     """A selection of the document as a reference (reflist.Item) to look for."""
     from .reflist import item_of, join_wrapped

@@ -194,8 +194,13 @@ async def test_hide_from_details(user: User) -> None:
     await user.should_see("A workshop contribution")
     user.find(f"pub-{pub_id}").click()
     user.find("hide-publication").click()
+    user.find("hide-publication-ok").click()  # (an explanation of what it does, first)
     await user.should_not_see("A workshop contribution", retries=40)
-    await user.should_see("show hidden (1)")
+    await user.should_see("with the hidden (1)")
+    # Only the hidden ones: to find them again.
+    await user.open(f"/person/{pid}?hidden=only")
+    await user.should_see("A workshop contribution")
+    await user.should_not_see("Deep ranking for search")
 
 
 async def test_track_and_star(user: User) -> None:
@@ -1019,11 +1024,11 @@ async def test_filters_in_url(user: User, monkeypatch) -> None:
         lambda code: urls.append(json.loads(code.split("'', ", 1)[1].rstrip(")"))),
     )
     # Filters given in the URL are applied (a reload gives back the same view)...
-    await user.open(f"/person/{pid}?q=workshop&nopre=1")
+    await user.open(f"/person/{pid}?q=workshop")
     await user.should_see("A workshop contribution")
     await user.should_not_see("Deep ranking for search")
     # ... and the address bar follows the current filters.
-    assert urls and urls[-1] == f"/person/{pid}?q=workshop&nopre=1"
+    assert urls and urls[-1] == f"/person/{pid}?q=workshop"
 
 
 def test_source_badges_link_to_the_record() -> None:

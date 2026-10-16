@@ -215,6 +215,12 @@ async def test_document_page(user: User, monkeypatch, fake_viewer):
     user.find(marker=f"doc-show-{ids['d']}").click()
     user.find(marker="doc-reject").click()
     await user.should_not_see(marker=f"doc-paper-{ids['d']}")
+    # ... and restored (a wrong rejection).
+    await user.should_see(marker="doc-rejected")
+    user.find(marker=f"doc-restore-{ids['d']}").click()
+    await user.should_see(marker=f"doc-paper-{ids['d']}")
+    await user.should_not_see(marker="doc-rejected")
+    assert not documents.rejected(doc)
     # The document's own note.
     await user.should_see(marker="doc-note")
     user.find(marker="doc-note").elements.pop().value = "Strong candidate"
