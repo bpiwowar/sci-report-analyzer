@@ -18,7 +18,13 @@ from .db.models import (
     FolderSettings,
     FolderSettingsUse,
     Period,
+    PeriodDocument,
+    PeriodNote,
+    PeriodTag,
     Person,
+    Publication,
+    PublicationPdf,
+    SectionText,
 )
 from .db.session import session_scope
 from .i18n import _
@@ -534,6 +540,14 @@ def add_person(
         return p.id
 
 
+def period_in(folder_id: int, person_id: int) -> int | None:
+    """The id of the person's period in the folder, if they are in it."""
+    with session_scope() as s:
+        return s.scalar(
+            select(Period.id).where(Period.folder_id == folder_id, Period.person_id == person_id)
+        )
+
+
 def remove_person(folder_id: int, person_id: int, *, keep: bool = False) -> None:
     """Take a person out of a folder: their period in it, with its paper tags, notes,
     documents and report, is deleted; or, with ``keep``, becomes one of their own periods
@@ -619,10 +633,6 @@ class PersonRow:
 
 def people_rows() -> list[PersonRow]:
     """Every person with the folders they are in (for the cleanup view)."""
-    from sqlalchemy import func
-
-    from .db.models import Publication
-
     with session_scope() as s:
         counts = dict(
             s.execute(
@@ -650,6 +660,58 @@ def people_rows() -> list[PersonRow]:
             )
             for p in people
         ]
+
+
+# What a deletion loses that is the user's own work (asked for explicitly before deleting).
+PRECIOUS = ("notes", "annotated_pdfs", "documents", "excerpts", "report_texts")
+
+
+def deletion_counts(
+    *, person_ids: list[int] | None = None, period_ids: list[int] | None = None
+) -> dict[str, int]:
+    """What deleting these people (with their papers, PDFs and periods), or these periods
+    (with their documents, notes, excerpts and report), loses; ``precious``: how much of it
+    is the user's own work (see PRECIOUS)."""
+
+    def n(q) -> int:
+        return s.scalar(select(func.count()).select_from(q.subquery())) or 0
+
+    def filled(column):
+        return column.is_not(None) & (func.trim(column) != "")
+
+    with session_scope() as s:
+        if person_ids is not None:
+            periods = select(Period.id).where(Period.person_id.in_(person_ids))
+            pubs = select(Publication.id).where(Publication.person_id.in_(person_ids))
+            pdfs = select(PublicationPdf).where(PublicationPdf.publication_id.in_(pubs))
+            counts = {
+                "people": len(person_ids),
+                "papers": n(pubs),
+                "pdfs": n(pdfs),
+                "annotated_pdfs": n(pdfs.where(PublicationPdf.edited_at.is_not(None))),
+                "paper_notes": n(pubs.where(filled(Publication.note))),
+            }
+        else:
+            periods = select(Period.id).where(Period.id.in_(period_ids or []))
+            counts = {"paper_notes": 0}
+        docs = select(PeriodDocument).where(PeriodDocument.period_id.in_(periods))
+        counts |= {
+            "periods": n(periods),
+            "documents": n(docs),
+            "annotated_documents": n(docs.where(PeriodDocument.edited_at.is_not(None))),
+            "starred": n(select(PeriodTag).where(PeriodTag.period_id.in_(periods))),
+            "excerpts": n(select(Excerpt).where(Excerpt.period_id.in_(periods))),
+            "report_texts": n(select(SectionText).where(SectionText.period_id.in_(periods))),
+        }
+        counts["notes"] = (
+            counts.pop("paper_notes")
+            + n(select(PeriodNote).where(PeriodNote.period_id.in_(periods)))
+            + n(select(Period.id).where(Period.id.in_(periods), filled(Period.notes)))
+            + n(docs.where(filled(PeriodDocument.note)))
+        )
+        counts.setdefault("annotated_pdfs", 0)
+        counts["precious"] = sum(counts[k] for k in PRECIOUS)
+        return counts
 
 
 def delete_people(person_ids: list[int]) -> None:

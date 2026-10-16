@@ -1032,6 +1032,16 @@ async def test_remove_from_folder_keeping_or_deleting_data(user: User) -> None:
     user.find(f"leave-{fid}").click()
     user.find("remove-delete").click()
     assert folders.folders()[0].members == [] and annotations.periods(other) == []
+    # With notes there: confirmed again, listing them.
+    period = folders.add_person(fid, other)
+    folders.set_notes(period, "Notes on John")
+    await user.open(f"/person/{other}?tab=sources")
+    user.find(f"leave-{fid}").click()
+    user.find("remove-delete").click()
+    await user.should_see("• 1 note (on papers, in folders, on documents)")
+    assert [m.name for m in folders.folders()[0].members] == ["John Roe"]
+    user.find("remove-delete-confirm").click()
+    assert folders.folders()[0].members == [] and annotations.periods(other) == []
 
 
 async def test_people_cleanup_delete(user: User) -> None:
@@ -1045,6 +1055,41 @@ async def test_people_cleanup_delete(user: User) -> None:
     user.find("delete-people").click()
     user.find("confirm-delete").click()
     assert [r.name for r in folders.people_rows()] == ["Jane Doe"]
+    # With notes: listed, and DELETE typed to confirm.
+    other = make_person("To Remove")
+    folders.set_notes(folders.add_person(folders.save_folder(None, "F"), other), "Notes")
+    await user.open("/?folder=0")
+    table = user.find("people-table").elements.pop()
+    table.selected = [r for r in table.rows if r["id"] == other]
+    user.find("delete-people").click()
+    await user.should_see("• 1 note (on papers, in folders, on documents)")
+    user.find("confirm-delete").click()
+    assert len(folders.people_rows()) == 2  # (not typed)
+    user.find("deletion-word").type("DELETE")
+    user.find("confirm-delete").click()
+    assert [r.name for r in folders.people_rows()] == ["Jane Doe"]
+
+
+async def test_delete_person_with_notes_asks_for_the_name(user: User) -> None:
+    from sci_report_analyzer import folders
+
+    pid = make_person("To Remove")
+    folders.set_notes(folders.add_person(folders.save_folder(None, "F"), pid), "Notes")
+    await user.open(f"/person/{pid}?tab=sources")
+    user.find("delete-person").click()
+    await user.should_see("• 1 note (on papers, in folders, on documents)")
+    user.find("deletion-word").type("to remove")
+    user.find("confirm-delete").click()
+    assert len(folders.people_rows()) == 1  # (not the name)
+    user.find("deletion-word").clear().type("To Remove")
+    user.find("confirm-delete").click()
+    assert folders.people_rows() == []
+    # Its page, if still open (e.g. in another tab), refreshed: no error.
+    from sci_report_analyzer.ui.person import sources_list, stale_banner
+    from sci_report_analyzer.ui.theme import refresh_alive
+
+    refresh_alive(sources_list)
+    refresh_alive(stale_banner)
 
 
 async def test_author_menu_alias_and_category(user: User) -> None:

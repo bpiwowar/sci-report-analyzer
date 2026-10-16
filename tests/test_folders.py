@@ -185,3 +185,44 @@ def test_notes_saved_only_from_the_stored_ones():
     assert folders.folders()[0].notes == "The folder's own."
     folders.save_folder(fid, "Hiring committee", notes="")
     assert folders.folders()[0].notes is None
+
+
+def test_deletion_counts_of_people_and_periods():
+    from helpers import PDF
+
+    from sci_report_analyzer import categories, documents, pdfs
+
+    a = make_person("Ann")
+    add_source(a, "dblp", "a", [pub("k1", "Paper one"), pub("k2", "Paper two")])
+    pub_id = annotations_pub(a)
+    fid = folders.save_folder(None, "Committee")
+    period = folders.add_person(fid, a)
+    # Nothing of the user's own yet.
+    n = folders.deletion_counts(person_ids=[a])
+    assert (n["people"], n["papers"], n["periods"], n["precious"]) == (1, 2, 1, 0)
+    assert folders.deletion_counts(period_ids=[period])["precious"] == 0
+    # Then notes (on a paper, in the folder, on a paper in it, on a document), a document,
+    # an annotated PDF, an excerpt and a report text.
+    pdfs.save(pub_id, PDF, None)
+    pdfs.save(pub_id, PDF, None, edited=True)  # (annotated in the viewer)
+    annotations.set_note(pub_id, "A paper note")
+    annotations.set_note(pub_id, "A note in the folder", period)
+    folders.set_notes(period, "Notes on Ann")
+    doc = documents.add(period, "cv.pdf", PDF)
+    documents.set_note(doc, "A document note")
+    research = categories.add(fid, "Research")
+    categories.add_excerpt(research, period, "Led a project.", 1, [], document_id=doc)
+    categories.set_section_text(period, research, "A summary.")
+    n = folders.deletion_counts(person_ids=[a])
+    assert {k: n[k] for k in folders.PRECIOUS} == {
+        "notes": 4,
+        "annotated_pdfs": 1,
+        "documents": 1,
+        "excerpts": 1,
+        "report_texts": 1,
+    }
+    assert (n["pdfs"], n["precious"]) == (1, 8)
+    # A period: not the paper's own note, nor its PDF.
+    n = folders.deletion_counts(period_ids=[period])
+    assert (n["notes"], n["annotated_pdfs"], n["documents"], n["precious"]) == (3, 0, 1, 6)
+    assert folders.period_in(fid, a) == period

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-16 20:48+0200\n"
+"POT-Creation-Date: 2026-10-16 23:37+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -1275,6 +1275,9 @@ msgstr "Niveau personnalisé."
 msgid "Custom rule {n}"
 msgstr "Règle personnalisée {n}"
 
+msgid "DELETE"
+msgstr "SUPPRIMER"
+
 msgid "DOI (by hand)"
 msgstr "DOI (à la main)"
 
@@ -1375,6 +1378,9 @@ msgstr "Supprimer le dossier « {folder} »"
 msgid "Delete the person"
 msgstr "Supprimer la personne"
 
+msgid "Delete the person's data in the folder?"
+msgstr "Supprimer les données de la personne dans le dossier ?"
+
 msgid "Delete the rule"
 msgstr "Supprimer la règle"
 
@@ -1389,22 +1395,14 @@ msgid "Delete the track"
 msgstr "Supprimer la session"
 
 #, python-brace-format
-msgid "Delete {name} and all their data (tags, stars, periods)?"
-msgstr "Supprimer {name} et toutes ses données (étiquettes, étoiles, périodes) ?"
+msgid "Delete {name}?"
+msgstr "Supprimer {name} ?"
 
 #, python-brace-format
-msgid ""
-"Delete {n} person and all their data (sources, publications, tags, stars,"
-" periods)?"
-msgid_plural ""
-"Delete {n} people and all their data (sources, publications, tags, stars,"
-" periods)?"
-msgstr[0] ""
-"Supprimer {n} personne et toutes ses données (sources, publications, "
-"étiquettes, étoiles, périodes) ?"
-msgstr[1] ""
-"Supprimer {n} personnes et toutes leurs données (sources, publications, "
-"étiquettes, étoiles, périodes) ?"
+msgid "Delete {n} person?"
+msgid_plural "Delete {n} people?"
+msgstr[0] "Supprimer {n} personne ?"
+msgstr[1] "Supprimer {n} personnes ?"
 
 #, python-brace-format
 msgid "Delete “{name}” and its subcategories?"
@@ -3916,13 +3914,13 @@ msgid "Remove from the folder"
 msgstr "Retirer du dossier"
 
 msgid ""
-"Remove from the folder: keep the person's stars, tags, notes, documents "
-"and report there as one of their own periods (Profile tab), or delete "
-"them?"
+"Remove from the folder: keep the person's stars, tags, notes, documents, "
+"excerpts and report there as one of their own periods (Profile tab), or "
+"delete them?"
 msgstr ""
-"Retirer du dossier : garder les étoiles, étiquettes, notes, documents et "
-"rapport de la personne comme l'une de ses propres périodes (onglet "
-"Profil), ou les supprimer ?"
+"Retirer du dossier : garder les étoiles, étiquettes, notes, documents, "
+"extraits et rapport de la personne comme l'une de ses propres périodes "
+"(onglet Profil), ou les supprimer ?"
 
 msgid "Remove from this folder"
 msgstr "Retirer de ce dossier"
@@ -5266,6 +5264,9 @@ msgstr ""
 msgid "This cannot be undone."
 msgstr "Cette action est irréversible."
 
+msgid "This deletes:"
+msgstr "Cela supprime :"
+
 msgid "This excerpt is no longer there"
 msgstr "Cet extrait n'existe plus"
 
@@ -5279,6 +5280,9 @@ msgstr "Cette page est celle du profil {found}, pas de {expected}"
 
 msgid "This paper is no longer in the database"
 msgstr "Cet article n'est plus dans la base de données"
+
+msgid "This person was deleted."
+msgstr "Cette personne a été supprimée."
 
 #, python-brace-format
 msgid "This removes, for {n} person:"
@@ -5421,6 +5425,10 @@ msgstr "Tapez pour trouver un extrait"
 #, python-brace-format
 msgid "Type “{folder}” to confirm"
 msgstr "Tapez « {folder} » pour confirmer"
+
+#, python-brace-format
+msgid "Type “{word}” to confirm"
+msgstr "Tapez « {word} » pour confirmer"
 
 #, python-brace-format
 msgid "Type: {kind}"
@@ -7260,6 +7268,56 @@ msgstr ""
 "étiquettes, des étoiles, un canal de publication / rang / type / session "
 "fixé à la main, des corrections, une note, sont masqués ou ont été "
 "fusionnés / séparés à la main"
+
+#, python-brace-format
+msgid "• {n} document (application, CV…), with its annotations"
+msgid_plural "• {n} documents (applications, CVs…), with their annotations"
+msgstr[0] "• {n} document (candidature, CV…), avec ses annotations"
+msgstr[1] "• {n} documents (candidatures, CV…), avec leurs annotations"
+
+#, python-brace-format
+msgid "• {n} excerpt"
+msgid_plural "• {n} excerpts"
+msgstr[0] "• {n} extrait"
+msgstr[1] "• {n} extraits"
+
+#, python-brace-format
+msgid "• {n} note (on papers, in folders, on documents)"
+msgid_plural "• {n} notes (on papers, in folders, on documents)"
+msgstr[0] "• {n} note (sur des articles, dans des dossiers, sur des documents)"
+msgstr[1] "• {n} notes (sur des articles, dans des dossiers, sur des documents)"
+
+#, python-brace-format
+msgid "• {n} paper"
+msgid_plural "• {n} papers"
+msgstr[0] "• {n} article"
+msgstr[1] "• {n} articles"
+
+#, python-brace-format
+msgid "• {n} period (in a folder or their own), with its tags and stars"
+msgid_plural "• {n} periods (in folders or their own), with their tags and stars"
+msgstr[0] "• {n} période (dans un dossier ou propre), avec ses étiquettes et étoiles"
+msgstr[1] ""
+"• {n} périodes (dans des dossiers ou propres), avec leurs étiquettes et "
+"étoiles"
+
+#, python-brace-format
+msgid "• {n} person, with their sources, career and theses"
+msgid_plural "• {n} people, with their sources, careers and theses"
+msgstr[0] "• {n} personne, avec ses sources, sa carrière et ses thèses"
+msgstr[1] "• {n} personnes, avec leurs sources, carrières et thèses"
+
+#, python-brace-format
+msgid "• {n} report section text"
+msgid_plural "• {n} report section texts"
+msgstr[0] "• {n} texte de section du rapport"
+msgstr[1] "• {n} textes de section du rapport"
+
+#, python-brace-format
+msgid "• {n} stored PDF ({annotated} annotated)"
+msgid_plural "• {n} stored PDFs ({annotated} annotated)"
+msgstr[0] "• {n} PDF stocké ({annotated} annoté(s))"
+msgstr[1] "• {n} PDF stockés ({annotated} annoté(s))"
 
 #, python-brace-format
 msgid "• {papers} paper(s) and {records} source record(s)"

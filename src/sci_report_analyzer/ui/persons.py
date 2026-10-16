@@ -23,11 +23,12 @@ from ..sync import (
     start_sync,
 )
 from .categories_editor import categories_dialog
-from .dialogs import close_then, confirm, ok_handler, transient_dialog
+from .dialogs import close_then, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
 from .folders_editor import ALL, delete_dialog, expand_to, folders_tree
 from .person import (
     candidate_details,
+    deletion_dialog,
     link_url,
     move_to_folder_dialog,
     orcid_badge,
@@ -586,17 +587,11 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
             folders.delete_people(ids)
             ui.navigate.reload()
 
-        confirm(
-            ngettext(
-                "Delete {n} person and all their data (sources, publications, "
-                "tags, stars, periods)?",
-                "Delete {n} people and all their data (sources, publications, "
-                "tags, stars, periods)?",
-                len(ids),
-            ).format(n=len(ids)),
-            _("Delete"),
+        deletion_dialog(
+            ngettext("Delete {n} person?", "Delete {n} people?", len(ids)).format(n=len(ids)),
+            folders.deletion_counts(person_ids=ids),
             ok,
-            mark="confirm-delete",
+            word=_("DELETE"),
         )
 
     add_btn.on_click(add)

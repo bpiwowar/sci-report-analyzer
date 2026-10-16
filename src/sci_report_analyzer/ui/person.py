@@ -28,7 +28,7 @@ from ..sync import (
     suggested_orcid,
     sync_link,
 )
-from .dialogs import actions, confirm, ok_handler, transient_dialog
+from .dialogs import actions, close_then, ok_handler, transient_dialog
 from .documents_page import open_document, page_url_of, report_view
 from .folder_notes import NOTES_TIP
 from .panel import PublicationsPanel, period_label
@@ -421,11 +421,122 @@ def _delete_dialog(person: Person) -> None:
         folders.delete_people([person.id])
         ui.navigate.to("/")
 
-    confirm(
-        _("Delete {name} and all their data (tags, stars, periods)?").format(name=person.name),
-        _("Delete"),
+    deletion_dialog(
+        _("Delete {name}?").format(name=person.name),
+        folders.deletion_counts(person_ids=[person.id]),
         delete,
+        word=person.name,
     )
+
+
+def deletion_dialog(
+    title: str,
+    n: dict[str, int],
+    on_ok,
+    *,
+    word: str | None = None,
+    ok_label: str | None = None,
+    mark: str = "confirm-delete",
+) -> None:
+    """Big confirmation of a deletion: what it loses (``folders.deletion_counts``, the
+    user's own work in red); when some is, ``word`` typed to confirm (if given)."""
+    with transient_dialog(width="w-full max-w-xl") as (dlg, _card):
+        with ui.row().classes("items-center gap-2 no-wrap"):
+            ui.icon("warning", size="lg", color="negative")
+            ui.label(title).classes("text-xl font-medium")
+        with ui.column().classes("gap-1 bg-red-1 rounded p-3 w-full").mark("deletion-losses"):
+            ui.label(_("This deletes:")).classes("font-medium")
+            for line, precious in _losses(n):
+                ui.label(line).classes("text-negative font-medium" if precious else "")
+            ui.label(_("This cannot be undone.")).classes("text-negative font-medium")
+        typed = None
+        if word and n["precious"]:
+            typed = (
+                ui.input(_("Type “{word}” to confirm").format(word=word))
+                .props("dense outlined")
+                .classes("w-full")
+                .mark("deletion-word")
+            )
+
+        def ok() -> bool | None:
+            if typed is not None and (typed.value or "").strip() != word:
+                ui.notify(_("Type “{word}” to confirm").format(word=word), type="warning")
+                return False
+            on_ok()
+
+        actions(dlg, ok_label or _("Delete"), ok, danger=True, icon="delete_forever", mark=mark)
+
+
+def _losses(n: dict[str, int]) -> list[tuple[str, bool]]:
+    """The lines of what a deletion loses (those with something), and whether each is the
+    user's own work."""
+    lines = []
+    if n.get("people"):
+        lines.append(
+            (
+                ngettext(
+                    "• {n} person, with their sources, career and theses",
+                    "• {n} people, with their sources, careers and theses",
+                    n["people"],
+                ).format(n=n["people"]),
+                False,
+            )
+        )
+    if n.get("papers"):
+        lines.append(
+            (
+                ngettext("• {n} paper", "• {n} papers", n["papers"]).format(n=n["papers"]),
+                False,
+            )
+        )
+    if n.get("pdfs"):
+        lines.append(
+            (
+                ngettext(
+                    "• {n} stored PDF ({annotated} annotated)",
+                    "• {n} stored PDFs ({annotated} annotated)",
+                    n["pdfs"],
+                ).format(n=n["pdfs"], annotated=n["annotated_pdfs"]),
+                bool(n["annotated_pdfs"]),
+            )
+        )
+    if n["periods"]:
+        lines.append(
+            (
+                ngettext(
+                    "• {n} period (in a folder or their own), with its tags and stars",
+                    "• {n} periods (in folders or their own), with their tags and stars",
+                    n["periods"],
+                ).format(n=n["periods"]),
+                False,
+            )
+        )
+    for key, text in (
+        (
+            "documents",
+            ngettext(
+                "• {n} document (application, CV…), with its annotations",
+                "• {n} documents (applications, CVs…), with their annotations",
+                n["documents"],
+            ),
+        ),
+        (
+            "notes",
+            ngettext(
+                "• {n} note (on papers, in folders, on documents)",
+                "• {n} notes (on papers, in folders, on documents)",
+                n["notes"],
+            ),
+        ),
+        ("excerpts", ngettext("• {n} excerpt", "• {n} excerpts", n["excerpts"])),
+        (
+            "report_texts",
+            ngettext("• {n} report section text", "• {n} report section texts", n["report_texts"]),
+        ),
+    ):
+        if n[key]:
+            lines.append((text.format(n=n[key]), True))
+    return lines
 
 
 def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
@@ -503,6 +614,8 @@ def purge_dialog(person_ids: list[int], who: str, after=None) -> None:
 @ui.refreshable
 def stale_banner(person_id: int) -> None:
     person = persons.load(person_id)
+    if person is None:  # (deleted, e.g. in another tab)
+        return
     stale = [ln for ln in person.links if ln.is_stale or ln.sync_state == "error"]
     if is_syncing(person_id):
         with ui.row().classes("w-full items-center bg-blue-1 text-blue-9 rounded p-2"):
@@ -617,6 +730,9 @@ def link_url(ln: SourceLink) -> str | None:
 @ui.refreshable
 def sources_list(person_id: int) -> None:
     person = persons.load(person_id)
+    if person is None:  # (deleted, e.g. in another tab)
+        ui.label(_("This person was deleted.")).classes("text-grey")
+        return
     links = [ln for ln in person.links if not manual.is_hal_document(ln)]
     validated = [ln for ln in links if ln.status == "validated"]
     candidates = sorted(
@@ -1065,17 +1181,34 @@ def folders_section(person_id: int, on_change) -> None:
 
 def remove_from_folder_dialog(folder_id: int, person_id: int, done) -> None:
     """Take a person out of a folder, keeping their data there (as one of their own periods)
-    or deleting it."""
+    or deleting it (confirmed again, listing it, if some is the user's own work)."""
 
     def remove(keep: bool) -> None:
         folders.remove_person(folder_id, person_id, keep=keep)
         done()
 
+    def delete() -> None:
+        period = folders.period_in(folder_id, person_id)
+        n = folders.deletion_counts(period_ids=[period] if period else [])
+        if not n["precious"]:
+            remove(False)
+            return
+        close_then(
+            dlg,
+            lambda: deletion_dialog(
+                _("Delete the person's data in the folder?"),
+                n,
+                lambda: remove(False),
+                mark="remove-delete-confirm",
+            ),
+        )
+
     with transient_dialog(width="w-[32rem]") as (dlg, _card):
         ui.label(
             _(
-                "Remove from the folder: keep the person's stars, tags, notes, documents and "
-                "report there as one of their own periods (Profile tab), or delete them?"
+                "Remove from the folder: keep the person's stars, tags, notes, documents, "
+                "excerpts and report there as one of their own periods (Profile tab), or "
+                "delete them?"
             )
         )
         with ui.row().classes("justify-end w-full"):
@@ -1083,7 +1216,7 @@ def remove_from_folder_dialog(folder_id: int, person_id: int, done) -> None:
             ui.button(
                 _("Delete the data"),
                 color="negative",
-                on_click=ok_handler(dlg, lambda: remove(False)),
+                on_click=ok_handler(dlg, delete),
             ).props("flat").mark("remove-delete")
             ui.button(_("Keep as a period"), on_click=ok_handler(dlg, lambda: remove(True))).mark(
                 "remove-keep"

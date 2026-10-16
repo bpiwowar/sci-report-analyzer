@@ -405,7 +405,8 @@ text: in the notes and the copy, its excerpts are not listed but follow the text
 a date and can be hidden. Each person has their **own period** in each of their folders
 (click it on their line in the folder, or set it in their Profile tab, under Periods), with its own stars, tags and notes; opening a person from a
 folder selects it. Removing a person from a folder (✕ on their line, or in their Profile
-tab) either keeps that period, with its data, as one of their own periods, or deletes it.
+tab) either keeps that period, with its data, as one of their own periods, or deletes it
+(confirmed again, listing them, if it has notes, documents, excerpts or report texts).
 **Moving** them to another folder (the folder-with-an-arrow button, same places) takes
 that period with them, with all its data; their excerpts are filed in the other folder's
 categories (added if missing).

@@ -411,7 +411,9 @@ Les **dossiers** (page Rapports) regroupent des personnes, par exemple pour un c
 une date et peut être masqué. Chaque personne a sa **propre période** dans chacun de ses dossiers
 (définie en cliquant dessus sur sa ligne dans le dossier, ou dans son onglet Profil, sous Périodes), avec ses propres étoiles, étiquettes et notes ; ouvrir une personne depuis un
 dossier sélectionne celle-ci. Retirer une personne d'un dossier (✕ sur sa ligne, ou dans son onglet Profil)
-garde cette période, avec ses données, comme l'une de ses propres périodes, ou la supprime.
+garde cette période, avec ses données, comme l'une de ses propres périodes, ou la supprime
+(avec une seconde confirmation qui les liste si elle a des notes, documents, extraits ou
+textes de rapport).
 La **déplacer** vers un autre dossier (le bouton dossier avec une flèche, aux mêmes endroits)
 emporte cette période, avec toutes ses données ; ses extraits sont classés dans les catégories
 de l'autre dossier (ajoutées s'il le faut).
