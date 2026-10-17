@@ -49,13 +49,15 @@ def folders_tree(
     people: Callable[[folders.FolderNode, int], None] | None = None,
     counts: dict[int, int] | None = None,
     person_dropped: Callable[[int, folders.FolderNode], None] | None = None,
+    actions: Callable[[folders.FolderNode], None] | None = None,
 ) -> None:
     """The folders as a tree, ``current`` (a folder id, or ALL) shown selected; ``select``:
     called with the folder clicked (ALL: the All people view); ``changed``: once something
     changed (the tree is shown again by it); ``people``: shows an expanded folder's people
     (after the folders within it), at a depth; ``counts``: the number of people of each
     folder (shown once collapsed); ``person_dropped``: a person (of ``people``: their
-    period's id, see dnd "person") dropped onto a folder."""
+    period's id, see dnd "person") dropped onto a folder; ``actions``: a folder's buttons, on
+    its row (before its menu)."""
     expanded: set[int] = set(annotations.ui_state(EXPANDED) or [])
     counts = counts or {}
 
@@ -177,6 +179,8 @@ def folders_tree(
                 ui.icon("tune", size="xs", color="grey-7").classes("shrink-0").tooltip(
                     _("Settings: {name}").format(name=n.settings)
                 ).mark(f"folder-settings-name-{n.id}")
+            if actions:
+                actions(n)
             with (
                 ui.button(icon="more_vert")
                 .props("flat dense round size=sm")

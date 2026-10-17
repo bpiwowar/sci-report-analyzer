@@ -595,6 +595,24 @@ def all_people() -> dict[int, str]:
         return {p.id: p.name for p in s.scalars(select(Person).order_by(Person.name))}
 
 
+def find_people(query: str, limit: int = 50) -> list[tuple[int, str, str | None]]:
+    """The people (id, name, affiliation) whose name or affiliation has each of the words of
+    ``query`` (any case, accents too), by name; at most ``limit``."""
+    from .authors import fold_name
+
+    words = fold_name(query).split()
+    with session_scope() as s:
+        rows = s.execute(select(Person.id, Person.name, Person.affiliation).order_by(Person.name))
+        out = []
+        for pid, name, aff in rows:
+            text = fold_name(f"{name} {aff or ''}")
+            if all(w in text for w in words):
+                out.append((pid, name, aff))
+                if len(out) >= limit:
+                    break
+        return out
+
+
 @dataclass
 class PersonRow:
     id: int

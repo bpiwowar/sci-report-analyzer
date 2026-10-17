@@ -1,6 +1,7 @@
 """A person's timeline: what is dated about them, by year. Their career and the theses they
-supervised (spans of years, one above the other when they overlap), their excerpts in a folder (see
-categories.timeline) and their papers (by year)."""
+supervised (spans of years, one above the other when they overlap), the theses they were on the
+jury of (a moment: their defence), their excerpts in a folder (see categories.timeline) and
+their papers (by year)."""
 
 from __future__ import annotations
 
@@ -130,6 +131,42 @@ def supervised(person_id: int, today: date | None = None) -> list[Supervised]:
             )
         )
     return sorted(found, key=lambda x: x.year or 0, reverse=True)
+
+
+@dataclass
+class Jury:
+    """A thesis the person was on the jury of (``role``: see theses.JURY_ROLES): a moment, its
+    defence (``date`` as known; ``at``: where, in years, to the month if known, else the
+    middle of its year); ``year``: none without a date; ``lane``: its row (see lanes)."""
+
+    id: int
+    role: str
+    student: str
+    title: str
+    date: str
+    year: int | None
+    at: float = 0.0
+    first: int = 0
+    last: int = 0
+    lane: int = 0
+
+
+def juries(person_id: int) -> list[Jury]:
+    """The theses the person was on the jury of (not hidden), the most recent first (those
+    without a date last)."""
+    found = []
+    for t in persons.theses(person_id):
+        if t.role not in theses.JURY_ROLES:
+            continue
+        sp = theses.span(t)
+        when = sp.end or (sp.start if not sp.start_estimated else None) or ""
+        year = to_year(when)
+        month = re.match(r"\d{4}-(\d{2})", when)
+        at = year + ((int(month[1]) - 0.5) / 12 if month else 0.5) if year else 0.0
+        found.append(
+            Jury(t.id, t.role, t.student or "", t.title or "", when, year, at, year or 0, year or 0)
+        )
+    return sorted(found, key=lambda x: x.at, reverse=True)
 
 
 def papers_by_year(person_id: int) -> dict[int, list[str]]:

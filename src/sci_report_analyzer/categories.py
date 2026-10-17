@@ -13,7 +13,15 @@ from datetime import datetime
 from sqlalchemy import func, select
 
 from . import folders, i18n
-from .db.models import Category, Excerpt, PeriodDocument, Publication, SectionText, Tag
+from .db.models import (
+    Category,
+    Excerpt,
+    Period,
+    PeriodDocument,
+    Publication,
+    SectionText,
+    Tag,
+)
 from .db.session import session_scope
 from .i18n import _
 
@@ -728,6 +736,8 @@ class ExcerptView:
     comment: str | None = None  # (a commentary, Markdown; leading a group: the group's)
     minor: bool = False
     url: str | None = None  # (a link; leading a group: the group's)
+    punctual: bool = False  # (a one-off event: a moment, no duration)
+    in_period: bool = False  # (sometime within the person's period: no precise date)
 
     @property
     def tag_names(self) -> list[str]:
@@ -816,6 +826,8 @@ def add_excerpt(
     tags: list[str] | None = None,
     level: str | None = None,
     original: str | None = None,
+    punctual: bool = False,
+    in_period: bool = False,
 ) -> int:
     """File a passage (its years, markers, tags and level: see update_excerpt; ``original``:
     its text as selected, when rewritten); one filed there already is kept."""
@@ -854,6 +866,8 @@ def add_excerpt(
             minor=minor,
             caveat=caveat,
             level=level or None,
+            punctual=punctual,
+            in_period=in_period and not punctual,
         )
         s.add(e)
         _set_tags(s, e, tags or [])
@@ -933,6 +947,8 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
                 comment=e.comment,
                 minor=e.minor,
                 url=e.url,
+                punctual=e.punctual,
+                in_period=e.in_period,
             )
             for e, doc, title, colour in rows
         ]
@@ -948,11 +964,13 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
 @dataclass
 class Dated:
     """An excerpt (or a group: its lead) on a person's timeline, at ``year``: its first one
-    (else its last); without years of its own, that of its paper (``paper_year``)."""
+    (else its last); without years of its own, along the person's period (within it, see
+    ExcerptView.in_period: ``period``, its years), else that of its paper (``paper_year``)."""
 
     excerpt: ExcerptView
     year: int
     paper_year: bool = False
+    period: tuple[int | None, int | None] | None = None
 
 
 def timeline(
@@ -960,8 +978,8 @@ def timeline(
 ) -> tuple[list[tuple[int, list[Dated]]], list[ExcerptView]]:
     """The excerpts of a person in a folder (groups: their leads) by year, the most recent
     first, each in the order of the categories within a year; and those without a year (nor
-    a paper's), in their order. Those left out of the timeline (see set_in_timeline): not
-    there, but added to ``left_out`` (if given)."""
+    a paper's; within the period, one without years), in their order. Those left out of the
+    timeline (see set_in_timeline): not there, but added to ``left_out`` (if given)."""
     views = excerpts(period_id, grouped=True)
     if left_out is not None:
         left_out.extend(v for v in views if not v.in_timeline)
@@ -978,11 +996,18 @@ def timeline(
                 )
             )
         }
+        years = s.execute(
+            select(Period.start_year, Period.end_year).where(Period.id == period_id)
+        ).first()
+    within = tuple(years) if years and (years[0] or years[1]) else None
     by_year: dict[int, list[Dated]] = {}
     undated = []
     for v in views:
         if year := v.start_year or v.end_year:
             by_year.setdefault(year, []).append(Dated(v, year))
+        elif v.in_period and within:
+            year = within[0] or within[1]
+            by_year.setdefault(year, []).append(Dated(v, year, period=within))
         elif year := paper_years.get(v.publication_id):
             by_year.setdefault(year, []).append(Dated(v, year, paper_year=True))
         else:
@@ -1130,6 +1155,7 @@ def remove_excerpt(excerpt_id: int) -> None:
                 lead.influence, lead.salient, lead.caveat = e.influence, e.salient, e.caveat
                 lead.minor, lead.discarded, lead.level = e.minor, e.discarded, e.level
                 lead.in_timeline = e.in_timeline
+                lead.punctual, lead.in_period = e.punctual, e.in_period
                 lead.group_text, lead.comment, lead.url = e.group_text, e.comment, e.url
                 lead.tags = list(e.tags)
                 for x in others[1:]:
@@ -1149,11 +1175,14 @@ def update_excerpt(
     caveat: bool = False,
     tags: list[str] | None = None,
     level: str | None = None,
+    punctual: bool | None = None,
+    in_period: bool | None = None,
 ) -> None:
     """Its text (unless None or blank), years, markers ("influence", "salient", "minor",
     "caveat"),
     tags (by name; None: unchanged) and level (its key, see reports.levels; none: the
-    folder's default)."""
+    folder's default); whether it is a one-off event, or within the person's period (None:
+    unchanged; not both)."""
     with session_scope() as s:
         if e := s.get(Excerpt, excerpt_id):
             if text is not None and text.strip():
@@ -1162,6 +1191,10 @@ def update_excerpt(
             before = _rank(e, firsts)
             e.start_year, e.end_year, e.influence = start, end, influence
             e.salient, e.minor, e.caveat, e.level = salient, minor, caveat, level or None
+            if punctual is not None:
+                e.punctual = punctual
+            if in_period is not None:
+                e.in_period = in_period and not e.punctual
             if _rank(e, firsts) != before:  # (checked or unchecked: moved, see _place_by_rank)
                 s.flush()
                 _place_by_rank(s, e, firsts)

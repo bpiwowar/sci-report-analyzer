@@ -21,7 +21,13 @@ from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
 from .theme import DEFAULT_COLOUR, bare_page
 from .timeline import timeline_view
-from .viewer_side import Side, bookmark_here, bookmarks_section, categories_section
+from .viewer_side import (
+    Side,
+    bookmark_here,
+    bookmarks_section,
+    categories_section,
+    excerpt_dialog,
+)
 
 if TYPE_CHECKING:
     from .pdf_dock import PdfDock
@@ -532,6 +538,7 @@ class ReportTabs:
         )
         self.boxes = boxes
         self.sides: dict[str, Side] = {}
+        self.editor: Side | None = None  # (the timeline's excerpts edited: see _edit)
         self._documents_of()
         dock.on_shown.append(self._shown)
         ui.on("vr-pdf-quote", lambda: self._quote(inline=False))
@@ -569,7 +576,16 @@ class ReportTabs:
         if which == "timeline":
             with ui.row().classes("items-center"):
                 self._choice(which)
-            timeline_view(self.person_id, p, self._select, self._open, self.show_tab)
+            self.editor = None  # (gone with the tab's content)
+            timeline_view(
+                self.person_id,
+                p,
+                self._select,
+                self._show,
+                self._edit,
+                self.show_tab,
+                lambda pub_id: self.dock.open(f"p{pub_id}"),
+            )
             return
         side = (_notes if which == "report" else _excerpts)(self.person_id, p.id)
         self.sides[which] = side
@@ -662,6 +678,33 @@ class ReportTabs:
         """The PDF of an excerpt beside the page, at its page."""
         key = f"d{e.document_id}" if e.document_id else f"p{e.publication_id}"
         self.dock.open(key, e.page)
+
+    def _show(self, e: categories.ExcerptView) -> None:
+        """The PDF of an excerpt beside the page, at it (a document's: selected there, once
+        its excerpts are drawn)."""
+        self._open(e)
+        if not e.document_id or not e.page:
+            return
+        tops = [r[3] for r in e.rects if len(r) < 5 or r[4] == e.page]
+        y = json.dumps(max(tops) + 20 if tops else None)
+        ui.run_javascript(
+            f"(() => {{ let n = 0; const go = () => {{ const w = vrDock.win(); "
+            f"if (w && w.vrDoc && w.vrPdf && w.vrDoc.excerpts.some(x => x.id === {e.id})) "
+            f"{{ w.vrPdf.go({e.page}, {y}); w.vrDoc.select({e.id}); }} "
+            "else if (n++ < 40) setTimeout(go, 250); }; go(); })()"
+        )
+
+    async def _edit(self, e: categories.ExcerptView, then: Callable[[], None]) -> None:
+        """An excerpt's dialog, as in the Excerpts tab (``then``: once saved), from the
+        timeline: a side of its own (its papers, for the commentary's citations), in it."""
+        p = self.period
+        if p is None:
+            return
+        if self.editor is None or gone(self.editor.host.dialogs):
+            with self.boxes["timeline"]:
+                self.editor = Side(self.person_id, p.id, ("notes", 0))
+            await self.editor.load()
+        excerpt_dialog(self.editor, e, then=then)
 
     async def _find(self) -> None:
         """The paper of the selection (shown in the Report tab; a document's: to link it

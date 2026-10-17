@@ -10,7 +10,11 @@ and reports, to prepare an evaluation.
 1. **Add a person** (name, optional affiliation and ORCID, the sources to search; in a
    folder, their period and tags in it). The sources are searched and the possible profiles
    are listed in the dialog: tick the right ones (the likely ones are) to validate them right
-   away. The others stay *candidates* in the **Profile** tab, under **Sources** (its sub-tabs:
+   away. In a folder, their **documents** there come next (PDFs dropped or chosen,
+   each listed, renamed or removed; or skipped), before their page. Each folder of the tree
+   has its own button (a person with a +) to **add people** to it: those already known,
+   searched as you type (by name or affiliation; those in it already said so), with the
+   period and tags given; or a new person (the dialog above). The others stay *candidates* in the **Profile** tab, under **Sources** (its sub-tabs:
    **Career**, **Periods** and **Sources**; the person is edited, purged or deleted above them).
    Their **career** (their CV) is built there too: positions and diplomas, dated (a year,
    `2019-09` or `2019-09-01`), a diploma with its thesis; the position without an end is the
@@ -457,25 +461,34 @@ column, so that the gaps show; this year marked; their period in the folder on a
 background), a row for each kind. Their **career** (Profile tab): a line of their CV as a bar
 along its time, to the month when its dates have one (a current position: up to now, fading),
 its name above it; the **PhD students** they supervised, each a bar from the thesis's start
-to its defence (in progress: up to now), the student's name above it; overlapping bars one
+to its defence (in progress: up to now), the student's name above it; the **thesis juries** they were on (each a dot at the defence, to the month if known, else the middle of its year, the student's name above it, coloured by their role: reviewer (rapporteur), examiner, president, as the legend says; hovered, its role, title, student and date; clicked, in the details, with a button to the Theses tab; hidden theses left out); overlapping bars one
 above the other. Their **excerpts** in the folder, a row for each main category (in their
 category's colour): the beginning of their text above a thin bar along their years (a single
-year: that one); their **papers**: a small bar a year, as high as their number (their titles
-hovered). Hovered, a bar tells all about it. Clicked, what it is is shown below the
+year: that one; since a year, without an end: up to now, fading, as a current position; a **one-off event**, a switch of its dialog: a dot in the middle of its year, never continuing; **within the period**, its other switch, for an excerpt without a precise date: along the person's period in the folder, or its own years if it has some, dotted and lighter, said “within the period (2020–2024)” in the details; one switch on turns the other off; without years of its own, placed along the period, unless the period has none either, said so, listed without years; the legend shows both looks); their **papers**: a small bar a year, as high as their number, stacked by the colours of their ranks (hovered: their number by rank, as in the Publications tab, e.g. “9 papers in 2022 — 3 Q1, 2 Q2, 1 CORE A*, 3 unranked”, and their titles; clicked: listed below, each with its rank, venue and first authors, a stored PDF opened beside the page, else its links shown). Hovered, a bar tells all about it. Clicked, what it is is shown below the
 timeline: a line of the career or a PhD student, with **Edit** (its dialog: the timeline
 drawn again) and a button to its tab; an excerpt, or a year (its excerpts), where an excerpt
-clicked is shown in the Excerpts tab (where its years are edited), its PDF icon opening its
-PDF beside the page. A paper's excerpt without years is at the paper's year. The timeline
+clicked opens its PDF beside the page, at it (selected there), the timeline still shown; its
+pencil edits it (its dialog, as in the Excerpts tab: its years, markers, text…; the timeline
+drawn again), its list button shows it in the Excerpts tab. A paper's excerpt without years is at the paper's year. The timeline
 starts with the earliest of their career, theses and excerpts (their papers at most three
 years before; the earlier ones counted below). It opens zoomed in (years twice as wide as
-fitting the width), scrolled to their period in the folder; the magnifiers widen or narrow
-the years (the text stays the same size), down to the whole timeline fitting the width. Each
+fitting the width), scrolled to their period in the folder; its slider widens or narrows
+the years at once while moved (the text stays the same size, the middle stays in view), from
+the whole timeline fitting the width to four times as wide; the timeline keeps where it is
+scrolled when an item is clicked or it is drawn again. Each
 kind is shown or hidden with its switch; one they have none of is said so. An excerpt has
 a switch of its own (in the details below, or its button in the Excerpts tab): off, it is
-left out of the timeline (still kept), listed apart below, where it is switched back on. The
+left out of the timeline (still kept), listed apart below, where it is switched back on.
+The excerpts can be **filtered** (the chips under the switches): by their markers (salient,
+influence, minor, caveat) and by their levels (the folder's: local, national…; an excerpt
+without one counts as the folder's default level). Several chips of a kind: one of them;
+both kinds: both; none ticked: all shown. The filters apply to the timeline, the details and
+the lists below; how many excerpts they hide is said, with a button to clear them. A folder
+without levels says so instead of their chips. The
 excerpts without years, and the lines of the career without dates, are listed apart, below.
 The timeline takes the full width: a PDF shown beside the page is set aside meanwhile (still
-in the strip below), and shown again when leaving the tab.
+in the strip below; one opened from the timeline is shown), and shown again when leaving the
+tab.
 
 Folders can be **within other folders**: the Reports page shows them as a **tree**, each
 folder expanded showing the folders within it then its people, one line each (their period,

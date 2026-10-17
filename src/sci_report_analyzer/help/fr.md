@@ -10,7 +10,7 @@ et des rapports, pour préparer une évaluation.
 1. **Ajoutez une personne** (nom, affiliation et ORCID facultatifs, les sources à interroger ;
    dans un dossier, sa période et ses étiquettes). Les sources sont interrogées et les profils
    possibles listés dans la fenêtre : cochez les bons (les plus probables le sont) pour les
-   valider tout de suite. Les autres restent *candidats* dans l'onglet **Profil**, sous **Sources** (ses
+   valider tout de suite. Dans un dossier, ses **documents** dans ce dossier viennent ensuite (des PDF déposés ou choisis, chacun listé, renommé ou retiré ; ou on passe), avant sa page. Chaque dossier de l'arbre a son propre bouton (une personne avec un +) pour y **ajouter des personnes** : celles déjà connues, cherchées au fil de la frappe (par nom ou affiliation ; celles qui y sont déjà sont signalées), avec la période et les étiquettes données ; ou une nouvelle personne (la fenêtre ci-dessus). Les autres restent *candidats* dans l'onglet **Profil**, sous **Sources** (ses
    sous-onglets : **Parcours**, **Périodes** et **Sources** ; on modifie, purge ou supprime
    la personne au-dessus).
    Son **parcours** (son CV) s'y construit aussi : postes et diplômes, datés (une année,
@@ -464,23 +464,23 @@ plus anciennes à gauche (chaque année une colonne, pour que les trous se voien
 période dans le dossier sur fond turquoise), une ligne par sorte. Sa **carrière** (onglet Profil) : une ligne de son
 CV en barre le long de sa durée, au mois près quand ses dates le donnent (un poste actuel : jusqu'à aujourd'hui, en
 s'estompant), son nom au-dessus ; les **doctorants** qu'elle a encadrés, chacun en barre du début de la thèse à sa
-soutenance (en cours : jusqu'à aujourd'hui), le nom du doctorant au-dessus ; les barres qui se chevauchent l'une
+soutenance (en cours : jusqu'à aujourd'hui), le nom du doctorant au-dessus ; les **jurys de thèse** dont elle a fait partie (chacun un point à la soutenance, au mois près si on le connaît, sinon au milieu de son année, le nom du doctorant au-dessus, coloré selon son rôle : rapporteur, examinateur, président, comme le dit la légende ; au survol, son rôle, son titre, le doctorant et la date ; cliqué, dans les détails, avec un bouton vers l'onglet Thèses ; les thèses masquées laissées de côté) ; les barres qui se chevauchent l'une
 au-dessus de l'autre. Ses **extraits** dans le dossier, une ligne par catégorie principale (de la couleur de leur
-catégorie) : le début de leur texte au-dessus d'une fine barre le long de leurs années (une seule : celle-là) ; ses
-**articles** : une petite barre par année, aussi haute que leur nombre (leurs titres au survol). Au survol, une barre
+catégorie) : le début de leur texte au-dessus d'une fine barre le long de leurs années (une seule : celle-là ; depuis une année, sans fin : jusqu'à aujourd'hui, en s'estompant, comme un poste actuel ; un **événement ponctuel**, un interrupteur de sa fenêtre : un point au milieu de son année, sans jamais se prolonger ; **dans la période**, son autre interrupteur, pour un extrait sans date précise : le long de la période de la personne dans le dossier, ou de ses propres années s'il en a, en pointillé et plus clair, dit « dans la période (2020–2024) » dans les détails ; allumer l'un éteint l'autre ; sans années à lui, placé le long de la période, sauf si elle n'en a pas non plus, ce qui est signalé, listé parmi les extraits sans années ; la légende montre les deux aspects) ; ses
+**articles** : une petite barre par année, aussi haute que leur nombre, empilée aux couleurs de leurs rangs (au survol : leur nombre par rang, comme dans l'onglet Publications, par exemple « 9 articles en 2022 — 3 Q1, 2 Q2, 1 CORE A*, 3 non classés », et leurs titres ; cliquée : listés en dessous, chacun avec son rang, sa revue ou conférence et ses premiers auteurs, un PDF stocké s'ouvrant à côté de la page, sinon ses liens affichés). Au survol, une barre
 dit tout d'elle. Cliqué, ce qu'il est s'affiche sous la chronologie : une ligne de la carrière ou un doctorant, avec
 **Modifier** (sa fenêtre : la chronologie redessinée) et un bouton vers son onglet ; un extrait, ou une année (ses
-extraits), où un extrait cliqué est montré dans l'onglet Extraits (où ses années se modifient), son icône PDF ouvrant son
-PDF à côté de la page. L'extrait d'un article sans années est à l'année de l'article. La chronologie commence au plus
+extraits), où un extrait cliqué ouvre son PDF à côté de la page, à l'extrait (sélectionné là), la chronologie
+toujours affichée ; son crayon le modifie (sa fenêtre, comme dans l'onglet Extraits : ses années, ses marqueurs, son
+texte… ; la chronologie redessinée), son bouton liste le montre dans l'onglet Extraits. L'extrait d'un article sans années est à l'année de l'article. La chronologie commence au plus
 ancien de sa carrière, de ses thèses et de ses extraits (ses articles au plus trois ans avant ; les plus anciens
 comptés en dessous). Elle s'ouvre agrandie (des années deux fois plus larges que pour tenir dans la largeur), défilée
-jusqu'à sa période dans le dossier ; les loupes élargissent ou resserrent les années (le texte gardant sa taille),
-jusqu'à la chronologie entière dans la largeur. Chaque sorte s'affiche ou se masque par son interrupteur ; celle dont
+jusqu'à sa période dans le dossier ; son curseur élargit ou resserre les années dès qu'on le déplace (le texte gardant sa taille, le milieu restant en vue), de la chronologie entière dans la largeur à quatre fois plus large ; la chronologie garde l'endroit où elle est défilée quand on clique un élément ou qu'elle est redessinée. Chaque sorte s'affiche ou se masque par son interrupteur ; celle dont
 elle n'a aucun élément est signalée. Un extrait a son propre interrupteur (dans les détails en dessous, ou son bouton
 dans l'onglet Extraits) : éteint, il est laissé hors de la chronologie (toujours gardé), listé à part en dessous, où
-il se rallume. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à part, en dessous. La
+il se rallume. Les extraits se **filtrent** (les pastilles sous les interrupteurs) : par leurs marqueurs (saillant, rayonnement, mineur, bémol) et par leurs niveaux (ceux du dossier : local, national… ; un extrait sans niveau compte comme du niveau par défaut du dossier). Plusieurs pastilles d'une sorte : l'une d'elles ; les deux sortes : les deux ; aucune cochée : tous affichés. Les filtres s'appliquent à la chronologie, aux détails et aux listes en dessous ; le nombre d'extraits qu'ils masquent est indiqué, avec un bouton pour les effacer. Un dossier sans niveaux le signale à la place de leurs pastilles. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à part, en dessous. La
 chronologie prend toute la largeur : un PDF affiché à côté de la page est mis de côté pendant ce temps (toujours dans
-le bandeau du bas), et réaffiché en quittant l'onglet.
+le bandeau du bas ; celui ouvert depuis la chronologie s'affiche), et réaffiché en quittant l'onglet.
 
 Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre**, chaque dossier
 déplié montrant les dossiers qu'il contient puis ses personnes, une ligne chacune (sa période, ses étoiles, ses

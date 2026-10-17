@@ -8,12 +8,14 @@ from functools import partial
 from html import escape
 
 from fastapi.responses import RedirectResponse
-from nicegui import ui
+from nicegui import context, ui
 
 from .. import (
     annotations,
+    documents,
     folders,
     manual,
+    pdfs,
     persons,
     pubview,
     source_settings,
@@ -264,6 +266,7 @@ def _add_dialog(current: folders.FolderView | None) -> None:
             pid = persons.create(name.value, aff.value)
             if given:
                 set_orcid(pid, given)
+            period = None
             if current:
                 period = folders.add_person(
                     current.id, pid, int_or_none(start.value), int_or_none(end.value)
@@ -280,7 +283,7 @@ def _add_dialog(current: folders.FolderView | None) -> None:
             errors = await discover(pid, where.value or [])
             if dialog.is_deleted:
                 return
-            _candidates(pid, given, errors, found, buttons, dialog)
+            _candidates(pid, given, errors, found, buttons, dialog, period)
 
         name.on("keydown.enter", search)
         with buttons:
@@ -297,8 +300,10 @@ def _candidates(
     found: ui.column,
     buttons: ui.row,
     dialog: ui.dialog,
+    period: int | None = None,
 ) -> None:
-    """The profiles found for a new person, to tick (the likely ones are)."""
+    """The profiles found for a new person, to tick (the likely ones are); then (in a folder:
+    ``period``) their documents there, before their page."""
     links = sorted(
         (ln for ln in persons.load(pid).links if ln.status == "candidate"),
         key=lambda ln: (-ln.score, ln.source),
@@ -357,22 +362,130 @@ def _candidates(
                 ).format(n=len(chosen)),
                 type="positive",
             )
-        ui.navigate.to(urls.person_url(pid, tab=None if chosen else "sources"))
-        dialog.close()
+        _then(pid, period, None if chosen else "sources", found, buttons, dialog)
 
     buttons.clear()
     with buttons:
-        ui.button(_("Later, in the Sources tab"), on_click=lambda: _later(pid, dialog)).props(
-            "flat"
-        ).mark("add-person-later")
+        ui.button(
+            _("Later, in the Sources tab"),
+            on_click=lambda: _then(pid, period, "sources", found, buttons, dialog),
+        ).props("flat").mark("add-person-later")
         ui.button(_("Validate the ticked ones"), icon="check", on_click=done).mark(
             "add-person-validate"
         )
 
 
-def _later(pid: int, dialog: ui.dialog) -> None:
-    ui.navigate.to(urls.person_url(pid, tab="sources"))
-    dialog.close()
+def _then(
+    pid: int,
+    period: int | None,
+    tab: str | None,
+    found: ui.column,
+    buttons: ui.row,
+    dialog: ui.dialog,
+) -> None:
+    """Their sources chosen: their page (at ``tab``), but first, in a folder, their documents
+    there."""
+
+    def go() -> None:
+        ui.navigate.to(urls.person_url(pid, period, tab=tab))
+        dialog.close()
+
+    if period is None:
+        go()
+    else:
+        _documents_step(pid, period, found, buttons, go)
+
+
+def _documents_step(
+    pid: int, period: int, found: ui.column, buttons: ui.row, go: Callable[[], None]
+) -> None:
+    """A new person's documents within the folder (their application, CV…): PDFs dropped or
+    chosen, each listed, renamed or removed; then (or skipping it) their page (``go``)."""
+
+    @ui.refreshable
+    def listing() -> None:
+        docs = documents.of_person(pid).get(period, [])
+        if not docs:
+            ui.label(_("No document yet")).classes("text-sm text-grey").mark("add-person-no-doc")
+        for d in docs:
+            with (
+                ui.row().classes("w-full items-center gap-1 no-wrap").mark(f"add-person-doc-{d.id}")
+            ):
+                ui.icon("description", color="grey-8")
+
+                def rename(e, d=d) -> None:
+                    if (name := (e.sender.value or "").strip()) and name != d.name:
+                        documents.rename(d.id, name)
+                        d.name = name
+
+                ui.input(value=d.name).props("dense borderless").classes("grow").on(
+                    "blur", rename
+                ).on("keydown.enter", rename).tooltip(_("Its name (edit it to rename it)")).mark(
+                    f"add-person-doc-name-{d.id}"
+                )
+                ui.button(
+                    icon="delete", on_click=lambda d=d: (documents.remove(d.id), listing.refresh())
+                ).props("flat dense round size=sm color=negative").tooltip(_("Remove it")).mark(
+                    f"add-person-doc-remove-{d.id}"
+                )
+
+    async def upload(e) -> None:
+        try:
+            documents.add(period, e.file.name, await e.file.read())
+        except pdfs.PdfError as err:
+            ui.notify(f"{e.file.name}: {err}", type="warning")
+            return
+        listing.refresh()
+        skip.set_visibility(False)
+
+    found.clear()
+    with found:
+        ui.label(
+            _(
+                "Their documents in the folder (PDFs: an application, a CV…), to read beside "
+                "their page; or later, from their Report tab."
+            )
+        ).classes("text-sm")
+        picker = (
+            ui.upload(multiple=True, auto_upload=True, on_upload=upload)
+            .props('accept=".pdf,application/pdf"')
+            .classes("hidden")
+            .mark("add-person-upload")
+        )
+        files = "e.dataTransfer.types.includes('Files')"
+        with (
+            ui.column()
+            .classes("w-full items-center gap-1 p-4 rounded text-grey-8")
+            .style("border:2px dashed #bbb")
+            .on(
+                "dragover",
+                js_handler=f"(e) => {{ if ({files}) {{ e.preventDefault(); "
+                "e.currentTarget.style.borderColor = 'var(--q-primary)'; } }",
+            )
+            .on("dragleave", js_handler="(e) => e.currentTarget.style.borderColor = '#bbb'")
+            .on(
+                "drop",
+                js_handler="(e) => { e.currentTarget.style.borderColor = '#bbb'; "
+                f"if ({files}) {{ e.preventDefault(); getElement({picker.id})"
+                ".$refs.qRef.addFiles(e.dataTransfer.files); } }",
+            )
+            .mark("add-person-drop")
+        ):
+            ui.icon("upload_file", size="md")
+            ui.label(_("Drop PDF files here")).classes("text-sm")
+            ui.button(
+                _("Choose files"),
+                icon="folder_open",
+                on_click=lambda: picker.run_method("pickFiles"),
+            ).props("flat dense no-caps").mark("add-person-pick-files")
+        with ui.column().classes("w-full gap-0 max-h-[40vh] overflow-auto"):
+            listing()
+    buttons.clear()
+    with buttons:
+        skip = ui.button(_("Skip"), on_click=go).props("flat").mark("add-person-docs-skip")
+        ui.button(_("Continue to their page"), icon="arrow_forward", on_click=go).mark(
+            "add-person-docs-done"
+        )
 
 
 # ---- a folder: the tree, with the people --------------------------------------------------
@@ -452,10 +565,125 @@ def _tree(current: int, changed: Callable[[], None], view: dict) -> None:
         people=people,
         counts={f.id: len(f.members) for f in known.values()},
         person_dropped=person_dropped,
+        actions=lambda n: _add_people_button(known[n.id]),
     )
     ui.label(_("Each person has their own period in the folder (click it to set it).")).classes(
         "text-xs text-grey"
     )
+
+
+def _add_people_button(f: folders.FolderView) -> None:
+    """A folder's button (in the tree) adding people to it: see _people_dialog (not in the
+    tree, drawn again while syncing)."""
+
+    def open_() -> None:
+        with context.client.content:
+            _people_dialog(f)
+
+    ui.button(icon="person_add", on_click=open_).props(
+        "flat dense round size=sm color=primary"
+    ).classes("shrink-0").tooltip(_("Add people to “{folder}”").format(folder=f.name)).mark(
+        f"folder-people-{f.id}"
+    )
+
+
+def _people_dialog(f: folders.FolderView) -> None:
+    """People added to a folder: those already known, searched by name (or affiliation) as
+    typed, each added with the period and tags given (those in it already: said so); or a new
+    person (see _add_dialog). The folder shown again once closed, if some were added."""
+    members = {m.person_id for m in f.members}
+    added: list[int] = []
+    with transient_dialog(
+        _("Add people to “{folder}”").format(folder=f.name), width="w-[40rem] max-w-full"
+    ) as (dialog, _card):
+        query = (
+            ui.input(_("Search the people (name, affiliation)"))
+            .props("autofocus clearable dense outlined")
+            .classes("w-full")
+            .mark("folder-people-search")
+        )
+        with ui.row().classes("items-center gap-2 no-wrap w-full"):
+            ui.label(_("Period in the folder")).classes("text-sm")
+            start = (
+                ui.number(_("from"), format="%d")
+                .props("dense outlined")
+                .classes("w-24")
+                .mark("folder-people-start")
+            )
+            end = (
+                ui.number(_("to"), format="%d")
+                .props("dense outlined")
+                .classes("w-24")
+                .mark("folder-people-end")
+            )
+            tags = (
+                ui.select(
+                    folders.tags_of(f),
+                    value=[],
+                    label=_("Tags"),
+                    multiple=True,
+                    new_value_mode="add-unique",
+                    with_input=True,
+                )
+                .props("dense use-chips")
+                .classes("grow")
+                .mark("folder-people-tags")
+            )
+
+        def add(pid: int) -> None:
+            period = folders.add_person(f.id, pid, int_or_none(start.value), int_or_none(end.value))
+            if tags.value:
+                folders.set_tags(period, tags.value)
+            members.add(pid)
+            added.append(pid)
+            found.refresh()
+
+        @ui.refreshable
+        def found() -> None:
+            people = folders.find_people(query.value or "")
+            if not people:
+                ui.label(_("No one found: add them as a new person.")).classes(
+                    "text-sm text-grey"
+                ).mark("folder-people-none")
+            for pid, name, aff in people:
+                with (
+                    ui.row()
+                    .classes("w-full items-center gap-2 no-wrap")
+                    .mark(f"folder-people-row-{pid}")
+                ):
+                    ui.icon("person", color="grey-7")
+                    with ui.column().classes("gap-0 grow min-w-0"):
+                        ui.label(name).classes("text-sm font-medium")
+                        if aff:
+                            ui.label(aff).classes("text-xs text-grey ellipsis")
+                    if pid in members:
+                        ui.badge(
+                            _("added") if pid in added else _("in the folder"),
+                            color="positive" if pid in added else "grey",
+                        ).props("outline").mark(f"folder-people-in-{pid}")
+                    else:
+                        ui.button(_("Add"), icon="person_add", on_click=lambda p=pid: add(p)).props(
+                            "flat dense no-caps"
+                        ).mark(f"folder-people-add-{pid}")
+
+        with ui.column().classes("w-full gap-1 max-h-[50vh] overflow-auto"):
+            found()
+        query.on_value_change(found.refresh)
+
+        def new_person() -> None:
+            added.clear()  # (their page next: the folder not shown again)
+            close_then(dialog, lambda: _add_dialog(f))
+
+        # (closed: the folder shown again, with those added)
+        dialog.on_value_change(lambda e: None if e.value or not added else ui.navigate.reload())
+        with ui.row().classes("w-full items-center"):
+            ui.button(_("New person…"), icon="person_add_alt", on_click=new_person).props(
+                "flat"
+            ).tooltip(_("Not known yet: their name, then their sources searched")).mark(
+                "folder-people-new"
+            )
+            ui.space()
+            ui.button(_("Done"), on_click=dialog.close).mark("folder-people-done")
 
 
 def _add_people(f: folders.FolderView, indent: str) -> None:
