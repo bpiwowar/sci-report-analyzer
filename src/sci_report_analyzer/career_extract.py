@@ -1,17 +1,17 @@
-"""A person's career read by the LLM in their documents and profiles (see career.py): lines
-of a CV suggested, to be checked before being added.
+"""A person's career read by the LLM in their documents and profiles (see career.py): lines of
+a CV suggested, to be checked before being added.
 
 The documents are long (an application: tens of pages) and a local LLM slow with a long
-text, so only their pages likely about the career are sent (see career_words for the
-words, editable by language), chosen by the user (see pages): those headed as a CV
-(“Curriculum vitae”, “Parcours”…), whole; the others by the number of their lines with a
-year and a position or a diploma (those lines sent, with the lines around them); ticked
-first, the most likely, within BUDGET characters. They are read in parts (see batches): the
-pages following each other in a document together, up to PIECE characters; each part read
-apart (a structured output, as the data model: a position, or a diploma and its thesis;
-each with the words it comes from). The instructions (see prompt) can be changed, and
-saved. A line whose words are not in the text is marked unchecked; those already in the CV
-are left out."""
+text, so only their pages likely about the career are sent (see career_words for the words,
+editable by language), chosen by the user (see pages): those headed as a CV (“Curriculum
+vitae”, “Parcours”… a short line among their first ones), whole; the others by the number of
+their lines with a year and a position or a diploma (those lines sent, with the lines around
+them); ticked first, the most likely, within BUDGET characters. They are read in parts (see
+batches): the pages following each other in a document together, up to PIECE characters;
+each part read apart (a structured output, as the data model: a position, or a diploma and
+its thesis; each with the words it comes from). The instructions (see prompt) can be
+changed, and saved. A line whose words are not in the text is marked unchecked; those
+already in the CV are left out."""
 
 from __future__ import annotations
 
@@ -30,8 +30,8 @@ from .source_settings import active_links
 BUDGET = 6000  # (characters of the pages ticked first)
 PIECE = 6000  # (characters of a part, at most)
 AROUND = 2  # (lines kept around a line about the career)
-HEADING_LENGTH = 60  # (a heading: a short line)
-HEADING_LINES = 8  # (… or among the first lines of its page)
+HEADING_LENGTH = 60  # (a heading: a short line…)
+HEADING_LINES = 8  # (… among the first lines of its page)
 _PROMPT_SETTING = "career_prompt"
 
 _YEAR = re.compile(r"\b(19[5-9]\d|20[0-4]\d)\b")
@@ -174,8 +174,7 @@ def document_pages(name: str, lines: list[dict], doc_id: int | None = None) -> l
         folded = [career_words.normalize(t) for t in texts]
         whole = "\n".join(texts)
         if heading and any(
-            heading.match(t) and (i < HEADING_LINES or len(t) <= HEADING_LENGTH)
-            for i, t in enumerate(folded)
+            heading.match(t) and len(t) <= HEADING_LENGTH for t in folded[:HEADING_LINES]
         ):
             hits = sum(1 for t in folded if _YEAR.search(t))
             out.append(Page(doc_id, name, page, whole, "heading", hits))

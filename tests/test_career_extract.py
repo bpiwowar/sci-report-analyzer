@@ -67,6 +67,9 @@ def test_pages_ranked_and_words() -> None:
     # (a word with capitals: only with its case)
     cv = [_line(1, "CV"), _line(1, "x"), _line(2, "cv"), _line(2, "y")]
     assert [p.source for p in career_extract.passages("Dossier", cv)] == ["Dossier, p. 1"]
+    # (a heading among the first lines of a page only)
+    late = [_line(1, f"line {i}") for i in range(career_extract.HEADING_LINES)] + [_line(1, "CV")]
+    assert career_extract.passages("Dossier", late) == []
     words = career_words.words()
     words["en"]["positions"] = ["promot*"]
     words["fr"] = {g: [] for g in career_words.GROUPS}

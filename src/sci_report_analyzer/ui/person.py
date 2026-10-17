@@ -551,7 +551,7 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                 ).tooltip(_("Open it at this page"))
             if p.reason == "heading":
                 ui.badge(_("CV"), color="purple").props("outline").tooltip(
-                    _("Headed as a CV: sent whole")
+                    _("Headed as a CV (among its first lines): sent whole")
                 )
             elif p.reason == "lines":
                 ui.badge(

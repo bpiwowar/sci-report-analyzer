@@ -1304,11 +1304,11 @@ def career_words_section() -> Callable[[], dict[str, dict[str, list[str]]]]:
     ui.label(_("The pages sent")).classes("text-lg mt-4")
     ui.label(
         _(
-            "Only the pages likely about a career are sent to the model: those with a heading "
-            "below (whole), then those with the most lines having a year and a position or a "
-            "diploma. One word or phrase per line, without accents, nor case unless it has "
-            "capitals (CV: only in capitals); * for any letters (e.g. recrut*). The words of "
-            "every language are used together."
+            "Only the pages likely about a career are sent to the model: those with a heading"
+            " below among their first lines (whole), then those with the most lines having a "
+            "year and a position or a diploma. One word or phrase per line, without accents, "
+            "nor case unless it has capitals (CV: only in capitals); * for any letters (e.g. "
+            "recrut*). The words of every language are used together."
         )
     ).classes("text-sm text-grey-8 max-w-[48rem]")
     areas: dict[str, dict[str, ui.textarea]] = {}

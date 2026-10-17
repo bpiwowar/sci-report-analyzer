@@ -1,9 +1,9 @@
 """The words finding the passages of a person's documents about their career (see
-career_extract), by language, editable (Settings → Local LLM): headings (a page with one is
-sent whole), positions and diplomas (a line with one and a year is sent). One word or phrase
-per line, compared without accents, nor case unless it has capitals (``CV``: only in capitals);
-``*``: any letters (e.g. ``recrut*``). Those of every language are used together (a document
-may mix them)."""
+career_extract), by language, editable (Settings → Local LLM): headings (a page with one
+among its first lines is sent whole), positions and diplomas (a line with one and a year is
+sent). One word or phrase per line, compared without accents, nor case unless it has capitals
+(``CV``: only in capitals); ``*``: any letters (e.g. ``recrut*``). Those of every language
+are used together (a document may mix them)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .i18n import N_
 
 _SETTING = "career_words"
 GROUPS = {
-    "headings": N_("Headings (the page is sent whole)"),
+    "headings": N_("Headings (among the first lines of a page: sent whole)"),
     "positions": N_("Positions (a line with a year)"),
     "diplomas": N_("Diplomas (a line with a year)"),
 }
