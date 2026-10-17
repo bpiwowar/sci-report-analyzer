@@ -40,7 +40,9 @@ et des rapports, pour préparer une évaluation.
 Votre **adresse e-mail** (Paramètres → Clés d'API) est requise avant toute récupération : elle est envoyée
 aux sources (OpenAlex, Crossref et Unpaywall la demandent) afin qu'elles puissent vous contacter.
 
-Une **source principale** (Paramètres → Sources de publications ; un dossier peut en utiliser une autre, ou aucune, tout comme une personne dans un dossier, depuis ses périodes) décide
+Une **source principale** (Paramètres → Sources de publications ; un dossier peut en utiliser une autre, ou aucune,
+dans la section « Citations et sources » de ses réglages, tout comme une personne dans un dossier, depuis ses
+périodes) décide
 quels articles comptent : un article qu'elle ne liste pas pour la personne est exclu des rapports et de la
 synthèse, par exemple HAL, où les chercheurs du CNRS doivent déposer leurs articles. Le panneau les liste tous
 par défaut (un avertissement dit combien sont absents de HAL, chacun signalé) ; son filtre *tous / dans HAL /
@@ -219,27 +221,28 @@ Les **périodes** sont des intervalles d'années nommés (par exemple une pério
 **Étiquettes et notes** (détails d'un article, onglet « Étiquettes et notes ») : saisissez un nom pour créer une étiquette ; elle
 reste attachée à l'article. Les **listes étoilées** (★, par ex. « starred ») sont les listes ordonnées d'articles du
 dossier, posées dans la période de chaque personne : le bouton ★ met un article dans la première, les puces ★ des
-détails dans n'importe laquelle. Ce sont des réglages du dossier (l'onglet « Notes et citations » de sa fenêtre : leurs
-noms, le format de leurs numéros, si leurs articles sont à citer, leur ordre). Renommez et recolorez les étiquettes avec le
+détails dans n'importe laquelle. Ce sont des réglages du dossier (leur section « Citations et sources » : l'onglet
+« Paramètres » de la fenêtre du dossier, ou Paramètres → Réglages des dossiers ; leurs noms, le format de leurs
+numéros, si leurs articles sont à citer, leur ordre). Renommez et recolorez les étiquettes avec le
 bouton 🏷 ou dans Paramètres → Étiquettes et catégories. Chaque article a une **note** (Markdown),
 plus une note propre à la période sélectionnée. Le filtre « étiquettes » affiche les articles ayant l'une
-des étiquettes choisies ; le filtre des listes étoilées, à part (un bouton ★ par liste du dossier),
-ceux de l'une des listes activées : un article doit passer les deux. Pour écrire à
+des étiquettes choisies. L'onglet **Articles étoilés** de la personne montre chaque liste étoilée du dossier
+de la période, dans son ordre, avec son nombre d'articles (il suit la période du panneau). Pour écrire à
 leur sujet, utilisez l'éditeur de rapport (ci-dessous).
 
 **Étiqueter à partir d'une liste** (le bouton liste du panneau) : collez une liste de publications, par exemple la liste
 numérotée d'un rapport copiée depuis un PDF. Chaque élément est apparié à un article par son identifiant HAL ou son DOI, sinon
 par son titre (les auteurs et le canal qui l'entourent n'importent pas) ; vérifiez les correspondances, ajoutez les
 articles qui manquent aux sources (par l'identifiant HAL / DOI de l'élément, ou trouvés sur HAL), puis posez une étiquette sur ceux-ci, ou mettez-les
-dans une liste étoilée (★, dans la période) avec leurs **numéros** dans la liste. Filtrer sur cette liste
-affiche les articles dans son ordre (#3 sur leur puce), et la liste 🗒 les numérote et
+dans une liste étoilée (★, dans la période) avec leurs **numéros** dans la liste. L'onglet Articles
+étoilés affiche les articles de cette liste dans son ordre (#3 sur leur puce), et la liste 🗒 les numérote et
 se termine par les éléments non trouvés.
 
 **Numéros dans une liste étoilée** (la place d'un article dans celle-ci) : Alt-cliquez
 sur un numéro (`#3` à côté de la liste sur la ligne d'un article ; dans ses détails, où `#`
 s'affiche quand il n'en a pas, un simple clic aussi) pour le saisir (Entrée ou quitter le champ enregistre, Échap annule, vide
-le retire). Pour ordonner tous les articles d'une liste, filtrez sur celle-ci et cliquez sur
-le bouton liste numérotée à côté du filtre « étiquettes » : faites glisser les articles ou
+le retire). Pour ordonner tous les articles d'une liste, cliquez sur le bouton liste numérotée
+à côté de son nom dans l'onglet Articles étoilés : faites glisser les articles ou
 utilisez leurs flèches ↑ / ↓ (ils sont alors tous numérotés 1, 2… dans le nouvel ordre), saisissez
 un numéro, « Numéroter dans cet ordre » ou « Effacer les numéros ». Les articles sans numéro
 viennent après ceux numérotés (les plus récents d'abord), dans la liste comme dans les citations.
@@ -259,8 +262,8 @@ deux), et des modèles : `[@key]{.short-venue (.year)}` donne `EMNLP (2026)` (ch
 `.number` le numéro tel que sa liste étoilée l'écrit, `.index` le numéro seul comme dans
 `{**#.index**}`, `.title`, `.venue`, `.short-venue` l'acronyme, `.year`, `.tags`, `.notes` ;
 un crochet sans valeur est supprimé). Les modèles nommés (Paramètres → Modèles de citation,
-ou ceux du dossier) s'utilisent comme `.nom`. Les réglages du dossier (l'onglet
-« Notes et citations » de sa fenêtre) fixent ses listes étoilées : un article est numéroté dans la
+ou ceux du dossier) s'utilisent comme `.nom`. Les réglages du dossier (leur section
+« Citations et sources ») fixent ses listes étoilées : un article est numéroté dans la
 première où il est (dans son ordre, sinon par année). Chaque liste, et les articles seulement cités (d'aucune liste :
 numérotés à part, dans l'ordre de citation), a deux formats : sa **référence** (le numéro, par ex. `**#{index}**`, dans les
 références et comme `.number`) et sa **citation** (comment `[@key]` cite, par ex. `{(.number .short-venue, .year)}` ; vide :
@@ -279,12 +282,14 @@ comme citées (ou là où se trouve `[[references]]`, seul sur sa ligne : le men
 d'outils ; `[[references notes tags]]` : avec leurs notes, leurs étiquettes). Les blocs
 s'écrivent `[[nom]]` (autrefois `[]{.nom}`, toujours lu).
 
-**Modèles de rapport** (avec les catégories, dans les réglages des dossiers) : les textes dont un rapport part,
+**Modèles de rapport** (la section « Rapport » de chaque réglage des dossiers : Paramètres → Réglages des
+dossiers, ou l'onglet « Paramètres » de la fenêtre du dossier) : les textes dont un rapport part,
 ses titres, ses blocs (`[[publications]]`, `[[excerpts]]`, `[[cv]]`, `[[references]]`) et des
-consignes en commentaires (`%% … %%`, omis à l'affichage et à la copie) ; un est fourni. Le
-bouton 📄 de la barre d'outils des notes du dossier les fait partir de l'un
-d'eux (en demandant d'abord quand elles sont écrites), ou enregistre leur structure comme
-modèle (« Enregistrer comme modèle… » : leurs titres et leurs blocs, sans ce qui est écrit).
+consignes en commentaires (`%% … %%`, omis à l'affichage et à la copie) ; un est fourni. Les notes
+d'une personne dans un dossier partent vides : le bouton 📄 de la barre d'outils des notes du dossier les
+fait partir d'un modèle (en demandant d'abord quand elles sont écrites), ou enregistre leur structure comme
+modèle (« Enregistrer comme modèle… » : leurs titres et leurs blocs, sans ce qui est écrit). La même
+section fixe la langue des rapports (références, extraits, synthèse… ; par défaut, celle de l'interface).
 
 **Filtres de copie** : Maj+clic sur un bouton de copie (les notes, les extraits) copie via un
 filtre, en texte enrichi collé mis en forme dans un formulaire : ceux activés dans Paramètres →
@@ -358,8 +363,8 @@ les auteurs, le canal ou l'année). La note du document cite les articles de la 
 (`[@key]`, le bouton ❝ pour en choisir un, ceux du document en premier) ; son aperçu et sa copie
 les numérotent (« [1] », dans l'ordre de première citation), la copie se terminant par les références.
 
-**Catégories** (page du dossier : le bouton des catégories ; l'onglet Extraits de la personne ; ou l'onglet des
-catégories de la visionneuse) :
+**Catégories** (page du dossier : le bouton des catégories ; l'onglet Extraits de la personne ; l'onglet des
+catégories de la visionneuse ; ou la section « Catégories » des réglages du dossier, modifiée aussitôt) :
 l'arborescence ordonnée des catégories d'un dossier (par exemple une grille d'évaluation), que l'on fait glisser pour les ordonner et les imbriquer,
 chacune avec un identifiant facultatif (`#id`, pour les rapports : voir plus bas) ; une catégorie contenant des extraits (directement ou en dessous, de n'importe quelle personne du dossier)
 n'est supprimée qu'une fois ceux-ci déplacés vers une autre, choisie à ce moment-là. Dans le PDF d'un document (un rapport,
@@ -399,14 +404,14 @@ ceux d'une catégorie qui a un identifiant, ou la section Rayonnement ;
 `[[excerpts#id]]` insère ceux de la catégorie de cet identifiant (et en dessous ; ses
 sous-catégories en titres sous celui du bloc), alors omis de `[[excerpts]]`, par ex.
 `# Recherche` puis `[[excerpts#recherche]]`, et `# Autres activités` puis `[[excerpts]]`.
-Où vont les extraits de rayonnement, les réglages du dossier le disent (« Extraits de
-rayonnement ») : listés aussi dans la section Rayonnement (là où est `[[influence]]`, sinon à
+Où vont les extraits de rayonnement, les réglages du dossier le disent (leur section
+« Extraits » : « Extraits de rayonnement ») : listés aussi dans la section Rayonnement (là où est `[[influence]]`, sinon à
 la fin de `[[excerpts]]`), comme par défaut ; seulement là, sous des sous-sections au nom
 de leurs catégories (imbriquées comme elles, un niveau plus bas), retirés de leurs catégories
 (une catégorie restée vide disparaît) ; ou seulement dans leurs catégories, avec leur
 étiquette, par ex. changée en icône par les filtres de copie. Les extraits saillants, mineurs
 et les bémols ont toujours leur étiquette.
-Les réglages du dossier fixent l'étiquette de chaque marqueur (par défaut dans la langue de
+Les réglages du dossier (section « Extraits ») fixent l'étiquette de chaque marqueur (par défaut dans la langue de
 ses rapports : #saillant, #rayonnement, #mineur, #bemol ; en anglais #salient, #influence,
 #minor, #caveat) et
 si un extrait se déplace quand on le marque (« En premier », par défaut) : marqué, il passe en
@@ -449,19 +454,22 @@ repliés (aussi tous à la fois, avec les boutons au-dessus de l'arbre) et celui
 sur un dossier le sélectionne (déplié) : ses actions et son filtre par étiquette sont dans la barre au-dessus, qui
 reste en haut ; « Toutes les personnes (nettoyage) » liste chaque personne. Glissez un dossier sur un autre pour le mettre
 dedans (sur son haut ou son bas : à côté), ou sur « Déposer ici » pour le premier niveau. Le menu ⋮ de chaque
-dossier le renomme, ajoute un dossier dedans, le déplace (« Déplacer vers… ») et choisit ses réglages. Un dossier
-utilise les **réglages** du dossier où il est, ou les siens (une icône dans l'arbre) : tous, ses catégories, ses listes
-étoilées et les citations dans ses notes (les formats des numéros, ses modèles), ses modèles de rapport.
-Choisir ses propres réglages part d'une copie de ceux de son parent ; revenir à ceux de son parent supprime les
-siens (sauf si d'autres dossiers les utilisent), les extraits de ses personnes allant dans les catégories de mêmes
-noms (ajoutées si elles manquent), comme quand un dossier utilisant les réglages de son parent est déplacé.
-**Déplacer ses réglages vers…** donne les réglages qu'utilise un dossier à un dossier où il est (par exemple son
-parent, pour que tous les dossiers qu'il contient les partagent) : le dossier (et ceux entre les deux) utilise
-alors ceux de la cible, comme les dossiers qui utilisaient les anciens réglages de la cible (supprimés, sauf si
-d'autres les utilisent). **Copier ses réglages vers…** donne à n'importe quel autre dossier sa propre copie. Les
-deux nomment les dossiers dont les réglages changent avant de le faire, les extraits suivant comme ci-dessus. Un
-dossier mis au premier niveau garde les réglages qu'il utilisait ; les dialogues des catégories et des citations
-disent quand d'autres dossiers utilisent les mêmes.
+dossier le renomme, ajoute un dossier dedans, le déplace (« Déplacer vers… ») et choisit ses réglages (« Ses
+réglages… »). Les **réglages des dossiers** sont nommés, dans Paramètres → Réglages des dossiers. On les y crée
+(vides, ou copie d'autres), renomme, modifie, rend par défaut et supprime (une fois qu'aucun dossier ne les
+utilise et qu'aucun extrait n'est classé dans leurs catégories). Ils se modifient par sections, en onglets en
+haut (aussi l'onglet « Paramètres » de la fenêtre du dossier, son onglet « Dossier » donnant son nom, sa date, ses
+notes et les réglages qu'il utilise) : **Catégories** (leur arborescence, modifiée aussitôt), **Rapport** (les
+modèles de rapport, la langue des rapports), **Extraits** (les étiquettes des marqueurs et si un extrait marqué
+passe en premier, les niveaux, où vont les extraits de rayonnement), **Citations et sources** (la source
+principale, les listes étoilées, la façon dont les notes numérotent et citent les articles, les modèles de
+citation propres au dossier) et **Modèles (IA locale)** (un LLM et un modèle d'embeddings utilisés à la place de
+ceux par défaut ; vide : ceux par défaut). Chaque dossier utilise les réglages choisis dans sa fenêtre ou son
+menu (une icône dans l'arbre quand ce ne sont pas ceux par défaut), sinon ceux par défaut ; un dossier créé dans
+un autre part de son choix, et un dossier déplacé garde ses réglages. Choisir d'autres réglages classe les extraits
+de ses personnes dans les catégories de mêmes noms (ajoutées si elles manquent), leurs articles étoilés dans les
+listes étoilées de mêmes noms. Des réglages utilisés par plusieurs dossiers changent pour tous : les dialogues des
+catégories et des citations disent lesquels.
 
 **Catégories de coauteurs** (par exemple « Collaborateurs int. ») : cliquez sur le nom d'un coauteur dans les
 détails d'une publication pour le placer dans une catégorie (ou pour indiquer qu'il s'agit de la personne ou de l'un de
@@ -485,6 +493,32 @@ Les **thèses** (d'après theses.fr) affichent leur début et leur fin (soutenan
 thèses en cours, donc pour une thèse soutenue, c'est le début observé lorsqu'elle était en cours, sinon une
 estimation (3 ans avant la soutenance, marquée ≈). Elles suivent la période du panneau :
 encadrements qui la chevauchent, jurys dont la soutenance tombe dans la période.
+
+Les **paramètres** sont groupés (Sources, Canaux, Annotations, Rapports, IA, Données) dans une liste à gauche ;
+le champ de recherche au-dessus trouve un réglage par ses mots. Une page aux modifications non enregistrées est
+listée en dessous, avec ses Enregistrer / Annuler.
+
+**IA locale** (facultative : Paramètres → IA). Les informations personnelles sont confidentielles : seuls des
+modèles locaux sont utilisés, servis sur cette machine ou le réseau local (les autres serveurs sont refusés, les
+modèles cloud d'Ollama jamais listés ni utilisés). **LLM local (Ollama)** l'active, avec son serveur, le modèle
+général, s'il réfléchit avant de répondre (par défaut), et les **embeddings** (d'Ollama ou d'un serveur à l'API
+compatible OpenAI) qui suggèrent la catégorie d'un extrait (le plus proche des groupes d'extraits de chaque
+catégorie : combien de groupes au plus, combien d'extraits dans un groupe au moins ; « Entraîner », dans le
+sélecteur de catégorie, réapprend à partir des extraits classés). Chaque tâche a sa propre page, avec son modèle
+(le modèle général sauf si un autre est choisi ; un petit, 4–8B, suffit souvent, et est bien plus rapide), s'il
+réfléchit (« Par défaut » : non ; « Réfléchit » ; « Ne réfléchit pas ») et ses instructions (modifiées là ;
+« Instructions par défaut » les rétablit) :
+
+- **Lecture d'un parcours** : dans l'onglet Parcours d'une personne, « Lire dans ses documents », le LLM lit les
+  pages de ses documents qui portent sur un parcours (trouvées par les mots réglés là, dans chaque langue) et
+  suggère des lignes de son CV.
+- **Réécriture des extraits** : un nouvel extrait est reformulé (court, impersonnel, sans ses dates) et ses années
+  lues en lui et autour, proposé dans sa fenêtre, où son texte se modifie aussi tout de suite (la sélection gardée
+  comme son original). « Aucun (pas de réécriture) » : seulement ses années, trouvées autour.
+
+Quand le LLM est désactivé (ou qu'une tâche n'a pas de modèle, ou n'obtient pas de réponse valide), la page de la
+tâche et la fenêtre de l'extrait le disent, avec un lien pour l'activer. Les réglages d'un dossier peuvent
+utiliser d'autres modèles (leur section « Modèles (IA locale) »).
 
 Des **sauvegardes** de la base de données (pas des PDF) sont faites dans `backups/` à côté de celle-ci (Paramètres →
 Données et cache indique où) : une par jour au démarrage (les 7 dernières sont conservées), et une avant chaque mise à niveau de
