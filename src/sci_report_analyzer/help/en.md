@@ -39,7 +39,9 @@ and reports, to prepare an evaluation.
 Your **email** (Settings → API keys) is required before anything is fetched: it is sent to
 the sources (OpenAlex, Crossref and Unpaywall ask for it) so they can reach you.
 
-A **primary source** (Settings → Publication sources; a folder can use another one, or none, and so can a person in a folder, from their periods) decides
+A **primary source** (Settings → Publication sources; a folder can use another one, or none,
+in its settings' “Citations & sources” section, and so can a person in a folder, from their
+periods) decides
 which papers count: one it doesn't list for the person is left out of the reports and the
 summary, e.g. HAL, where CNRS researchers must deposit their papers. The panel lists them all
 by default (a warning says how many are not in HAL, each one marked); its filter *all / in
@@ -215,13 +217,13 @@ click it to open the page.
 **Tags & notes** (a paper's details, "Tags & notes" tab): type a name to create a tag; it
 sticks to the paper. The **star lists** (★, e.g. "starred") are the folder's ordered lists of
 papers, set within each person's period in it: the ★ button puts a paper in the first one,
-the details' ★ chips in any. They are the folder's settings (its dialog's “Settings” tab,
-or Settings → Folder settings: their names, their numbers' format, whether their papers are to be cited,
-their order). Rename and recolour tags with the 🏷 button or in Settings → Tags &
+the details' ★ chips in any. They are the folder's settings (their “Citations & sources”
+section: the folder dialog's “Settings” tab, or Settings → Folder settings; their names, their
+numbers' format, whether their papers are to be cited, their order). Rename and recolour tags with the 🏷 button or in Settings → Tags &
 categories. Each paper has a **note** (Markdown),
 plus a note within the selected period. The "tags" filter shows the papers having one of
-the chosen tags; the star list filter, apart from it (a ★ toggle per list of the folder),
-the papers in one of the lists turned on: a paper must pass both. To write
+the chosen tags. The person's **Starred papers** tab shows each star list of the period's
+folder, in its order, with its number of papers (following the panel's period). To write
 about them, use the report editor (below).
 
 **Tag from a list** (the panel's list button): paste a list of publications, e.g. a report's
@@ -229,13 +231,13 @@ numbered list copied from a PDF. Each item is matched with a paper by its HAL id
 by its title (the authors and venue around it do not matter); check the matches, add the
 papers the sources miss (by the item's HAL id / DOI, or found on HAL), then put a tag on
 them, or put them in a star list (★, within the period) with their **numbers** in the list.
-Filtering on that list shows the papers in its order (#3 on their chip), and the 🗒 listing
-numbers them and ends with the items not found.
+The Starred papers tab shows that list's papers in its order (#3 on their chip), and the 🗒
+listing numbers them and ends with the items not found.
 
 **Numbers in a star list** (a paper's place in it): Alt-click a number (`#3` next to the
 list on a paper's row; in its details, where `#` is shown when it has none, a plain click
-too) to type it (Enter or leaving it saves, Escape cancels, empty removes it). To order all the papers of a list, filter on it
-and click the numbered-list button next to the tags filter: drag the papers or use their ↑ / ↓
+too) to type it (Enter or leaving it saves, Escape cancels, empty removes it). To order all the papers of a list, click the
+numbered-list button next to its name in the Starred papers tab: drag the papers or use their ↑ / ↓
 arrows (they are then all numbered 1, 2… in the new order), type a number, “Number in this
 order” or “Clear the numbers”. Papers without a number come after the numbered ones (latest
 first), in the list as in the citations.
@@ -256,7 +258,7 @@ without brackets: `@a, @b{.notes}`), `@key` its title, venue, year and category,
 star list writes it, `.index` the bare number as in `{**#.index**}`, `.title`, `.venue`,
 `.short-venue` the acronym, `.year`, `.tags`, `.notes`; a bracket without a value is dropped).
 Named templates (Settings → Citation templates, or the folder's own) are used as `.name`.
-The folder's settings (its dialog's “Settings” tab) set its star lists: a paper
+The folder's settings (their “Citations & sources” section) set its star lists: a paper
 is numbered in the first one it is in (in its order, else by year). Each list, and the
 papers cited only (in no list: numbered apart, as first cited), has two formats: its
 **reference** (the number, e.g. `**#{index}**`, in the references and as `.number`) and its
@@ -276,13 +278,14 @@ substitutes the citations, followed by the references, numbered as cited (or whe
 with their notes, their tags). Blocks are written `[[name]]` (formerly `[]{.name}`, still
 read).
 
-**Report templates** (Settings → Report templates): the texts a report starts from, their
+**Report templates** (the “Report” section of each folder settings: Settings → Folder
+settings, or the folder dialog's “Settings” tab): the texts a report starts from, their
 headings, blocks (`[[publications]]`, `[[excerpts]]`, `[[cv]]`, `[[references]]`) and guidance as
-comments (`%% … %%`, left out when shown or copied); one is shipped. A folder's starting
-notes (its settings, Reports tab: “From a template”) are copied from one; the toolbar's 📄
-button of the folder notes starts them from one (asked first when they are written), or
-saves their structure as one (“Save as a template…”: their headings and blocks, what is
-written left out).
+comments (`%% … %%`, left out when shown or copied); one is shipped. A person's notes in a
+folder start empty: the toolbar's 📄 button of the folder notes starts them from a template
+(asked first when they are written), or saves their structure as one (“Save as a
+template…”: their headings and blocks, what is written left out). The same section sets the
+language of the reports (references, excerpts, summary…; by default, that of the interface).
 
 **Copy filters**: Shift+click on a copy button (the notes, the excerpts) copies through a
 filter, as rich text pasted formatted into a form: those enabled in Settings → Copy filters
@@ -358,8 +361,8 @@ authors, venue or year). The document's note cites the person's papers as report
 (`[@key]`, the ❝ button to pick one, those of the document first); its preview and copy
 number them (“[1]”, as first cited), the copy ending with the references.
 
-**Categories** (folder page: the category button; the person's Excerpts tab; or the viewer's
-categories tab): a
+**Categories** (folder page: the category button; the person's Excerpts tab; the viewer's
+categories tab; or the “Categories” section of the folder settings, changed at once): a
 folder's ordered tree of categories (e.g. an evaluation grid), dragged to order and nest
 them, each with an optional id (`#id`, for the reports: see below); one with excerpts (there or below, of anyone in the folder)
 is deleted once they are moved to another one, chosen then. In a document's PDF (a report,
@@ -396,12 +399,13 @@ the report's “Insert a block” menu inserts them, by category (the block `[[e
 date), those of a category with an id, or the Rayonnement section; `[[excerpts#id]]` inserts those of the category of that id (and below it; its
 subcategories as headings below the block's heading), then left out of `[[excerpts]]`, e.g.
 `# Research` then `[[excerpts#research]]`, and `# Other activities` then `[[excerpts]]`.
-Where the influence excerpts go, the folder's settings say (“Rayonnement excerpts”): also
+Where the influence excerpts go, the folder's settings say (their “Excerpts” section:
+“Rayonnement excerpts”): also
 listed in the Rayonnement section (where `[[influence]]` is, else at the end of
 `[[excerpts]]`), as by default; only there, under subsections named after their categories (nested as these, one
 level below), taken out of their categories, one left empty being left out; or only in their
 categories, tagged #influence, e.g. turned into an icon by the copy filters. The salient,
-minor and caveat excerpts are always tagged. The folder's settings set each marker's tag (by
+minor and caveat excerpts are always tagged. The folder's settings (“Excerpts” section) set each marker's tag (by
 default in the language of its reports: #salient, #influence, #minor, #caveat; in French
 #saillant, #rayonnement, #mineur, #bemol) and whether an excerpt moves when marked (“First”, by
 default): marked, it moves to the top of its category, among those marked so (salient ones
@@ -445,11 +449,17 @@ selected are remembered. A click on a folder selects it (expanded): its actions 
 filter are in the bar above, staying on top; "All people (cleanup)" lists every person. Drag a folder onto another one to
 put it within it (onto its top or bottom: next to it), or onto "Drop here" for the top level.
 Each folder's ⋮ menu renames it, adds a folder within it, moves it ("Move to…") and chooses
-its settings. The **folder settings** are named, in Settings → Folder settings: their
-categories, their star lists and the citations in the notes (the number formats, the
-templates), the report templates, the language of the reports, the primary source… There they
-are created (empty, or a copy of others), renamed, edited, made the default, and deleted
-(once no folder uses them and no excerpt is filed in their categories). Each folder uses the
+its settings ("Its settings…"). The **folder settings** are named, in Settings → Folder
+settings. There they are created (empty, or a copy of others), renamed, edited, made the
+default, and deleted (once no folder uses them and no excerpt is filed in their categories).
+They are edited in sections, in tabs atop (also the folder dialog's “Settings” tab, its
+“Folder” tab giving its name, date, notes and the settings it uses):
+**Categories** (their tree, changed at once), **Report** (the report templates, the language
+of the reports), **Excerpts** (the markers' tags and whether a marked excerpt comes first,
+the levels, where the rayonnement excerpts go), **Citations & sources** (the primary source,
+the star lists, how the notes number and cite the papers, the folder's own citation
+templates) and **Models (local AI)** (an LLM and an embedding model used instead of the
+default ones; blank: the default). Each folder uses the
 settings chosen in its dialog or its menu (an icon in the tree when not the default ones),
 else the default ones; a folder made within another one starts with its choice, and a folder
 moved keeps its settings. Choosing other settings files its people's excerpts in the
@@ -479,6 +489,34 @@ last three authors).
 theses in progress only, so for a defended one it is the start seen while in progress, else
 estimated (3 years before the defence, marked ≈). They follow the panel's period:
 supervision overlapping it, juries with the defence within it.
+
+**Settings** are grouped (Sources, Venues, Annotations, Reports, AI, Data) in a list on the
+left; the search box above it finds a setting by its words. A page with unsaved changes is
+listed below them, with its Save / Cancel.
+
+**Local AI** (optional: Settings → AI). Personal information is confidential: only local
+models are used, served on this machine or the local network (other servers are refused,
+Ollama's cloud models never listed nor used). **Local LLM (Ollama)** turns it on, with its
+server, the general model, whether it thinks before answering (by default), and the
+**embeddings** (from Ollama or an OpenAI-compatible server) suggesting an excerpt's category
+(the closest of each category's clusters of excerpts: how many clusters at most, how many
+excerpts in one at least; the category picker's “Train” learns again from the excerpts
+filed). Each task has its own page, with its model (the general one unless another is
+chosen; a small one, 4–8B, is often enough, and much faster), whether it thinks (“Default”:
+it doesn't; “Thinks”; “Doesn't think”) and its instructions (edited there; “Default instructions”
+brings them back):
+
+- **Reading a career**: on a person's Career tab, “Read in their documents”, the LLM reads
+  the pages of their documents about a career (found by the words set there, in each
+  language) and suggests lines of their CV.
+- **Rewriting the excerpts**: a new excerpt is reworded (short, impersonal, without its
+  dates) and its years read in it and around it, proposed in its dialog, where its text can
+  also be edited at once (the selection kept as its original). “None (no rewriting)”: only
+  its years, found around it.
+
+When the LLM is off (or a task has no model, or gets no valid answer), the task's page and
+the excerpt dialog say so, with a link to turn it on. A folder's settings can use other
+models (their “Models (local AI)” section).
 
 **Backups** of the database (not of the PDFs) are made in `backups/` next to it (Settings →
 Data & cache shows where): one a day at startup (the last 7 kept), and one before each upgrade of
