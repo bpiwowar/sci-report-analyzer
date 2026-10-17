@@ -1603,6 +1603,72 @@ def llm_off_note(st: llm.OllamaSettings) -> None:
         ui.link(_("Turn it on"), "/settings?tab=llm").classes("text-sm").mark("llm-off-link")
 
 
+def task_model_section(
+    task: str, current: str, none: str | None = None
+) -> Callable[[], tuple[str, str]]:
+    """The model of an LLM task (blank: the general one; ``none``: the label of no model at all,
+    if allowed) and whether it thinks (blank: its default, see llm.TASK_THINK); returns
+    their values (see save_task_think)."""
+    st = llm.settings()
+    fixed = {
+        "": _("The general model ({model})").format(model=st.model or _("none")),
+        **({llm.NONE: none} if none else {}),
+    }
+
+    def options(models: list[str]) -> dict[str, str]:
+        kept = [current] if current and current not in fixed else []
+        return {**fixed, **{m: m for m in sorted({*models, *kept})}}
+
+    model = (
+        ui.select(options([]), value=current if current in options([]) else "", label=_("Model"))
+        .props("options-dense")
+        .classes("w-[32rem]")
+        .tooltip(_("A small model (e.g. 4–8B) is often enough, and much faster"))
+        .mark(f"llm-task-{task}")
+    )
+    ui.label(suggested(task)).classes("text-xs text-grey-8 max-w-[48rem]").mark(
+        f"llm-suggested-{task}"
+    )
+    default_think = llm.TASK_THINK.get(task, st.think)
+    think = (
+        ui.toggle(
+            {
+                "": _("Default ({choice})").format(
+                    choice=_("thinks") if default_think else _("doesn't think")
+                ),
+                "on": _("Thinks"),
+                "off": _("Doesn't think"),
+            },
+            value={True: "on", False: "off"}.get(st.task_think.get(task), ""),
+        )
+        .props("dense no-caps")
+        .tooltip(
+            _(
+                "Whether a reasoning model (e.g. qwen3) thinks before answering: much slower, "
+                "rarely better to read facts in a text"
+            )
+        )
+        .mark(f"llm-task-{task}-think")
+    )
+
+    async def load() -> None:
+        try:
+            models = await llm.list_models(st.url)
+        except Exception:
+            return  # (the server not running: the model as saved)
+        model.set_options(options(models), value=model.value)
+
+    ui.timer(0.1, load, once=True)
+    return lambda: (model.value or "", think.value or "")
+
+
+def save_task_think(stored: llm.OllamaSettings, task: str, thinking: str) -> None:
+    """Whether a task's model thinks ("on", "off"; blank: its default), in ``stored``."""
+    stored.task_think = {k: v for k, v in stored.task_think.items() if k != task}
+    if thinking:
+        stored.task_think[task] = thinking == "on"
+
+
 def rewrite_tab() -> None:
     """Rewriting the new excerpts with the LLM (see excerpt_rewrite): its model."""
     st = llm.stored_settings()
@@ -1615,50 +1681,20 @@ def rewrite_tab() -> None:
             "found around it."
         )
     ).classes("text-sm text-grey-8 max-w-[48rem]")
-    none = {
-        "": _("The general model ({model})").format(model=st.model or _("none")),
-        llm.NONE: _("None (no rewriting)"),
-    }
-
-    def rewrite_options(models: list[str]) -> dict[str, str]:
-        chosen = st.rewrite_model if st.rewrite_model and st.rewrite_model != llm.NONE else ""
-        return {**none, **{m: m for m in sorted({*models, *([chosen] if chosen else [])})}}
-
-    rewrite_model = (
-        ui.select(
-            rewrite_options([]),
-            value=st.rewrite_model,
-            label=_("Model rewriting the excerpts"),
-        )
-        .classes("w-[32rem]")
-        .mark("llm-rewrite-model")
-    )
+    task_values = task_model_section("rewrite", st.rewrite_model, _("None (no rewriting)"))
     ui.label(
         _("(or set the {env} environment variable)").format(env=llm.REWRITE_MODEL_ENV)
     ).classes("text-xs text-grey")
-    ui.label(suggested("rewrite")).classes("text-xs text-grey-8 max-w-[48rem]").mark(
-        "llm-suggested-rewrite"
-    )
-
-    async def load() -> None:
-        try:
-            models = await llm.list_models(llm.settings().url)
-        except Exception:
-            return  # (the server not running: the model as saved)
-        rewrite_model.set_options(rewrite_options(models), value=rewrite_model.value)
-
-    ui.timer(0.1, load, once=True)
-
-    def values() -> str:
-        return rewrite_model.value or ""
 
     def save() -> None:
+        chosen, thinking = task_values()
         stored = llm.stored_settings()
-        stored.rewrite_model = values()
+        stored.rewrite_model = chosen
+        save_task_think(stored, "rewrite", thinking)
         llm.save_settings(stored)
         ui.notify(_("Saved"), type="positive")
 
-    save = unsaved.track(values, save)
+    save = unsaved.track(task_values, save)
     with ui.row().classes("gap-2"):
         unsaved.cancel_button()
         ui.button(_("Save"), on_click=save).mark("rewrite-save")
@@ -1676,53 +1712,7 @@ def career_tab() -> None:
             "pages of their documents about a career, and suggests lines of their CV."
         )
     ).classes("text-sm text-grey-8 max-w-[48rem]")
-    task_model = (
-        ui.select(
-            [st.tasks["career"]] if st.tasks.get("career") else [],
-            value=st.tasks.get("career") or None,
-            label=_("Model (blank: the default one, {model})").format(model=st.model or _("none")),
-            clearable=True,
-            with_input=True,
-            new_value_mode="add-unique",
-        )
-        .classes("w-[32rem]")
-        .tooltip(_("A small model (e.g. 4–8B) is often enough, and much faster"))
-        .mark("llm-task-career")
-    )
-    ui.label(suggested("career")).classes("text-xs text-grey-8 max-w-[48rem]").mark(
-        "llm-suggested-career"
-    )
-    default_think = llm.TASK_THINK.get("career", st.think)
-    think = (
-        ui.toggle(
-            {
-                "": _("Default ({choice})").format(
-                    choice=_("thinks") if default_think else _("doesn't think")
-                ),
-                "on": _("Thinks"),
-                "off": _("Doesn't think"),
-            },
-            value={True: "on", False: "off"}.get(st.task_think.get("career"), ""),
-        )
-        .props("dense no-caps")
-        .tooltip(
-            _(
-                "Whether a reasoning model (e.g. qwen3) thinks before answering: much slower, "
-                "rarely better to read facts in a text"
-            )
-        )
-        .mark("llm-task-career-think")
-    )
-
-    async def load() -> None:
-        try:
-            models = await llm.list_models(st.url)
-        except Exception:
-            return  # (the server not running: the model as saved)
-        value = task_model.value
-        task_model.set_options(sorted({*models, *([value] if value else [])}), value=value)
-
-    ui.timer(0.1, load, once=True)
+    task_values = task_model_section("career", st.tasks.get("career", ""))
     ui.label(_("Instructions ({name}: the person's name)")).classes("text-sm text-grey-8 mt-2")
     instructions = (
         ui.textarea(value=career_extract.prompt())
@@ -1738,16 +1728,14 @@ def career_tab() -> None:
     words_value = career_words_section()
 
     def values() -> tuple[str, str, dict, str]:
-        return task_model.value or "", think.value or "", words_value(), instructions.value or ""
+        return *task_values(), words_value(), instructions.value or ""
 
     def save() -> None:
         chosen, thinking, words, prompt = values()
         stored = llm.stored_settings()
         stored.tasks = {**stored.tasks, "career": chosen}
         stored.tasks = {k: v for k, v in stored.tasks.items() if v}
-        stored.task_think = {k: v for k, v in stored.task_think.items() if k != "career"}
-        if thinking:
-            stored.task_think["career"] = thinking == "on"
+        save_task_think(stored, "career", thinking)
         llm.save_settings(stored)
         career_words.save_words(words)
         career_extract.save_prompt(prompt)

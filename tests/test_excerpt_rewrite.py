@@ -151,14 +151,16 @@ async def test_settings_page(user: User, model) -> None:
     """Settings → Rewriting the excerpts: its model, among the server's (none; by default, the
     general one); the local LLM off: said."""
     await user.open("/settings?tab=rewrite")
-    await user.should_see(marker="llm-rewrite-model")
-    select = user.find(marker="llm-rewrite-model").elements.pop()
+    await user.should_see(marker="llm-task-rewrite")
+    select = user.find(marker="llm-task-rewrite").elements.pop()
     assert select.value == "gemma3:4b" and llm.NONE in select.options and "" in select.options
     select.value = llm.NONE
     await user.should_not_see(marker="llm-off-link")
+    user.find(marker="llm-task-rewrite-think").elements.pop().value = "on"
     user.find(marker="rewrite-save").click()
     await user.should_see("Saved")
     assert llm.stored_settings().rewrite_model == llm.NONE and llm.rewrite_model() == ""
+    assert llm.stored_settings().task_think == {"rewrite": True}
     llm.save_settings(llm.OllamaSettings(enabled=False))
     await user.open("/settings?tab=rewrite")
     await user.should_see(marker="llm-off-link")
