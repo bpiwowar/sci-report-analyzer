@@ -2179,6 +2179,17 @@ class _ExcerptsSection:
                                 self.discard,
                             ),
                             (
+                                "timeline",
+                                "timeline" if not lead.in_timeline else "visibility_off",
+                                _("Put it back on the timeline")
+                                if not lead.in_timeline
+                                else _(
+                                    "Leave it out of the timeline (the Timeline tab): still "
+                                    "kept, and listed there apart"
+                                ),
+                                self.timeline_switch,
+                            ),
+                            (
                                 "merge",
                                 "call_merge",
                                 _(
@@ -2212,6 +2223,10 @@ class _ExcerptsSection:
 
     def discard(self, x: categories.ExcerptView) -> None:
         categories.set_discarded(x.id, not x.discarded)
+        self.side.refresh_excerpts()
+
+    def timeline_switch(self, x: categories.ExcerptView) -> None:
+        categories.set_in_timeline(x.id, not x.in_timeline)
         self.side.refresh_excerpts()
 
     def split(self, x: categories.ExcerptView) -> None:

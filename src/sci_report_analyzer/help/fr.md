@@ -476,8 +476,11 @@ ancien de sa carrière, de ses thèses et de ses extraits (ses articles au plus 
 comptés en dessous). Elle s'ouvre agrandie (des années deux fois plus larges que pour tenir dans la largeur), défilée
 jusqu'à sa période dans le dossier ; les loupes élargissent ou resserrent les années (le texte gardant sa taille),
 jusqu'à la chronologie entière dans la largeur. Chaque sorte s'affiche ou se masque par son interrupteur ; celle dont
-elle n'a aucun élément est signalée. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à
-part, en dessous.
+elle n'a aucun élément est signalée. Un extrait a son propre interrupteur (dans les détails en dessous, ou son bouton
+dans l'onglet Extraits) : éteint, il est laissé hors de la chronologie (toujours gardé), listé à part en dessous, où
+il se rallume. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à part, en dessous. La
+chronologie prend toute la largeur : un PDF affiché à côté de la page est mis de côté pendant ce temps (toujours dans
+le bandeau du bas), et réaffiché en quittant l'onglet.
 
 Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre**, chaque dossier
 déplié montrant les dossiers qu'il contient puis ses personnes, une ligne chacune (sa période, ses étoiles, ses
