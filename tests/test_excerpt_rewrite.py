@@ -157,10 +157,28 @@ async def test_settings_page(user: User, model) -> None:
     select.value = llm.NONE
     await user.should_not_see(marker="llm-off-link")
     user.find(marker="llm-task-rewrite-think").elements.pop().value = "on"
+    user.find(marker="rewrite-prompt").elements.pop().value = "Mine: {text}"
     user.find(marker="rewrite-save").click()
     await user.should_see("Saved")
     assert llm.stored_settings().rewrite_model == llm.NONE and llm.rewrite_model() == ""
     assert llm.stored_settings().task_think == {"rewrite": True}
+    assert excerpt_rewrite.prompt() == "Mine: {text}"
+    excerpt_rewrite.save_prompt("")
+    assert excerpt_rewrite.prompt() == excerpt_rewrite.PROMPT
     llm.save_settings(llm.OllamaSettings(enabled=False))
     await user.open("/settings?tab=rewrite")
     await user.should_see(marker="llm-off-link")
+
+
+def test_edited_instructions() -> None:
+    """The instructions edited: sent; not a valid template (braces of their own): the default
+    ones."""
+    excerpt_rewrite.save_prompt("Rewrite {text} (around: {before} / {after})")
+    try:
+        [m] = excerpt_rewrite.messages("Led X", "In 2020,", "and Y.")
+        assert m["content"] == "Rewrite Led X (around: In 2020, / and Y.)"
+        excerpt_rewrite.save_prompt('Rewrite {passage} as {"json": 1}')
+        [m] = excerpt_rewrite.messages("Led X", "", "")
+        assert m["content"].startswith("You rewrite a passage") and "Led X" in m["content"]
+    finally:
+        excerpt_rewrite.save_prompt("")

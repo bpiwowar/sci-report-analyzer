@@ -16,6 +16,7 @@ from .. import (
     config,
     contribution,
     datadir,
+    excerpt_rewrite,
     i18n,
     keys,
     llm,
@@ -1662,6 +1663,24 @@ def task_model_section(
     return lambda: (model.value or "", think.value or "")
 
 
+def prompt_section(task: str, current: str, default: str, label: str) -> ui.textarea:
+    """The instructions of an LLM task, to edit (``label``: with their placeholders), with a
+    button bringing back the ``default`` ones."""
+    ui.label(label).classes("text-sm text-grey-8 mt-2")
+    area = (
+        ui.textarea(value=current)
+        .props("outlined autogrow input-class=text-xs")
+        .classes("w-full max-w-[48rem] font-mono")
+        .mark(f"{task}-prompt")
+    )
+    ui.button(
+        _("Default instructions"),
+        icon="restart_alt",
+        on_click=lambda: area.set_value(default),
+    ).props("flat dense no-caps").mark(f"{task}-prompt-default")
+    return area
+
+
 def save_task_think(stored: llm.OllamaSettings, task: str, thinking: str) -> None:
     """Whether a task's model thinks ("on", "off"; blank: its default), in ``stored``."""
     stored.task_think = {k: v for k, v in stored.task_think.items() if k != task}
@@ -1685,16 +1704,26 @@ def rewrite_tab() -> None:
     ui.label(
         _("(or set the {env} environment variable)").format(env=llm.REWRITE_MODEL_ENV)
     ).classes("text-xs text-grey")
+    instructions = prompt_section(
+        "rewrite",
+        excerpt_rewrite.prompt(),
+        excerpt_rewrite.PROMPT,
+        _("Instructions ({text}: the passage selected; {before}, {after}: the text around it)"),
+    )
+
+    def values() -> tuple[str, str, str]:
+        return *task_values(), instructions.value or ""
 
     def save() -> None:
-        chosen, thinking = task_values()
+        chosen, thinking, prompt = values()
         stored = llm.stored_settings()
         stored.rewrite_model = chosen
         save_task_think(stored, "rewrite", thinking)
         llm.save_settings(stored)
+        excerpt_rewrite.save_prompt(prompt)
         ui.notify(_("Saved"), type="positive")
 
-    save = unsaved.track(task_values, save)
+    save = unsaved.track(values, save)
     with ui.row().classes("gap-2"):
         unsaved.cancel_button()
         ui.button(_("Save"), on_click=save).mark("rewrite-save")
@@ -1713,18 +1742,12 @@ def career_tab() -> None:
         )
     ).classes("text-sm text-grey-8 max-w-[48rem]")
     task_values = task_model_section("career", st.tasks.get("career", ""))
-    ui.label(_("Instructions ({name}: the person's name)")).classes("text-sm text-grey-8 mt-2")
-    instructions = (
-        ui.textarea(value=career_extract.prompt())
-        .props("outlined autogrow input-class=text-xs")
-        .classes("w-full max-w-[48rem] font-mono")
-        .mark("career-prompt")
+    instructions = prompt_section(
+        "career",
+        career_extract.prompt(),
+        career_extract.PROMPT,
+        _("Instructions ({name}: the person's name)"),
     )
-    ui.button(
-        _("Default instructions"),
-        icon="restart_alt",
-        on_click=lambda: instructions.set_value(career_extract.PROMPT),
-    ).props("flat dense no-caps").mark("career-prompt-default")
     words_value = career_words_section()
 
     def values() -> tuple[str, str, dict, str]:

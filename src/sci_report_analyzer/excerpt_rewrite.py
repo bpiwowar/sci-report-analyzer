@@ -46,7 +46,11 @@ Answer in JSON:
 impersonal entry in the passage's own language: no first person ("I", "je", "j'ai été"…), \
 no dates or years, its facts kept (names, roles, places), nothing added; e.g. \
 "j'ai été membre du comité de direction de X" → "Membre du comité de direction de X", \
-"I was the chair of the Y committee" → "Chair of the Y committee".
+"I was the chair of the Y committee" → "Chair of the Y committee". The most important \
+information first: what it is and its kind, then the details; e.g. a project: its type or \
+funding first, "Projet ANR Quokka (coordinateur)" rather than "Coordinateur du projet \
+Quokka financé par l'ANR", "ERC Starting Grant Wombat" rather than "Wombat, a project \
+funded by an ERC Starting Grant".
 - "start_year", "end_year": the years the passage is about, read in it, else in the text \
 around it when it applies to the passage (e.g. "Between 2019 and 2021, I was A and B", \
 A selected: 2019 and 2021); null if unknown. A single year: both the same.
@@ -60,9 +64,25 @@ def context_window(before: str, after: str, lines: int = CONTEXT_LINES) -> tuple
     return "\n".join(before.split("\n")[-lines - 1 :]), "\n".join(after.split("\n")[: lines + 1])
 
 
+def prompt() -> str:
+    """The instructions sent (those saved, else PROMPT); ``{text}``: the passage selected,
+    ``{before}``, ``{after}``: the text around it."""
+    return llm.prompt("rewrite", PROMPT)
+
+
+def save_prompt(text: str) -> None:
+    """(blank or the default one: following the default)"""
+    llm.save_prompt("rewrite", PROMPT, text)
+
+
 def messages(text: str, before: str, after: str) -> list[dict[str, str]]:
     before, after = context_window(before, after)
-    content = PROMPT.format(text=text.strip(), before=before.strip(), after=after.strip())
+    values = {"text": text.strip(), "before": before.strip(), "after": after.strip()}
+    try:
+        content = prompt().format(**values)
+    except (KeyError, IndexError, ValueError):  # (instructions edited: braces of their own)
+        logger.warning("The rewriting instructions are not a valid template: the default ones")
+        content = PROMPT.format(**values)
     return [{"role": "user", "content": content}]
 
 

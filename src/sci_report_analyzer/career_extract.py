@@ -22,7 +22,6 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 
 from . import career, career_words, documents, llm
-from .db.app_settings import delete_setting, get_setting, set_setting
 from .db.models import Period, Person, SourceLink
 from .db.session import session_scope
 from .source_settings import active_links
@@ -32,7 +31,6 @@ PIECE = 6000  # (characters of a part, at most)
 AROUND = 2  # (lines kept around a line about the career)
 HEADING_LENGTH = 60  # (a heading: a short line…)
 HEADING_LINES = 8  # (… among the first lines of its page)
-_PROMPT_SETTING = "career_prompt"
 
 _YEAR = re.compile(r"\b(19[5-9]\d|20[0-4]\d)\b")
 
@@ -95,18 +93,12 @@ Answer with an empty list if the excerpts tell nothing of the kind."""
 
 def prompt() -> str:
     """The instructions sent (those saved, else PROMPT); ``{name}``: the person's name."""
-    try:
-        return get_setting(_PROMPT_SETTING) or PROMPT
-    except Exception:  # (no database: e.g. in unit tests)
-        return PROMPT
+    return llm.prompt("career", PROMPT)
 
 
 def save_prompt(text: str) -> None:
     """(blank or the default one: following the default)"""
-    if not text.strip() or text.strip() == PROMPT.strip():
-        delete_setting(_PROMPT_SETTING)
-    else:
-        set_setting(_PROMPT_SETTING, text)
+    llm.save_prompt("career", PROMPT, text)
 
 
 @dataclass

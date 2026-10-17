@@ -26,7 +26,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from .db.app_settings import get_setting, set_setting
+from .db.app_settings import delete_setting, get_setting, set_setting
 from .i18n import N_
 
 DEFAULT_URL = "http://localhost:11434"
@@ -201,6 +201,22 @@ def model(folder_id: int | None = None, task: str | None = None) -> str:
         return ""
     chosen = folder_models(folder_id)[0] or st.tasks.get(task or "", "") or st.model
     return "" if is_cloud(chosen) else chosen
+
+
+def prompt(task: str, default: str) -> str:
+    """The instructions of a task (those saved, else ``default``)."""
+    try:
+        return get_setting(f"{task}_prompt") or default
+    except Exception:  # (no database: e.g. in unit tests)
+        return default
+
+
+def save_prompt(task: str, default: str, text: str) -> None:
+    """A task's instructions (blank or ``default``: following the default)."""
+    if not text.strip() or text.strip() == default.strip():
+        delete_setting(f"{task}_prompt")
+    else:
+        set_setting(f"{task}_prompt", text)
 
 
 def rewrite_model() -> str:
