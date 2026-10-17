@@ -335,6 +335,44 @@ async def test_extract_dialog(user: User, answering, monkeypatch) -> None:
     assert career_extract.prompt() == career_extract.PROMPT
 
 
+async def test_extract_selection(user: User, answering, fake_viewer) -> None:
+    """The text selected in a document's viewer (V): read at once, alone."""
+    pid, doc, _letters = _person_with_document()
+    selection = {
+        "text": "In 2016, I was recruited as an associate professor at Quokka University.",
+        "p": 2,
+        "rects": [[72, 100, 300, 110, 2]],
+    }
+    user.javascript_rules[re.compile(r"vrPdf\.selection\(\)")] = lambda _: selection
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="doc-papers")
+    await user.should_not_see(marker="pdf-career")  # (no LLM)
+    llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3"))
+    try:
+        await user.open(f"/doc/{doc}")
+        user.find(marker="pdf-career").click()
+        await user.should_see(marker="career-extract-add")
+        [chat] = answering
+        assert chat[1]["content"] == f"[Application, p. 2]\n{selection['text']}"  # (no profile)
+        await user.should_see("Quokka University")
+        user.find(marker="career-extract-add").click()
+        await user.should_see("1 line added to the career")
+        assert [e.title for e in career.entries(pid)] == ["Associate professor"]
+        # (again, back: the instructions, to read it again; no pages to choose)
+        user.find(marker="pdf-career").click()
+        await user.should_see(marker="career-extract-back")
+        user.find(marker="career-extract-back").click()
+        await user.should_see(marker="career-extract-read")
+        await user.should_not_see(marker="career-extract-back-pages")
+        # Nothing selected: said so.
+        selection["text"] = ""
+        await user.open(f"/doc/{doc}")
+        user.find(marker="pdf-career").click()
+        await user.should_see("Select the text (or an area over it) in the PDF first")
+    finally:
+        llm.save_settings(llm.OllamaSettings())
+
+
 async def test_extract_stopped(user: User, monkeypatch) -> None:
     """Reading stopped: the lines found so far (here, in the first part); the model named."""
     pid, doc, _letters = _person_with_document()

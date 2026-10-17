@@ -19,7 +19,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import Client, app, background_tasks, ui
 
-from .. import annotations, documents, pdfs, pdftext, persons
+from .. import annotations, documents, llm, pdfs, pdftext, persons
 from ..i18n import N_, _, ngettext
 from .dialogs import transient_dialog
 from .theme import APP_NAME, bare_page
@@ -412,7 +412,8 @@ def _selection_actions(side: Side, bookmarked: tuple[str, int], *, here: bool) -
             _(
                 "Select an area of a page (A, or Alt+drag): draw a rectangle on the page, the "
                 "text inside it becomes the selection, to quote (Q), add as an excerpt (E), find "
-                "its paper (F), tag the papers of a list (L) or copy (⌘C / Ctrl+C). Shift+drag "
+                "its paper (F), tag the papers of a list (L), read a career (V) or copy (⌘C / "
+                "Ctrl+C). Shift+drag "
                 "adds another area (their texts, in order). Escape to leave."
             )
         ):
@@ -428,6 +429,14 @@ def _selection_actions(side: Side, bookmarked: tuple[str, int], *, here: bool) -
             ).format(folder=side.folder[1]),
             side.add_excerpt,
             "pdf-excerpt",
+        )
+    if side.source[0] == "doc" and llm.model(task="career"):  # (a CV: its career)
+        action(
+            "vr-pdf-career",
+            "work_history",
+            _("Read the career in the selected text (or the areas) with the LLM, at once (V)"),
+            side.career_selection,
+            "pdf-career",
         )
     action(
         "vr-pdf-bookmark",

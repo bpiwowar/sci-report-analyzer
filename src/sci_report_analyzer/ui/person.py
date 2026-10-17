@@ -458,12 +458,17 @@ def _source_view(sug: career_extract.Suggestion, mark: str) -> None:
             ui.label(f"“{sug.quote}”").classes("text-xs italic text-grey-8").mark(f"{mark}-text")
 
 
-def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
+def _extract_dialog(
+    person_id: int,
+    on_change: Callable[[], None],
+    selection: career_extract.Page | None = None,
+) -> None:
     """The lines of the CV the LLM reads in the person's documents (see career_extract), in
     steps: the documents and their pages (those likely about a career ticked; read in parts,
     see career_extract.batches); the instructions (to change, and save); the parts read, each
     shown; the lines found, each with the words it comes from in its page: the ticked ones
-    added, or one edited then added."""
+    added, or one edited then added. ``selection``: only that text read (selected in a
+    document's viewer), at once (the instructions shown going back)."""
     with transient_dialog(_("Career read by the LLM"), width="w-full max-w-3xl") as (
         dlg,
         _card,
@@ -494,14 +499,14 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
     keys = career_extract.ticked(career_extract.pages(person_id, list(chosen_docs)))
     # (all the pages shown, else those ticked)
     state = {
-        "profiles": bool(known),
+        "profiles": bool(known) and selection is None,
         "instructions": career_extract.prompt(),
         "all": False,
         "step": 0,
         "stopped": False,
     }
     names = [
-        _("1. Pages"),
+        _("1. Selection") if selection else _("1. Pages"),
         _("2. Instructions"),
         _("3. Reading"),
         _("4. Lines found"),
@@ -512,6 +517,8 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
         steps.set_text(" › ".join(f"[{n}]" if j == i else n for j, n in enumerate(names)))
 
     def chosen_pages() -> list[career_extract.Page]:
+        if selection:
+            return [selection]
         return [p for p in career_extract.pages(person_id, list(chosen_docs)) if p.key in keys]
 
     def add_ticked() -> None:
@@ -841,9 +848,10 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                 ui.label(json.dumps(career_extract.SCHEMA, indent=1)).classes(_SENT + " max-h-64")
             parts_view()
         with footer:
-            ui.button(_("Back"), icon="arrow_back", on_click=choose).props("flat").mark(
-                "career-extract-back-pages"
-            )
+            if selection is None:
+                ui.button(_("Back"), icon="arrow_back", on_click=choose).props("flat").mark(
+                    "career-extract-back-pages"
+                )
             ui.space()
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(
@@ -1046,6 +1054,14 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
             if got:
                 ui.button(_("Add the ticked ones"), on_click=add_ticked).mark("career-extract-add")
 
+    if selection:
+        with dlg:  # (read at once)
+            ui.timer(
+                0.05,
+                lambda: run([selection], state["profiles"], state["instructions"]),
+                once=True,
+            )
+        return
     choose()
     if pdfs.has_viewer() and any(not d.read for d in docs):
         with dlg:

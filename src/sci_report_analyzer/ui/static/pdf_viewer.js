@@ -341,7 +341,7 @@ window.vrPdf = {
       ?.firstSelectedEditor;
     const hl = !!(ed && ed.editorType === 'highlight');
     for (const [id, ok] of [['vr-pdf-find', text], ['vr-pdf-tag-list', text],
-                            ['vr-pdf-excerpt', text || hl]]) {
+                            ['vr-pdf-career', text], ['vr-pdf-excerpt', text || hl]]) {
       const b = document.getElementById(id);
       if (b) { b.disabled = !ok; b.classList.toggle('disabled', !ok); }
     }

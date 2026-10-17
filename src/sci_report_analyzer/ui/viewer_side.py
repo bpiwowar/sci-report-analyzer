@@ -12,6 +12,7 @@ from nicegui import ui
 
 from .. import (
     annotations,
+    career_extract,
     categories,
     classifier,
     documents,
@@ -744,6 +745,20 @@ class Side:
             ui.notify(_("Select the reference (or its title) in the PDF first"), type="warning")
             return
         find_dialog(self, sel["text"], sel.get("p"), sel.get("rects") or [])
+
+    async def career_selection(self) -> None:
+        """The career's lines in the text selected (or the areas drawn) in a document, read
+        by the LLM at once (see person._extract_dialog)."""
+        from .person import _extract_dialog
+
+        sel = await ui.run_javascript("vrPdf.selection()")
+        text = (sel or {}).get("text") or ""
+        if not text.strip():
+            ui.notify(_("Select the text (or an area over it) in the PDF first"), type="warning")
+            return
+        d = documents.info(self.source[1])
+        page = career_extract.Page(d.id, d.name, sel.get("p") or 1, text.strip(), "selection")
+        _extract_dialog(self.person_id, lambda: None, page)
 
 
 def short_title(s: PubStat | None, width: int = 40) -> str:

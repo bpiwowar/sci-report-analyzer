@@ -9,11 +9,13 @@ window.vrKeys = {
     b: 'vr-pdf-bookmark',
     f: 'vr-pdf-find',  // (without a selection: says so)
     l: 'vr-pdf-tag-list',  // (the papers of a list, tagged)
+    v: 'vr-pdf-career',  // (only with an LLM, in a document: the button there)
   },
   // The event of a key on the selection (none: not one, or not on this page).
   event(key) {
     const name = this.selection[key];
-    return name === 'vr-pdf-excerpt' && !document.getElementById(name) ? null : name;
+    const optional = name === 'vr-pdf-excerpt' || name === 'vr-pdf-career';
+    return optional && !document.getElementById(name) ? null : name;
   },
   typing(t) {
     return !!(t && (t.isContentEditable || (t.closest && t.closest('input, textarea, select'))));
