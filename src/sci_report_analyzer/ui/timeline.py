@@ -123,7 +123,8 @@ def timeline_view(
     spans, no_date = tl.career_spans(person_id)
     directed = tl.supervised(person_id)
     papers = tl.papers_by_year(person_id)
-    paths = {n.id: n.path for n in categories.tree(period.folder.id)}
+    nodes = categories.tree(period.folder.id)
+    paths = {n.id: n.path for n in nodes}
     excerpts = [_spanned(d) for _y, items in dated for d in items]
     shown = {"career": True, "excerpts": True, "theses": True, "papers": True}
     picked: dict[str, int] = {}  # ("year" or "excerpt": shown in the details)
@@ -148,6 +149,7 @@ def timeline_view(
             [t for t in directed if t.year] if on["theses"] else [],
             excerpts if on["excerpts"] else [],
             papers if on["papers"] else {},
+            nodes,
             period,
             picked,
             pick,
@@ -238,13 +240,14 @@ def _chart(
     directed: list[tl.Supervised],
     excerpts: list[_Span],
     papers: dict[int, list[str]],
+    nodes: list[categories.Node],
     period: Period,
     picked: dict[str, int],
     pick: Callable[..., None],
     show_tab: Callable[[str], None],
 ) -> None:
     """The years, from the earliest of the items (papers not much earlier than the rest) to
-    this year at least; a row for each kind."""
+    this year at least; a row for each kind (the excerpts: for each main category)."""
     this_year = date.today().year
     core = [y for sp in [*spans, *directed, *excerpts] for y in (sp.first, sp.last)]
     if not core and not papers:
@@ -264,19 +267,24 @@ def _chart(
     def col(year: int) -> int:
         return year - lo + 2
 
-    rows: list[tuple[str, str, str, str, int]] = []  # (kind, name, icon, colour, its rows)
+    # (kind, name, icon, colour, its rows, its marker, its excerpts)
+    rows: list[tuple[str, str, str, str, int, str, list[_Span]]] = []
     if spans:
         lanes = tl.lanes(spans, room=room)
-        rows.append(("career", _("Career"), "work", KIND_COLOUR["position"], lanes))
+        rows.append(("career", _("Career"), "work", KIND_COLOUR["position"], lanes, "career", []))
     if directed:
         lanes = tl.lanes(directed, room=room)
-        rows.append(("theses", _("PhD students"), "school", KIND_COLOUR["thesis"], lanes))
-    if excerpts:
-        lanes = tl.lanes(excerpts, room=room)
-        rows.append(("excerpts", _("Excerpts"), "format_quote", "var(--q-primary)", lanes))
+        rows.append(
+            ("theses", _("PhD students"), "school", KIND_COLOUR["thesis"], lanes, "theses", [])
+        )
+    for main, xs in _by_main(excerpts, nodes):
+        lanes = tl.lanes(xs, room=room)
+        name, colour = (main.name, main.colour) if main else (_("Excerpts"), "var(--q-primary)")
+        mark = f"excerpts timeline-row-main-{main.id if main else 0}"
+        rows.append(("excerpts", name, "format_quote", colour, lanes, mark, xs))
     if papers:
-        rows.append(("papers", _("Papers"), "article", KIND_COLOUR["papers"], 1))
-    total = 1 + sum(k for *_x, k in rows)
+        rows.append(("papers", _("Papers"), "article", KIND_COLOUR["papers"], 1, "papers", []))
+    total = 1 + sum(row[4] for row in rows)
     cover = {y for x in excerpts for y in range(x.first, x.last + 1)}
 
     with ui.element("div").classes("vr-tl-wrap w-full").mark("timeline-chart"):
@@ -318,13 +326,13 @@ def _chart(
                         _("Its excerpts, below")
                     )
             row = 2
-            for kind, name, icon, colour, k in rows:
+            for kind, name, icon, colour, k, mark, xs in rows:
                 ui.element("div").classes("vr-tl-sep").style(f"grid-row:{row}")
                 with (
                     ui.element("div")
                     .classes("vr-tl-head")
                     .style(f"grid-row:{row}/span {k}")
-                    .mark(f"timeline-row-{kind}")
+                    .mark(f"timeline-row-{mark}")
                 ):
                     ui.icon(icon, size="xs").style(f"color:{colour}")
                     ui.label(name)
@@ -335,7 +343,7 @@ def _chart(
                     for t, end in _cells(directed, hi):
                         _thesis(t, row, col, end, show_tab)
                 elif kind == "excerpts":
-                    for x, end in _cells(excerpts, hi):
+                    for x, end in _cells(xs, hi):
                         _excerpt(x, row, col, end, picked, pick)
                 else:
                     top = max(map(len, papers.values()))
@@ -350,6 +358,27 @@ def _chart(
                 earlier,
             ).format(n=earlier, year=lo)
         ).classes("text-xs text-grey").mark("timeline-papers-earlier")
+
+
+def _by_main(
+    excerpts: list[_Span], nodes: list[categories.Node]
+) -> list[tuple[categories.Node | None, list[_Span]]]:
+    """The excerpts by main category (that at the top of theirs), in the categories' order
+    (those of none known: last, together)."""
+    by_id = {n.id: n for n in nodes}
+
+    def main(cat_id: int) -> categories.Node | None:
+        n = by_id.get(cat_id)
+        while n is not None and n.parent_id is not None and n.parent_id in by_id:
+            n = by_id[n.parent_id]
+        return n
+
+    groups: dict[int, list[_Span]] = {}
+    for x in excerpts:
+        m = main(x.d.excerpt.category_id)
+        groups.setdefault(m.id if m else 0, []).append(x)
+    order = [n for n in nodes if n.id in groups] + ([None] if 0 in groups else [])
+    return [(n, groups[n.id if n else 0]) for n in order]
 
 
 def _year_names(n: int) -> None:

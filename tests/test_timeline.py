@@ -94,6 +94,9 @@ async def test_timeline_tab_ranges(user: User) -> None:
     await user.open(f"/person/{pid}/{period}?tab=timeline")
     await user.should_see(marker=f"timeline-span-{project}")
     await user.should_see("Taught a course.", marker=f"timeline-span-{taught}")
+    # A row for each main category (named after it).
+    await user.should_see("Research", marker=f"timeline-row-main-{cats['Research']}")
+    await user.should_see("Teaching", marker=f"timeline-row-main-{cats['Teaching']}")
     user.find(marker=f"timeline-span-{project}").click()
     await user.should_see("An excerpt, 2019–2022", marker="timeline-details")
     await user.should_see("Led a project.", marker="timeline-details")
