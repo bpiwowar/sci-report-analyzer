@@ -364,3 +364,58 @@ async def test_timeline_full_width(user: User, fake_viewer) -> None:
     await user.open(f"/person/{pid}/{period}?tab=timeline&pdfs=d{doc}&pdf=d{doc}")
     await user.should_see(marker="timeline")
     await user.should_not_see(marker=f"dock-frame-d{doc}")
+
+
+async def test_timeline_filters(user: User) -> None:
+    """The excerpts filtered by markers and levels (several of a kind: one of them; both
+    kinds: both); how many are hidden said, cleared at once."""
+    from sci_report_analyzer import reports
+
+    pid, period, cats, _paper = _seed()
+    fid = folders.folders()[0].id
+    reports.save_levels(fid, [reports.Level(k, k) for k in reports.DEFAULT_LEVELS], "national")
+    add = categories.add_excerpt
+    talk = add(cats["Research"], period, "Gave a talk.", 1, [], start=2021, influence=True)
+    prize = add(
+        cats["Research"],
+        period,
+        "Won a prize.",
+        1,
+        [],
+        start=2022,
+        salient=True,
+        level="international",
+    )
+    course = add(cats["Teaching"], period, "Taught a course.", 1, [], start=2021, level="local")
+    undated = add(cats["Teaching"], period, "A committee.", 1, [], salient=True)
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see(marker=f"timeline-span-{course}")
+    await user.should_see(marker="timeline-filters")
+    await user.should_not_see(marker="timeline-filter-hidden")
+    # Salient or influence: the course hidden (said so).
+    user.find(marker="timeline-filter-marker-salient").trigger("update:selected", True)
+    user.find(marker="timeline-filter-marker-influence").trigger("update:selected", True)
+    await user.should_not_see(marker=f"timeline-span-{course}")
+    await user.should_see(marker=f"timeline-span-{talk}")
+    await user.should_see(marker=f"timeline-span-{prize}")
+    await user.should_see("A committee.", marker="timeline-undated")
+    await user.should_see("1 excerpt hidden by the filters", marker="timeline-filter-hidden")
+    # And national (the talk: without a level, the folder's default one).
+    user.find(marker="timeline-filter-level-national").trigger("update:selected", True)
+    await user.should_not_see(marker=f"timeline-span-{prize}")
+    await user.should_see(marker=f"timeline-span-{talk}")
+    await user.should_see("2 excerpts hidden by the filters", marker="timeline-filter-hidden")
+    # (the committee, without a level too: national)
+    await user.should_see("A committee.", marker="timeline-undated")
+    # Kept once drawn again (a kind hidden, shown again).
+    user.find(marker="timeline-show-papers").click()
+    await user.should_not_see(marker=f"timeline-span-{prize}")
+    user.find(marker="timeline-filter-clear").click()
+    await user.should_see(marker=f"timeline-span-{prize}")
+    await user.should_see(marker=f"timeline-span-{course}")
+    await user.should_not_see(marker="timeline-filter-hidden")
+    assert undated
+    # A folder without levels: said so.
+    reports.save_levels(fid, [])
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see(marker="timeline-filter-no-levels")

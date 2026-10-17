@@ -478,7 +478,7 @@ comptés en dessous). Elle s'ouvre agrandie (des années deux fois plus larges q
 jusqu'à sa période dans le dossier ; son curseur élargit ou resserre les années dès qu'on le déplace (le texte gardant sa taille, le milieu restant en vue), de la chronologie entière dans la largeur à quatre fois plus large ; la chronologie garde l'endroit où elle est défilée quand on clique un élément ou qu'elle est redessinée. Chaque sorte s'affiche ou se masque par son interrupteur ; celle dont
 elle n'a aucun élément est signalée. Un extrait a son propre interrupteur (dans les détails en dessous, ou son bouton
 dans l'onglet Extraits) : éteint, il est laissé hors de la chronologie (toujours gardé), listé à part en dessous, où
-il se rallume. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à part, en dessous. La
+il se rallume. Les extraits se **filtrent** (les pastilles sous les interrupteurs) : par leurs marqueurs (saillant, rayonnement, mineur, bémol) et par leurs niveaux (ceux du dossier : local, national… ; un extrait sans niveau compte comme du niveau par défaut du dossier). Plusieurs pastilles d'une sorte : l'une d'elles ; les deux sortes : les deux ; aucune cochée : tous affichés. Les filtres s'appliquent à la chronologie, aux détails et aux listes en dessous ; le nombre d'extraits qu'ils masquent est indiqué, avec un bouton pour les effacer. Un dossier sans niveaux le signale à la place de leurs pastilles. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à part, en dessous. La
 chronologie prend toute la largeur : un PDF affiché à côté de la page est mis de côté pendant ce temps (toujours dans
 le bandeau du bas ; celui ouvert depuis la chronologie s'affiche), et réaffiché en quittant l'onglet.
 

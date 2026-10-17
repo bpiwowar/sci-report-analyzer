@@ -474,7 +474,13 @@ the whole timeline fitting the width to four times as wide; the timeline keeps w
 scrolled when an item is clicked or it is drawn again. Each
 kind is shown or hidden with its switch; one they have none of is said so. An excerpt has
 a switch of its own (in the details below, or its button in the Excerpts tab): off, it is
-left out of the timeline (still kept), listed apart below, where it is switched back on. The
+left out of the timeline (still kept), listed apart below, where it is switched back on.
+The excerpts can be **filtered** (the chips under the switches): by their markers (salient,
+influence, minor, caveat) and by their levels (the folder's: local, national…; an excerpt
+without one counts as the folder's default level). Several chips of a kind: one of them;
+both kinds: both; none ticked: all shown. The filters apply to the timeline, the details and
+the lists below; how many excerpts they hide is said, with a button to clear them. A folder
+without levels says so instead of their chips. The
 excerpts without years, and the lines of the career without dates, are listed apart, below.
 The timeline takes the full width: a PDF shown beside the page is set aside meanwhile (still
 in the strip below; one opened from the timeline is shown), and shown again when leaving the

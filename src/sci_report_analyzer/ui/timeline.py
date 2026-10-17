@@ -18,7 +18,7 @@ from itertools import pairwise
 
 from nicegui import ui
 
-from .. import career, categories, persons
+from .. import career, categories, persons, reports
 from .. import timeline as tl
 from ..db.models import Period
 from ..i18n import _, ngettext
@@ -184,6 +184,9 @@ def timeline_view(
         "picked": {},  # ("year", "excerpt", "career" or "thesis": shown in the details)
         "zoom": ZOOM_START,  # (see ZOOM_MIN)
         "drawn": False,  # (the chart drawn already: drawn again, scrolled where it was)
+        # (the excerpts shown: those with one of these markers, and of one of these levels;
+        # none: whatever)
+        "filters": {"markers": set(), "levels": set()},
     }
 
     @ui.refreshable
@@ -211,7 +214,8 @@ def _view(
     nodes = categories.tree(period.folder.id)
     paths = {n.id: n.path for n in nodes}
     excerpts = [_spanned(d) for _y, items in dated for d in items]
-    shown, picked = state["shown"], state["picked"]
+    shown, picked, filters = state["shown"], state["picked"], state["filters"]
+    levels, default = reports.level_tags(period.folder.id)
     counts = {
         "career": len(spans) + len(no_date),
         "excerpts": len(excerpts) + len(undated) + len(left_out),
@@ -243,6 +247,28 @@ def _view(
     def on() -> dict[str, bool]:
         return {k: bool(v and counts[k]) for k, v in shown.items()}
 
+    def kept() -> tuple[list[_Span], list[categories.ExcerptView], list[categories.ExcerptView]]:
+        """The excerpts (on the timeline, without years, left out) the filters let through."""
+        ok = lambda e: _passes(e, filters, default)  # noqa: E731
+        return (
+            [x for x in excerpts if ok(x.d.excerpt)],
+            [e for e in undated if ok(e)],
+            [e for e in left_out if ok(e)],
+        )
+
+    def filtered() -> None:
+        """The filters changed: what they hide no longer picked, all drawn again."""
+        if (i := picked.get("excerpt")) and not any(x.d.excerpt.id == i for x in kept()[0]):
+            picked.clear()
+        chart.refresh()
+        below.refresh()
+        bar.refresh()
+
+    @ui.refreshable
+    def bar() -> None:
+        if counts["excerpts"]:
+            _filters_bar(filters, levels, counts["excerpts"] - sum(map(len, kept())), filtered)
+
     @ui.refreshable
     def chart() -> None:
         on_ = on()
@@ -250,7 +276,7 @@ def _view(
         _chart(
             spans if on_["career"] else [],
             [t for t in directed if t.year] if on_["theses"] else [],
-            excerpts if on_["excerpts"] else [],
+            kept()[0] if on_["excerpts"] else [],
             papers if on_["papers"] else {},
             nodes,
             period,
@@ -269,11 +295,12 @@ def _view(
         on_ = on()
         _line_details(person_id, spans, directed, picked, pick, show_tab, rebuild)
         if on_["excerpts"]:
-            _details(excerpts, picked, paths, pick, acts)
-            if undated:
-                _undated_excerpts(undated, paths, acts)
-            if left_out:
-                _left_out(left_out, paths, acts)
+            spans_, undated_, left_out_ = kept()
+            _details(spans_, picked, paths, pick, acts)
+            if undated_:
+                _undated_excerpts(undated_, paths, acts)
+            if left_out_:
+                _left_out(left_out_, paths, acts)
         if on_["career"] and no_date:
             _undated_career(no_date, show_tab)
 
@@ -307,12 +334,14 @@ def _view(
                 "(their number a year). Clicked, what it is shown below: a line of their career "
                 "or a PhD student, edited there; an excerpt, or a year's: clicked there, its PDF "
                 "beside the page, at it; its pencil edits it (its years…). An excerpt without "
-                "years of its own is at its paper's year. The slider widens the years."
+                "years of its own is at its paper's year. The slider widens the years; the chips "
+                "filter the excerpts (by marker, by level)."
             )
         ).classes("text-sm text-grey")
         with ui.row().classes("w-full items-start no-wrap gap-2"):
             with ui.column().classes("grow gap-1"):
                 _legend(shown, counts, period, toggle)
+                bar()
             # (wider years, the timeline then scrolled; or back to fitting the width: at once
             # while moved, kept once released)
             with ui.row().classes("items-center gap-1 no-wrap shrink-0"):
@@ -327,6 +356,70 @@ def _view(
                 ui.icon("zoom_in", color="grey", size="xs")
         chart()
         below()
+
+
+def _passes(e: categories.ExcerptView, filters: dict, default: str | None) -> bool:
+    """Whether an excerpt has one of the markers of ``filters`` and one of its levels (that
+    of an excerpt without one: the folder's ``default``); none of either: whatever."""
+    if (markers := filters["markers"]) and not any(getattr(e, k) for k in markers):
+        return False
+    return not (levels := filters["levels"]) or (e.level or default) in levels
+
+
+def _filters_bar(
+    filters: dict, levels: dict[str, str], hidden: int, changed: Callable[[], None]
+) -> None:
+    """The excerpts filtered by their markers and their levels (several of each: one of
+    them; both: both), each a chip to tick; how many they hide, to clear them."""
+
+    def chip(kind: str, key: str, label: str, icon: str | None, colour: str) -> None:
+        def toggle(e) -> None:
+            (filters[kind].add if e.value else filters[kind].discard)(key)
+            changed()
+
+        on = key in filters[kind]
+        ui.chip(
+            label,
+            icon=icon,
+            color=colour,
+            text_color="white" if on else None,
+            selectable=True,
+            selected=on,
+            on_selection_change=toggle,
+        ).props("dense" if on else "dense outline").mark(f"timeline-filter-{kind[:-1]}-{key}")
+
+    with ui.row().classes("items-center gap-x-1 gap-y-0").mark("timeline-filters"):
+        ui.icon("filter_alt", color="grey", size="xs").tooltip(
+            _(
+                "Only the excerpts with one of the markers ticked, and of one of the levels "
+                "ticked (none ticked: all)"
+            )
+        )
+        ui.label(_("Excerpts:")).classes("text-sm text-grey")
+        for key, (label, _tip, icon, colour) in MARKER_ICONS.items():
+            chip("markers", key, _(label), icon, colour)
+        ui.label("·").classes("mx-1 text-grey")
+        if levels:
+            for key, tag in levels.items():
+                chip("levels", key, tag, None, "primary")
+        else:
+            ui.label(
+                _("No levels in the folder's settings (Settings → Folder settings → Excerpts)")
+            ).classes("text-xs text-grey").mark("timeline-filter-no-levels")
+        if hidden:
+            ui.label(
+                ngettext(
+                    "{n} excerpt hidden by the filters",
+                    "{n} excerpts hidden by the filters",
+                    hidden,
+                ).format(n=hidden)
+            ).classes("text-xs text-orange-9 ml-2").mark("timeline-filter-hidden")
+        if filters["markers"] or filters["levels"]:
+            ui.button(
+                _("Clear"),
+                icon="filter_alt_off",
+                on_click=lambda: (filters["markers"].clear(), filters["levels"].clear(), changed()),
+            ).props("flat dense no-caps size=sm").mark("timeline-filter-clear")
 
 
 def _legend(
