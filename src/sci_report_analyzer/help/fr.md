@@ -546,7 +546,9 @@ réfléchit (« Par défaut » : non ; « Réfléchit » ; « Ne réflé
   formulations côte à côte avec leur durée (le premier passage d'un modèle compte son chargement) ; « Garder »
   en prend une, et peut faire de son modèle celui qui réécrit les extraits.
 - **Lecture d'une liste de références** : dans « Étiqueter à partir d'une liste », « Lire avec le
-  LLM » lit une liste collée en références (titre, auteurs, canal, année, DOI), appariées par leur titre ; une
+  LLM » lit une liste collée en références (titre, auteurs, année, canal, DOI et lien), appariées par leur
+  titre ; ce qui est entre elles (une note sur un article, un titre de section, des étiquettes) est laissé de
+  côté, comme un titre absent de la liste ; chacune garde son numéro dans la liste (« P3. » : 3) ; une
   longue liste par parties.
 
 Quand le LLM est désactivé (ou qu'une tâche n'a pas de modèle, ou n'obtient pas de réponse valide), la page de la
