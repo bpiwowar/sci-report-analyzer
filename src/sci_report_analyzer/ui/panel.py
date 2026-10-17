@@ -100,6 +100,14 @@ def on_chart_click(chart: ui.echart, handler: Callable[[str, int, dict[str, bool
     )
 
 
+# The charts, while the PDFs are beside the page (body.vr-docked, see pdf_dock): hidden, but
+# when asked (body.vr-charts-on).
+ui.add_css(
+    ".vr-charts-toggle{display:none}body.vr-docked .vr-charts-toggle{display:inline-flex}"
+    "body.vr-docked:not(.vr-charts-on) .vr-charts{display:none}",
+    shared=True,
+)
+
 MULTI_TIP = N_("Shift-click: add to the selection (or remove) · Alt-click: only this one")
 
 # The summary's table of detail levels: hovering a cell highlights its column and row headers.
@@ -485,10 +493,19 @@ class PublicationsPanel:
             self._toolbar(filtered, conditioned)
             cats = category_list(filtered)
             self._distribution(matching("category"), cats, sels)
-            self._years(matching("year"), cats, sels)
-            with ui.row().classes("w-full gap-4 no-wrap"):
-                self._coauthors(matching("coauthors"), sels)
-                self._contributions(matching("contribution", "phd", "authorcat"), sels)
+            # (the PDFs beside the page: the charts hidden, but on demand; see CHARTS_CSS)
+            ui.button(_("Charts"), icon="bar_chart").props("flat dense no-caps").classes(
+                "vr-charts-toggle"
+            ).on(
+                "click", js_handler="() => document.body.classList.toggle('vr-charts-on')"
+            ).tooltip(_("Show or hide the charts (years, co-authors, contributions)")).mark(
+                "charts-toggle"
+            )
+            with ui.column().classes("w-full vr-charts"):
+                self._years(matching("year"), cats, sels)
+                with ui.row().classes("w-full gap-4 no-wrap"):
+                    self._coauthors(matching("coauthors"), sels)
+                    self._contributions(matching("contribution", "phd", "authorcat"), sels)
             self._list(conditioned)
             ui.label(_(DISCLAIMER)).classes("text-xs text-grey")
         self.push_url()

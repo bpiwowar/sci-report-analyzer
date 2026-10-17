@@ -200,7 +200,10 @@ class PdfDock:
         self.drawer.value = self.shown is not None
         self.footer.value = bool(self.keys or self.docs)
         self._strip()
-        self.footer.client.run_javascript(f"vrDock.shown = {json.dumps(self.shown)}")
+        self.footer.client.run_javascript(
+            f"vrDock.shown = {json.dumps(self.shown)}; "  # (the page narrower: see panel.py)
+            f"document.body.classList.toggle('vr-docked', {json.dumps(self.shown is not None)})"
+        )
         if not changed:
             return
         annotations.save_ui_state(
