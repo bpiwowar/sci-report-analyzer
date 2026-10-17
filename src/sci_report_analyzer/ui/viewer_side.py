@@ -283,7 +283,8 @@ class Side:
         sel["text"] = pdftext.clean_pdf_text(sel["text"], one_paragraph=True)
         page, rects = sel.get("p"), sel.get("rects") or []
         dated, rewriting = categories.detect_years(sel["text"]), bool(llm.rewrite_model())
-        before, after = await self._around(rects) if rewriting or not dated else ("", "")
+        llm_on = llm.settings().enabled  # (other models tried: see change_llm_dialog)
+        before, after = await self._around(rects) if llm_on or not dated else ("", "")
         category_picker(
             self,
             sel["text"],
@@ -292,6 +293,9 @@ class Side:
             around=None if dated else categories.context_years("", before, after),
             suggest=(lambda: excerpt_rewrite.rewrite(sel["text"], before, after))
             if rewriting
+            else None,
+            rewriter=(lambda name: excerpt_rewrite.trial(sel["text"], before, after, name))
+            if llm_on
             else None,
             merge=lambda lead, ref_only: self.merge_excerpt(
                 lead, sel["text"], page, rects, ref_only=ref_only
@@ -1373,6 +1377,7 @@ def category_picker(
     merge: Callable[[categories.ExcerptView, bool], None] | None = None,
     around: tuple[int, int] | None = None,
     suggest: Callable[[], Awaitable[excerpt_rewrite.Rewrite | None]] | None = None,
+    rewriter: Callable[[str], Awaitable[excerpt_rewrite.Trial]] | None = None,
 ) -> None:
     """Choose the category of an excerpt (``chosen`` is called with it): click it, or type to
     find it (Enter: the first one), or name a new one. ``title``, ``done`` (its
@@ -1384,8 +1389,9 @@ def category_picker(
     cited), the similar ones shown with a warning; ``around``: its years when its text has
     none (found around it: see categories.context_years); ``suggest``: a neutral wording of
     it and its years (see excerpt_rewrite), asked for once the dialog is open and proposed
-    there, edited, then used (its text filed, the text selected kept as its original) or not.
-    The category chosen last (here, else that
+    there, edited, then used (its text filed, the text selected kept as its original) or not;
+    ``rewriter``: its rewrite by a given model, to try others (see change_llm_dialog; none:
+    the local LLM off, said there). The category chosen last (here, else that
     of the excerpt filed last) is proposed: marked, scrolled to, and Enter picks it (nothing
     typed)."""
     folder_id = side.folder[0]
@@ -1438,24 +1444,27 @@ def category_picker(
             if properties
             else dict
         )
+
+        def use(wording: str, r: excerpt_rewrite.Rewrite) -> None:
+            nonlocal rewritten
+            if wording := " ".join(wording.split()):
+                show(wording)
+                rewritten = True
+            if r.start or r.end:
+                props.set_years(r.start, r.end)  # type: ignore[attr-defined]
+            if hint is not None:
+                hint.set_visibility(False)
+
+        hint: ui.row | None = None
         if properties and suggest is not None:
             hint = ui.row().classes("w-full items-center no-wrap gap-2").mark("excerpt-rewrite")
             with hint:
                 ui.spinner(size="sm")
                 ui.label(_("The local AI rewrites the excerpt…")).classes("text-xs text-grey")
 
-            def use(wording: str, r: excerpt_rewrite.Rewrite) -> None:
-                nonlocal rewritten
-                if wording := " ".join(wording.split()):
-                    show(wording)
-                    rewritten = True
-                if r.start or r.end:
-                    props.set_years(r.start, r.end)  # type: ignore[attr-defined]
-                hint.set_visibility(False)
-
             async def proposed() -> None:
                 r = await suggest()
-                if hint.is_deleted:
+                if hint is None or hint.is_deleted:
                     return
                 hint.clear()
                 if r is None:  # (said, not hidden)
@@ -1495,6 +1504,14 @@ def category_picker(
                 ui.link(_("Settings"), "/settings?tab=rewrite", new_tab=True).classes(
                     "text-xs"
                 ).mark("excerpt-rewrite-settings")
+        if properties:
+            ui.button(
+                _("Change LLM"),
+                icon="compare_arrows",
+                on_click=lambda: change_llm_dialog(side, text, rewriter, lambda r: use(r.text, r)),
+            ).props("flat dense no-caps size=sm").tooltip(
+                _("Rewrite the excerpt with other models, compare them and keep the best")
+            ).mark("excerpt-change-llm")
 
         def edited() -> bool:
             """Its text typed in (not only its years taken out, or put back)."""
@@ -1515,6 +1532,144 @@ def category_picker(
         with category_list(side, filed, pick, current=current, last=last):
             ui.space()
             ui.button(_("Close"), on_click=dlg.close).props("flat").mark("category-close")
+
+
+def change_llm_dialog(
+    side: Side,
+    text: str,
+    rewriter: Callable[[str], Awaitable[excerpt_rewrite.Trial]] | None,
+    keep: Callable[[excerpt_rewrite.Rewrite], None],
+) -> None:
+    """The passage ``text`` rewritten by other models, to compare them (``rewriter``: its
+    rewrite by a model, see excerpt_rewrite.trial; none: the local LLM off, said, with where
+    to turn it on): those chosen run one after the other (a local server rarely holds several
+    at once), their rewrites side by side with their times; one kept (``keep`` is called with
+    it), its model made the one rewriting the excerpts if asked."""
+    with (
+        side.host.dialogs,
+        transient_dialog(_("Change LLM"), width="w-full max-w-5xl") as (dlg, _card),
+    ):
+        short = text if len(text) <= 300 else text[:299] + "…"
+        ui.label(f"“{' '.join(short.split())}”").classes("text-sm text-grey")
+        if rewriter is None:  # (said, with where to turn it on)
+            with ui.row().classes("items-center gap-2 no-wrap bg-orange-1 rounded p-2"):
+                ui.icon("power_off", color="orange-9")
+                ui.label(_("The local LLM is off: no model to try")).classes(
+                    "text-sm text-orange-10"
+                ).mark("change-llm-off")
+                ui.link(_("Turn it on"), "/settings?tab=llm", new_tab=True).classes("text-sm").mark(
+                    "change-llm-settings"
+                )
+            with ui.row().classes("w-full"):
+                ui.space()
+                ui.button(_("Close"), on_click=dlg.close).props("flat").mark("change-llm-close")
+            return
+        current = llm.rewrite_model()
+        with ui.row().classes("w-full items-center no-wrap gap-2"):
+            models = (
+                ui.select(
+                    [current] if current else [],
+                    value=[current] if current else [],
+                    label=_("Models"),
+                    multiple=True,
+                    with_input=True,
+                    new_value_mode="add-unique",
+                )
+                .props("use-chips options-dense")
+                .classes("grow")
+                .mark("change-llm-models")
+            )
+            run = ui.button(_("Run"), icon="play_arrow").props("no-caps").mark("change-llm-run")
+        status = ui.label().classes("text-xs text-grey").mark("change-llm-status")
+        ui.label(
+            _("A model's first answer includes its loading: run it again for its own time")
+        ).classes("text-xs text-grey")
+        default = ui.checkbox(
+            _("Make the model of the one kept the model rewriting the excerpts")
+        ).mark("change-llm-default")
+        results = ui.grid(columns="repeat(auto-fill, minmax(240px, 1fr))").classes("w-full gap-2")
+        with ui.row().classes("w-full"):
+            ui.space()
+            ui.button(_("Close"), on_click=dlg.close).props("flat").mark("change-llm-close")
+
+        async def load() -> None:
+            st = llm.settings()
+            try:
+                found = await llm.list_chat_models(st.chat_api, llm.chat_server(st))
+            except Exception as e:  # (said: the models can still be typed)
+                if not status.is_deleted:
+                    status.set_text(
+                        _("Cannot reach the server: {error} (type the models)").format(error=e)
+                    )
+                return
+            if not models.is_deleted:
+                value = list(models.value or [])
+                models.set_options(sorted({*found, *value}), value=value)
+
+        ui.timer(0.1, load, once=True)
+
+    def chosen(t: excerpt_rewrite.Trial) -> None:
+        if t.rewrite is None:
+            return
+        keep(t.rewrite)
+        if default.value:
+            stored = llm.stored_settings()
+            stored.rewrite_model = t.model
+            llm.save_settings(stored)
+            ui.notify(_("{model} now rewrites the excerpts").format(model=t.model))
+        close(dlg)
+
+    async def compare() -> None:
+        names = list(models.value or [])
+        if not names:
+            ui.notify(_("Choose the models to try first"), type="warning")
+            return
+        run.disable()
+        results.clear()
+        bodies = []
+        for i, name in enumerate(names):
+            with results, ui.card().classes("p-2 gap-1").mark(f"change-llm-result-{i}"):
+                ui.label(name).classes("text-sm font-medium break-all")
+                with ui.column().classes("w-full gap-1") as body:
+                    ui.label(_("Waiting…")).classes("text-xs text-grey")
+                bodies.append(body)
+        try:
+            for i, (name, body) in enumerate(zip(names, bodies, strict=True)):
+                body.clear()
+                with body:
+                    ui.spinner(size="sm")
+                status.set_text(
+                    _("Rewriting with {model} ({i}/{n})…").format(model=name, i=i + 1, n=len(names))
+                )
+                t = await rewriter(name)
+                if dlg.is_deleted:  # (closed: the others not run)
+                    return
+                body.clear()
+                with body:
+                    ui.label(_("{seconds} s").format(seconds=f"{t.seconds:.1f}")).classes(
+                        "text-xs text-grey"
+                    ).mark(f"change-llm-time-{i}")
+                    if t.rewrite is None:  # (said)
+                        ui.label(
+                            _("No valid answer: {error}").format(error=t.error)
+                            if t.error
+                            else _("No valid answer")
+                        ).classes("text-xs text-negative").mark(f"change-llm-failed-{i}")
+                        continue
+                    ui.label(t.rewrite.text).classes("text-sm").mark(f"change-llm-text-{i}")
+                    if t.rewrite.start or t.rewrite.end:
+                        ui.label(categories.years_label(t.rewrite.start, t.rewrite.end)).classes(
+                            "text-xs text-grey"
+                        )
+                    ui.button(_("Keep it"), on_click=lambda t=t: chosen(t)).props(
+                        "flat dense no-caps"
+                    ).tooltip(_("Use this wording and these years")).mark(f"change-llm-keep-{i}")
+            status.set_text(_("Done: keep the best one"))
+        finally:
+            if not run.is_deleted:
+                run.enable()
+
+    run.on_click(compare)
 
 
 def category_list(

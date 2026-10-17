@@ -9,6 +9,8 @@ categories.context_years)."""
 from __future__ import annotations
 
 import logging
+import time
+from dataclasses import dataclass
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -123,11 +125,30 @@ async def rewrite(
     name = llm.rewrite_model()
     if not name or not text.strip():
         return None
+    return (await trial(text, before, after, name, timeout=timeout)).rewrite
+
+
+@dataclass
+class Trial:
+    """A passage rewritten by a model (see trial): its rewrite (none: no valid answer; the
+    ``error`` raised, if any) and how long it took (seconds)."""
+
+    model: str
+    rewrite: Rewrite | None
+    seconds: float
+    error: str = ""
+
+
+async def trial(text: str, before: str, after: str, name: str, timeout: float = TIMEOUT) -> Trial:
+    """The rewrite of a passage selected by the model ``name`` (e.g. to compare models: see
+    ui.viewer_side.change_llm_dialog), timed; any error caught (said in it)."""
+    start = time.monotonic()
     try:
         answer = await llm.chat_json(
             messages(text, before, after), SCHEMA, task="rewrite", timeout=timeout, name=name
         )
     except Exception as e:  # (no valid answer: the deterministic years instead)
         logger.info("No rewrite: %s", e)
-        return None
-    return proposal(answer) if isinstance(answer, dict) else None
+        return Trial(name, None, time.monotonic() - start, str(e) or type(e).__name__)
+    r = proposal(answer) if isinstance(answer, dict) else None
+    return Trial(name, r, time.monotonic() - start)
