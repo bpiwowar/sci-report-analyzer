@@ -52,7 +52,7 @@ from .pdf_dock import PdfDock
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
 PROFILE_TABS = ("career", "periods", "sources")  # (the Profile tab's, in order)
-REPORT_TABS = ("report", "excerpts")  # (filled once shown, see ReportTabs)
+REPORT_TABS = ("report", "excerpts", "timeline")  # (filled once shown, see ReportTabs)
 
 
 def register() -> None:
@@ -230,6 +230,7 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
                 ("theses", _("Theses"), "school"),
                 ("report", _("Report"), "description"),
                 ("excerpts", _("Excerpts"), "format_quote"),
+                ("timeline", _("Timeline"), "timeline"),
             ):
                 ui.tab(name, label, icon=icon).mark(f"tab-{name}").tooltip(label)
     return tabs

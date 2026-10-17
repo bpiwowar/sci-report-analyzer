@@ -431,7 +431,11 @@ categories (added if missing).
 The 📝 button of a person's line (also next to the folder's name on their page) opens their
 **notes in the folder** (their Report tab; their excerpts by category: the Excerpts tab), as
 next to their PDFs: to write them without opening any document (e.g. when they have none).
-An excerpt's dialog names its category under its title.
+An excerpt's dialog names its category under its title. Their **Timeline** tab places
+their excerpts in the folder by year, the most recent first: each at its first year (a
+paper's excerpt without years: at the paper's year), those without years listed apart;
+clicked, an excerpt is shown in the Excerpts tab (where its years are edited), its PDF icon
+opening its PDF beside the page.
 
 Folders can be **within other folders**: the Reports page shows them as a **tree**, each
 folder expanded showing the folders within it then its people, one line each (their period,

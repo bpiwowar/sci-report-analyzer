@@ -440,7 +440,10 @@ de l'autre dossier (ajoutées s'il le faut).
 Le bouton 📝 de la ligne d'une personne (aussi à côté du nom du dossier sur sa page) ouvre ses **notes dans le
 dossier** (son onglet Rapport ; ses extraits par catégorie : l'onglet Extraits), comme à côté de ses PDF : pour les
 écrire sans ouvrir de document (par exemple quand elle n'en a aucun). La fenêtre d'un extrait nomme sa catégorie sous
-son titre.
+son titre. Son onglet **Chronologie** place ses extraits dans le dossier par année, les plus récents d'abord :
+chacun à sa première année (l'extrait d'un article sans années : à l'année de l'article), ceux sans années
+listés à part ; cliqué, un extrait est montré dans l'onglet Extraits (où ses années se modifient), son icône
+PDF ouvrant son PDF à côté de la page.
 
 Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre**, chaque dossier
 déplié montrant les dossiers qu'il contient puis ses personnes, une ligne chacune (sa période, ses étoiles, ses

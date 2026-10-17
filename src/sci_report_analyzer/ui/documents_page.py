@@ -14,13 +14,14 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from nicegui import app, ui
 
-from .. import annotations, documents, pdfs, reports, urls
+from .. import annotations, categories, documents, pdfs, reports, urls
 from ..i18n import N_, Labels, _
 from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .mdedit import MarkdownEditor, tool_group
 from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
 from .theme import DEFAULT_COLOUR, bare_page
+from .timeline import timeline_view
 from .viewer_side import Side, bookmarks_section, categories_section
 
 if TYPE_CHECKING:
@@ -494,9 +495,10 @@ window.vrFit();
 
 
 class ReportTabs:
-    """A person's Report and Excerpts tabs, within a folder (or a period; chosen when several,
-    ``period_id`` first): their notes there, with its documents (added here, opened beside the
-    page: see pdf_dock); their excerpts there, by category. Each filled once shown. The PDF
+    """A person's Report, Excerpts and Timeline tabs, within a folder (or a period; chosen when
+    several, ``period_id`` first): their notes there, with its documents (added here, opened
+    beside the page: see pdf_dock); their excerpts there, by category; and by year. Each
+    filled once shown (the timeline: each time, the excerpts edited meanwhile). The PDF
     shown beside the page is theirs: quoted into the notes (Q), its passages filed (E), its
     excerpts clicked selected (its side column hidden: see vrDock)."""
 
@@ -508,7 +510,7 @@ class ReportTabs:
         boxes: dict[str, ui.column],
         show_tab: Callable[[str], None],
     ) -> None:
-        """``boxes``: where the tabs go ("report", "excerpts")."""
+        """``boxes``: where the tabs go ("report", "excerpts", "timeline")."""
         self.person_id = person_id
         self.dock = dock
         self.show_tab = show_tab
@@ -532,7 +534,9 @@ class ReportTabs:
     def fill(self, which: str) -> None:
         """The tab ``which``, unless filled already."""
         box = self.boxes[which]
-        if box.default_slot.children:
+        if which == "timeline":
+            box.clear()
+        elif box.default_slot.children:
             return
         with box:
             self._build(which)
@@ -549,6 +553,11 @@ class ReportTabs:
             with ui.row().classes("items-center"):
                 self._choice(which)
             ui.label(_("Notes and excerpts: only within a folder.")).classes("text-sm text-grey")
+            return
+        if which == "timeline":
+            with ui.row().classes("items-center"):
+                self._choice(which)
+            timeline_view(p.id, p.folder.id, self._select, self._open)
             return
         side = (_notes if which == "report" else _excerpts)(self.person_id, p.id)
         self.sides[which] = side
@@ -611,6 +620,11 @@ class ReportTabs:
     def _select(self, excerpt_id: int | None) -> None:
         if (side := self._side("excerpts")) is not None:
             side.select_excerpt(excerpt_id)
+
+    def _open(self, e: categories.ExcerptView) -> None:
+        """The PDF of an excerpt beside the page, at its page."""
+        key = f"d{e.document_id}" if e.document_id else f"p{e.publication_id}"
+        self.dock.open(key, e.page)
 
 
 def _documents(p, open_doc, on_change=None) -> None:

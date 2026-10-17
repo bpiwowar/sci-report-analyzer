@@ -944,6 +944,55 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
     return [v for v in views if v.group_id not in by_id]
 
 
+@dataclass
+class Dated:
+    """An excerpt (or a group: its lead) on a person's timeline, at ``year``: its first one
+    (else its last); without years of its own, that of its paper (``paper_year``)."""
+
+    excerpt: ExcerptView
+    year: int
+    paper_year: bool = False
+
+
+def timeline(period_id: int) -> tuple[list[tuple[int, list[Dated]]], list[ExcerptView]]:
+    """The excerpts of a person in a folder (groups: their leads) by year, the most recent
+    first, each in the order of the categories within a year; and those without a year (nor
+    a paper's), in their order."""
+    views = excerpts(period_id, grouped=True)
+    found = folders.folder_of_period(period_id)
+    order = {n.id: i for i, n in enumerate(tree(found[0]))} if found else {}
+    pubs = {v.publication_id for v in views if v.publication_id}
+    with session_scope() as s:
+        paper_years = {
+            i: override or year
+            for i, year, override in s.execute(
+                select(Publication.id, Publication.year, Publication.year_override).where(
+                    Publication.id.in_(pubs)
+                )
+            )
+        }
+    by_year: dict[int, list[Dated]] = {}
+    undated = []
+    for v in views:
+        if year := v.start_year or v.end_year:
+            by_year.setdefault(year, []).append(Dated(v, year))
+        elif year := paper_years.get(v.publication_id):
+            by_year.setdefault(year, []).append(Dated(v, year, paper_year=True))
+        else:
+            undated.append(v)
+    rank = {v.id: i for i, v in enumerate(views)}
+    return [
+        (
+            year,
+            sorted(
+                by_year[year],
+                key=lambda d: (order.get(d.excerpt.category_id, len(order)), rank[d.excerpt.id]),
+            ),
+        )
+        for year in sorted(by_year, reverse=True)
+    ], undated
+
+
 # An excerpt's markers as shown on a PDF, next to it (as the copy filters do by default).
 MARKER_SYMBOLS = {"salient": "⭐", "influence": "🌍", "minor": "🔹", "caveat": "⚠️"}
 
