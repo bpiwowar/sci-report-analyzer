@@ -1,13 +1,19 @@
-"""A person's timeline within a folder: a vertical axis of years, the most recent at the top
-(every year a tick, the gaps seen), with arrows from it to what is dated about them. On the
-left, their career (see timeline.career_spans) and the theses they supervised: bars along
-their years; on the right, their excerpts (see categories.timeline) and their papers (small
-marks). Each kind shown or hidden; what is without a date listed apart."""
+"""A person's timeline within a folder: a horizontal axis of years, the oldest on the left
+(every year a column, the gaps seen; this year marked, their period in the folder shaded),
+a row for each kind of what is dated about them. Their career (see timeline.career_spans)
+and the PhDs they supervised: bars along their years, one above the other when they
+overlap; their excerpts (see categories.timeline): a dot in their year, a thin bar along
+their years when several; their papers: a small bar a year, as high as their number. An
+excerpt, or a year's, clicked: shown in the details below. Each kind shown or hidden; what
+is without a date listed apart."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+import math
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import date
+from itertools import pairwise
 
 from nicegui import ui
 
@@ -24,56 +30,92 @@ KIND_COLOUR = {
     "thesis": "#6639ba",  # (as the PhD students' names: .vr-student)
     "papers": "#8c959f",
 }
-# Most papers drawn as marks in a year (the others counted).
-MAX_MARKS = 12
+# Most excerpts of a single year drawn as dots in it (more: their number).
+MAX_DOTS = 4
+# Papers earlier than the rest by more years than this: left out of the axis (counted).
+PAPERS_BEFORE = 3
+# Up to that many years, each named on the axis whatever the width (beyond: every fifth one
+# when too narrow for all, see _year_names).
+NAMED_YEARS = 16
+# The width of the column of the rows' names, of a year named.
+LABEL_PX, NAMED_PX = 84, 34  # (a year at least: .95rem, see _CSS)
 
-# The grid: the career's lanes (--lane wide), the axis (its line at the middle, the years
-# on it), the items on the right. A connector: from the axis to its item, an arrow at the
-# item; on the left, across the lanes nearer the axis (--k of them).
+# The grid: the rows' names (sticky, on the left), then a column a year. Behind: the
+# years' lines, the period's band, the rows' separators; on them, the items.
 _CSS = """
-.vr-tl { --tl-bg:#fff; --tl-axis:#8c959f; --tl-band:rgba(9,105,218,.07); --lane:11rem;
-  --axis:4rem; --gap:1.25rem; display:grid; grid-auto-rows:minmax(1.75rem,auto);
-  position:relative; min-width:min-content; }
-body.body--dark .vr-tl { --tl-bg:var(--q-dark); --tl-band:rgba(88,166,255,.10); }
-.vr-tl-band { grid-column:1/-1; border-radius:6px; background:var(--tl-band); }
-.vr-tl-axis { position:relative; z-index:1; }
-.vr-tl-axis::before { content:""; position:absolute; left:calc(50% - 1px); top:.4rem;
-  bottom:0; width:2px; background:var(--tl-axis); }
-.vr-tl-axis::after { content:""; position:absolute; left:calc(50% - 6px); top:0;
-  border:6px solid transparent; border-bottom:9px solid var(--tl-axis); border-top:0; }
-.vr-tl-year { z-index:3; justify-self:center; align-self:start; margin-top:.3rem;
-  padding:0 .4rem; border-radius:9px; font-size:.7rem; line-height:1.1rem;
-  color:var(--tl-axis); background:var(--tl-bg); }
-.vr-tl-year.full { font-size:.85rem; font-weight:600; color:inherit;
-  border:1.5px solid var(--q-primary); }
-.vr-tl-items { padding:.15rem 0 .5rem var(--gap); min-width:0; z-index:2; }
-.vr-tl-card { position:relative; border-left:3px solid var(--c); border-radius:4px;
-  padding:.1rem .5rem; background:color-mix(in srgb, var(--c) 7%, var(--tl-bg)); }
-.vr-tl-card::before { content:""; position:absolute; top:.75rem;
-  left:calc(-1 * (var(--gap) + var(--axis) / 2) - 3px);
-  width:calc(var(--gap) + var(--axis) / 2 - 4px); border-top:2px solid var(--c); }
-.vr-tl-card::after { content:""; position:absolute; top:calc(.75rem - 4px); left:-10px;
-  border:5px solid transparent; border-left:7px solid var(--c); border-right:0; }
-.vr-tl-items > .vr-tl-card { max-width:48rem; }
-.vr-tl-papers { --c:#8c959f; }
-.vr-tl-papers::before { border-top-style:dashed; }
-.vr-tl-mark { display:inline-block; width:6px; height:9px; margin-right:2px;
-  border-radius:1px; background:var(--c); }
-.vr-tl-span { position:relative; margin:.15rem 0; z-index:2; }
-.vr-tl-span .vr-tl-bar { position:absolute; right:.35rem; top:.45rem; bottom:.2rem;
-  width:5px; border-radius:3px; background:var(--c); }
-.vr-tl-span.now .vr-tl-bar { top:0; background:linear-gradient(to top, var(--c) 75%,
+.vr-tl-wrap { overflow-x:auto; container-type:inline-size; }
+.vr-tl { --tl-bg:#fff; --tl-line:rgba(140,149,159,.25); --tl-band:rgba(9,105,218,.08);
+  --tl-now:#d4a72c; --label:5.25rem; display:grid; position:relative; width:100%;
+  grid-template-columns:var(--label) repeat(var(--n), minmax(0, 6rem));
+  min-width:calc(var(--label) + var(--n) * .95rem); font-size:.75rem; }
+body.body--dark .vr-tl { --tl-bg:var(--q-dark); --tl-line:rgba(160,170,180,.2);
+  --tl-band:rgba(88,166,255,.13); }
+.vr-tl-col { grid-row:1/-1; border-left:1px solid var(--tl-line); }
+.vr-tl-col.now { background:linear-gradient(to right, transparent calc(50% - 1px),
+  var(--tl-now) calc(50% - 1px), var(--tl-now) calc(50% + 1px), transparent calc(50% + 1px)); }
+.vr-tl-band { grid-row:1/-1; background:var(--tl-band); }
+.vr-tl-sep { grid-column:1/-1; border-top:1px solid var(--tl-line); }
+.vr-tl-head { grid-column:1; position:sticky; left:0; z-index:4; display:flex; gap:.25rem;
+  align-items:center; padding:.35rem .4rem .35rem .1rem; background:var(--tl-bg);
+  font-weight:500; line-height:1.05rem; border-right:1px solid var(--tl-line); }
+.vr-tl-year { z-index:2; padding:.25rem 0; display:flex; justify-content:center; white-space:nowrap;
+  font-size:.68rem; color:#8c959f; }
+.vr-tl-year.full { color:inherit; font-weight:600; }
+.vr-tl-year.now span { padding:0 .2rem; border-radius:6px; color:#fff;
+  background:var(--tl-now); }
+.vr-tl-year.pick { cursor:pointer; }
+.vr-tl-year.pick:hover span { text-decoration:underline; }
+.vr-tl-item { z-index:2; min-width:0; align-self:center; padding:.2rem 0; cursor:pointer; }
+.vr-tl-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1rem;
+  font-size:.72rem; padding:0 .15rem 1px 1px; }
+.vr-tl-bar { height:7px; border-radius:4px; background:var(--c); }
+.vr-tl-item.now .vr-tl-bar { border-radius:4px 0 0 4px;
+  background:linear-gradient(to right, var(--c) 65%, transparent); }
+.vr-tl-item.thin { padding:3px 0; }
+.vr-tl-item.thin .vr-tl-bar { height:5px; }
+.vr-tl-item.off { opacity:.45; }
+.vr-tl-item:hover .vr-tl-bar, .vr-tl-item.picked .vr-tl-bar {
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--c) 40%, transparent); }
+.vr-tl-dots { z-index:2; display:flex; flex-wrap:wrap; justify-content:center;
+  align-content:center; gap:2px; padding:.3rem 1px; border-radius:5px; cursor:pointer; }
+.vr-tl-dots:hover, .vr-tl-dots.picked { background:color-mix(in srgb, var(--q-primary) 16%,
   transparent); }
-.vr-tl-span .vr-tl-link { position:absolute; top:.75rem; left:calc(100% - .35rem);
-  width:calc(var(--k) * var(--lane) + var(--axis) / 2 + .35rem); z-index:-1;
-  border-top:2px solid var(--c); }
-.vr-tl-span .vr-tl-link::after { content:""; position:absolute; left:-2px; top:-6px;
-  border:5px solid transparent; border-right:7px solid var(--c); border-left:0; }
-.vr-tl-span .vr-tl-card { margin-right:1rem; border-left-width:0;
-  border-right:3px solid var(--c); }
-.vr-tl-span .vr-tl-card::before, .vr-tl-span .vr-tl-card::after { display:none; }
+.vr-tl-dot { width:8px; height:8px; border-radius:50%; background:var(--c); }
+.vr-tl-dot.paper { background:transparent; border:2px solid var(--c); }
+.vr-tl-dot.off { opacity:.4; }
+.vr-tl-count { padding:0 .25rem; border-radius:7px; font-size:.65rem; font-weight:600;
+  line-height:.95rem; color:#fff; background:var(--q-primary); }
+.vr-tl-papers { z-index:2; height:2.3rem; display:flex; flex-direction:column;
+  align-items:center; justify-content:flex-end; padding-top:.2rem; }
+.vr-tl-papers .n { font-size:.6rem; line-height:.75rem; color:#8c959f; }
+.vr-tl-hist { width:min(65%, 14px); border-radius:2px 2px 0 0; background:#8c959f; }
+.vr-tl-details { display:grid; gap:.5rem; grid-template-columns:repeat(auto-fill,
+  minmax(17rem, 1fr)); }
+@container (max-width: 640px) {
+  .vr-tl { --label:4.25rem; }
+  .vr-tl-head .q-icon { display:none; }
+}
 """
 ui.add_css(_CSS, shared=True)
+
+
+@dataclass
+class _Span:
+    """An excerpt (``d``) on the timeline, along its years (one: a dot); ``lane``: its row
+    (see timeline.lanes)."""
+
+    d: categories.Dated
+    first: int
+    last: int
+    lane: int = 0
+
+
+def _spanned(d: categories.Dated) -> _Span:
+    """An excerpt along its years (without both: at its year)."""
+    e = d.excerpt
+    if d.paper_year or not (e.start_year and e.end_year):
+        return _Span(d, d.year, d.year)
+    return _Span(d, min(e.start_year, e.end_year), max(e.start_year, e.end_year))
 
 
 def timeline_view(
@@ -84,38 +126,47 @@ def timeline_view(
     show_tab: Callable[[str], None],
 ) -> None:
     """The timeline of a person, their excerpts those in the folder of ``period``: an
-    excerpt clicked, selected in the Excerpts tab (``select``), its PDF opened beside the
-    page (``open_pdf``); a line of their career, the Profile tab shown (``show_tab``), a
-    thesis, the Theses tab."""
+    excerpt (or a year's) clicked, shown in the details below, where clicked it is selected
+    in the Excerpts tab (``select``), its PDF opened beside the page (``open_pdf``); a line
+    of their career, the Profile tab shown (``show_tab``), a thesis, the Theses tab."""
     dated, undated = categories.timeline(period.id)
     spans, no_date = tl.career_spans(person_id)
     directed = tl.supervised(person_id)
     papers = tl.papers_by_year(person_id)
     paths = {n.id: n.path for n in categories.tree(period.folder.id)}
+    excerpts = [_spanned(d) for _y, items in dated for d in items]
     shown = {"career": True, "excerpts": True, "theses": True, "papers": True}
+    picked: dict[str, int] = {}  # ("year" or "excerpt": shown in the details)
     counts = {
         "career": len(spans) + len(no_date),
-        "excerpts": sum(len(items) for _y, items in dated) + len(undated),
+        "excerpts": len(excerpts) + len(undated),
         "theses": len(directed),
         "papers": sum(map(len, papers.values())),
     }
 
+    def pick(kind: str | None = None, value: int = 0) -> None:
+        picked.clear()
+        if kind:
+            picked[kind] = value
+        drawn.refresh()
+
     @ui.refreshable
     def drawn() -> None:
         on = {k: v and counts[k] for k, v in shown.items()}
-        _axis(
+        _chart(
             spans if on["career"] else [],
-            dated if on["excerpts"] else [],
             [t for t in directed if t.year] if on["theses"] else [],
+            excerpts if on["excerpts"] else [],
             papers if on["papers"] else {},
             period,
-            paths,
-            select,
-            open_pdf,
+            picked,
+            pick,
             show_tab,
         )
-        if on["excerpts"] and undated:
-            _undated_excerpts(undated, paths, select, open_pdf)
+        if on["excerpts"]:
+            _details(excerpts, picked, paths, pick, select, open_pdf)
+            if undated:
+                _undated_excerpts(undated, paths, select, open_pdf)
         if on["career"] and no_date:
             _undated_career(no_date, show_tab)
 
@@ -126,11 +177,12 @@ def timeline_view(
     with ui.column().classes("w-full gap-2").mark("timeline"):
         ui.label(
             _(
-                "What is dated about them, the most recent first: their career and the theses "
-                "they supervised on the left (a bar along its years), their excerpts and their "
-                "papers on the right. An excerpt is at its first year "
-                "(a paper's excerpt without years: at the paper's); clicked, it is shown in "
-                "the Excerpts tab, where its years are edited (its pencil)."
+                "What is dated about them, by year (the oldest on the left): their career and "
+                "the PhDs they supervised (a bar along their years), their excerpts (a dot in "
+                "their year, a thin bar along their years) and their papers (their number a "
+                "year). An excerpt, a year's dots or a year clicked: its excerpts shown below, "
+                "where clicked one is shown in the Excerpts tab (its years edited there: its "
+                "pencil). An excerpt without years of its own is at its paper's year."
             )
         ).classes("text-sm text-grey")
         _legend(shown, counts, period, toggle)
@@ -191,151 +243,340 @@ def _legend(
                 ui.label(text).classes("text-sm text-grey").mark(mark)
 
 
-def _axis(
+def _chart(
     spans: list[tl.CareerSpan],
-    dated: list[tuple[int, list[categories.Dated]]],
     directed: list[tl.Supervised],
+    excerpts: list[_Span],
     papers: dict[int, list[str]],
     period: Period,
-    paths: dict[int, str],
-    select: Callable[[int], None],
-    open_pdf: Callable[[categories.ExcerptView], None],
+    picked: dict[str, int],
+    pick: Callable[..., None],
     show_tab: Callable[[str], None],
 ) -> None:
-    """The axis of years, from the latest to the earliest of the items; the career on its
-    left, the rest on its right."""
-    years = (
-        [y for sp in [*spans, *directed] for y in (sp.first, sp.last)]
-        + [y for y, _items in dated]
-        + list(papers)
-    )
-    if not years:
+    """The years, from the earliest of the items (papers not much earlier than the rest) to
+    this year at least; a row for each kind."""
+    this_year = date.today().year
+    core = [y for sp in [*spans, *directed, *excerpts] for y in (sp.first, sp.last)]
+    if not core and not papers:
         ui.label(_("Nothing dated to place on the timeline.")).classes("text-grey").mark(
             "timeline-nothing"
         )
         return
-    top, bottom = max(years), min(years)
-    # (the theses in the lanes beyond the career's)
-    lanes = tl.lanes(directed, max((sp.lane + 1 for sp in spans), default=0))
-    excerpts = dict(dated)
+    lo = min(core) - PAPERS_BEFORE if core else min(papers)
+    lo = min([*core, *(y for y in papers if y >= lo)])
+    earlier = sum(len(titles) for y, titles in papers.items() if y < lo)
+    papers = {y: titles for y, titles in papers.items() if y >= lo}
+    hi = max([*core, *papers, this_year])
+    n = hi - lo + 1
+    # (the years' room for a label, about: the narrower they are, the more)
+    room = max(1, min(6, math.ceil(n / 6)))
 
-    def row(year: int) -> int:
-        return top - year + 1
+    def col(year: int) -> int:
+        return year - lo + 2
 
-    columns = f"repeat({lanes}, var(--lane)) var(--axis) minmax(14rem, 1fr)"
-    with (
-        ui.element("div").classes("w-full overflow-x-auto"),
-        ui.element("div").classes("vr-tl").style(f"grid-template-columns:{columns}"),
-    ):
-        lo, hi = max(period.start_year or bottom, bottom), min(period.end_year or top, top)
-        if (period.start_year or period.end_year) and lo <= hi:
-            ui.element("div").classes("vr-tl-band").style(f"grid-row:{row(hi)}/{row(lo) + 1}").mark(
-                "timeline-period"
-            )
-        ui.element("div").classes("vr-tl-axis").style(
-            f"grid-column:{lanes + 1};grid-row:1/{row(bottom) + 1}"
-        )
-        for year in range(top, bottom - 1, -1):
-            full = year in excerpts or year in papers
-            full = full or any(sp.first <= year <= sp.last for sp in [*spans, *directed])
-            ui.label(str(year)).classes("vr-tl-year" + (" full" if full else "")).style(
-                f"grid-column:{lanes + 1};grid-row:{row(year)}"
-            ).mark(f"timeline-tick-{year}")
-            if year in excerpts or year in papers:
+    rows: list[tuple[str, str, str, str, int]] = []  # (kind, name, icon, colour, its rows)
+    if spans:
+        lanes = tl.lanes(spans, room=room)
+        rows.append(("career", _("Career"), "work", KIND_COLOUR["position"], lanes))
+    if directed:
+        lanes = tl.lanes(directed, room=room)
+        rows.append(("theses", _("PhD students"), "school", KIND_COLOUR["thesis"], lanes))
+    singles = [x for x in excerpts if x.first == x.last]
+    ranges = [x for x in excerpts if x.first != x.last]
+    if excerpts:
+        lanes = bool(singles) + tl.lanes(ranges)
+        rows.append(("excerpts", _("Excerpts"), "format_quote", "var(--q-primary)", lanes))
+    if papers:
+        rows.append(("papers", _("Papers"), "article", KIND_COLOUR["papers"], 1))
+    total = 1 + sum(k for *_x, k in rows)
+    cover = {y for x in excerpts for y in range(x.first, x.last + 1)}
+
+    with ui.element("div").classes("vr-tl-wrap w-full").mark("timeline-chart"):
+        _year_names(n)
+        with (
+            ui.element("div")
+            .classes(f"vr-tl vr-tl-n{n}")
+            .style(f"--n:{n};grid-template-rows:repeat({total}, auto)")
+        ):
+            first, last = max(period.start_year or lo, lo), min(period.end_year or hi, hi)
+            if (period.start_year or period.end_year) and first <= last:
+                ui.element("div").classes("vr-tl-band").style(
+                    f"grid-column:{col(first)}/{col(last) + 1}"
+                ).mark("timeline-period")
+            for year in range(lo, hi + 1):
+                ui.element("div").classes(
+                    "vr-tl-col" + (" now" if year == this_year else "")
+                ).style(f"grid-column:{col(year)}")
+            ui.element("div").classes("vr-tl-head").style("grid-row:1")
+            for year in range(lo, hi + 1):
+                full = year in cover or year in papers
+                full = full or any(sp.first <= year <= sp.last for sp in [*spans, *directed])
+                label = (
+                    ui.label()
+                    .classes(
+                        "vr-tl-year"
+                        + (" full" if full else "")
+                        + (" now" if year == this_year else "")
+                        + ("" if year % 5 == 0 else " minor")
+                        + (" pick" if year in cover else "")
+                    )
+                    .style(f"grid-column:{col(year)};grid-row:1")
+                    .mark(f"timeline-tick-{year}")
+                )
+                with label:
+                    ui.html(f"<span>{year}</span>", sanitize=False)
+                if year in cover:
+                    label.on("click", lambda year=year: pick("year", year)).tooltip(
+                        _("Its excerpts, below")
+                    )
+            row = 2
+            for kind, name, icon, colour, k in rows:
+                ui.element("div").classes("vr-tl-sep").style(f"grid-row:{row}")
                 with (
-                    ui.column()
-                    .classes("vr-tl-items gap-2")
-                    .style(f"grid-column:{lanes + 2};grid-row:{row(year)}")
-                    .mark(f"timeline-{year}")
+                    ui.element("div")
+                    .classes("vr-tl-head")
+                    .style(f"grid-row:{row}/span {k}")
+                    .mark(f"timeline-row-{kind}")
                 ):
-                    for d in excerpts.get(year, []):
-                        _item(d.excerpt, paths, select, open_pdf, d.paper_year)
-                    if titles := papers.get(year):
-                        _papers(year, titles)
-        for sp in spans:
-            _span(sp, lanes, row, show_tab)
-        for t in directed:
-            _thesis(t, lanes, row, show_tab)
+                    ui.icon(icon, size="xs").style(f"color:{colour}")
+                    ui.label(name)
+                if kind == "career":
+                    for sp, end in _cells(spans, hi):
+                        _career(sp, row, col, end, show_tab)
+                elif kind == "theses":
+                    for t, end in _cells(directed, hi):
+                        _thesis(t, row, col, end, show_tab)
+                elif kind == "excerpts":
+                    _excerpt_row(singles, ranges, row, col, picked, pick)
+                else:
+                    top = max(map(len, papers.values()))
+                    for year, titles in papers.items():
+                        _papers(year, titles, top, row, col)
+                row += k
+    if earlier:
+        ui.label(
+            ngettext(
+                "{n} earlier paper not shown (before {year})",
+                "{n} earlier papers not shown (before {year})",
+                earlier,
+            ).format(n=earlier, year=lo)
+        ).classes("text-xs text-grey").mark("timeline-papers-earlier")
 
 
-@contextmanager
+def _year_names(n: int) -> None:
+    """Beyond NAMED_YEARS years, those not a fifth one unnamed when too narrow for all."""
+    if n > NAMED_YEARS:
+        width = LABEL_PX + n * NAMED_PX
+        ui.html(
+            f"<style>@container (max-width:{width}px)"
+            f"{{.vr-tl-n{n} .vr-tl-year.minor span{{visibility:hidden}}}}</style>",
+            sanitize=False,
+        ).classes("hidden")
+
+
+def _cells(spans: list, hi: int):
+    """Each span (in its lane) with the year its cell ends at (excluded): that the next one
+    in its lane starts at, else the last one's after (its label's room)."""
+    by_lane: dict[int, list] = {}
+    for sp in spans:
+        by_lane.setdefault(sp.lane, []).append(sp)
+    for lane in by_lane.values():
+        lane.sort(key=lambda x: x.first)
+        for sp, after in pairwise([*lane, None]):
+            yield sp, after.first if after else hi + 1
+
+
 def _bar(
-    colour: str, sp, now: bool, lanes: int, row: Callable[[int], int], mark: str
-) -> Iterator[ui.column]:
-    """A span (``sp``: its ``first``, ``last`` years, its ``lane``) on the left of the axis:
-    its bar along its years (``now``: still going on), its card at their top (within),
-    an arrow to it from the axis."""
+    colour: str,
+    sp,
+    row: int,
+    col: Callable[[int], int],
+    end: int,
+    now: bool,
+    text: str,
+    mark: str,
+) -> ui.element:
+    """A span (``sp``: its ``first``, ``last`` years, its ``lane``) in its row's lane: its
+    ``text`` (as far as ``end``, the next one in its lane) above its bar along its years
+    (``now``: still going on)."""
+    width = (sp.last - sp.first + 1) / (end - sp.first) * 100
     with (
         ui.element("div")
-        .classes("vr-tl-span" + (" now" if now else ""))
-        .style(
-            f"--c:{colour};--k:{sp.lane};grid-column:{lanes - sp.lane};"
-            f"grid-row:{row(sp.last)}/{row(sp.first) + 1}"
-        )
-        .mark(mark)
+        .classes("vr-tl-item" + (" now" if now else ""))
+        .style(f"--c:{colour};grid-column:{col(sp.first)}/{col(end)};grid-row:{row + sp.lane}")
+        .mark(mark) as item
     ):
-        ui.element("div").classes("vr-tl-bar")
-        ui.element("div").classes("vr-tl-link")
-        with ui.column().classes("vr-tl-card gap-0 cursor-pointer") as card:
-            yield card
+        ui.label(text).classes("vr-tl-text")
+        ui.element("div").classes("vr-tl-bar").style(f"width:{width:.3f}%")
+    return item
 
 
-def _span(
-    sp: tl.CareerSpan, lanes: int, row: Callable[[int], int], show_tab: Callable[[str], None]
+def _career(
+    sp: tl.CareerSpan,
+    row: int,
+    col: Callable[[int], int],
+    end: int,
+    show_tab: Callable[[str], None],
 ) -> None:
     """A line of the career, along its years."""
     e = sp.entry
     colour = KIND_COLOUR["diploma" if e.kind == "diploma" else "position"]
-    with _bar(colour, sp, e.current, lanes, row, f"timeline-career-{e.id}") as card:
-        card.on("click", lambda: show_tab("profile")).tooltip(
-            _("Edited in the Profile tab (Career)")
-        )
+    item = _bar(colour, sp, row, col, end, e.current, e.line(), f"timeline-career-{e.id}")
+    item.on("click", lambda: show_tab("profile"))
+    with item, ui.tooltip().classes("max-w-sm"):
         with ui.row().classes("items-center gap-1 no-wrap"):
-            ui.icon("school" if e.kind == "diploma" else "work", size="xs").style(f"color:{colour}")
-            ui.label(e.when()).classes("text-xs text-grey-8")
-            if e.current:
-                ui.badge(_("current"), color="primary").props("outline")
-        ui.label(e.line()).classes("text-sm font-medium line-clamp-3")
+            ui.icon("school" if e.kind == "diploma" else "work", size="xs")
+            ui.label(e.when() + (f" ({_('current')})" if e.current else ""))
+        ui.label(e.line()).classes("text-sm font-medium")
         if e.details:
-            ui.label(e.details).classes("text-xs text-grey line-clamp-2")
+            ui.label(e.details)
+        ui.label(_("Edited in the Profile tab (Career)")).classes("italic")
 
 
 def _thesis(
-    t: tl.Supervised, lanes: int, row: Callable[[int], int], show_tab: Callable[[str], None]
+    t: tl.Supervised,
+    row: int,
+    col: Callable[[int], int],
+    end: int,
+    show_tab: Callable[[str], None],
 ) -> None:
     """A thesis they supervised, from its start to its defence (in progress: to now)."""
-    colour = KIND_COLOUR["thesis"]
-    with _bar(colour, t, t.in_progress, lanes, row, f"timeline-thesis-{t.id}") as card:
-        card.on("click", lambda: show_tab("theses")).tooltip(_("See it in the Theses tab"))
-        with ui.row().classes("items-center gap-1 no-wrap"):
-            ui.icon("school", size="xs").style(f"color:{KIND_COLOUR['thesis']}")
-            ui.label(
-                _("PhD of {student}").format(student=t.student or "?")
-                + (f", {t.years}" if t.years else "")
-            ).classes("text-xs vr-student")
-            if t.in_progress:
-                ui.badge(_("in progress"), color="grey").props("outline")
-        ui.label(t.title).classes("text-sm line-clamp-2")
+    text = t.student or t.title
+    item = _bar(
+        KIND_COLOUR["thesis"], t, row, col, end, t.in_progress, text, f"timeline-thesis-{t.id}"
+    )
+    item.on("click", lambda: show_tab("theses"))
+    with item, ui.tooltip().classes("max-w-sm"):
+        ui.label(
+            _("PhD of {student}").format(student=t.student or "?")
+            + (f", {t.years}" if t.years else "")
+            + (f" ({_('in progress')})" if t.in_progress else "")
+        )
+        ui.label(t.title).classes("text-sm font-medium")
+        ui.label(_("See it in the Theses tab")).classes("italic")
 
 
-def _papers(year: int, titles: list[str]) -> None:
-    """Their papers of a year: a mark each (up to MAX_MARKS), their titles hovered."""
-    marks = '<span class="vr-tl-mark"></span>' * min(len(titles), MAX_MARKS)
-    more = f" +{len(titles) - MAX_MARKS}" if len(titles) > MAX_MARKS else ""
+def _excerpt_row(
+    singles: list[_Span],
+    ranges: list[_Span],
+    row: int,
+    col: Callable[[int], int],
+    picked: dict[str, int],
+    pick: Callable[..., None],
+) -> None:
+    """The excerpts: those of a single year, dots in it (on a row of their own); those of
+    several, thin bars along them (one above the other when they overlap)."""
+    by_year: dict[int, list[_Span]] = {}
+    for x in singles:
+        by_year.setdefault(x.first, []).append(x)
+    for year, xs in by_year.items():
+        with (
+            ui.element("div")
+            .classes("vr-tl-dots" + (" picked" if picked.get("year") == year else ""))
+            .style(f"grid-column:{col(year)};grid-row:{row}")
+            .on("click", lambda year=year: pick("year", year))
+            .tooltip(
+                ngettext("{n} excerpt in {year}", "{n} excerpts in {year}", len(xs)).format(
+                    n=len(xs), year=year
+                )
+            )
+            .mark(f"timeline-excerpts-{year}")
+        ):
+            if len(xs) > MAX_DOTS:
+                ui.label(str(len(xs))).classes("vr-tl-count")
+                continue
+            for x in xs:
+                e = x.d.excerpt
+                ui.element("div").classes(
+                    "vr-tl-dot"
+                    + (" paper" if x.d.paper_year else "")
+                    + (" off" if e.discarded else "")
+                ).style(f"--c:{e.colour}").mark(f"timeline-dot-{e.id}")
+    start = row + bool(singles)
+    for x in ranges:
+        e = x.d.excerpt
+        with (
+            ui.element("div")
+            .classes(
+                "vr-tl-item thin"
+                + (" off" if e.discarded else "")
+                + (" picked" if picked.get("excerpt") == e.id else "")
+            )
+            .style(
+                f"--c:{e.colour};grid-column:{col(x.first)}/{col(x.last) + 1};"
+                f"grid-row:{start + x.lane}"
+            )
+            .on("click", lambda e=e: pick("excerpt", e.id))
+            .mark(f"timeline-span-{e.id}")
+        ):
+            ui.element("div").classes("vr-tl-bar")
+            with ui.tooltip().classes("max-w-sm"):
+                ui.label(e.years).classes("font-medium")
+                ui.label(e.quoted).classes("line-clamp-3")
+
+
+def _papers(year: int, titles: list[str], top: int, row: int, col: Callable[[int], int]) -> None:
+    """Their papers of a year: a bar as high as their number (``top``: the most of a
+    year's), their titles hovered."""
     with (
-        ui.row()
-        .classes("vr-tl-card vr-tl-papers items-center gap-2 no-wrap")
+        ui.element("div")
+        .classes("vr-tl-papers")
+        .style(f"grid-column:{col(year)};grid-row:{row}")
         .mark(f"timeline-papers-{year}")
     ):
-        ui.html(marks + more, sanitize=False).classes("text-xs text-grey")
-        ui.label(ngettext("{n} paper", "{n} papers", len(titles)).format(n=len(titles))).classes(
-            "text-xs text-grey"
+        ui.label(str(len(titles))).classes("n")
+        ui.element("div").classes("vr-tl-hist").style(
+            f"height:{max(3, round(len(titles) / top * 100)) * 0.014:.3f}rem"
         )
-        with ui.tooltip():
+        with ui.tooltip().classes("max-w-sm"):
+            ui.label(
+                ngettext("{n} paper in {year}", "{n} papers in {year}", len(titles)).format(
+                    n=len(titles), year=year
+                )
+            ).classes("font-medium")
             for title in titles[:20]:
                 ui.label(title).classes("text-xs")
             if len(titles) > 20:
                 ui.label(_("and {n} more").format(n=len(titles) - 20)).classes("text-xs")
+
+
+def _details(
+    excerpts: list[_Span],
+    picked: dict[str, int],
+    paths: dict[int, str],
+    pick: Callable[..., None],
+    select: Callable[[int], None],
+    open_pdf: Callable[[categories.ExcerptView], None],
+) -> None:
+    """The excerpts picked on the timeline: those of a year (along it, or in it), or one."""
+    if not excerpts:
+        return
+    with ui.column().classes("w-full gap-2 mt-2").mark("timeline-details"):
+        if not picked:
+            with ui.row().classes("items-center gap-1 no-wrap"):
+                ui.icon("touch_app", color="grey", size="xs")
+                ui.label(
+                    _("Click a year's dots, an excerpt's bar or a year to see its excerpts here.")
+                ).classes("text-sm text-grey").mark("timeline-details-hint")
+            return
+        if year := picked.get("year"):
+            found = [x for x in excerpts if x.first <= year <= x.last]
+            title = ngettext("{n} excerpt in {year}", "{n} excerpts in {year}", len(found)).format(
+                n=len(found), year=year
+            )
+        else:
+            found = [x for x in excerpts if x.d.excerpt.id == picked.get("excerpt")]
+            title = _("An excerpt, {years}").format(years=found[0].d.excerpt.years if found else "")
+        with ui.row().classes("items-center gap-2 w-full"):
+            ui.icon("format_quote", color="primary")
+            ui.label(title).classes("font-medium")
+            ui.space()
+            ui.button(icon="close", on_click=lambda: pick()).props(
+                "flat dense round size=sm"
+            ).tooltip(_("Close")).mark("timeline-details-close")
+        with ui.element("div").classes("vr-tl-details w-full"):
+            for x in found:
+                _item(x.d.excerpt, paths, select, open_pdf, x.d.paper_year)
 
 
 def _undated_excerpts(
@@ -358,9 +599,9 @@ def _undated_excerpts(
                 "pencil) to place them."
             )
         ).classes("text-sm text-grey")
-        with ui.column().classes("w-full gap-2 pl-3").style("border-left: 2px dashed grey"):
+        with ui.element("div").classes("vr-tl-details w-full"):
             for e in undated:
-                _item(e, paths, select, open_pdf, arrow=False)
+                _item(e, paths, select, open_pdf)
 
 
 def _undated_career(entries: list[career.Entry], show_tab: Callable[[str], None]) -> None:
@@ -393,20 +634,13 @@ def _item(
     select: Callable[[int], None],
     open_pdf: Callable[[categories.ExcerptView], None],
     paper_year: bool = False,
-    arrow: bool = True,
 ) -> None:
-    """An excerpt (or a group: its text) on the timeline, an arrow to it from the axis (but
-    without years): its category, years, markers, its text and where it is from."""
+    """An excerpt (or a group: its text): its category, years, markers, its text and where
+    it is from."""
     with (
         ui.column()
-        .classes(
-            "w-full gap-0 cursor-pointer"
-            + (" vr-tl-card" if arrow else "")
-            + (" opacity-50" if e.discarded else "")
-        )
-        .style(
-            f"--c:{e.colour}" if arrow else f"border-left:3px solid {e.colour};padding-left:.5rem"
-        )
+        .classes("w-full gap-0 cursor-pointer rounded" + (" opacity-50" if e.discarded else ""))
+        .style(f"border-left:3px solid {e.colour};padding:.15rem .5rem")
         .on("click", lambda: select(e.id))
         .tooltip(_("See it in the Excerpts tab"))
         .mark(f"timeline-excerpt-{e.id}")
@@ -417,7 +651,7 @@ def _item(
                 ui.badge(_("the paper's year"), color="grey").props("outline").tooltip(
                     _("No years of its own: placed at the year of its paper")
                 ).mark(f"timeline-paper-year-{e.id}")
-            elif e.years and e.start_year != e.end_year:
+            elif e.years:
                 ui.badge(e.years, color="blue-grey").props("outline").mark(f"timeline-years-{e.id}")
             for key, (label, _tip, icon, colour) in MARKER_ICONS.items():
                 if getattr(e, key):

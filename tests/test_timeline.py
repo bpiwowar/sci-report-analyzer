@@ -65,7 +65,14 @@ async def test_timeline_tab(user: User) -> None:
     undated = categories.add_excerpt(cats["Teaching"], period, "Taught a course.", 1, [])
     await user.open(f"/person/{pid}/{period}?tab=timeline")
     await user.should_see(marker="timeline")
-    await user.should_see("Led a project.", marker="timeline-2021")
+    await user.should_see(marker="timeline-row-excerpts")
+    # A dot in its year; the details below, until a year's are clicked: a hint.
+    await user.should_see(marker=f"timeline-dot-{dated}")
+    await user.should_see(marker="timeline-details-hint")
+    await user.should_not_see("Led a project.", marker="timeline-details")
+    user.find(marker="timeline-excerpts-2021").click()
+    await user.should_see("1 excerpt in 2021", marker="timeline-details")
+    await user.should_see("Led a project.", marker="timeline-details")
     # Without years: said so, apart (not hidden).
     await user.should_see("1 excerpt without years", marker="timeline-undated")
     await user.should_see("Taught a course.", marker="timeline-undated")
@@ -77,6 +84,30 @@ async def test_timeline_tab(user: User) -> None:
     assert undated
 
 
+async def test_timeline_tab_ranges(user: User) -> None:
+    """An excerpt along several years: a bar along them, in the details clicked (and in
+    those of each of its years)."""
+    pid, period, cats, _paper = _seed()
+    add = categories.add_excerpt
+    project = add(cats["Research"], period, "Led a project.", 1, [], start=2019, end=2022)
+    taught = add(cats["Teaching"], period, "Taught a course.", 1, [], start=2020, end=2020)
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see(marker=f"timeline-span-{project}")
+    await user.should_see(marker=f"timeline-dot-{taught}")
+    user.find(marker=f"timeline-span-{project}").click()
+    await user.should_see("An excerpt, 2019–2022", marker="timeline-details")
+    await user.should_see("Led a project.", marker="timeline-details")
+    await user.should_not_see("Taught a course.", marker="timeline-details")
+    # A year clicked: its excerpts, those along it too.
+    user.find(marker="timeline-tick-2020").click()
+    await user.should_see("2 excerpts in 2020", marker="timeline-details")
+    await user.should_see("Taught a course.", marker="timeline-details")
+    await user.should_see("Led a project.", marker="timeline-details")
+    # Closed: the hint again.
+    user.find(marker="timeline-details-close").click()
+    await user.should_see(marker="timeline-details-hint")
+
+
 async def test_timeline_tab_without_excerpts(user: User) -> None:
     pid, period, _cats, _paper = _seed()
     await user.open(f"/person/{pid}/{period}?tab=timeline")
@@ -84,7 +115,8 @@ async def test_timeline_tab_without_excerpts(user: User) -> None:
     # Nor career, nor theses: said so (the paper of 2018 still on it).
     await user.should_see(marker="timeline-none-career")
     await user.should_see(marker="timeline-none-theses")
-    await user.should_see("1 paper", marker="timeline-papers-2018")
+    await user.should_see(marker="timeline-row-papers")
+    await user.should_see("1 paper in 2018", marker="timeline-papers-2018")
     # Not within a folder: said so.
     other = make_person("Bob Sample")
     await user.open(f"/person/{other}?tab=timeline")
@@ -142,18 +174,30 @@ async def test_timeline_tab_career_and_theses(user: User) -> None:
     career.save(pid, Entry("position", "Mentor"))  # (no date: listed apart)
     done = replace(thesis("t1", "director", "On things"), defence_date="2016-06-01")
     add_source(pid, "thesesfr", "1", theses=[done])
+    (directed,) = timeline.supervised(pid)
     categories.add_excerpt(cats["Research"], period, "Led a project.", 1, [], start=2021)
     await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see(marker="timeline-row-career")
+    await user.should_see(marker="timeline-row-theses")
     await user.should_see("Lecturer", marker=f"timeline-career-{lead}")
-    await user.should_see("On things", marker="timeline-2016")
+    # A PhD: its student's name on its bar, its title hovered.
+    await user.should_see("A Student", marker=f"timeline-thesis-{directed.id}")
+    await user.should_see("On things", marker=f"timeline-thesis-{directed.id}")
     await user.should_see(marker="timeline-career-undated")
-    # Every year a tick, even without anything (the gaps seen); the folder's period shaded.
+    # Every year a column, even without anything (the gaps seen); the folder's period shaded.
     await user.should_see(marker="timeline-tick-2017")
     await user.should_see(marker="timeline-period")
+    # Clicked: its tab.
+    user.find(marker=f"timeline-thesis-{directed.id}").click()
+    tab = user.find(marker="tab-theses").elements.pop()
+    assert tab.parent_slot.parent.value == "theses"
+    user.find(marker="tab-timeline").click()
+    await user.should_see(marker=f"timeline-career-{lead}")
     # A kind hidden: off the timeline.
     user.find(marker="timeline-show-career").click()
     await user.should_not_see(marker=f"timeline-career-{lead}")
-    await user.should_see("Led a project.", marker="timeline-2021")
+    await user.should_not_see(marker="timeline-row-career")
+    await user.should_see(marker="timeline-excerpts-2021")
 
 
 def test_lanes_from_a_start() -> None:
@@ -166,3 +210,16 @@ def test_lanes_from_a_start() -> None:
     ]
     assert timeline.lanes(spans, start=2) == 4
     assert [t.lane for t in spans] == [3, 2, 2]
+
+
+def test_lanes_with_room() -> None:
+    """Each span taking at least ``room`` years (its label's): the next one in its lane not
+    before."""
+    spans = [
+        timeline.Supervised(1, 2020, "A", "", "", False, 2020, 2020),
+        timeline.Supervised(2, 2018, "B", "", "", False, 2018, 2018),
+        timeline.Supervised(3, 2015, "C", "", "", False, 2015, 2015),
+    ]
+    assert timeline.lanes(spans) == 1
+    assert timeline.lanes(spans, room=3) == 2
+    assert [t.lane for t in spans] == [0, 1, 0]

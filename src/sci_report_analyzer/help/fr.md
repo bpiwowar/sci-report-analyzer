@@ -456,17 +456,23 @@ de l'autre dossier (ajoutées s'il le faut).
 Le bouton 📝 de la ligne d'une personne (aussi à côté du nom du dossier sur sa page) ouvre ses **notes dans le
 dossier** (son onglet Rapport ; ses extraits par catégorie : l'onglet Extraits), comme à côté de ses PDF : pour les
 écrire sans ouvrir de document (par exemple quand elle n'en a aucun). La fenêtre d'un extrait nomme sa catégorie sous
-son titre. Son onglet **Chronologie** dessine ce qui est daté à son sujet le long d'un axe vertical des années, les plus
-récentes en haut (chaque année marquée, pour que les trous se voient ; sa période dans le dossier en grisé), une
-flèche partant de l'axe vers chaque élément. À gauche, sa **carrière** (onglet Profil) : une ligne de son CV en
-barre le long de ses années (un poste actuel : jusqu'à aujourd'hui), et au-delà les **thèses qu'elle a dirigées**, chacune
-en barre de son début à sa soutenance (en cours : jusqu'à aujourd'hui), celles qui se chevauchent côte à côte ;
-à droite, ses **extraits** dans le dossier (de la couleur de leur catégorie) et ses **articles** (une petite marque chacun, leurs
-titres au survol). Chaque sorte s'affiche ou se masque par son interrupteur ; celle dont elle n'a aucun élément
-est signalée. Un extrait est à sa première année (l'extrait d'un article sans années : à l'année de l'article) ;
-cliqué, il est montré dans l'onglet Extraits (où ses années se modifient), son icône PDF ouvrant son PDF à côté de
-la page ; une ligne de la carrière cliquée montre l'onglet Profil, une thèse l'onglet Thèses. Les extraits sans
-années, et les lignes de la carrière sans dates, sont listés à part, en dessous.
+son titre. Son onglet **Chronologie** dessine ce qui est daté à son sujet le long d'un axe horizontal des années, les
+plus anciennes à gauche (chaque année une colonne, pour que les trous se voient ; l'année en cours marquée ; sa
+période dans le dossier en grisé), une ligne par sorte. Sa **carrière** (onglet Profil) : une ligne de son CV en barre
+le long de ses années (un poste actuel : jusqu'à aujourd'hui, en s'estompant), son nom au-dessus ; les **doctorants**
+qu'elle a encadrés, chacun en barre du début de la thèse à sa soutenance (en cours : jusqu'à aujourd'hui), le nom du
+doctorant au-dessus ; les barres qui se chevauchent l'une au-dessus de l'autre. Ses **extraits** dans le dossier (de
+la couleur de leur catégorie) : un point dans leur année, une fine barre le long de leurs années quand ils en ont
+plusieurs ; ses **articles** : une petite barre par année, aussi haute que leur nombre (leurs titres au survol). Au
+survol, une barre dit tout d'elle ; une ligne de la carrière cliquée montre l'onglet Profil, une thèse l'onglet
+Thèses. Les points d'une année, la barre d'un extrait ou une année cliqués montrent ses extraits sous la chronologie ;
+là, un extrait cliqué est montré dans l'onglet Extraits (où ses années se modifient), son icône PDF ouvrant son PDF à
+côté de la page. L'extrait d'un article sans années est à l'année de l'article. La chronologie commence au plus ancien
+de sa carrière, de ses thèses et de ses extraits (ses articles au plus trois ans avant ; les plus anciens comptés en
+dessous) ; avec beaucoup d'années, seule une sur cinq est nommée quand c'est étroit, et la chronologie défile de côté
+quand elle est très longue. Chaque sorte s'affiche ou se masque par son interrupteur ; celle dont elle n'a aucun
+élément est signalée. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à part, en
+dessous.
 
 Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre**, chaque dossier
 déplié montrant les dossiers qu'il contient puis ses personnes, une ligne chacune (sa période, ses étoiles, ses

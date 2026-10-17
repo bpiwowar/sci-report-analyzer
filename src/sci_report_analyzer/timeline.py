@@ -1,5 +1,5 @@
 """A person's timeline: what is dated about them, by year. Their career and the theses they
-supervised (spans of years, side by side when they overlap), their excerpts in a folder (see
+supervised (spans of years, one above the other when they overlap), their excerpts in a folder (see
 categories.timeline) and their papers (by year)."""
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ from .sources.base import to_year
 @dataclass
 class CareerSpan:
     """A line of the CV on the timeline: from its first year to its last (a current
-    position: this year); ``lane``: its column, 0 the nearest the axis (overlapping lines
-    side by side)."""
+    position: this year); ``lane``: its row, 0 the top one (overlapping lines one above the
+    other)."""
 
     entry: career.Entry
     first: int
@@ -47,12 +47,14 @@ def career_spans(
     return spans, undated
 
 
-def lanes(spans: list, start: int = 0) -> int:
+def lanes(spans: list, start: int = 0, room: int = 1) -> int:
     """Each span (its ``first``, ``last`` years) in the first lane free over its years (from
-    the most recent down), from ``start`` on; returns the lanes taken, ``start`` included."""
+    the most recent down), from ``start`` on, taking at least ``room`` years (e.g. its
+    label's); returns the lanes taken, ``start`` included."""
     lowest: list[int] = []  # (each lane: the first year of its last span)
     for sp in sorted(spans, key=lambda x: (-x.last, -x.first)):
-        lane = next((i for i, low in enumerate(lowest) if sp.last < low), len(lowest))
+        end = max(sp.last, sp.first + room - 1)
+        lane = next((i for i, low in enumerate(lowest) if end < low), len(lowest))
         if lane == len(lowest):
             lowest.append(sp.first)
         lowest[lane] = sp.first
@@ -63,7 +65,7 @@ def lanes(spans: list, start: int = 0) -> int:
 @dataclass
 class Supervised:
     """A thesis the person directed: from its start to its defence (in progress: to this
-    year), as a span; ``year``: its last, none without a date; ``lane``: its column (see
+    year), as a span; ``year``: its last, none without a date; ``lane``: its row (see
     lanes)."""
 
     id: int
