@@ -59,9 +59,12 @@ def test_timeline_empty() -> None:
     assert categories.timeline(period) == ([], [])
 
 
-async def test_timeline_tab(user: User) -> None:
+async def test_timeline_tab(user: User, fake_viewer) -> None:
     pid, period, cats, _paper = _seed()
-    dated = categories.add_excerpt(cats["Research"], period, "Led a project.", 1, [], start=2021)
+    doc = documents.add(period, "Application.pdf", PDF)
+    dated = categories.add_excerpt(
+        cats["Research"], period, "Led a project.", 1, [], document_id=doc, start=2021
+    )
     undated = categories.add_excerpt(cats["Teaching"], period, "Taught a course.", 1, [])
     await user.open(f"/person/{pid}/{period}?tab=timeline")
     await user.should_see(marker="timeline")
@@ -76,12 +79,35 @@ async def test_timeline_tab(user: User) -> None:
     # Without years: said so, apart (not hidden).
     await user.should_see("1 excerpt without years", marker="timeline-undated")
     await user.should_see("Taught a course.", marker="timeline-undated")
-    # Clicked: shown in the Excerpts tab.
+    # Clicked: its PDF beside the page (the timeline still shown).
     user.find(marker=f"timeline-excerpt-{dated}").click()
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    tab = user.find(marker="tab-timeline").elements.pop()
+    assert tab.parent_slot.parent.value == "timeline"
+    # Its button: seen in the Excerpts tab.
+    user.find(marker=f"timeline-select-{dated}").click()
     await user.should_see(marker="excerpts-side")
-    tab = user.find(marker="tab-excerpts").elements.pop()
     assert tab.parent_slot.parent.value == "excerpts"
     assert undated
+
+
+async def test_timeline_edit_excerpt(user: User) -> None:
+    """An excerpt edited from the timeline (its dialog, as in the Excerpts tab): drawn again."""
+    pid, period, cats, _paper = _seed()
+    dated = categories.add_excerpt(cats["Research"], period, "Led a project.", 1, [], start=2021)
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    user.find(marker="timeline-tick-2021").click()
+    await user.should_see(marker=f"timeline-edit-{dated}")
+    user.find(marker=f"timeline-edit-{dated}").click()
+    await user.should_see(marker="excerpt-edit-text")
+    user.find(marker="excerpt-edit-text").clear().type("Led a big project.")
+    user.find(marker="excerpt-edit-save").click()
+    await user.should_see("Led a big project.", marker=f"timeline-span-{dated}")
+    assert next(e for e in categories.excerpts(period) if e.id == dated).text == (
+        "Led a big project."
+    )
+    tab = user.find(marker="tab-timeline").elements.pop()
+    assert tab.parent_slot.parent.value == "timeline"
 
 
 async def test_timeline_tab_ranges(user: User) -> None:

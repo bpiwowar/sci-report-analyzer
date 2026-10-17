@@ -2325,182 +2325,191 @@ class _ExcerptsSection:
                 mark="excerpt-remove-confirm",
             )
 
-    def originals(self, e: categories.ExcerptView, text: ui.textarea) -> None:
-        """The passages as selected (of each excerpt of a group): where, how edited since; to
-        copy into the text (that of a group: added to it), or to open (their PDF, at their
-        page, in a new tab)."""
-        ui.label(_("As selected") if not e.members else _("The excerpts, as selected")).classes(
-            "text-sm font-medium"
-        )
-        with ui.column().classes("w-full gap-1 max-h-64 overflow-auto"):
-            for x in e.parts:
-                original = x.original or x.text
-
-                def use(original: str = original) -> None:
-                    current = (text.value or "").strip()
-                    text.value = f"{current} […] {original}" if e.members and current else original
-
-                with (
-                    ui.row()
-                    .classes("w-full items-start no-wrap gap-1")
-                    .mark(f"excerpt-original-{x.id}")
-                ):
-                    ui.icon("link" if x.ref_only else "format_quote", size="xs").classes(
-                        "mt-1 text-grey"
-                    )
-                    with ui.column().classes("gap-0 grow min-w-0"):
-                        ui.label(original).classes("text-sm")
-                        where = _("{source}, p. {page}").format(source=x.source, page=x.page or "?")
-                        if x.ref_only:
-                            where += " · " + _("cited by its place only")
-                        ui.label(where).classes("text-xs text-grey")
-                        if x.text != original:
-                            ui.label(_("Edited: {text}").format(text=x.text)).classes(
-                                "text-xs text-grey-8 italic"
-                            )
-                    ui.button(icon="content_paste_go", on_click=use).props(
-                        "flat dense round size=xs color=grey-7"
-                    ).tooltip(
-                        _("Add it to the text") if e.members else _("Back to it (as selected)")
-                    ).mark(f"excerpt-original-use-{x.id}")
-                    ui.button(icon="open_in_new").on(
-                        "click", js_handler=f"() => vrLink.open({json.dumps(excerpt_url(x))})"
-                    ).props("flat dense round size=xs color=grey-7").tooltip(
-                        _("Open its document (at its page)")
-                    ).mark(f"excerpt-original-open-{x.id}")
-
-    def category_line(self, e: categories.ExcerptView) -> None:
-        """Under the title of an excerpt's dialog: its category (its path, in its colour)."""
-        nodes = categories.tree(self.side.folder[0]) if self.side.folder else []
-        path = next((n.path for n in nodes if n.id == e.category_id), None)
-        if path is None:
-            return
-        with ui.row().classes("items-center gap-1 no-wrap -mt-3").mark("excerpt-category"):
-            ui.icon("circle", size="0.7rem").style(f"color: {e.colour}")
-            ui.label(path).classes("text-sm text-grey-8")
-
     def edit_excerpt(self, e: categories.ExcerptView, tab: str = "text") -> None:
-        """A dialog on an excerpt (that of its group), in tabs: its text (that of a group),
-        years, markers, level and tags, the passages as selected shown; its category (one
-        picked: all saved, then moved there); its commentary (Markdown) and link."""
-        side = self.side
-        with (
-            side.host.dialogs,
-            transient_dialog(
-                _("Merged excerpts") if e.members else _("Excerpt"), width="w-[40rem] max-w-full"
-            ) as (dialog, _card),
-        ):
-            self.category_line(e)
-            with ui.tabs().props("dense align=left no-caps").classes("w-full") as tabs:
-                tab_text = ui.tab("text", _("Excerpt"), icon="format_quote").mark(
-                    "excerpt-tab-text"
+        excerpt_dialog(self.side, e, tab)
+
+
+def _originals(e: categories.ExcerptView, text: ui.textarea) -> None:
+    """The passages as selected (of each excerpt of a group): where, how edited since; to
+    copy into the text (that of a group: added to it), or to open (their PDF, at their
+    page, in a new tab)."""
+    ui.label(_("As selected") if not e.members else _("The excerpts, as selected")).classes(
+        "text-sm font-medium"
+    )
+    with ui.column().classes("w-full gap-1 max-h-64 overflow-auto"):
+        for x in e.parts:
+            original = x.original or x.text
+
+            def use(original: str = original) -> None:
+                current = (text.value or "").strip()
+                text.value = f"{current} […] {original}" if e.members and current else original
+
+            with (
+                ui.row()
+                .classes("w-full items-start no-wrap gap-1")
+                .mark(f"excerpt-original-{x.id}")
+            ):
+                ui.icon("link" if x.ref_only else "format_quote", size="xs").classes(
+                    "mt-1 text-grey"
                 )
-                ui.tab("move", _("Category"), icon="drive_file_move").mark("excerpt-tab-move")
-                ui.tab("notes", _("Notes"), icon="comment").mark("excerpt-tab-notes")
-            with ui.tab_panels(tabs, value=tab).classes("w-full"):
-                with ui.tab_panel(tab_text).classes("p-1 gap-2"):
-                    text = (
-                        ui.textarea(
-                            _("Text of the group") if e.members else _("Text"), value=e.quoted
+                with ui.column().classes("gap-0 grow min-w-0"):
+                    ui.label(original).classes("text-sm")
+                    where = _("{source}, p. {page}").format(source=x.source, page=x.page or "?")
+                    if x.ref_only:
+                        where += " · " + _("cited by its place only")
+                    ui.label(where).classes("text-xs text-grey")
+                    if x.text != original:
+                        ui.label(_("Edited: {text}").format(text=x.text)).classes(
+                            "text-xs text-grey-8 italic"
                         )
-                        .props("outlined autogrow")
-                        .classes("w-full")
-                        .mark("excerpt-edit-text")
-                    )
-                    if e.members:
-                        ui.label(
-                            _(
-                                "Its quotes, joined; edited, it is the text of the group (its "
-                                "excerpts: their places only). Blank: its quotes again."
-                            )
-                        ).classes("text-xs text-grey")
-                    self.originals(e, text)
-                    props = excerpt_properties(
-                        e.start_year,
-                        e.end_year,
-                        e.influence,
-                        e.tag_names,
-                        salient=e.salient,
-                        minor=e.minor,
-                        caveat=e.caveat,
-                        folder_id=side.folder[0] if side.folder else None,
-                        level=e.level,
-                    )
-                with ui.tab_panel("move").classes("p-1 gap-2"):
-                    path = next(
-                        (n.path for n in categories.tree(side.folder[0]) if n.id == e.category_id),
-                        "",
-                    )
-                    ui.label(
-                        _("In {category}: pick another one to move it there (and save)").format(
-                            category=path
-                        )
-                    ).classes("text-sm text-grey")
+                ui.button(icon="content_paste_go", on_click=use).props(
+                    "flat dense round size=xs color=grey-7"
+                ).tooltip(
+                    _("Add it to the text") if e.members else _("Back to it (as selected)")
+                ).mark(f"excerpt-original-use-{x.id}")
+                ui.button(icon="open_in_new").on(
+                    "click", js_handler=f"() => vrLink.open({json.dumps(excerpt_url(x))})"
+                ).props("flat dense round size=xs color=grey-7").tooltip(
+                    _("Open its document (at its page)")
+                ).mark(f"excerpt-original-open-{x.id}")
 
-                    def moved(cat_id: int) -> None:
-                        save()
-                        categories.move_excerpt(e.id, cat_id)
-                        side.last_category = cat_id
-                        name = next(
-                            (n.path for n in categories.tree(side.folder[0]) if n.id == cat_id),
-                            "",
-                        )
-                        ui.notify(_("Moved to {category}").format(category=name))
-                        close(dialog)
-                        side.refresh_excerpts()
 
-                    category_list(side, e.quoted, moved, current=e.category_id)
-                with ui.tab_panel("notes").classes("p-1 gap-2"):
-                    editor = MarkdownEditor(
-                        e.comment or "",
-                        render=lambda t: (
-                            reports.render(
-                                t, reports.folder_context(side.stats, side.period_id)
-                            ).text
-                        ),
-                        mode="split",
-                        mark="excerpt-comment-input",
-                        height="10rem",
-                    )
-                    editor.open_cited = side.open_cited
+def _category_line(side: Side, e: categories.ExcerptView) -> None:
+    """Under the title of an excerpt's dialog: its category (its path, in its colour)."""
+    nodes = categories.tree(side.folder[0]) if side.folder else []
+    path = next((n.path for n in nodes if n.id == e.category_id), None)
+    if path is None:
+        return
+    with ui.row().classes("items-center gap-1 no-wrap -mt-3").mark("excerpt-category"):
+        ui.icon("circle", size="0.7rem").style(f"color: {e.colour}")
+        ui.label(path).classes("text-sm text-grey-8")
+
+
+def excerpt_dialog(
+    side: Side,
+    e: categories.ExcerptView,
+    tab: str = "text",
+    then: Callable[[], None] | None = None,
+) -> None:
+    """A dialog on an excerpt (that of its group), in tabs: its text (that of a group),
+    years, markers, level and tags, the passages as selected shown; its category (one
+    picked: all saved, then moved there); its commentary (Markdown) and link. ``then``: once
+    saved (e.g. the timeline drawn again; the side's excerpts are)."""
+    with (
+        side.host.dialogs,
+        transient_dialog(
+            _("Merged excerpts") if e.members else _("Excerpt"), width="w-[40rem] max-w-full"
+        ) as (dialog, _card),
+    ):
+        _category_line(side, e)
+        with ui.tabs().props("dense align=left no-caps").classes("w-full") as tabs:
+            tab_text = ui.tab("text", _("Excerpt"), icon="format_quote").mark("excerpt-tab-text")
+            ui.tab("move", _("Category"), icon="drive_file_move").mark("excerpt-tab-move")
+            ui.tab("notes", _("Notes"), icon="comment").mark("excerpt-tab-notes")
+        with ui.tab_panels(tabs, value=tab).classes("w-full"):
+            with ui.tab_panel(tab_text).classes("p-1 gap-2"):
+                text = (
+                    ui.textarea(_("Text of the group") if e.members else _("Text"), value=e.quoted)
+                    .props("outlined autogrow")
+                    .classes("w-full")
+                    .mark("excerpt-edit-text")
+                )
+                if e.members:
                     ui.label(
                         _(
-                            "Its commentary: in the notes and the copy, a comment after the "
-                            "excerpt (%% … %%), kept for reference, not shown. Empty: none."
+                            "Its quotes, joined; edited, it is the text of the group (its "
+                            "excerpts: their places only). Blank: its quotes again."
                         )
                     ).classes("text-xs text-grey")
-                    with ui.row().classes("w-full items-center no-wrap gap-1"):
-                        url = (
-                            ui.input(_("Link"), value=e.url or "", placeholder="https://…")
-                            .props("dense outlined clearable")
-                            .classes("grow")
-                            .tooltip(_("A link (URL), written after the excerpt in the notes"))
-                            .mark("excerpt-url")
-                        )
-                        ui.button(
-                            icon="open_in_new",
-                            on_click=lambda: (
-                                ui.navigate.to(url.value.strip(), new_tab=True)
-                                if (url.value or "").strip()
-                                else None
-                            ),
-                        ).props("flat dense round size=sm color=grey-7").tooltip(
-                            _("Open the link")
-                        ).mark("excerpt-url-open")
+                _originals(e, text)
+                props = excerpt_properties(
+                    e.start_year,
+                    e.end_year,
+                    e.influence,
+                    e.tag_names,
+                    salient=e.salient,
+                    minor=e.minor,
+                    caveat=e.caveat,
+                    folder_id=side.folder[0] if side.folder else None,
+                    level=e.level,
+                )
+            with ui.tab_panel("move").classes("p-1 gap-2"):
+                path = next(
+                    (n.path for n in categories.tree(side.folder[0]) if n.id == e.category_id),
+                    "",
+                )
+                ui.label(
+                    _("In {category}: pick another one to move it there (and save)").format(
+                        category=path
+                    )
+                ).classes("text-sm text-grey")
 
-            def save() -> None:
-                if e.members:
-                    joined = " […] ".join(x.text for x in e.parts if not x.ref_only)
-                    edited = " ".join((text.value or "").split())
-                    categories.set_group_text(e.id, None if edited == joined else edited)
-                categories.update_excerpt(e.id, text=None if e.members else text.value, **props())
-                categories.set_comment(e.id, editor.value)
-                categories.set_url(e.id, url.value)
-                side.refresh_excerpts()
+                def moved(cat_id: int) -> None:
+                    save(done=False)
+                    categories.move_excerpt(e.id, cat_id)
+                    side.last_category = cat_id
+                    name = next(
+                        (n.path for n in categories.tree(side.folder[0]) if n.id == cat_id),
+                        "",
+                    )
+                    ui.notify(_("Moved to {category}").format(category=name))
+                    close(dialog)
+                    side.refresh_excerpts()
+                    if then is not None:
+                        then()
 
-            actions(dialog, _("Save"), save, mark="excerpt-edit-save")
-        if tab == "notes":
-            editor.focus()
+                category_list(side, e.quoted, moved, current=e.category_id)
+            with ui.tab_panel("notes").classes("p-1 gap-2"):
+                editor = MarkdownEditor(
+                    e.comment or "",
+                    render=lambda t: (
+                        reports.render(t, reports.folder_context(side.stats, side.period_id)).text
+                    ),
+                    mode="split",
+                    mark="excerpt-comment-input",
+                    height="10rem",
+                )
+                editor.open_cited = side.open_cited
+                ui.label(
+                    _(
+                        "Its commentary: in the notes and the copy, a comment after the "
+                        "excerpt (%% … %%), kept for reference, not shown. Empty: none."
+                    )
+                ).classes("text-xs text-grey")
+                with ui.row().classes("w-full items-center no-wrap gap-1"):
+                    url = (
+                        ui.input(_("Link"), value=e.url or "", placeholder="https://…")
+                        .props("dense outlined clearable")
+                        .classes("grow")
+                        .tooltip(_("A link (URL), written after the excerpt in the notes"))
+                        .mark("excerpt-url")
+                    )
+                    ui.button(
+                        icon="open_in_new",
+                        on_click=lambda: (
+                            ui.navigate.to(url.value.strip(), new_tab=True)
+                            if (url.value or "").strip()
+                            else None
+                        ),
+                    ).props("flat dense round size=sm color=grey-7").tooltip(
+                        _("Open the link")
+                    ).mark("excerpt-url-open")
+
+        def save(done: bool = True) -> None:
+            if e.members:
+                joined = " […] ".join(x.text for x in e.parts if not x.ref_only)
+                edited = " ".join((text.value or "").split())
+                categories.set_group_text(e.id, None if edited == joined else edited)
+            categories.update_excerpt(e.id, text=None if e.members else text.value, **props())
+            categories.set_comment(e.id, editor.value)
+            categories.set_url(e.id, url.value)
+            side.refresh_excerpts()
+            if done and then is not None:
+                then()
+
+        actions(dialog, _("Save"), save, mark="excerpt-edit-save")
+    if tab == "notes":
+        editor.focus()
 
 
 def categories_section(side: Side) -> Callable[[], None]:

@@ -4,13 +4,14 @@ a row for each kind of what is dated about them. Their career (see timeline.care
 and the PhDs they supervised: bars along their years, one above the other when they
 overlap; their excerpts (see categories.timeline): the beginning of their text above a
 thin bar along their years (one above the other too); their papers: a small bar a year, as
-high as their number. An excerpt, or a year's, clicked: shown in the details below. Each
-kind shown or hidden; what is without a date listed apart."""
+high as their number. An excerpt, or a year's, clicked: shown in the details below (there,
+its PDF opened beside the page at it, clicked; edited, its pencil). Each kind shown or
+hidden; what is without a date listed apart."""
 
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import date
 from itertools import pairwise
@@ -127,6 +128,18 @@ class _Span:
     lane: int = 0
 
 
+@dataclass
+class _Acts:
+    """What an excerpt in the details does: ``show``, its PDF beside the page at it (clicked);
+    ``edit``, its dialog (as in the Excerpts tab; then the timeline drawn again); ``select``,
+    it in the Excerpts tab; ``on_timeline``, its switch."""
+
+    show: Callable[[categories.ExcerptView], None]
+    edit: Callable[[categories.ExcerptView], Awaitable[None] | None]
+    select: Callable[[int], None]
+    on_timeline: Callable[[categories.ExcerptView, bool], None]
+
+
 def _spanned(d: categories.Dated) -> _Span:
     """An excerpt along its years (without both: at its year)."""
     e = d.excerpt
@@ -139,14 +152,17 @@ def timeline_view(
     person_id: int,
     period: Period,
     select: Callable[[int], None],
-    open_pdf: Callable[[categories.ExcerptView], None],
+    show: Callable[[categories.ExcerptView], None],
+    edit: Callable[[categories.ExcerptView, Callable[[], None]], Awaitable[None] | None],
     show_tab: Callable[[str], None],
 ) -> None:
     """The timeline of a person, their excerpts those in the folder of ``period``: an
-    excerpt (or a year's) clicked, shown in the details below, where clicked it is selected
-    in the Excerpts tab (``select``), its PDF opened beside the page (``open_pdf``); a line
-    of their career or a PhD student clicked, in the details too, edited there (or seen in
-    its tab: ``show_tab``). Drawn again once one is edited (what is shown, the zoom kept)."""
+    excerpt (or a year's) clicked, shown in the details below, where clicked its PDF is
+    opened beside the page at it (``show``), edited with its pencil (``edit``: its dialog,
+    given what draws the timeline again once saved), seen in the Excerpts tab (``select``);
+    a line of their career or a PhD student clicked, in the details too, edited there (or
+    seen in its tab: ``show_tab``). Drawn again once one is edited (what is shown, the zoom
+    kept)."""
     state: dict = {
         "shown": {"career": True, "excerpts": True, "theses": True, "papers": True},
         "picked": {},  # ("year", "excerpt", "career" or "thesis": shown in the details)
@@ -155,7 +171,7 @@ def timeline_view(
 
     @ui.refreshable
     def view() -> None:
-        _view(person_id, period, select, open_pdf, show_tab, state, view.refresh)
+        _view(person_id, period, select, show, edit, show_tab, state, view.refresh)
 
     view()
 
@@ -164,7 +180,8 @@ def _view(
     person_id: int,
     period: Period,
     select: Callable[[int], None],
-    open_pdf: Callable[[categories.ExcerptView], None],
+    show: Callable[[categories.ExcerptView], None],
+    edit: Callable[[categories.ExcerptView, Callable[[], None]], Awaitable[None] | None],
     show_tab: Callable[[str], None],
     state: dict,
     rebuild: Callable[[], None],
@@ -197,6 +214,8 @@ def _view(
             picked.clear()
         rebuild()
 
+    acts = _Acts(show, lambda e: edit(e, rebuild), select, on_timeline)
+
     @ui.refreshable
     def drawn() -> None:
         on = {k: v and counts[k] for k, v in shown.items()}
@@ -213,11 +232,11 @@ def _view(
         )
         _line_details(person_id, spans, directed, picked, pick, show_tab, rebuild)
         if on["excerpts"]:
-            _details(excerpts, picked, paths, pick, select, open_pdf, on_timeline)
+            _details(excerpts, picked, paths, pick, acts)
             if undated:
-                _undated_excerpts(undated, paths, select, open_pdf, on_timeline)
+                _undated_excerpts(undated, paths, acts)
             if left_out:
-                _left_out(left_out, paths, select, open_pdf, on_timeline)
+                _left_out(left_out, paths, acts)
         if on["career"] and no_date:
             _undated_career(no_date, show_tab)
 
@@ -239,8 +258,8 @@ def _view(
                 "the PhDs they supervised (a bar along their years), their excerpts (the "
                 "beginning of their text above a thin bar along their years) and their papers "
                 "(their number a year). Clicked, what it is shown below: a line of their career "
-                "or a PhD student, edited there; an excerpt, or a year's, shown in the Excerpts "
-                "tab when clicked there (its years edited there: its pencil). An excerpt without "
+                "or a PhD student, edited there; an excerpt, or a year's: clicked there, its PDF "
+                "beside the page, at it; its pencil edits it (its years…). An excerpt without "
                 "years of its own is at its paper's year. The magnifiers widen the years."
             )
         ).classes("text-sm text-grey")
@@ -722,9 +741,7 @@ def _details(
     picked: dict[str, int],
     paths: dict[int, str],
     pick: Callable[..., None],
-    select: Callable[[int], None],
-    open_pdf: Callable[[categories.ExcerptView], None],
-    on_timeline: Callable[[categories.ExcerptView, bool], None],
+    acts: _Acts,
 ) -> None:
     """The excerpts picked on the timeline: those of a year (along it, or in it), or one."""
     if not excerpts or picked.keys() & {"career", "thesis"}:
@@ -754,15 +771,13 @@ def _details(
             ).tooltip(_("Close")).mark("timeline-details-close")
         with ui.element("div").classes("vr-tl-details w-full"):
             for x in found:
-                _item(x.d.excerpt, paths, select, open_pdf, on_timeline, x.d.paper_year)
+                _item(x.d.excerpt, paths, acts, x.d.paper_year)
 
 
 def _undated_excerpts(
     undated: list[categories.ExcerptView],
     paths: dict[int, str],
-    select: Callable[[int], None],
-    open_pdf: Callable[[categories.ExcerptView], None],
-    on_timeline: Callable[[categories.ExcerptView, bool], None],
+    acts: _Acts,
 ) -> None:
     with ui.column().classes("w-full gap-2 mt-4").mark("timeline-undated"):
         with ui.row().classes("items-center gap-2"):
@@ -780,15 +795,13 @@ def _undated_excerpts(
         ).classes("text-sm text-grey")
         with ui.element("div").classes("vr-tl-details w-full"):
             for e in undated:
-                _item(e, paths, select, open_pdf, on_timeline)
+                _item(e, paths, acts)
 
 
 def _left_out(
     left_out: list[categories.ExcerptView],
     paths: dict[int, str],
-    select: Callable[[int], None],
-    open_pdf: Callable[[categories.ExcerptView], None],
-    on_timeline: Callable[[categories.ExcerptView, bool], None],
+    acts: _Acts,
 ) -> None:
     """The excerpts left out of the timeline (their switch off): listed, folded."""
     with (
@@ -809,7 +822,7 @@ def _left_out(
         ).classes("text-sm text-grey")
         with ui.element("div").classes("vr-tl-details w-full"):
             for e in left_out:
-                _item(e, paths, select, open_pdf, on_timeline)
+                _item(e, paths, acts)
 
 
 def _undated_career(entries: list[career.Entry], show_tab: Callable[[str], None]) -> None:
@@ -839,19 +852,17 @@ def _undated_career(entries: list[career.Entry], show_tab: Callable[[str], None]
 def _item(
     e: categories.ExcerptView,
     paths: dict[int, str],
-    select: Callable[[int], None],
-    open_pdf: Callable[[categories.ExcerptView], None],
-    on_timeline: Callable[[categories.ExcerptView, bool], None],
+    acts: _Acts,
     paper_year: bool = False,
 ) -> None:
     """An excerpt (or a group: its text): its category, years, markers, its text and where
-    it is from."""
+    it is from; clicked, its PDF beside the page at it; its pencil, its dialog."""
     with (
         ui.column()
         .classes("w-full gap-0 cursor-pointer rounded" + (" opacity-50" if e.discarded else ""))
         .style(f"border-left:3px solid {e.colour};padding:.15rem .5rem")
-        .on("click", lambda: select(e.id))
-        .tooltip(_("See it in the Excerpts tab"))
+        .on("click", lambda: acts.show(e))
+        .tooltip(_("Click: its PDF beside the page, at it"))
         .mark(f"timeline-excerpt-{e.id}")
     ):
         with ui.row().classes("items-center gap-2"):
@@ -874,10 +885,18 @@ def _item(
             ui.label(e.source + (f", p. {e.page}" if e.page else "")).classes(
                 "text-xs text-grey ellipsis min-w-0"
             )
-            ui.button(icon="picture_as_pdf").props("flat dense round size=xs color=red-8").on(
-                "click.stop", lambda: open_pdf(e)
-            ).tooltip(_("Open its PDF beside the page")).mark(f"timeline-pdf-{e.id}")
-            # (its switch: clicked, the excerpt not selected)
+            # (its buttons and switch: clicked, the PDF not opened)
+            with (
+                ui.row()
+                .classes("items-center gap-0 no-wrap shrink-0")
+                .on("click", js_handler="(e) => e.stopPropagation()")
+            ):
+                ui.button(icon="edit", on_click=lambda: acts.edit(e)).props(
+                    "flat dense round size=xs color=grey-8"
+                ).tooltip(_("Edit it (its years, markers, text…)")).mark(f"timeline-edit-{e.id}")
+                ui.button(icon="format_list_bulleted", on_click=lambda: acts.select(e.id)).props(
+                    "flat dense round size=xs color=grey-8"
+                ).tooltip(_("See it in the Excerpts tab")).mark(f"timeline-select-{e.id}")
             with (
                 ui.row()
                 .classes("items-center gap-0 no-wrap shrink-0")
@@ -885,6 +904,6 @@ def _item(
                 .tooltip(_("On the timeline (off: left out of it, still kept)"))
             ):
                 ui.icon("timeline", size="xs", color="grey")
-                ui.switch(value=e.in_timeline, on_change=lambda v: on_timeline(e, v.value)).props(
-                    "dense size=xs"
-                ).mark(f"timeline-switch-{e.id}")
+                ui.switch(
+                    value=e.in_timeline, on_change=lambda v: acts.on_timeline(e, v.value)
+                ).props("dense size=xs").mark(f"timeline-switch-{e.id}")

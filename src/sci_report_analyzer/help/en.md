@@ -463,8 +463,9 @@ year: that one); their **papers**: a small bar a year, as high as their number (
 hovered). Hovered, a bar tells all about it. Clicked, what it is is shown below the
 timeline: a line of the career or a PhD student, with **Edit** (its dialog: the timeline
 drawn again) and a button to its tab; an excerpt, or a year (its excerpts), where an excerpt
-clicked is shown in the Excerpts tab (where its years are edited), its PDF icon opening its
-PDF beside the page. A paper's excerpt without years is at the paper's year. The timeline
+clicked opens its PDF beside the page, at it (selected there), the timeline still shown; its
+pencil edits it (its dialog, as in the Excerpts tab: its years, markers, text…; the timeline
+drawn again), its list button shows it in the Excerpts tab. A paper's excerpt without years is at the paper's year. The timeline
 starts with the earliest of their career, theses and excerpts (their papers at most three
 years before; the earlier ones counted below). It opens zoomed in (years twice as wide as
 fitting the width), scrolled to their period in the folder; the magnifiers widen or narrow
@@ -474,7 +475,8 @@ a switch of its own (in the details below, or its button in the Excerpts tab): o
 left out of the timeline (still kept), listed apart below, where it is switched back on. The
 excerpts without years, and the lines of the career without dates, are listed apart, below.
 The timeline takes the full width: a PDF shown beside the page is set aside meanwhile (still
-in the strip below), and shown again when leaving the tab.
+in the strip below; one opened from the timeline is shown), and shown again when leaving the
+tab.
 
 Folders can be **within other folders**: the Reports page shows them as a **tree**, each
 folder expanded showing the folders within it then its people, one line each (their period,

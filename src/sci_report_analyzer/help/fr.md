@@ -470,8 +470,9 @@ catégorie) : le début de leur texte au-dessus d'une fine barre le long de leu
 **articles** : une petite barre par année, aussi haute que leur nombre (leurs titres au survol). Au survol, une barre
 dit tout d'elle. Cliqué, ce qu'il est s'affiche sous la chronologie : une ligne de la carrière ou un doctorant, avec
 **Modifier** (sa fenêtre : la chronologie redessinée) et un bouton vers son onglet ; un extrait, ou une année (ses
-extraits), où un extrait cliqué est montré dans l'onglet Extraits (où ses années se modifient), son icône PDF ouvrant son
-PDF à côté de la page. L'extrait d'un article sans années est à l'année de l'article. La chronologie commence au plus
+extraits), où un extrait cliqué ouvre son PDF à côté de la page, à l'extrait (sélectionné là), la chronologie
+toujours affichée ; son crayon le modifie (sa fenêtre, comme dans l'onglet Extraits : ses années, ses marqueurs, son
+texte… ; la chronologie redessinée), son bouton liste le montre dans l'onglet Extraits. L'extrait d'un article sans années est à l'année de l'article. La chronologie commence au plus
 ancien de sa carrière, de ses thèses et de ses extraits (ses articles au plus trois ans avant ; les plus anciens
 comptés en dessous). Elle s'ouvre agrandie (des années deux fois plus larges que pour tenir dans la largeur), défilée
 jusqu'à sa période dans le dossier ; les loupes élargissent ou resserrent les années (le texte gardant sa taille),
@@ -480,7 +481,7 @@ elle n'a aucun élément est signalée. Un extrait a son propre interrupteur (da
 dans l'onglet Extraits) : éteint, il est laissé hors de la chronologie (toujours gardé), listé à part en dessous, où
 il se rallume. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à part, en dessous. La
 chronologie prend toute la largeur : un PDF affiché à côté de la page est mis de côté pendant ce temps (toujours dans
-le bandeau du bas), et réaffiché en quittant l'onglet.
+le bandeau du bas ; celui ouvert depuis la chronologie s'affiche), et réaffiché en quittant l'onglet.
 
 Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre**, chaque dossier
 déplié montrant les dossiers qu'il contient puis ses personnes, une ligne chacune (sa période, ses étoiles, ses
