@@ -1097,8 +1097,15 @@ async def test_excerpt_levels_in_the_viewer(user: User, fake_viewer):
     user.find(marker=f"excerpt-edit-{e}").click()
     await user.should_see(marker="excerpt-level")
     level = user.find(marker="excerpt-level").elements.pop()
-    assert list(level.options) == ["", "local", "national", "international"]
-    level.value = "national"
+    assert list(level.chips) == ["local", "national", "international"]
+    # A badge chosen, clicked again: no level; then chosen.
+    user.find(marker="excerpt-level-badge-local").click()
+    assert level.value == "local"
+    await user.should_not_see(marker="excerpt-level-none")
+    user.find(marker="excerpt-level-badge-local").click()
+    assert level.value == ""
+    await user.should_see(marker="excerpt-level-none")
+    user.find(marker="excerpt-level-badge-national").click()
     user.find(marker="excerpt-edit-save").click()
     await user.should_not_see(marker="excerpt-edit-save")
     assert {x.id: x.level for x in categories.excerpts(period)}[e] == "national"

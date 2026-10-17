@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-16 23:37+0200\n"
+"POT-Creation-Date: 2026-10-17 08:11+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -36,6 +36,10 @@ msgstr ""
 "(choisissez une période pour une étiquette propre à la période, p. ex. "
 "starred)"
 
+#, python-brace-format
+msgid "(default: {level})"
+msgstr "(par défaut : {level})"
+
 msgid "(disabled)"
 msgstr "(désactivée)"
 
@@ -44,6 +48,9 @@ msgstr "(sa catégorie)"
 
 msgid "(kept)"
 msgstr "(conservé)"
+
+msgid "(no level)"
+msgstr "(aucun niveau)"
 
 msgid "(no name)"
 msgstr "(sans nom)"
@@ -1327,10 +1334,6 @@ msgid "Declared by"
 msgstr "Déclaré par"
 
 #, python-brace-format
-msgid "Default ({level})"
-msgstr "Par défaut ({level})"
-
-#, python-brace-format
 msgid "Default ({source})"
 msgstr "Par défaut ({source})"
 
@@ -2252,12 +2255,13 @@ msgid "Its level"
 msgstr "Son niveau"
 
 msgid ""
-"Its level (e.g. national), written as a #tag in the Markdown; the "
-"folder's levels and default one: in its reports' settings"
+"Its level (e.g. national), written as a #tag in the Markdown; clicked "
+"again: no level. The folder's levels and default one: in its reports' "
+"settings"
 msgstr ""
-"Son niveau (par ex. national), écrit en #étiquette dans le Markdown ; les"
-" niveaux du dossier et celui par défaut : dans les réglages de ses "
-"rapports"
+"Son niveau (par ex. national), écrit en #étiquette dans le Markdown ; "
+"cliqué à nouveau : aucun niveau. Les niveaux du dossier et celui par "
+"défaut : dans les réglages de ses rapports"
 
 msgid "Its level (the folder's default)"
 msgstr "Son niveau (celui par défaut du dossier)"

@@ -950,7 +950,7 @@ def excerpt_properties(
             label, tip, icon, colour = MARKER_ICONS[key]
             flags[key] = ui.checkbox(_(label), value=value).tooltip(_(tip)).mark(f"excerpt-{key}")
             ui.icon(icon, size="xs", color=colour).classes("-ml-2")
-        level_in = level_select(folder_id, level)
+    level_in = LevelBadges(folder_id, level).classes("-mt-2")
     tags_in = (
         ui.select(
             sorted(set(categories.tag_names()) | set(tags or []), key=str.lower),
@@ -975,26 +975,56 @@ def excerpt_properties(
     }
 
 
-def level_select(folder_id: int | None, level: str | None) -> ui.select:
-    """An excerpt's level: one of the folder's (by its tag; a level no longer among them:
-    kept), or none (the folder's default, named)."""
-    shown = {lv.key: f"#{lv.tag}" for lv in reports.levels(folder_id)}
-    if level and level not in shown:
-        shown[level] = f"#{level}"
-    default = reports.default_level(folder_id)
-    none = _("Default ({level})").format(level=shown[default]) if default else _("No level")
-    return (
-        ui.select({"": none, **shown}, value=level or "", label=_("Level"))
-        .props("dense outlined options-dense")
-        .classes("w-44")
-        .tooltip(
-            _(
-                "Its level (e.g. national), written as a #tag in the Markdown; the folder's "
-                "levels and default one: in its reports' settings"
+class LevelBadges(ui.row):
+    """An excerpt's level, as badges: one of the folder's (by its tag; a level no longer
+    among them: kept), clicked to choose it, clicked again to clear it (no level: the folder's
+    default, named after them); its ``value``, the level's key (none: "")."""
+
+    def __init__(self, folder_id: int | None, level: str | None) -> None:
+        super().__init__()
+        self.classes("items-center gap-1").mark("excerpt-level")
+        self.value = level or ""
+        shown = {lv.key: f"#{lv.tag}" for lv in reports.levels(folder_id)}
+        if level and level not in shown:
+            shown[level] = f"#{level}"
+        default = reports.default_level(folder_id)
+        self.chips: dict[str, ui.chip] = {}
+        with self:
+            ui.label(_("Level")).classes("text-sm text-grey-8")
+            for key, tag in shown.items():
+                self.chips[key] = (
+                    ui.chip(tag, on_click=lambda key=key: self.pick(key))
+                    .props("dense clickable")
+                    .tooltip(
+                        _(
+                            "Its level (e.g. national), written as a #tag in the Markdown; "
+                            "clicked again: no level. The folder's levels and default one: in "
+                            "its reports' settings"
+                        )
+                    )
+                    .mark(f"excerpt-level-badge-{key}")
+                )
+            self.none = (
+                ui.label(
+                    _("(default: {level})").format(level=shown[default])
+                    if default in shown
+                    else _("(no level)")
+                )
+                .classes("text-xs text-grey italic")
+                .mark("excerpt-level-none")
             )
-        )
-        .mark("excerpt-level")
-    )
+        self.show()
+
+    def pick(self, key: str) -> None:
+        self.value = "" if self.value == key else key
+        self.show()
+
+    def show(self) -> None:
+        for key, chip in self.chips.items():
+            chosen = key == self.value
+            chip.props(f"color={'primary' if chosen else 'grey-3'}")
+            chip.props(f"text-color={'white' if chosen else 'grey-9'}")
+        self.none.set_visibility(not self.value)
 
 
 def similar_excerpts(
