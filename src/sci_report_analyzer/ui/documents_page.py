@@ -5,7 +5,6 @@ papers it mentions found and linked)."""
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -597,10 +596,7 @@ class ReportTabs:
             side.dock(source)
 
     async def _quote(self, *, inline: bool) -> None:
-        built = "report" in self.sides
-        if (side := self._side("report")) is not None:
-            if not built:  # (its editor there first)
-                await asyncio.sleep(0.3)
+        if (side := self._side("report")) is not None:  # (built now: quoted once its editor is)
             await side.quote(inline=inline)
 
     async def _excerpt(self) -> None:

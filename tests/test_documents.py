@@ -6,7 +6,7 @@ import re
 
 import pytest
 from helpers import PDF, add_source, make_person, note_status, own_settings, pub
-from nicegui import ui
+from nicegui import Client, ui
 from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
 from sqlalchemy import select
@@ -2451,6 +2451,35 @@ async def test_quote_and_excerpt_from_the_pdf_beside(user: User, monkeypatch, fa
     _page_event(user, "vrDocExcerpt", {"id": e.id})  # (its tint clicked in the PDF)
     row = user.find(marker=f"excerpt-part-{e.id}").elements.pop()
     assert "vr-excerpt-on" in row.classes
+
+
+async def test_quote_into_a_report_tab_not_built(user: User, monkeypatch, fake_viewer):
+    """Q in the PDF beside the page, its Report tab not built yet: built, then quoted into
+    its notes (inserted once its editor is there in the browser: see vrEditor)."""
+    pid, period, _ = _person()
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "Led the Quokka project", "p": 2, "rects": []}
+    user.javascript_rules[re.compile(r"vrPdf\.quoted\(\)")] = lambda _: selection
+    sent: list[str] = []
+    run_javascript = Client.run_javascript
+
+    def recorded(self, code, *args, **kwargs):
+        if "Quokka" in code:
+            sent.append(code)
+        return run_javascript(self, code, *args, **kwargs)
+
+    monkeypatch.setattr(Client, "run_javascript", recorded)
+    await user.open(f"/person/{pid}?pdfs=d{doc}&pdf=d{doc}")
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    await user.should_not_see(marker="folder-note")  # (the Report tab: not built)
+    _page_event(user, "vrPdfQuote", None)
+    await user.should_see(marker="folder-note")
+    for _i in range(50):
+        if sent:
+            break
+        await asyncio.sleep(0.02)
+    [code] = sent
+    assert code.startswith("vrEditor(")  # (not dropped: the editor awaited in the browser)
 
 
 async def test_papers_beside_the_notes_with_their_pdfs(user: User, fake_viewer):
