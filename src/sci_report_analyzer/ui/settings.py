@@ -41,7 +41,7 @@ from ..ranking.normalize import (
 )
 from ..ranking.service import MatchSettings, load_settings, save_settings, service
 from ..sources import ADAPTERS
-from . import scimago_years, shared_settings, unsaved
+from . import git_backup, scimago_years, shared_settings, unsaved
 from .colours import ColourInput
 from .dialogs import actions, confirm, transient_dialog
 from .settings_search import Search
@@ -88,6 +88,7 @@ NAV = (
             ("data", N_("Data & cache")),
             ("io", N_("Import / export")),
             ("shared", N_("Shared settings")),
+            ("backup", N_("Backup")),
         ),
     ),
 )
@@ -113,6 +114,7 @@ PANELS = {
     "data": lambda: data_tab(),
     "io": lambda: io_tab(),
     "shared": lambda: shared_settings.shared_tab(),
+    "backup": lambda: git_backup.backup_tab(),
 }
 ui.add_css(
     """

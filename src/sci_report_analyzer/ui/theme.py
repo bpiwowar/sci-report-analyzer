@@ -145,6 +145,9 @@ def _menu(compact: bool = False) -> None:
         ui.button(icon="dark_mode", on_click=dark.toggle).props(
             "flat round color=white dense" + size
         )
+        from .git_backup import backup_button
+
+        backup_button(compact)
         from ..stop import quit_button
 
         quit_button(compact)
