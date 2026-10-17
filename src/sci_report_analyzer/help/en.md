@@ -454,10 +454,10 @@ for each kind. Their **career** (Profile tab): a line of their CV as a bar along
 (a current position: up to now, fading), its name above it; the **PhD students** they
 supervised, each a bar from the thesis's start to its defence (in progress: up to now), the
 student's name above it; overlapping bars one above the other. Their **excerpts** in the
-folder (in their category's colour): a dot in their year, a thin bar along their years when
-they have several; their **papers**: a small bar a year, as high as their number (their
+folder (in their category's colour): the beginning of their text above a thin bar along their
+years (a single year: that one), one above the other when they overlap; their **papers**: a small bar a year, as high as their number (their
 titles hovered). Hovered, a bar tells all about it; a line of the career clicked shows the
-Profile tab, a thesis the Theses tab. A year's dots, an excerpt's bar or a year clicked
+Profile tab, a thesis the Theses tab. An excerpt or a year clicked
 shows its excerpts below the timeline; there an excerpt clicked is shown in the Excerpts tab
 (where its years are edited), its PDF icon opening its PDF beside the page. A paper's
 excerpt without years is at the paper's year. The timeline starts with the earliest of their

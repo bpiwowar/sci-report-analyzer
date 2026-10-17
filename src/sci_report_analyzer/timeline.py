@@ -4,6 +4,7 @@ categories.timeline) and their papers (by year)."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 
@@ -18,13 +19,26 @@ from .sources.base import to_year
 @dataclass
 class CareerSpan:
     """A line of the CV on the timeline: from its first year to its last (a current
-    position: this year); ``lane``: its row, 0 the top one (overlapping lines one above the
+    position: this year), and more precisely from ``begin`` to ``stop`` (in years: its
+    months, when known); ``lane``: its row, 0 the top one (overlapping lines one above the
     other)."""
 
     entry: career.Entry
     first: int
     last: int
     lane: int = 0
+    begin: float = 0.0
+    stop: float = 0.0
+
+    def __post_init__(self) -> None:
+        self.begin = self.begin or float(self.first)
+        self.stop = self.stop or float(self.last + 1)
+
+
+def _month(v: str | None) -> int | None:
+    """The month of a date (“2024-09-30”, “2024-10”), none if only its year."""
+    m = re.search(r"\b(?:1[89]|20)\d{2}-(\d{1,2})\b", v or "")
+    return int(m[1]) if m and 1 <= int(m[1]) <= 12 else None
 
 
 def career_spans(
@@ -42,22 +56,34 @@ def career_spans(
         if e.current:
             last = max(this_year, first)
         first, last = first or last, last or first
-        spans.append(CareerSpan(e, min(first, last), max(first, last)))
+        first, last = min(first, last), max(first, last)
+        begin = first + ((_month(e.start) or 1) - 1) / 12 if to_year(e.start) == first else first
+        stop = last + 1.0
+        if not e.current and to_year(e.end) == last and (m := _month(e.end)):
+            stop = last + m / 12
+        spans.append(CareerSpan(e, first, last, begin=begin, stop=max(stop, begin + 1 / 12)))
     lanes(spans)
     return spans, undated
 
 
+def bounds(sp) -> tuple[float, float]:
+    """Where a span begins and stops, in years (its ``begin``, ``stop`` if it has them, else
+    from the start of its first year to the end of its last one)."""
+    return getattr(sp, "begin", sp.first), getattr(sp, "stop", sp.last + 1)
+
+
 def lanes(spans: list, start: int = 0, room: int = 1) -> int:
-    """Each span (its ``first``, ``last`` years) in the first lane free over its years (from
-    the most recent down), from ``start`` on, taking at least ``room`` years (e.g. its
-    label's); returns the lanes taken, ``start`` included."""
-    lowest: list[int] = []  # (each lane: the first year of its last span)
-    for sp in sorted(spans, key=lambda x: (-x.last, -x.first)):
-        end = max(sp.last, sp.first + room - 1)
-        lane = next((i for i, low in enumerate(lowest) if end < low), len(lowest))
+    """Each span (its ``first``, ``last`` years; see bounds) in the first lane free over its
+    time (from the most recent down), from ``start`` on, taking at least ``room`` years
+    (e.g. its label's); returns the lanes taken, ``start`` included."""
+    lowest: list[float] = []  # (each lane: where its last span begins)
+    for sp in sorted(spans, key=lambda x: tuple(-b for b in reversed(bounds(x)))):
+        begin, stop = bounds(sp)
+        end = max(stop, begin + room)
+        lane = next((i for i, low in enumerate(lowest) if end <= low + 1e-9), len(lowest))
         if lane == len(lowest):
-            lowest.append(sp.first)
-        lowest[lane] = sp.first
+            lowest.append(begin)
+        lowest[lane] = begin
         sp.lane = start + lane
     return start + len(lowest)
 

@@ -2,10 +2,10 @@
 (every year a column, the gaps seen; this year marked, their period in the folder shaded),
 a row for each kind of what is dated about them. Their career (see timeline.career_spans)
 and the PhDs they supervised: bars along their years, one above the other when they
-overlap; their excerpts (see categories.timeline): a dot in their year, a thin bar along
-their years when several; their papers: a small bar a year, as high as their number. An
-excerpt, or a year's, clicked: shown in the details below. Each kind shown or hidden; what
-is without a date listed apart."""
+overlap; their excerpts (see categories.timeline): the beginning of their text above a
+thin bar along their years (one above the other too); their papers: a small bar a year, as
+high as their number. An excerpt, or a year's, clicked: shown in the details below. Each
+kind shown or hidden; what is without a date listed apart."""
 
 from __future__ import annotations
 
@@ -30,8 +30,6 @@ KIND_COLOUR = {
     "thesis": "#6639ba",  # (as the PhD students' names: .vr-student)
     "papers": "#8c959f",
 }
-# Most excerpts of a single year drawn as dots in it (more: their number).
-MAX_DOTS = 4
 # Papers earlier than the rest by more years than this: left out of the axis (counted).
 PAPERS_BEFORE = 3
 # Up to that many years, each named on the axis whatever the width (beyond: every fifth one
@@ -76,15 +74,7 @@ body.body--dark .vr-tl { --tl-bg:var(--q-dark); --tl-line:rgba(160,170,180,.2);
 .vr-tl-item.off { opacity:.45; }
 .vr-tl-item:hover .vr-tl-bar, .vr-tl-item.picked .vr-tl-bar {
   box-shadow:0 0 0 2px color-mix(in srgb, var(--c) 40%, transparent); }
-.vr-tl-dots { z-index:2; display:flex; flex-wrap:wrap; justify-content:center;
-  align-content:center; gap:2px; padding:.3rem 1px; border-radius:5px; cursor:pointer; }
-.vr-tl-dots:hover, .vr-tl-dots.picked { background:color-mix(in srgb, var(--q-primary) 16%,
-  transparent); }
-.vr-tl-dot { width:8px; height:8px; border-radius:50%; background:var(--c); }
-.vr-tl-dot.paper { background:transparent; border:2px solid var(--c); }
-.vr-tl-dot.off { opacity:.4; }
-.vr-tl-count { padding:0 .25rem; border-radius:7px; font-size:.65rem; font-weight:600;
-  line-height:.95rem; color:#fff; background:var(--q-primary); }
+.vr-tl-item.paper .vr-tl-bar { background:transparent; border:1.5px solid var(--c); }
 .vr-tl-papers { z-index:2; height:2.3rem; display:flex; flex-direction:column;
   align-items:center; justify-content:flex-end; padding-top:.2rem; }
 .vr-tl-papers .n { font-size:.6rem; line-height:.75rem; color:#8c959f; }
@@ -101,7 +91,7 @@ ui.add_css(_CSS, shared=True)
 
 @dataclass
 class _Span:
-    """An excerpt (``d``) on the timeline, along its years (one: a dot); ``lane``: its row
+    """An excerpt (``d``) on the timeline, along its years (one: that year); ``lane``: its row
     (see timeline.lanes)."""
 
     d: categories.Dated
@@ -178,9 +168,9 @@ def timeline_view(
         ui.label(
             _(
                 "What is dated about them, by year (the oldest on the left): their career and "
-                "the PhDs they supervised (a bar along their years), their excerpts (a dot in "
-                "their year, a thin bar along their years) and their papers (their number a "
-                "year). An excerpt, a year's dots or a year clicked: its excerpts shown below, "
+                "the PhDs they supervised (a bar along their years), their excerpts (the "
+                "beginning of their text above a thin bar along their years) and their papers "
+                "(their number a year). An excerpt or a year clicked: its excerpts shown below, "
                 "where clicked one is shown in the Excerpts tab (its years edited there: its "
                 "pencil). An excerpt without years of its own is at its paper's year."
             )
@@ -281,10 +271,8 @@ def _chart(
     if directed:
         lanes = tl.lanes(directed, room=room)
         rows.append(("theses", _("PhD students"), "school", KIND_COLOUR["thesis"], lanes))
-    singles = [x for x in excerpts if x.first == x.last]
-    ranges = [x for x in excerpts if x.first != x.last]
     if excerpts:
-        lanes = bool(singles) + tl.lanes(ranges)
+        lanes = tl.lanes(excerpts, room=room)
         rows.append(("excerpts", _("Excerpts"), "format_quote", "var(--q-primary)", lanes))
     if papers:
         rows.append(("papers", _("Papers"), "article", KIND_COLOUR["papers"], 1))
@@ -347,7 +335,8 @@ def _chart(
                     for t, end in _cells(directed, hi):
                         _thesis(t, row, col, end, show_tab)
                 elif kind == "excerpts":
-                    _excerpt_row(singles, ranges, row, col, picked, pick)
+                    for x, end in _cells(excerpts, hi):
+                        _excerpt(x, row, col, end, picked, pick)
                 else:
                     top = max(map(len, papers.values()))
                     for year, titles in papers.items():
@@ -375,15 +364,15 @@ def _year_names(n: int) -> None:
 
 
 def _cells(spans: list, hi: int):
-    """Each span (in its lane) with the year its cell ends at (excluded): that the next one
-    in its lane starts at, else the last one's after (its label's room)."""
+    """Each span (in its lane) with where its text may go up to (in years): where the next
+    one in its lane begins, else the end of the axis."""
     by_lane: dict[int, list] = {}
     for sp in spans:
         by_lane.setdefault(sp.lane, []).append(sp)
     for lane in by_lane.values():
-        lane.sort(key=lambda x: x.first)
+        lane.sort(key=lambda x: tl.bounds(x)[0])
         for sp, after in pairwise([*lane, None]):
-            yield sp, after.first if after else hi + 1
+            yield sp, tl.bounds(after)[0] if after else hi + 1
 
 
 def _bar(
@@ -395,19 +384,30 @@ def _bar(
     now: bool,
     text: str,
     mark: str,
+    classes: str = "",
 ) -> ui.element:
-    """A span (``sp``: its ``first``, ``last`` years, its ``lane``) in its row's lane: its
-    ``text`` (as far as ``end``, the next one in its lane) above its bar along its years
-    (``now``: still going on)."""
-    width = (sp.last - sp.first + 1) / (end - sp.first) * 100
+    """A span (``sp``: its ``first``, ``last`` years, its ``lane``; see timeline.bounds) in
+    its row's lane, over the years it is in: its ``text`` (as far as ``end``, where the next
+    one in its lane begins) above its bar along its time (``now``: still going on)."""
+    begin, stop = tl.bounds(sp)
+    cell = max(sp.last + 1, math.ceil(end - 1e-9))  # (the year its cell ends at, excluded)
+    span = cell - sp.first
+
+    def pct(years: float) -> str:
+        return f"{years / span * 100:.3f}%"
+
     with (
         ui.element("div")
-        .classes("vr-tl-item" + (" now" if now else ""))
-        .style(f"--c:{colour};grid-column:{col(sp.first)}/{col(end)};grid-row:{row + sp.lane}")
+        .classes("vr-tl-item" + (" now" if now else "") + classes)
+        .style(f"--c:{colour};grid-column:{col(sp.first)}/{col(cell)};grid-row:{row + sp.lane}")
         .mark(mark) as item
     ):
-        ui.label(text).classes("vr-tl-text")
-        ui.element("div").classes("vr-tl-bar").style(f"width:{width:.3f}%")
+        ui.label(text).classes("vr-tl-text").style(
+            f"margin-left:{pct(begin - sp.first)};max-width:{pct(end - begin)}"
+        )
+        ui.element("div").classes("vr-tl-bar").style(
+            f"margin-left:{pct(begin - sp.first)};width:{pct(stop - begin)}"
+        )
     return item
 
 
@@ -456,63 +456,30 @@ def _thesis(
         ui.label(_("See it in the Theses tab")).classes("italic")
 
 
-def _excerpt_row(
-    singles: list[_Span],
-    ranges: list[_Span],
+def _excerpt(
+    x: _Span,
     row: int,
     col: Callable[[int], int],
+    end: int,
     picked: dict[str, int],
     pick: Callable[..., None],
 ) -> None:
-    """The excerpts: those of a single year, dots in it (on a row of their own); those of
-    several, thin bars along them (one above the other when they overlap)."""
-    by_year: dict[int, list[_Span]] = {}
-    for x in singles:
-        by_year.setdefault(x.first, []).append(x)
-    for year, xs in by_year.items():
-        with (
-            ui.element("div")
-            .classes("vr-tl-dots" + (" picked" if picked.get("year") == year else ""))
-            .style(f"grid-column:{col(year)};grid-row:{row}")
-            .on("click", lambda year=year: pick("year", year))
-            .tooltip(
-                ngettext("{n} excerpt in {year}", "{n} excerpts in {year}", len(xs)).format(
-                    n=len(xs), year=year
-                )
-            )
-            .mark(f"timeline-excerpts-{year}")
-        ):
-            if len(xs) > MAX_DOTS:
-                ui.label(str(len(xs))).classes("vr-tl-count")
-                continue
-            for x in xs:
-                e = x.d.excerpt
-                ui.element("div").classes(
-                    "vr-tl-dot"
-                    + (" paper" if x.d.paper_year else "")
-                    + (" off" if e.discarded else "")
-                ).style(f"--c:{e.colour}").mark(f"timeline-dot-{e.id}")
-    start = row + bool(singles)
-    for x in ranges:
-        e = x.d.excerpt
-        with (
-            ui.element("div")
-            .classes(
-                "vr-tl-item thin"
-                + (" off" if e.discarded else "")
-                + (" picked" if picked.get("excerpt") == e.id else "")
-            )
-            .style(
-                f"--c:{e.colour};grid-column:{col(x.first)}/{col(x.last) + 1};"
-                f"grid-row:{start + x.lane}"
-            )
-            .on("click", lambda e=e: pick("excerpt", e.id))
-            .mark(f"timeline-span-{e.id}")
-        ):
-            ui.element("div").classes("vr-tl-bar")
-            with ui.tooltip().classes("max-w-sm"):
-                ui.label(e.years).classes("font-medium")
-                ui.label(e.quoted).classes("line-clamp-3")
+    """An excerpt: the beginning of its text above a thin bar along its years (a single
+    one: that year; at its paper's: hollow), clicked shown below."""
+    e = x.d.excerpt
+    classes = (
+        " thin"
+        + (" paper" if x.d.paper_year else "")
+        + (" off" if e.discarded else "")
+        + (" picked" if picked.get("excerpt") == e.id else "")
+    )
+    item = _bar(e.colour, x, row, col, end, False, e.quoted, f"timeline-span-{e.id}", classes)
+    item.on("click", lambda: pick("excerpt", e.id))
+    with item, ui.tooltip().classes("max-w-sm"):
+        ui.label(
+            _("the paper's year ({year})").format(year=x.first) if x.d.paper_year else e.years
+        ).classes("font-medium")
+        ui.label(e.quoted).classes("line-clamp-4")
 
 
 def _papers(year: int, titles: list[str], top: int, row: int, col: Callable[[int], int]) -> None:
@@ -555,9 +522,9 @@ def _details(
         if not picked:
             with ui.row().classes("items-center gap-1 no-wrap"):
                 ui.icon("touch_app", color="grey", size="xs")
-                ui.label(
-                    _("Click a year's dots, an excerpt's bar or a year to see its excerpts here.")
-                ).classes("text-sm text-grey").mark("timeline-details-hint")
+                ui.label(_("Click an excerpt or a year to see its excerpts here.")).classes(
+                    "text-sm text-grey"
+                ).mark("timeline-details-hint")
             return
         if year := picked.get("year"):
             found = [x for x in excerpts if x.first <= year <= x.last]

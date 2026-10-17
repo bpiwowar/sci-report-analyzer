@@ -66,11 +66,11 @@ async def test_timeline_tab(user: User) -> None:
     await user.open(f"/person/{pid}/{period}?tab=timeline")
     await user.should_see(marker="timeline")
     await user.should_see(marker="timeline-row-excerpts")
-    # A dot in its year; the details below, until a year's are clicked: a hint.
-    await user.should_see(marker=f"timeline-dot-{dated}")
+    # In its year, the beginning of its text; the details below, until a year's are
+    # clicked: a hint.
+    await user.should_see("Led a project.", marker=f"timeline-span-{dated}")
     await user.should_see(marker="timeline-details-hint")
-    await user.should_not_see("Led a project.", marker="timeline-details")
-    user.find(marker="timeline-excerpts-2021").click()
+    user.find(marker="timeline-tick-2021").click()
     await user.should_see("1 excerpt in 2021", marker="timeline-details")
     await user.should_see("Led a project.", marker="timeline-details")
     # Without years: said so, apart (not hidden).
@@ -93,11 +93,10 @@ async def test_timeline_tab_ranges(user: User) -> None:
     taught = add(cats["Teaching"], period, "Taught a course.", 1, [], start=2020, end=2020)
     await user.open(f"/person/{pid}/{period}?tab=timeline")
     await user.should_see(marker=f"timeline-span-{project}")
-    await user.should_see(marker=f"timeline-dot-{taught}")
+    await user.should_see("Taught a course.", marker=f"timeline-span-{taught}")
     user.find(marker=f"timeline-span-{project}").click()
     await user.should_see("An excerpt, 2019–2022", marker="timeline-details")
     await user.should_see("Led a project.", marker="timeline-details")
-    await user.should_not_see("Taught a course.", marker="timeline-details")
     # A year clicked: its excerpts, those along it too.
     user.find(marker="timeline-tick-2020").click()
     await user.should_see("2 excerpts in 2020", marker="timeline-details")
@@ -141,6 +140,20 @@ def test_career_spans() -> None:
         ("PhD", 2010, 2013, 0),  # (2013: the Postdoc's, in the other lane)
     ]
     assert [e.title for e in undated] == ["Consultant"]
+
+
+def test_career_spans_by_month() -> None:
+    """A position ending in September and the next one starting in October: in one lane
+    (their months, not only their years)."""
+    pid = make_person("Ed Placeholder")
+    for e in (
+        Entry("position", "Researcher", "2018-10-01", "2024-09-30"),
+        Entry("position", "Senior researcher", "2024-10"),
+    ):
+        career.save(pid, e)
+    spans, _undated = timeline.career_spans(pid, today=date(2026, 5, 1))
+    got = [(s.entry.title, round(s.begin, 2), round(s.stop, 2), s.lane) for s in spans]
+    assert got == [("Senior researcher", 2024.75, 2027.0, 0), ("Researcher", 2018.75, 2024.75, 0)]
 
 
 def test_supervised_and_papers() -> None:
@@ -197,7 +210,7 @@ async def test_timeline_tab_career_and_theses(user: User) -> None:
     user.find(marker="timeline-show-career").click()
     await user.should_not_see(marker=f"timeline-career-{lead}")
     await user.should_not_see(marker="timeline-row-career")
-    await user.should_see(marker="timeline-excerpts-2021")
+    await user.should_see(marker="timeline-row-excerpts")
 
 
 def test_lanes_from_a_start() -> None:

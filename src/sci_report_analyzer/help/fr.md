@@ -462,10 +462,10 @@ période dans le dossier en grisé), une ligne par sorte. Sa **carrière** (ongl
 le long de ses années (un poste actuel : jusqu'à aujourd'hui, en s'estompant), son nom au-dessus ; les **doctorants**
 qu'elle a encadrés, chacun en barre du début de la thèse à sa soutenance (en cours : jusqu'à aujourd'hui), le nom du
 doctorant au-dessus ; les barres qui se chevauchent l'une au-dessus de l'autre. Ses **extraits** dans le dossier (de
-la couleur de leur catégorie) : un point dans leur année, une fine barre le long de leurs années quand ils en ont
-plusieurs ; ses **articles** : une petite barre par année, aussi haute que leur nombre (leurs titres au survol). Au
+la couleur de leur catégorie) : le début de leur texte au-dessus d'une fine barre le long de leurs années (une seule : celle-là), l'un
+au-dessus de l'autre quand ils se chevauchent ; ses **articles** : une petite barre par année, aussi haute que leur nombre (leurs titres au survol). Au
 survol, une barre dit tout d'elle ; une ligne de la carrière cliquée montre l'onglet Profil, une thèse l'onglet
-Thèses. Les points d'une année, la barre d'un extrait ou une année cliqués montrent ses extraits sous la chronologie ;
+Thèses. Un extrait ou une année cliqués montrent ses extraits sous la chronologie ;
 là, un extrait cliqué est montré dans l'onglet Extraits (où ses années se modifient), son icône PDF ouvrant son PDF à
 côté de la page. L'extrait d'un article sans années est à l'année de l'article. La chronologie commence au plus ancien
 de sa carrière, de ses thèses et de ses extraits (ses articles au plus trois ans avant ; les plus anciens comptés en
