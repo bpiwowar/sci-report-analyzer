@@ -9,7 +9,7 @@ from pathlib import Path
 
 from nicegui import app, background_tasks, ui
 
-from . import config, i18n, livereload, stop, venue_match
+from . import config, git_backup, i18n, livereload, stop, venue_match
 from .annotations import normalize_ui_state
 from .db import backup
 from .db.session import init_engine
@@ -51,6 +51,8 @@ def setup() -> None:
     documents_page.register()
     folder_notes.register()
     app.on_startup(lambda: background_tasks.create(datasets.keep_datasets_fresh()))
+    git_backup.install()  # (renames and moves: their directories moved at once)
+    app.on_startup(lambda: background_tasks.create(git_backup.keep_backing_up()))
     app.on_shutdown(_shutdown)
 
 

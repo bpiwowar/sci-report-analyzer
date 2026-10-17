@@ -72,6 +72,13 @@ kept) and before each schema migration (`pre-migration-…`; a `.pending` marker
 that migration failed, and it is never removed). To restore a backup, stop the app and copy it
 over `sci-report-analyzer.sqlite` (removing the `-wal` / `-shm` files, if any).
 
+The folders are also backed up in a **git repository** (Settings → Backup: its full path,
+`git-backup` in the data directory by default, and how often, every 30 minutes by default
+when something changed; or with the backup button in the header): each person in a folder
+in a directory of their own (notes as typed and as generated, excerpts, categories,
+documents and PDFs), a commit each time. A folder or person renamed or moved: their
+directory is moved at once, in a commit of its own. Needs `git`.
+
 ## Data sources
 
 Venue ranks come from third-party data, credited here and in the app (Settings → Data & cache):
