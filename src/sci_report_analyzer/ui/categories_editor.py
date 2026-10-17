@@ -263,9 +263,9 @@ def categories_editor(folder_id: int, changed: Callable[[], None] | None = None)
         ui.button(_("Add"), icon="add", on_click=add).props("flat dense").mark("category-add")
         mine = folders.settings_of(folder_id)
         others = {
-            f.id: f.path
-            for f in folders.folders()
-            if folders.settings_of(f.id) != mine and categories.tree(f.id)
+            x.id: x.name
+            for x in folders.named_settings()
+            if x.id != mine and categories.tree(folders.SettingsRef(x.id))
         }
         if others:
             source = (
@@ -284,5 +284,5 @@ def categories_editor(folder_id: int, changed: Callable[[], None] | None = None)
                     done()
 
             ui.button(icon="content_copy", on_click=copy).props("flat dense round").tooltip(
-                _("Add the categories of another folder")
+                _("Add the categories of other settings")
             ).mark("category-copy")

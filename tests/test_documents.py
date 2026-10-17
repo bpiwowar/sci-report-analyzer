@@ -694,7 +694,7 @@ def test_categories_and_markdown():
     categories.update_excerpt(led)
     other = folders.save_folder(None, "Hiring 2027")
     own_settings(other)
-    assert categories.copy_tree(folder, other) == 3
+    assert categories.copy_tree(folders.settings_of(folder), other) == 3
     assert [n.path for n in categories.tree(other)][2] == "Research › Projects"
     # Deleted (with its subcategory) once its excerpts are moved elsewhere.
     assert not categories.delete(research) and categories.excerpt_count(research) == 1
@@ -1390,7 +1390,7 @@ def test_category_colours():
     )
     # Copied with the categories.
     second = folders.save_folder(None, "Second committee")
-    categories.copy_tree(folder, second)
+    categories.copy_tree(folders.settings_of(folder), second)
     assert [n.colour for n in categories.tree(second)] == [
         n.colour for n in categories.tree(folder)
     ]

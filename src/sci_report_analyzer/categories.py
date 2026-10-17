@@ -452,12 +452,11 @@ def delete(cat_id: int) -> bool:
     return True
 
 
-def copy_tree(source_folder: int, folder_id: int) -> int:
-    """Add the categories of another folder (without their excerpts); returns how many."""
+def copy_tree(source_id: int, folder_id: int) -> int:
+    """Add the categories of other settings (``source_id``) to those of a folder (without
+    their excerpts); returns how many."""
     with session_scope() as s:
-        return copy_settings(
-            s, folders.settings_id(s, source_folder), folders.settings_id(s, folder_id)
-        )
+        return copy_settings(s, source_id, folders.settings_id(s, folder_id))
 
 
 def copy_settings(s, source_id: int, settings_id: int) -> int:
