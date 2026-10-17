@@ -338,9 +338,10 @@ shown (or ») to minimize them (the page alone; « shows the last one again), �
 for the person (and in the address) until closed. Each has the viewer's header (its ↗ opens it
 in a window of its own) and its side panel, hidden: meanwhile, the page's notes and excerpts
 are its own, Q quoting into the notes (the Report tab), E filing the selection (the Excerpts
-tab), an excerpt clicked on its pages selected in the Excerpts tab, and an excerpt clicked
-there shown on its page. A document renamed from its title (double-click) is renamed in the
-strip too.
+tab), F finding the selection's paper and L tagging the papers of a list (from the Report tab),
+B bookmarking the place read, an excerpt clicked on its pages selected in the Excerpts tab,
+and an excerpt clicked there shown on its page. A document renamed from its title (double-click)
+is renamed in the strip too.
 
 **Documents** (person's Report tab, “Documents” menu): PDFs of the person within a folder or
 a period (an application, a CV…), uploaded there and read in the same viewer (annotations,

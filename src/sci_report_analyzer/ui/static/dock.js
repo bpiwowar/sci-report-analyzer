@@ -4,8 +4,10 @@
 // column is hidden; a link to a PDF (a document's, a paper's) opens it here.
 window.vrDock = {
   shown: null,  // (the key of the PDF shown: "d3", a document; "p12", a paper)
-  // The events of a PDF's frame taken here (see vrPane.emit there).
-  takes: ['vr-pdf-quote', 'vr-pdf-quote-inline', 'vr-pdf-excerpt', 'vr-doc-excerpt'],
+  // The events of a PDF's frame taken here (see vrPane.emit there): its shortcuts (Q, E, F,
+  // L, B) and its excerpts clicked.
+  takes: ['vr-pdf-quote', 'vr-pdf-quote-inline', 'vr-pdf-excerpt', 'vr-doc-excerpt',
+          'vr-pdf-find', 'vr-pdf-tag-list', 'vr-pdf-bookmark'],
   win() {
     const f = this.shown && document.querySelector(`iframe[data-vr-dock="${this.shown}"]`);
     return f && f.contentWindow;

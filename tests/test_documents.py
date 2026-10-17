@@ -2453,6 +2453,47 @@ async def test_quote_and_excerpt_from_the_pdf_beside(user: User, monkeypatch, fa
     assert "vr-excerpt-on" in row.classes
 
 
+async def test_find_tag_and_bookmark_from_the_pdf_beside(user: User, fake_viewer):
+    """F, L and B in the PDF shown beside the person's page (its side column hidden): done
+    on the page (the paper found and linked there, the list's papers to tag, the place
+    bookmarked), as Q and E."""
+    from pathlib import Path
+
+    from sci_report_analyzer.ui import pdf_dock
+
+    dock_js = (Path(pdf_dock.__file__).parent / "static" / "dock.js").read_text()
+    for name in ("vr-pdf-find", "vr-pdf-tag-list", "vr-pdf-bookmark"):
+        assert f"'{name}'" in dock_js  # (taken from the frame: see vrDock.takes)
+    pid, period, ids = _person()
+    doc = documents.add(period, "Application.pdf", PDF)
+    documents.set_lines(doc, LINES)
+    selection = {
+        "text": "[9] J. Doe. Neural retrieval models for long documents. ECIR 2022.",
+        "p": 3,
+        "rects": [[72, 400, 300, 410]],
+    }
+    user.javascript_rules[re.compile(r"vrPdf\.selection\(\)")] = lambda _: selection
+    user.javascript_rules[re.compile(r"vrPdf\.location\(\)")] = lambda _: {
+        "p": 2,
+        "y": 640.0,
+        "text": "Publications",
+    }
+    await user.open(f"/person/{pid}?pdfs=d{doc}&pdf=d{doc}")
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    _page_event(user, "vrPdfBookmark", None)  # (B)
+    await user.should_see("Bookmarked: Publications")
+    assert documents.bookmarks("doc", doc) == [{"name": "Publications", "p": 2, "y": 640.0}]
+    _page_event(user, "vrPdfFind", None)  # (F: in the Report tab, shown)
+    await user.should_see(marker=f"find-link-{ids['b']}")
+    user.find(marker=f"find-link-{ids['b']}").click()
+    await user.should_see("Linked")
+    [link] = documents.links_of(doc)
+    assert link["pub"] == ids["b"] and link["p"] == 3
+    _page_event(user, "vrPdfTagList", None)  # (L)
+    await user.should_see(marker="reflist-text")
+    assert user.find(marker="reflist-text").elements.pop().value == selection["text"]
+
+
 async def test_document_renamed_beside_the_page(user: User, fake_viewer):
     """A document renamed from its title above its PDF, beside the person's page: its tab in
     the strip renamed at once."""
