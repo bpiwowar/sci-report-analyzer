@@ -2277,3 +2277,24 @@ async def test_quote_and_excerpt_from_the_pdf_beside(user: User, monkeypatch, fa
     _page_event(user, "vrDocExcerpt", {"id": e.id})  # (its tint clicked in the PDF)
     row = user.find(marker=f"excerpt-part-{e.id}").elements.pop()
     assert "vr-excerpt-on" in row.classes
+
+
+async def test_papers_beside_the_notes_with_their_pdfs(user: User, fake_viewer):
+    """The papers beside the notes (Report tab): each with its stored PDF (a PDF file's icon,
+    opened beside the page), then its sources' badges with their PDFs, as in the panel."""
+    pid, period, ids = _person()
+    a = ids["a"]
+    pdfs.save(a, PDF, None)
+    await user.open(f"/person/{pid}?tab=report")
+    await user.should_see(marker="folder-note-mode")
+    user.find(marker="folder-note-mode").elements.pop().value = "side"
+    user.find(marker="folder-papers-search").type("deep ranking")
+    await user.should_see(marker=f"folder-papers-stored-pdf-{a}")
+    link = user.find(marker=f"folder-papers-stored-pdf-{a}").elements.pop()
+    assert link.props["href"] == f"/pdf/{a}?period={period}"
+    icons = [e for e in link.descendants() if isinstance(e, ui.icon)]
+    assert icons and icons[0].props["name"].endswith("/pdf.svg")
+    row = link
+    while not any(m.startswith("folder-papers-row-") for m in row._markers):
+        row = row.parent_slot.parent
+    assert any(m.startswith("source-") for e in row.descendants() for m in e._markers)

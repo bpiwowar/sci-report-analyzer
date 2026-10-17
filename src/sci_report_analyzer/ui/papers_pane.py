@@ -13,6 +13,7 @@ from ..i18n import _
 from ..pubview import tag_order
 from . import pdf_viewer
 from .mdedit import MarkdownEditor
+from .pub_details import source_links
 from .tags import draggable, number_edit, reorder, save_number, step
 from .theme import NOTE_EXTRAS
 
@@ -263,20 +264,27 @@ class PapersPane:
                     ui.label(s.title or _("(untitled)")).classes(
                         "text-sm leading-tight grow min-w-0"
                     )
-                    if s.pdf or pdf_viewer.can_download(s):
+                    if s.pdf:  # (beside the person's page, see pdf_dock)
+                        edited = s.pdf == "edited"
                         with ui.link(
-                            target=pdf_viewer.page_url(s.id, self.period_id, fetch=not s.pdf),
+                            target=pdf_viewer.page_url(s.id, self.period_id), new_tab=True
+                        ).mark(f"{self.mark}-stored-pdf-{s.id}"):
+                            pdf_viewer.pdf_icon(edited).tooltip(
+                                _(pdf_viewer.EDITED_TIP) if edited else _(pdf_viewer.STORED_TIP)
+                            )
+                    elif pdf_viewer.can_download(s):
+                        with ui.link(
+                            target=pdf_viewer.page_url(s.id, self.period_id, fetch=True),
                             new_tab=True,
-                        ):
-                            ui.icon(
-                                "picture_as_pdf", size="xs", color="red-8" if s.pdf else "grey-6"
-                            ).tooltip(
-                                _("View the PDF, with its notes (a new window)")
-                                if s.pdf
-                                else _("Download the PDF (open access) and view it (a new window)")
+                        ).mark(f"{self.mark}-get-pdf-{s.id}"):
+                            ui.icon("picture_as_pdf", size="xs", color="grey-6").tooltip(
+                                _("Download the PDF (open access) and view it (a new window)")
                             )
                 about = " · ".join(x for x in (s.venue, str(s.year or "")) if x)
                 ui.label(f"@{p.key} · {about}").classes("w-full text-xs text-grey ellipsis")
+                # (its sources, each with its PDF there: as in the publications panel)
+                with ui.row().classes("w-full items-center gap-1"):
+                    source_links(s, f"{self.mark}-")
                 texts = (s.note, s.period_notes.get(self.period_id))
                 notes = [n.strip() for n in texts if n and n.strip()]
                 if notes:

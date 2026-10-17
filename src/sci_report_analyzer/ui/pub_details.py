@@ -181,6 +181,25 @@ def source_badge(m: MemberView) -> None:
     menu.on("before-show", fill)
 
 
+def source_links(s: PubStat, mark: str = "") -> None:
+    """A paper's publisher's page, then its sources' badges, each followed by its PDF there
+    (each PDF once), as in the publications panel (``mark``: before their markers)."""
+    if s.publisher_url:
+        with ui.link(target=s.publisher_url, new_tab=True).mark(f"{mark}publisher-{s.id}"):
+            ui.icon("launch", size="xs", color="primary").tooltip(
+                _("Publisher's page: {url}").format(url=s.publisher_url)
+            )
+    shown: set[str] = set()
+    for m in s.members:
+        source_badge(m)
+        if m.pdf_url and m.pdf_url not in shown:
+            shown.add(m.pdf_url)
+            with ui.link(target=m.pdf_url, new_tab=True).mark(f"{mark}pdf-{m.id}"):
+                ui.icon("picture_as_pdf", size="xs", color="red-7").tooltip(
+                    _("PDF from {source}: {url}").format(source=m.source, url=m.pdf_url)
+                )
+
+
 def venue_rule_dialog(
     done,
     *,
@@ -836,7 +855,9 @@ def _stored_pdf(s: PubStat, done) -> None:
         .classes("flex items-center gap-1")
         .mark("stored-pdf")
     ):
-        ui.icon("edit_document", size="xs", color="red-8")
+        from .pdf_viewer import pdf_icon
+
+        pdf_icon(s.pdf == "edited")
         ui.label(_("Stored PDF (annotated)") if s.pdf == "edited" else _("Stored PDF"))
 
     def remove() -> None:
