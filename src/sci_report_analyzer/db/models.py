@@ -55,6 +55,8 @@ class Person(Base):
     career: Mapped[list[CareerEntry]] = relationship(
         back_populates="person", cascade="all, delete-orphan", order_by="CareerEntry.id"
     )
+    # PhD students added by hand (the others: on the theses of their sources).
+    added_theses: Mapped[list[Thesis]] = relationship(cascade="all, delete-orphan")
 
 
 class CareerEntry(Base):
@@ -616,11 +618,17 @@ class PeriodDocument(Base):
 
 
 class Thesis(Base):
+    """A thesis of a person's source (theses.fr), or a PhD student added by hand."""
+
     __tablename__ = "thesis"
     __table_args__ = (UniqueConstraint("link_id", "thesis_id", "role"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    link_id: Mapped[int] = mapped_column(ForeignKey("source_link.id", ondelete="CASCADE"))
+    # None: added by hand (to ``person_id``).
+    link_id: Mapped[int | None] = mapped_column(ForeignKey("source_link.id", ondelete="CASCADE"))
+    person_id: Mapped[int | None] = mapped_column(
+        ForeignKey("person.id", ondelete="CASCADE"), index=True
+    )
     thesis_id: Mapped[str]
     # director | rapporteur | examiner | president | author | other
     role: Mapped[str] = mapped_column(String(16))
@@ -632,8 +640,19 @@ class Thesis(Base):
     start_date: Mapped[str | None]
     institution: Mapped[str | None]
     url: Mapped[str | None]
+    # Set by hand, over those of the source (kept on its updates; None: the source's).
+    start_override: Mapped[str | None] = mapped_column(String(10))
+    end_override: Mapped[str | None] = mapped_column(String(10))
+    # Removed by hand from the source's: still listed (to restore), counted nowhere.
+    hidden: Mapped[bool] = mapped_column(default=False, server_default="0")
+    comment: Mapped[str | None]  # (why it is hidden)
 
-    link: Mapped[SourceLink] = relationship(back_populates="theses")
+    link: Mapped[SourceLink | None] = relationship(back_populates="theses")
+
+    @property
+    def added(self) -> bool:
+        """Added by hand (not from a source)."""
+        return self.link_id is None
 
 
 # ---- Matching settings (shareable) ----------------------------------------------------------

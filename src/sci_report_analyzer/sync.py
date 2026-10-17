@@ -117,6 +117,7 @@ def store_result(link_id: int, result: FetchResult) -> int:
                 t.start_date = ft.start_date or t.start_date  # (no longer given once defended)
             gone = [t for k, t in old.items() if k not in keep]
             _carry_start_dates(kept, gone)
+            _carry_edits([t for t in kept if (t.thesis_id, t.role) not in old], gone)
             for t in gone:
                 s.delete(t)
         return len(seen) + len(result.theses)
@@ -132,6 +133,21 @@ def _carry_start_dates(theses: list[Thesis], gone: list[Thesis]) -> None:
         before = next((g for g in left if g.role == t.role and g.student == t.student), None)
         if before is not None:
             t.start_date = before.start_date
+            left.remove(before)
+
+
+EDITS = ("start_override", "end_override", "hidden", "comment")
+
+
+def _carry_edits(new: list[Thesis], gone: list[Thesis]) -> None:
+    """Keep what was set by hand on a thesis (its dates, hidden) when it changes id (once
+    defended, above): on the new one of the same student."""
+    left = [g for g in gone if g.student and any(getattr(g, f) for f in EDITS)]
+    for t in new:
+        before = next((g for g in left if g.role == t.role and g.student == t.student), None)
+        if before is not None:
+            for f in EDITS:
+                setattr(t, f, getattr(before, f))
             left.remove(before)
 
 

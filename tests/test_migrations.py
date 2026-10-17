@@ -297,3 +297,31 @@ def test_settings_report_templates_never_saved_a7d3f9c2e5b8(tmp_path):
     _upgrade(db, "a7d3f9c2e5b8")
     with sqlite3.connect(db) as c:
         assert list(c.execute("SELECT report_templates FROM folder_settings")) == [(None,)]
+
+
+def test_thesis_edits_d4a7c2e9f5b3(tmp_path):
+    """The theses of a source kept as they were (shown, their own dates); a PhD student
+    added by hand: without a source, of a person (gone when downgraded)."""
+    db = tmp_path / "db.sqlite"
+    _upgrade(db, "a7d3f9c2e5b8")
+    with sqlite3.connect(db) as c:
+        _person(c, 1, [])
+        c.execute(
+            "INSERT INTO thesis (link_id, thesis_id, role, title, student, supervisors,"
+            " start_date) VALUES (1, 's1', 'director', 'T', 'Carl Sample', '[]', '2021-10-01')"
+        )
+    _upgrade(db, "d4a7c2e9f5b3")
+    with sqlite3.connect(db) as c:
+        rows = list(
+            c.execute(
+                "SELECT start_date, start_override, end_override, hidden, comment FROM thesis"
+            )
+        )
+        c.execute(
+            "INSERT INTO thesis (person_id, thesis_id, role, student, supervisors)"
+            " VALUES (1, 'manual:x', 'director', 'Eve Madeup', '[]')"
+        )
+    assert rows == [("2021-10-01", None, None, 0, None)]
+    _downgrade(db, "a7d3f9c2e5b8")
+    with sqlite3.connect(db) as c:
+        assert [s for (s,) in c.execute("SELECT student FROM thesis")] == ["Carl Sample"]

@@ -139,6 +139,47 @@ async def test_student_outcome(user: User) -> None:
     assert table.rows[0]["outcome"] == "Researcher at Inria"
 
 
+async def test_edit_phd_students(user: User) -> None:
+    from sci_report_analyzer import persons
+
+    pid = _seed()
+    await user.open(f"/person/{pid}?tab=theses")
+    await user.should_see("Supervised (1)")
+    row_id = user.find("theses-director").elements.pop().rows[0]["id"]
+    # Its dates, set over theses.fr's.
+    user.find("theses-director").trigger("edit", row_id)
+    await user.should_see("Edit the PhD student")
+    user.find(marker="student-start").clear().type("2020-10")
+    user.find(marker="student-save").click()
+    await user.should_see("PhD student saved")
+    (row,) = user.find("theses-director").elements.pop().rows
+    assert (row["start"], bool(row["edited"])) == ("2020-10", True)
+    # One added by hand.
+    user.find(marker="thesis-add").click()
+    await user.should_see("Add a PhD student")
+    user.find(marker="student-name").type("Eve Madeup")
+    user.find(marker="student-start").type("2022")
+    user.find(marker="student-save").click()
+    await user.should_see("Supervised (2)")
+    rows = user.find("theses-director").elements.pop().rows
+    added = next(r for r in rows if r["student"] == "Eve Madeup")
+    assert added["added"] and added["start"] == "2022"
+    # Removed: the one from theses.fr hidden (with why), the one added deleted.
+    user.find("theses-director").trigger("remove", row_id)
+    user.find(marker="student-comment").type("Not supervised")
+    user.find(marker="student-remove").click()
+    await user.should_see("Supervised (1) · 1 hidden")
+    hidden = next(r for r in user.find("theses-director").elements.pop().rows if r["hidden"])
+    assert hidden["comment"] == "Not supervised"
+    assert persons.students(pid) == ["Eve Madeup"]
+    user.find("theses-director").trigger("remove", added["id"])
+    user.find(marker="student-remove").click()
+    await user.should_see("Supervised (0) · 1 hidden")
+    user.find("theses-director").trigger("restore", row_id)
+    await user.should_see("Supervised (1)")
+    assert persons.students(pid) == ["A Student"]
+
+
 async def test_period_filter(user: User) -> None:
     from sci_report_analyzer import annotations
 

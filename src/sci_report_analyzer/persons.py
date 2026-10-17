@@ -10,8 +10,8 @@ from sqlalchemy.orm import selectinload
 
 from .db.models import Period, Person, Publication, SourceLink, Thesis
 from .db.session import session_scope
-from .source_settings import active_links
 from .sources.hal import is_document
+from .theses import of_person
 
 
 def load(person_id: int) -> Person | None:
@@ -105,9 +105,10 @@ def paper(pub_id: int) -> tuple[str | None, int] | None:
 # ---- PhD students and theses ----------------------------------------------------------------
 
 
-def theses(person_id: int, role: str | None = None) -> list[Thesis]:
-    """The person's theses (of their validated, used sources); ``role``: in that role."""
-    query = select(Thesis).join(SourceLink).where(SourceLink.person_id == person_id, active_links())
+def theses(person_id: int, role: str | None = None, hidden: bool = False) -> list[Thesis]:
+    """The person's theses (of their validated, used sources, and the PhD students added by
+    hand); ``role``: in that role; ``hidden``: those removed by hand too."""
+    query = of_person(person_id, hidden)
     if role is not None:
         query = query.where(Thesis.role == role)
     with session_scope() as s:

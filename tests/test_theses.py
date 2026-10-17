@@ -5,8 +5,8 @@ from dataclasses import replace
 from helpers import add_source, make_person, thesis
 from sqlalchemy import select
 
-from sci_report_analyzer import sync, theses
-from sci_report_analyzer.db.models import Thesis
+from sci_report_analyzer import persons, sync, theses
+from sci_report_analyzer.db.models import Person, Thesis
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.sources.base import FetchResult
 
@@ -71,3 +71,109 @@ def test_search_links() -> None:
     ]
     assert len(links) == 6
     assert links[1]["url"] == "https://www.google.com/search?q=%22Alice+Martin%22"
+
+
+# ---- edited by hand -------------------------------------------------------------------------
+
+
+def _supervised(tid: str, student: str, **kw):
+    return replace(thesis(tid, "director", f"Thesis of {student}"), student=student, **kw)
+
+
+def _row(pid: int, student: str) -> Thesis:
+    return next(t for t in persons.theses(pid, hidden=True) if t.student == student)
+
+
+def test_span_set_by_hand() -> None:
+    t = _t(start="2021-10-01", defence="2024-12-12", status="soutenue")
+    t.start_override, t.end_override = "2021-09", "2025-01-15"
+    assert theses.span(t) == theses.Span("2021-09", "2025-01-15")
+    # An end set over a thesis in progress: within the periods up to then only.
+    running = _t(start="2020-10-01", status="enCours")
+    running.end_override = "2023-06-30"
+    assert not theses.in_period(running, 2024, None)
+
+
+def test_dates_kept_on_updates() -> None:
+    pid = make_person()
+    ongoing = _supervised("s1", "Carl Sample", start_date="2021-10-01", status="enCours")
+    link = add_source(pid, "thesesfr", "123456789", theses=[ongoing])
+    theses.set_dates(_row(pid, "Carl Sample").id, "2021-11", "")
+    t = _row(pid, "Carl Sample")
+    assert (t.start_override, t.end_override, t.start_date) == ("2021-11", None, "2021-10-01")
+    sync.finish_link(link, FetchResult(theses=[ongoing]))
+    assert theses.span(_row(pid, "Carl Sample")).start == "2021-11"
+    # Defended: a new id on theses.fr, the dates set by hand carried over.
+    defended = _supervised("2024PA000009", "Carl Sample", defence_date="2024-12-12")
+    sync.finish_link(link, FetchResult(theses=[defended]))
+    t = _row(pid, "Carl Sample")
+    assert (t.thesis_id, t.start_override) == ("2024PA000009", "2021-11")
+    assert theses.span(t) == theses.Span("2021-11", "2024-12-12")
+    # The source's own dates: back to them.
+    theses.set_dates(t.id, "2021-10-01", "2024-12-12")
+    t = _row(pid, "Carl Sample")
+    assert (t.start_override, t.end_override) == (None, None)
+
+
+def test_hidden_kept_and_not_counted() -> None:
+    from sci_report_analyzer.pubview import PeopleIndex
+
+    pid = make_person()
+    rows = [_supervised("s1", "Carl Sample"), _supervised("s2", "Dana Placeholder")]
+    link = add_source(pid, "thesesfr", "123456789", theses=rows)
+    assert theses.remove(_row(pid, "Dana Placeholder").id, " Not a student of hers ") is False
+    sync.finish_link(link, FetchResult(theses=rows))  # (fetched again: still hidden)
+    t = _row(pid, "Dana Placeholder")
+    assert (t.hidden, t.comment) == (True, "Not a student of hers")
+    assert persons.students(pid) == ["Carl Sample"]
+    assert [t.student for t in persons.theses(pid)] == ["Carl Sample"]
+    with session_scope() as s:
+        people = PeopleIndex.for_person(s, s.get(Person, pid))
+        assert [st.name for st in people.students] == ["Carl Sample"]
+    theses.set_comment(t.id, "Co-supervised elsewhere")
+    assert _row(pid, "Dana Placeholder").comment == "Co-supervised elsewhere"
+    theses.restore(t.id)
+    t = _row(pid, "Dana Placeholder")
+    assert (t.hidden, t.comment) == (False, None)
+    assert persons.students(pid) == ["Carl Sample", "Dana Placeholder"]
+
+
+def test_student_added_by_hand() -> None:
+    pid = make_person()
+    add_source(pid, "thesesfr", "123456789", theses=[_supervised("s1", "Carl Sample")])
+    row_id = theses.save_student(
+        pid,
+        theses.Student(
+            " Eve Madeup ", "On made-up things", "2019-10", "", [" Jane Doe", " Al Other", ""]
+        ),
+    )
+    assert persons.students(pid) == ["Carl Sample", "Eve Madeup"]
+    t = _row(pid, "Eve Madeup")
+    assert (t.added, t.role, t.status, t.supervisors) == (
+        True,
+        "director",
+        "enCours",
+        ["Jane Doe", "Al Other"],
+    )
+    theses.set_dates(row_id, "2019-10", "2023-03-01")
+    t = _row(pid, "Eve Madeup")
+    assert (t.start_date, t.defence_date, t.status, t.end_override) == (
+        "2019-10",
+        "2023-03-01",
+        "soutenue",
+        None,
+    )
+    theses.save_student(pid, theses.Student("Eve Madeup", "Renamed", "2019", "2023"), row_id)
+    assert _row(pid, "Eve Madeup").title == "Renamed"
+    # Removed: deleted (not hidden).
+    assert theses.remove(row_id) is True
+    assert persons.students(pid) == ["Carl Sample"]
+    assert len(persons.theses(pid, hidden=True)) == 1
+    # Without any theses.fr profile too; gone with the person.
+    other = make_person("Ann Example")
+    theses.save_student(other, theses.Student("Finn Fictive"))
+    assert persons.students(other) == ["Finn Fictive"]
+    with session_scope() as s:
+        s.delete(s.get(Person, other))
+    with session_scope() as s:
+        assert s.scalars(select(Thesis).where(Thesis.person_id == other)).all() == []

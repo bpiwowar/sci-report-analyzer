@@ -1,13 +1,19 @@
 """PhD theses: their start and end (defence), whether they fall in a period, and where to
-look for what became of the students."""
+look for what became of the students; the PhD students edited by hand (their dates, added,
+hidden)."""
 
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from dataclasses import dataclass
 from urllib.parse import quote_plus
 
-from .db.models import Thesis
+from sqlalchemy import Select, and_, or_, select
+
+from .db.models import SourceLink, Thesis
+from .db.session import session_scope
+from .source_settings import active_links
 from .sources.base import to_year
 
 # A French PhD lasts about three years: the start of a defended thesis, when unknown.
@@ -32,10 +38,12 @@ class Span:
 
 
 def span(t: Thesis) -> Span:
-    if t.start_date:
-        return Span(t.start_date, t.defence_date)
-    if year := to_year(t.defence_date):
-        return Span(str(year - TYPICAL_YEARS), t.defence_date, start_estimated=True)
+    """Its dates (those set by hand first)."""
+    start, end = t.start_override or t.start_date, t.end_override or t.defence_date
+    if start:
+        return Span(start, end)
+    if year := to_year(end):
+        return Span(str(year - TYPICAL_YEARS), end, start_estimated=True)
     return Span(None, None)
 
 
@@ -77,3 +85,97 @@ def search_links(student: str) -> list[dict[str, str]]:
             },
         ]
     return links
+
+
+# ---- edited by hand -------------------------------------------------------------------------
+# The theses of a source keep what is set by hand over its updates (their dates, hidden); a
+# PhD student added by hand is a thesis without a source, of the person (``Thesis.added``).
+
+
+def of_person(person_id: int, hidden: bool = False) -> Select:
+    """Query of the person's theses: of their validated, used sources, and added by hand;
+    ``hidden``: those removed by hand too."""
+    query = (
+        select(Thesis)
+        .outerjoin(SourceLink)
+        .where(
+            or_(
+                and_(SourceLink.person_id == person_id, active_links()),
+                Thesis.person_id == person_id,
+            )
+        )
+    )
+    return query if hidden else query.where(~Thesis.hidden)
+
+
+@dataclass
+class Student:
+    """A supervised PhD student as typed (dates: a year, YYYY-MM or YYYY-MM-DD)."""
+
+    student: str
+    title: str | None = None
+    start: str | None = None
+    end: str | None = None
+    supervisors: list[str] | None = None
+    institution: str | None = None
+
+
+def save_student(person_id: int, st: Student, row_id: int | None = None) -> int:
+    """Add a PhD student by hand (``row_id``: edit one added by hand); its id."""
+    with session_scope() as s:
+        t = s.get(Thesis, row_id) if row_id else None
+        if t is None:
+            t = Thesis(
+                person_id=person_id, thesis_id=f"manual:{uuid.uuid4().hex[:12]}", role="director"
+            )
+            s.add(t)
+        t.student = st.student.strip()
+        t.title = (st.title or "").strip() or None
+        t.start_date = (st.start or "").strip() or None
+        t.defence_date = (st.end or "").strip() or None
+        t.status = "soutenue" if t.defence_date else "enCours"
+        t.supervisors = [n.strip() for n in st.supervisors or [] if n.strip()]
+        t.institution = (st.institution or "").strip() or None
+        s.flush()
+        return t.id
+
+
+def set_dates(row_id: int, start: str | None, end: str | None) -> None:
+    """The start and end of a thesis: of one added by hand, else set over its source's
+    (empty, or the source's: back to it)."""
+    start, end = (start or "").strip() or None, (end or "").strip() or None
+    with session_scope() as s:
+        t = s.get(Thesis, row_id)
+        if t.added:
+            t.start_date, t.defence_date = start, end
+            t.status = "soutenue" if end else "enCours"
+        else:
+            t.start_override = start if start != t.start_date else None
+            t.end_override = end if end != t.defence_date else None
+
+
+def remove(row_id: int, comment: str | None = None) -> bool:
+    """Remove a PhD student: one added by hand is deleted (True), a source's is hidden
+    (with why, ``comment``)."""
+    with session_scope() as s:
+        t = s.get(Thesis, row_id)
+        if t.added:
+            s.delete(t)
+            return True
+        t.hidden = True
+        t.comment = (comment or "").strip() or None
+        return False
+
+
+def restore(row_id: int) -> None:
+    """Show (and count) a hidden thesis again."""
+    with session_scope() as s:
+        t = s.get(Thesis, row_id)
+        t.hidden = False
+        t.comment = None
+
+
+def set_comment(row_id: int, comment: str) -> None:
+    """Why a thesis is hidden."""
+    with session_scope() as s:
+        s.get(Thesis, row_id).comment = comment.strip() or None
