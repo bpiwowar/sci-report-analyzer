@@ -9,8 +9,9 @@ are never listed nor used. The Ollama server itself can refuse them with
 
 Environment variables take precedence over the stored settings: ``OLLAMA_HOST`` (the server
 URL, as for the ollama CLI), ``SCI_REPORT_ANALYZER_OLLAMA_MODEL`` and
-``SCI_REPORT_ANALYZER_EMBED_MODEL``. A task (see TASKS) and a folder (its reports' settings:
-see folder_models) can use other models.
+``SCI_REPORT_ANALYZER_EMBED_MODEL``, ``SCI_REPORT_ANALYZER_REWRITE_MODEL`` (rewriting the
+excerpts: see rewrite_model; "none": not rewritten). A task (see TASKS) and a folder (its
+reports' settings: see folder_models) can use other models.
 """
 
 from __future__ import annotations
@@ -32,11 +33,13 @@ DEFAULT_URL = "http://localhost:11434"
 URL_ENV = "OLLAMA_HOST"
 MODEL_ENV = "SCI_REPORT_ANALYZER_OLLAMA_MODEL"
 EMBED_MODEL_ENV = "SCI_REPORT_ANALYZER_EMBED_MODEL"
+REWRITE_MODEL_ENV = "SCI_REPORT_ANALYZER_REWRITE_MODEL"
+NONE = "none"  # (a model: none, e.g. the excerpts not rewritten)
 # The tasks using the LLM: each can have its own model (none: the default one).
 TASKS = {"career": N_("Reading a person's career")}
 # Whether a task's model thinks by default (none: the general setting); reading a text to
 # extract facts gains little from it, and takes much longer.
-TASK_THINK = {"career": False}
+TASK_THINK = {"career": False, "rewrite": False}
 # The kind of model suggested for a task (and the embeddings), its size first, then examples.
 SUGGESTED = {
     "default": N_(
@@ -48,6 +51,10 @@ SUGGESTED = {
         "Suggested: a small instruction model (4–8B) is enough to copy facts from a text into "
         "JSON, and much faster: e.g. qwen3:8b (without thinking), gemma3:4b; 12–14B if it "
         "misses lines or mixes people (e.g. gemma3:12b, qwen3:14b)."
+    ),
+    "rewrite": N_(
+        "Suggested: a small instruction model (4–8B), multilingual (French), e.g. qwen3:8b "
+        "(without thinking), gemma3:4b."
     ),
     "embed": N_(
         "Suggested: a multilingual embedding model (French and English), small (0.3–0.6B) and "
@@ -118,6 +125,9 @@ class OllamaSettings:
     # own choice (see thinks).
     think: bool = False
     task_think: dict[str, bool] = field(default_factory=dict)
+    # The model rewriting a new excerpt (and finding its years: see excerpt_rewrite; blank
+    # or NONE: none).
+    rewrite_model: str = ""
 
 
 def stored_settings() -> OllamaSettings:
@@ -148,10 +158,14 @@ def settings() -> OllamaSettings:
         st.model = model
     if model := os.environ.get(EMBED_MODEL_ENV):
         st.embed_model = model
+    if model := os.environ.get(REWRITE_MODEL_ENV):
+        st.rewrite_model = model
     st.url = _normalize_url(st.url)
     if st.embed_api not in EMBED_APIS:
         st.embed_api = "ollama"
     st.model = "" if is_cloud(st.model) else st.model
+    if is_cloud(st.rewrite_model):
+        st.rewrite_model = ""
     if st.embed_api == "ollama" and is_cloud(st.embed_model):
         st.embed_model = ""
     return st
@@ -184,6 +198,13 @@ def model(folder_id: int | None = None, task: str | None = None) -> str:
     return "" if is_cloud(chosen) else chosen
 
 
+def rewrite_model() -> str:
+    """The LLM rewriting the new excerpts (blank: none, the LLM being off or none chosen)."""
+    st = settings()
+    chosen = st.rewrite_model.strip()
+    return chosen if st.enabled and chosen and chosen.lower() != NONE else ""
+
+
 def embed_model(folder_id: int | None = None) -> str:
     """The embedding model to use (in a folder; blank: none, the LLM being off or no model
     chosen)."""
@@ -210,12 +231,14 @@ async def chat_json(
     task: str | None = None,
     progress: Callable[[str, int], None] | None = None,
     timeout: float = 600.0,
+    name: str | None = None,
 ) -> dict:
     """The LLM's answer to ``messages`` (Ollama's /api/chat) for a task, as JSON following
     ``schema`` (a structured output: constrained decoding; raises if no LLM, the server is
     not local or unreachable). Streamed: ``progress`` is called with the phase ("reading" the
-    text, "thinking", "writing" the answer) and the characters written in it."""
-    name = model(folder_id, task)
+    text, "thinking", "writing" the answer) and the characters written in it. ``name``: this
+    model instead (a local one)."""
+    name = model(folder_id, task) if name is None else ("" if is_cloud(name) else name)
     if not name:
         raise RuntimeError("No LLM (Settings → Local LLM)")
     st = settings()

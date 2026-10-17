@@ -799,9 +799,10 @@ def add_excerpt(
     caveat: bool = False,
     tags: list[str] | None = None,
     level: str | None = None,
+    original: str | None = None,
 ) -> int:
-    """File a passage (its years, markers, tags and level: see update_excerpt); one filed
-    there already is kept."""
+    """File a passage (its years, markers, tags and level: see update_excerpt; ``original``:
+    its text as selected, when rewritten); one filed there already is kept."""
     text = " ".join(text.split())
     with session_scope() as s:
         same = s.scalar(  # (filed there already)
@@ -825,7 +826,7 @@ def add_excerpt(
             category_id=category_id,
             period_id=period_id,
             text=text,
-            original=text,
+            original=" ".join(original.split()) if original else text,
             page=page,
             rects=rects or [],
             document_id=document_id,

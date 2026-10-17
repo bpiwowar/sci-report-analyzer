@@ -2174,3 +2174,59 @@ async def test_excerpts_collapsed_searched_discarded(user: User, fake_viewer):
     user.find(marker=f"excerpt-discard-{course}").click()
     await user.should_not_see(marker=f"excerpt-discarded-{course}")
     assert "Two courses." in categories.markdown(folder, period)
+
+
+async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_viewer):
+    """A passage without a date: the years around it in the PDF proposed; with a model
+    rewriting the excerpts, its wording proposed too, used: filed (the text selected kept)."""
+    from sci_report_analyzer import categories, excerpt_rewrite, llm
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    service = categories.add(folder, "Service")
+    doc = documents.add(period, "Application.pdf", PDF)
+    line = "Entre 2019 et 2021, j'ai été membre du conseil de l'école X et trésorier."
+    x = 50 + 5 * line.index("membre")
+    documents.set_lines(doc, [{"p": 1, "t": line, "r": [50, 700, 50 + 5 * len(line), 710]}])
+    selection = {
+        "text": "membre du conseil de l'école X",
+        "p": 1,
+        "rects": [[x, 700, x + 150, 710, 1]],
+    }
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker=f"pick-category-{service}")
+    assert user.find(marker="excerpt-start").elements.pop().value == 2019
+    assert user.find(marker="excerpt-end").elements.pop().value == 2021
+    await user.should_not_see(marker="excerpt-rewrite")
+    for dlg in user.find(ui.dialog).elements:
+        dlg.close()
+    await user.should_not_see(marker="excerpt-start")
+
+    asked = []
+
+    async def rewrite(text, before, after):
+        asked.append((text, before, after))
+        return excerpt_rewrite.Rewrite(text="Membre du conseil de l'école X", start=2019)
+
+    monkeypatch.setattr(llm, "rewrite_model", lambda: "gemma3:4b")
+    monkeypatch.setattr(excerpt_rewrite, "rewrite", rewrite)
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker="excerpt-rewrite-text")
+    assert asked == [(selection["text"], "Entre 2019 et 2021, j'ai été ", " et trésorier.")]
+    assert user.find(marker="excerpt-rewrite-text").elements.pop().value == (
+        "Membre du conseil de l'école X"
+    )
+    user.find(marker="excerpt-rewrite-use").click()
+    assert user.find(marker="excerpt-end").elements.pop().value is None  # (ongoing)
+    user.find(marker=f"pick-category-{service}").click()
+    await user.should_see("Added to Service")
+    [e] = categories.excerpts(period)
+    assert (e.text, e.original, e.start_year, e.end_year) == (
+        "Membre du conseil de l'école X",
+        "membre du conseil de l'école X",
+        2019,
+        None,
+    )
