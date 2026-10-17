@@ -51,10 +51,14 @@ def detect_years(text: str) -> tuple[int, int] | None:
     before its start, a short end only right after a dash or slash); not part of a longer
     number, a decimal, a date ("2026-05-12": 2026 alone) or a DOI, nor page numbers
     ("pp. 2026-2032")."""
+    if first := next(_ranges(text), None):
+        return first[2]
+    found = {y for _s, _e, y in _singles(text)}
+    return (min(found), max(found)) if found else None
 
-    def pages(m: re.Match) -> bool:
-        return bool(_PAGES.search(text[: m.start()]))
 
+def _ranges(text: str):
+    """The ranges of a text (see detect_years): their start, end and years."""
     for m in _RANGE.finditer(text):
         a, sep, b = int(m[1]), m[2], int(m[3])
         if len(m[3]) == 2:
@@ -63,10 +67,78 @@ def detect_years(text: str) -> tuple[int, int] | None:
             b = a // 100 * 100 + int(m[3])
             if b < a:
                 b += 100
-        if a <= b < 2100 and not pages(m):
-            return a, b
-    found = {int(m[1]) for m in _SINGLE.finditer(text) if not pages(m)}
-    return (min(found), max(found)) if found else None
+        if a <= b < 2100 and not _PAGES.search(text[: m.start()]):
+            yield m.start(), m.end(), (a, b)
+
+
+def _singles(text: str):
+    """The years of a text (see detect_years): their start, end and year."""
+    for m in _SINGLE.finditer(text):
+        if not _PAGES.search(text[: m.start()]):
+            yield m.start(), m.end(), int(m[1])
+
+
+# Between two years of one expression: "2019 et 2021", "2019, 2020 and 2021".
+_JOINED = re.compile(r"^[\s,]*(?:(?:and|et|or|ou|&|then|puis)[\s,]*)*$", re.IGNORECASE)
+
+
+def _expressions(text: str) -> list[tuple[int, int, tuple[int, int]]]:
+    """The dates of a text, in order (start, end, years): its ranges, and its years (those
+    joined by "and", "et", a comma…: one, their span; "entre 2019 et 2021": 2019–2021)."""
+    ranges = list(_ranges(text))
+    out = sorted(ranges)
+    for a, b, y in _singles(text):
+        if not any(s <= a < e for s, e, _y in ranges):
+            out.append((a, b, (y, y)))
+    out.sort()
+    merged: list[tuple[int, int, tuple[int, int]]] = []
+    for a, b, y in out:
+        if (
+            merged
+            and (a, b, y) not in ranges
+            and merged[-1] not in ranges
+            and _JOINED.match(text[merged[-1][1] : a])
+        ):
+            s, _e, (lo, hi) = merged[-1]
+            merged[-1] = (s, b, (min(lo, y[0]), max(hi, y[1])))
+        else:
+            merged.append((a, b, y))
+    return merged
+
+
+# Where a sentence ends (or a list's item: a line starting with a bullet, a number or
+# years).
+_SENTENCE_END = re.compile(r"[.!?…](?=\s|$)|\n(?=\s*(?:[•▪◦·*–—-]|\d{1,2}[.)]\s|(?:19|20)\d\d\b))")
+CONTEXT_LINES = 5  # lines before a passage, at most, where its years are looked for
+
+
+def context_years(
+    text: str, before: str, after: str, *, lines: int = CONTEXT_LINES
+) -> tuple[int, int] | None:
+    """The years of a passage (see detect_years); none in it, those of its context: the
+    text ``before`` and ``after`` it (around it in its PDF, its lines separated by "\n"),
+    the nearest date there: in its sentence (before it, then after it: "Entre 2019 et
+    2021, j'ai été XXX": 2019–2021), then in its line (before, then after), then in the
+    ``lines`` lines before it (a heading, an item: "2019–2021: Head of…")."""
+    if years := detect_years(text):
+        return years
+    ends = [m.end() for m in _SENTENCE_END.finditer(before)]
+    start = ends[-1] if ends else 0
+    stop = m.start() if (m := _SENTENCE_END.search(after)) else len(after)
+    line_start = before.rfind("\n") + 1
+    line_stop = after.find("\n")
+    line_stop = len(after) if line_stop < 0 else line_stop
+    previous = before[: max(line_start - 1, 0)].split("\n")[::-1][:lines] if line_start else []
+    for chunk, last in (
+        (before[start:], True),
+        (after[:stop], False),
+        (before[line_start:start], True),
+        (after[stop:line_stop], False),
+        *((ln, True) for ln in previous),
+    ):
+        if found := _expressions(chunk):
+            return found[-1 if last else 0][2]
+    return None
 
 
 # Years ("2026", "2026-32", "2026 to 2032"…: see detect_years) leading a passage (with a
@@ -743,9 +815,10 @@ def add_excerpt(
     caveat: bool = False,
     tags: list[str] | None = None,
     level: str | None = None,
+    original: str | None = None,
 ) -> int:
-    """File a passage (its years, markers, tags and level: see update_excerpt); one filed
-    there already is kept."""
+    """File a passage (its years, markers, tags and level: see update_excerpt; ``original``:
+    its text as selected, when rewritten); one filed there already is kept."""
     text = " ".join(text.split())
     with session_scope() as s:
         same = s.scalar(  # (filed there already)
@@ -769,7 +842,7 @@ def add_excerpt(
             category_id=category_id,
             period_id=period_id,
             text=text,
-            original=text,
+            original=" ".join(original.split()) if original else text,
             page=page,
             rects=rects or [],
             document_id=document_id,

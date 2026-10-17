@@ -305,6 +305,75 @@ def _line_at(lines: list[dict[str, Any]], page: int, rect: list[float]) -> int |
     return best
 
 
+def _offset(line: dict[str, Any], x: float) -> int:
+    """Where in a line's text is ``x`` (by its runs, else its rectangle)."""
+    text, runs = line["t"], line.get("c") or [[0, line["r"][0], line["r"][2]]]
+    for k, (at, x0, x1) in enumerate(runs):
+        end = runs[k + 1][0] if k + 1 < len(runs) else len(text)
+        if x <= x1 or k + 1 == len(runs):
+            share = 0.0 if x1 <= x0 else min(max((x - x0) / (x1 - x0), 0.0), 1.0)
+            return at + round(share * (end - at))
+    return len(text)
+
+
+_GAP = 1.0  # between two lines of a block, at most (times a line's height)
+_HEADING_GAP, _HEADING_LEN = 2.5, 80  # a heading over a block: its gap, its length at most
+
+
+def _block_before(lines: list[dict[str, Any]], i: int, n: int) -> list[str]:
+    """The ``n`` lines at most before line ``i`` on its page and in its block (no wider gap
+    between them, the line beside it included), and the heading over the block (a short
+    line just over it), nearest first."""
+    out, cur = [], lines[i]
+    for j in range(i - 1, max(i - 1 - n, -1), -1):
+        ln = lines[j]
+        if ln["p"] != cur["p"]:
+            break
+        h = cur["r"][3] - cur["r"][1]
+        gap = ln["r"][1] - cur["r"][3]
+        if gap > _GAP * h:
+            if gap <= _HEADING_GAP * h and len(ln["t"].strip()) <= _HEADING_LEN:
+                out.append(ln["t"])
+            break
+        out.append(ln["t"])
+        cur = ln
+    return out
+
+
+def _block_after(lines: list[dict[str, Any]], i: int, n: int) -> list[str]:
+    """The ``n`` lines at most after line ``i`` on its page and in its block."""
+    out, cur = [], lines[i]
+    for ln in lines[i + 1 : i + 1 + n]:
+        h = cur["r"][3] - cur["r"][1]
+        if ln["p"] != cur["p"] or cur["r"][1] - ln["r"][3] > _GAP * h:
+            break
+        out.append(ln["t"])
+        cur = ln
+    return out
+
+
+def selection_context(
+    lines: list[dict[str, Any]], rects: list[list[float]], n: int = 5
+) -> tuple[str, str]:
+    """The text before and after a selection (its rectangles, their page fifth, as the
+    viewer gives them: see pdf_viewer.js), in a PDF's ``lines`` (see set_lines): from the
+    start of its block (``n`` lines at most before it, and its heading) to where it starts
+    (its first rectangle), from where it ends (its last) to the end of its block (``n``
+    lines at most); its lines separated by "\\n" (see categories.context_years). Not found:
+    ("", "")."""
+    if not rects or not lines:
+        return "", ""
+    first, last = rects[0], rects[-1]
+    i = _line_at(lines, int(first[4]) if len(first) > 4 else 0, first[:4])
+    j = _line_at(lines, int(last[4]) if len(last) > 4 else 0, last[:4])
+    if i is None or j is None:
+        return "", ""
+    head = lines[i]["t"][: _offset(lines[i], first[0])]
+    tail = lines[j]["t"][_offset(lines[j], last[2]) :]
+    before = "\n".join([*_block_before(lines, i, n)[::-1], head])
+    return before, "\n".join([tail, *_block_after(lines, j, n)])
+
+
 # A reference's label at the start of its line: "[11]", "[C3]", "11." or "11)".
 _LABEL = re.compile(r"^\s*(?:\[([A-Za-z]{0,3}\d{1,4})\]|(\d{1,3})[.)]\s)")
 # A citation: "[11]", "[3, 11]", "[3-5]", "[C3; J1]".

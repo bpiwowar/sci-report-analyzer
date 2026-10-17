@@ -22,12 +22,13 @@ from .theme import DEFAULT_COLOUR, bare_page
 from .viewer_side import Side, bookmarks_section, categories_section
 
 # A PDF's lines of text (PDF.js: each with its page, text, rectangle and runs), as the server
-# keeps them (see documents.set_lines); and a document's, extracted and sent.
+# keeps them (see documents.set_lines), of all its pages or some; and a document's, extracted
+# and sent.
 LINES_JS = """
-window.sraLines = window.sraLines || (async (d) => {
+window.sraLines = window.sraLines || (async (d, pages) => {
   const out = [];
   const round = (r) => r.map(v => Math.round(v * 10) / 10);
-  for (let p = 1; p <= d.numPages; p++) {
+  for (const p of pages || Array.from({length: d.numPages}, (_, k) => k + 1)) {
     const page = await d.getPage(p);
     const tc = await page.getTextContent();
     let cur = null;

@@ -1426,6 +1426,35 @@ def llm_tab() -> None:
         )
         .mark("llm-think")
     )
+    ui.label(_("Rewriting the excerpts")).classes("text-lg mt-4")
+    ui.label(
+        _(
+            "A new excerpt reworded (short, impersonal, without its dates) and its years read "
+            "in it and the lines around it, proposed when it is filed. None: only its years, "
+            "found around it."
+        )
+    ).classes("text-sm text-grey-8 max-w-[48rem]")
+    none = {llm.NONE: _("None (no rewriting)")}
+
+    def rewrite_options(models: list[str]) -> dict[str, str]:
+        chosen = st.rewrite_model if st.rewrite_model and st.rewrite_model != llm.NONE else ""
+        return {**none, **{m: m for m in sorted({*models, *([chosen] if chosen else [])})}}
+
+    rewrite_model = (
+        ui.select(
+            rewrite_options([]),
+            value=st.rewrite_model or llm.NONE,
+            label=_("Model rewriting the excerpts"),
+        )
+        .classes("w-[32rem]")
+        .mark("llm-rewrite-model")
+    )
+    ui.label(
+        _("(or set the {env} environment variable)").format(env=llm.REWRITE_MODEL_ENV)
+    ).classes("text-xs text-grey")
+    ui.label(suggested("rewrite")).classes("text-xs text-grey-8 max-w-[48rem]").mark(
+        "llm-suggested-rewrite"
+    )
 
     async def load(notify: bool = False) -> None:
         try:
@@ -1438,6 +1467,7 @@ def llm_tab() -> None:
                 ui.notify(message, type="negative")
             return
         model.set_options(models, value=model.value if model.value in models else None)
+        rewrite_model.set_options(rewrite_options(models), value=rewrite_model.value)
         if models:
             message = ngettext(
                 "Ollama is running: {n} model", "Ollama is running: {n} models", len(models)
@@ -1556,6 +1586,7 @@ def llm_tab() -> None:
             embed_model=(embed_model.value or "").strip(),
             cluster_min=max(1, int(cluster_min.value or 1)),
             cluster_max=max(1, int(cluster_max.value or 1)),
+            rewrite_model=rewrite_model.value or llm.NONE,
         )
 
     def save() -> bool | None:
