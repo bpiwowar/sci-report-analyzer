@@ -34,11 +34,12 @@ KIND_COLOUR = {
 # Papers earlier than the rest by more years than this: left out of the axis (counted).
 PAPERS_BEFORE = 3
 # Up to that many years, each named on the axis whatever the width (beyond: every fifth one
-# when too narrow for all, see _year_names).
+# when too narrow for all, see _year_names_css).
 NAMED_YEARS = 16
-# The zoom: a year's width, times that of the years fitting the width (more: scrolled).
-ZOOM = (1, 1.5, 2, 3, 4)
-ZOOM_START = 2  # (twice: scrolled to the period in the folder, else to this year)
+# The zoom (its slider): a year's width, times that of the years fitting the width (more:
+# scrolled), from fitting it to four times as wide.
+ZOOM_MIN, ZOOM_MAX, ZOOM_STEP = 1.0, 4.0, 0.1
+ZOOM_START = 2.0  # (twice: scrolled to the period in the folder, else to this year)
 # The width of the column of the rows' names, of a year named.
 LABEL_PX, NAMED_PX = 84, 34  # (a year at least: .95rem, see _CSS)
 
@@ -48,9 +49,10 @@ _CSS = """
 .vr-tl-wrap { overflow-x:auto; container-type:inline-size; }
 .vr-tl { --tl-bg:#fff; --tl-line:rgba(140,149,159,.25); --tl-band:rgba(0,150,136,.14);
   --tl-band-edge:rgba(0,150,136,.55);
-  --tl-now:#d4a72c; --label:5.25rem; display:grid; position:relative; width:100%;
-  grid-template-columns:var(--label) repeat(var(--n), minmax(0, 6rem));
-  min-width:calc(var(--label) + var(--n) * .95rem); font-size:.75rem; }
+  --tl-now:#d4a72c; --label:5.25rem; display:grid; position:relative; width:max-content;
+  min-width:100%; grid-template-columns:var(--label) repeat(var(--n), max(.95rem,
+  min(calc(6rem * var(--tl-zoom)), calc((100cqw - var(--label)) * var(--tl-zoom) / var(--n)))));
+  font-size:.75rem; }
 body.body--dark .vr-tl { --tl-bg:var(--q-dark); --tl-line:rgba(160,170,180,.2);
   --tl-band:rgba(77,208,192,.16); --tl-band-edge:rgba(77,208,192,.6); }
 .vr-tl-col { grid-row:1/-1; border-left:1px solid var(--tl-line); }
@@ -117,6 +119,15 @@ window.vrTimelineScroll = (id, keep) => {
   };
   for (const t of keep ? [0, 100, 300] : [300, 900]) setTimeout(go, t);
 };
+// The zoom's slider moved: the years wider or narrower at once (the middle kept in view).
+window.vrTimelineZoom = (z) => {
+  const w = document.querySelector('.vr-tl-wrap'), g = w && w.querySelector('.vr-tl');
+  if (!g) return;
+  const at = (w.scrollLeft + w.clientWidth / 2) / w.scrollWidth;
+  g.style.setProperty('--tl-zoom', z);
+  w.scrollLeft = at * w.scrollWidth - w.clientWidth / 2;
+  window.vrTlAt = at;
+};
 </script>""",
     shared=True,
 )
@@ -171,7 +182,7 @@ def timeline_view(
     state: dict = {
         "shown": {"career": True, "excerpts": True, "theses": True, "papers": True},
         "picked": {},  # ("year", "excerpt", "career" or "thesis": shown in the details)
-        "zoom": ZOOM_START,  # (see ZOOM)
+        "zoom": ZOOM_START,  # (see ZOOM_MIN)
         "drawn": False,  # (the chart drawn already: drawn again, scrolled where it was)
     }
 
@@ -210,6 +221,7 @@ def _view(
 
     # (the items of the chart, by kind and id: marked once picked, the chart kept as it is)
     items: dict[tuple[str, int], ui.element] = {}
+    layout: dict = {}  # (of the chart drawn: see _chart)
 
     def pick(kind: str | None = None, value: int = 0) -> None:
         picked.clear()
@@ -244,8 +256,9 @@ def _view(
             period,
             picked,
             pick,
-            ZOOM[state["zoom"]],
+            state["zoom"],
             items,
+            layout,
             state["drawn"],
         )
         state["drawn"] = True
@@ -269,12 +282,21 @@ def _view(
         chart.refresh()
         below.refresh()
 
-    def zoom(by: int) -> None:
-        state["zoom"] = max(0, min(len(ZOOM) - 1, state["zoom"] + by))
-        narrower.set_enabled(state["zoom"] > 0)
-        wider.set_enabled(state["zoom"] < len(ZOOM) - 1)
-        if by:
+    def zoom(e) -> None:
+        """The slider released (its years shown already, see vrTimelineZoom): the chart
+        drawn again only if its lanes change (the room for the labels), else as it is."""
+        try:
+            z = max(ZOOM_MIN, min(ZOOM_MAX, float(e.args)))
+        except (TypeError, ValueError):
+            return
+        state["zoom"] = z
+        if layout.get("room") != _room(layout.get("n", 1), z):
             chart.refresh()
+            return
+        if (grid := layout.get("grid")) is not None and not grid.is_deleted:
+            grid.style(f"--tl-zoom:{z}")
+        if (names := layout.get("names")) is not None and not names.is_deleted:
+            names.set_content(_year_names_css(layout["n"], z))
 
     with ui.column().classes("w-full gap-2").mark("timeline"):
         ui.label(
@@ -285,27 +307,24 @@ def _view(
                 "(their number a year). Clicked, what it is shown below: a line of their career "
                 "or a PhD student, edited there; an excerpt, or a year's: clicked there, its PDF "
                 "beside the page, at it; its pencil edits it (its years…). An excerpt without "
-                "years of its own is at its paper's year. The magnifiers widen the years."
+                "years of its own is at its paper's year. The slider widens the years."
             )
         ).classes("text-sm text-grey")
         with ui.row().classes("w-full items-start no-wrap gap-2"):
             with ui.column().classes("grow gap-1"):
                 _legend(shown, counts, period, toggle)
-            # (wider years, the timeline then scrolled; or back to fitting the width)
-            with ui.row().classes("items-center gap-0 no-wrap").mark("timeline-zoom"):
-                narrower = (
-                    ui.button(icon="zoom_out", on_click=lambda: zoom(-1))
-                    .props("flat dense round size=sm")
-                    .tooltip(_("Narrower years"))
-                    .mark("timeline-zoom-out")
-                )
-                wider = (
-                    ui.button(icon="zoom_in", on_click=lambda: zoom(1))
-                    .props("flat dense round size=sm")
-                    .tooltip(_("Wider years (scrolled sideways)"))
-                    .mark("timeline-zoom-in")
-                )
-            zoom(0)
+            # (wider years, the timeline then scrolled; or back to fitting the width: at once
+            # while moved, kept once released)
+            with ui.row().classes("items-center gap-1 no-wrap shrink-0"):
+                ui.icon("zoom_out", color="grey", size="xs")
+                ui.slider(min=ZOOM_MIN, max=ZOOM_MAX, step=ZOOM_STEP, value=state["zoom"]).props(
+                    "dense"
+                ).classes("w-28").on(
+                    "update:model-value", js_handler="(v) => vrTimelineZoom(v)"
+                ).on("change", zoom).tooltip(
+                    _("The width of the years (left: the whole timeline fitting the width)")
+                ).mark("timeline-zoom")
+                ui.icon("zoom_in", color="grey", size="xs")
         chart()
         below()
 
@@ -375,12 +394,15 @@ def _chart(
     pick: Callable[..., None],
     zoom: float,
     items: dict[tuple[str, int], ui.element],
+    layout: dict,
     keep: bool,
 ) -> None:
     """The years, from the earliest of the items (papers not much earlier than the rest) to
     this year at least; a row for each kind (the excerpts: for each main category); a year
     ``width`` rem wide (none: the years fitting the width); ``items``: given its items (by kind
-    and id); ``keep``: drawn again, scrolled where it was."""
+    and id); ``layout``: given its number of years ("n"), the room for a label ("room"), its
+    grid and the style naming its years ("grid", "names"); ``keep``: drawn again, scrolled
+    where it was."""
     this_year = date.today().year
     core = [y for sp in [*spans, *directed, *excerpts] for y in (sp.first, sp.last)]
     if not core and not papers:
@@ -394,8 +416,9 @@ def _chart(
     papers = {y: titles for y, titles in papers.items() if y >= lo}
     hi = max([*core, *papers, this_year])
     n = hi - lo + 1
-    # (the years' room for a label, about: the narrower they are, the more)
-    room = max(1, min(6, math.ceil(n / (6 * zoom))))
+    room = _room(n, zoom)
+    layout.clear()
+    layout.update(n=n, room=room)
 
     def col(year: int) -> int:
         return year - lo + 2
@@ -421,20 +444,16 @@ def _chart(
     cover = {y for x in excerpts for y in range(x.first, x.last + 1)}
 
     with ui.element("div").classes("vr-tl-wrap w-full").mark("timeline-chart") as wrap:
-        _year_names(n, zoom)
-        sized = ""
-        if zoom > 1:  # (wider than the page: scrolled to the period, else to this year)
-            year = f"max(.95rem, calc((100cqw - var(--label)) * {zoom} / {n}))"
-            sized = (
-                f";grid-template-columns:var(--label) repeat({n}, {year})"
-                ";width:max-content;min-width:100%"
-            )
-            ui.run_javascript(f"vrTimelineScroll({wrap.id}, {str(keep).lower()})")
+        if n > NAMED_YEARS:
+            layout["names"] = ui.html(_year_names_css(n, zoom), sanitize=False).classes("hidden")
+        # (wider than the page: scrolled to the period, else to this year)
+        ui.run_javascript(f"vrTimelineScroll({wrap.id}, {str(keep).lower()})")
         with (
             ui.element("div")
-            .classes(f"vr-tl {_names(n, zoom)}")
-            .style(f"--n:{n};grid-template-rows:repeat({total}, auto){sized}")
-        ):
+            .classes(f"vr-tl vr-tl-n{n}")
+            .style(f"--n:{n};--tl-zoom:{zoom};grid-template-rows:repeat({total}, auto)")
+        ) as grid:
+            layout["grid"] = grid
             first, last = max(period.start_year or lo, lo), min(period.end_year or hi, hi)
             if (period.start_year or period.end_year) and first <= last:
                 ui.element("div").classes("vr-tl-band").style(
@@ -522,20 +541,20 @@ def _by_main(
     return [(n, groups[n.id if n else 0]) for n in order]
 
 
-def _names(n: int, zoom: float) -> str:
-    return f"vr-tl-n{n}-z{round(zoom * 10)}"
+def _room(n: int, zoom: float) -> int:
+    """The years' room for a label, about (``n`` years, ``zoom`` times wider than fitting the
+    width): the narrower they are, the more."""
+    return max(1, min(6, math.ceil(n / (6 * zoom))))
 
 
-def _year_names(n: int, zoom: float) -> None:
+def _year_names_css(n: int, zoom: float) -> str:
     """Beyond NAMED_YEARS years, those not a fifth one unnamed when too narrow for all (the
     years ``zoom`` times wider than fitting the width)."""
-    if n > NAMED_YEARS:
-        width = LABEL_PX + n * NAMED_PX / zoom
-        ui.html(
-            f"<style>@container (max-width:{width:.0f}px)"
-            f"{{.{_names(n, zoom)} .vr-tl-year.minor span{{visibility:hidden}}}}</style>",
-            sanitize=False,
-        ).classes("hidden")
+    width = LABEL_PX + n * NAMED_PX / zoom
+    return (
+        f"<style>@container (max-width:{width:.0f}px)"
+        f"{{.vr-tl-n{n} .vr-tl-year.minor span{{visibility:hidden}}}}</style>"
+    )
 
 
 def _cells(spans: list, hi: int):

@@ -1,6 +1,7 @@
 """A person's timeline: their excerpts in a folder placed by their years (categories.timeline),
 their career, supervised theses and papers (timeline), and its tab on the person's page."""
 
+import asyncio
 from dataclasses import replace
 from datetime import date
 
@@ -253,19 +254,30 @@ async def test_timeline_tab_career_and_theses(user: User) -> None:
     assert tab.parent_slot.parent.value == "theses"
     user.find(marker="tab-timeline").click()
     await user.should_see(marker=f"timeline-career-{lead}")
-    # Zoomed in at first (the years twice as wide as fitting the width: scrolled), out to
-    # fitting it, no further.
-    out = user.find(marker="timeline-zoom-out").elements.pop()
-    assert out.enabled
-    user.find(marker="timeline-zoom-out").click()
-    user.find(marker="timeline-zoom-out").click()
-    await user.should_see(marker=f"timeline-career-{lead}")
-    assert not out.enabled
+    # Zoomed in at first (the years twice as wide as fitting the width: scrolled); the
+    # slider released, out to fitting it (no further), kept once drawn again.
+    slider = user.find(marker="timeline-zoom").elements.pop()
+    assert slider.value == 2
+    assert _zoom(user) == 2
+    user.find(marker="timeline-zoom").trigger("change", 0.5)
+    for _i in range(50):  # (drawn again: the room for the labels changed)
+        if _zoom(user) == 1:
+            break
+        await asyncio.sleep(0.02)
+    assert _zoom(user) == 1
     # A kind hidden: off the timeline.
     user.find(marker="timeline-show-career").click()
     await user.should_not_see(marker=f"timeline-career-{lead}")
     await user.should_not_see(marker="timeline-row-career")
     await user.should_see(marker="timeline-row-excerpts")
+    assert _zoom(user) == 1
+
+
+def _zoom(user: User) -> float:
+    """That of the chart shown (its years' width, see timeline.ZOOM_MIN)."""
+    chart = user.find(marker="timeline-chart").elements.pop()
+    grid = next(c for c in chart.descendants() if "vr-tl" in c.classes)
+    return float(grid.style["--tl-zoom"])
 
 
 def test_lanes_from_a_start() -> None:

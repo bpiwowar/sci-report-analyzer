@@ -468,8 +468,10 @@ pencil edits it (its dialog, as in the Excerpts tab: its years, markers, text…
 drawn again), its list button shows it in the Excerpts tab. A paper's excerpt without years is at the paper's year. The timeline
 starts with the earliest of their career, theses and excerpts (their papers at most three
 years before; the earlier ones counted below). It opens zoomed in (years twice as wide as
-fitting the width), scrolled to their period in the folder; the magnifiers widen or narrow
-the years (the text stays the same size), down to the whole timeline fitting the width. Each
+fitting the width), scrolled to their period in the folder; its slider widens or narrows
+the years at once while moved (the text stays the same size, the middle stays in view), from
+the whole timeline fitting the width to four times as wide; the timeline keeps where it is
+scrolled when an item is clicked or it is drawn again. Each
 kind is shown or hidden with its switch; one they have none of is said so. An excerpt has
 a switch of its own (in the details below, or its button in the Excerpts tab): off, it is
 left out of the timeline (still kept), listed apart below, where it is switched back on. The
