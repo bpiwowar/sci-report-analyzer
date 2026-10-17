@@ -42,6 +42,9 @@ def test_setting(monkeypatch, model) -> None:
     assert llm.rewrite_model() == ""  # (the LLM off)
     llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3", rewrite_model="none"))
     assert llm.rewrite_model() == ""
+    # None chosen: the general model.
+    llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3"))
+    assert llm.rewrite_model() == "qwen3"
 
 
 def test_none_no_call(monkeypatch, model) -> None:
@@ -145,11 +148,12 @@ def test_fallback(model, response) -> None:
 
 @pytest.mark.nicegui_main_file("tests/app_main.py")
 async def test_settings_page(user: User, model) -> None:
-    """Settings → Local LLM: the model rewriting the excerpts, among the server's (none)."""
+    """Settings → Local LLM: the model rewriting the excerpts, among the server's (none; by
+    default, the general one)."""
     await user.open("/settings?tab=llm")
     await user.should_see(marker="llm-rewrite-model")
     select = user.find(marker="llm-rewrite-model").elements.pop()
-    assert select.value == "gemma3:4b" and llm.NONE in select.options
+    assert select.value == "gemma3:4b" and llm.NONE in select.options and "" in select.options
     select.value = llm.NONE
     user.find(marker="llm-save").click()
     await user.should_see("Saved")

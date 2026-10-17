@@ -168,8 +168,8 @@ def settings() -> OllamaSettings:
     if st.embed_api not in EMBED_APIS:
         st.embed_api = "ollama"
     st.model = "" if is_cloud(st.model) else st.model
-    if is_cloud(st.rewrite_model):
-        st.rewrite_model = ""
+    if is_cloud(st.rewrite_model):  # (refused: not the general model in its place either)
+        st.rewrite_model = NONE
     if st.embed_api == "ollama" and is_cloud(st.embed_model):
         st.embed_model = ""
     st.cluster_min, st.cluster_max = max(1, int(st.cluster_min)), max(1, int(st.cluster_max))
@@ -204,9 +204,10 @@ def model(folder_id: int | None = None, task: str | None = None) -> str:
 
 
 def rewrite_model() -> str:
-    """The LLM rewriting the new excerpts (blank: none, the LLM being off or none chosen)."""
+    """The LLM rewriting the new excerpts: the one chosen, else the general one (blank: none,
+    the LLM being off, or "none" chosen)."""
     st = settings()
-    chosen = st.rewrite_model.strip()
+    chosen = st.rewrite_model.strip() or st.model
     return chosen if st.enabled and chosen and chosen.lower() != NONE else ""
 
 

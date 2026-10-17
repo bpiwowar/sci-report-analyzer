@@ -1438,7 +1438,10 @@ def llm_tab() -> None:
             "found around it."
         )
     ).classes("text-sm text-grey-8 max-w-[48rem]")
-    none = {llm.NONE: _("None (no rewriting)")}
+    none = {
+        "": _("The general model ({model})").format(model=st.model or _("none")),
+        llm.NONE: _("None (no rewriting)"),
+    }
 
     def rewrite_options(models: list[str]) -> dict[str, str]:
         chosen = st.rewrite_model if st.rewrite_model and st.rewrite_model != llm.NONE else ""
@@ -1447,7 +1450,7 @@ def llm_tab() -> None:
     rewrite_model = (
         ui.select(
             rewrite_options([]),
-            value=st.rewrite_model or llm.NONE,
+            value=st.rewrite_model,
             label=_("Model rewriting the excerpts"),
         )
         .classes("w-[32rem]")
@@ -1590,7 +1593,7 @@ def llm_tab() -> None:
             embed_model=(embed_model.value or "").strip(),
             cluster_min=max(1, int(cluster_min.value or 1)),
             cluster_max=max(1, int(cluster_max.value or 1)),
-            rewrite_model=rewrite_model.value or llm.NONE,
+            rewrite_model=rewrite_model.value or "",
         )
 
     def save() -> bool | None:
