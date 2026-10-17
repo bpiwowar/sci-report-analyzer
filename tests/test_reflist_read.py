@@ -27,7 +27,6 @@ long documents J. Doe, A. Other. ECIR, 2021
 
 def _ref(**kw) -> dict:
     return {
-        "number": None,
         "title": "",
         "authors": [],
         "venue": "",
@@ -41,7 +40,6 @@ def _ref(**kw) -> dict:
 READ = {
     "references": [
         _ref(
-            number=1,
             title="Learning to rank with sparse representations of documents",
             authors=["J. Doe", "B. Smith"],
             venue="SIGIR",
@@ -49,7 +47,6 @@ READ = {
             doi="10.9999/made.up",  # (not in the list: left out)
         ),
         _ref(
-            number=2,
             title="Neural retrieval models for long documents",
             authors=["J. Doe", "A. Other"],
             venue="ECIR",
@@ -101,27 +98,43 @@ def test_parts() -> None:
 
 
 def test_items_of() -> None:
-    sent = PASTED
+    """The references read: their number, that of the label before their title in the text;
+    a title not in it (made up), or what is no reference (a note: neither venue nor year;
+    neither authors nor venue), left out; no DOI or link that is not in it."""
+    sent = PASTED + "A note about the paper above, in Some Place. J. Doe\n"
     answer = {
         "references": [
             _ref(
-                number=3,
                 title=" Deep ranking for  serach (with a typo) ",
                 authors=["J. Doe"],
                 venue="Neural Computation",
                 year=2021,
                 doi="10.1162/NECO.2021.1",
             ),
-            _ref(number=1, title="Learning…", url="https://hal.science/hal-03700001v2"),
-            _ref(title="   "),  # (no title: left out)
-            _ref(title="A made-up one", doi="10.9999/made.up", year=3021),
+            _ref(
+                title="« Learning to rank with sparse representations »",
+                authors=["J. Doe"],
+                year=2022,
+                url="https://hal.science/hal-03700001v2",
+            ),
+            _ref(title="   ", authors=["J. Doe"], year=2020),  # (no title)
+            _ref(title="A made-up one", authors=["J. Doe"], venue="Nowhere", year=2020),
+            _ref(title="A note about the paper above", authors=["J. Doe"]),  # (a note)
+            _ref(title="Somewhere", year=2018),  # (neither authors nor venue)
+            _ref(
+                title="A paper that is not there at all",
+                authors=["J. Doe"],
+                venue="Somewhere",
+                year=3021,  # (not a year)
+                doi="arXiv:2101.00001",  # (not a DOI, nor in the text)
+            ),
         ]
     }
     items = reflist_read.items_of(answer, sent)
     assert [(i.number, i.title) for i in items] == [
         (3, "Deep ranking for serach (with a typo)"),
-        (1, "Learning…"),
-        (None, "A made-up one"),
+        (1, "Learning to rank with sparse representations"),
+        (4, "A paper that is not there at all"),
     ]
     assert items[0].doi == "10.1162/neco.2021.1" and items[0].years == {2021}
     assert items[0].authors == ["J. Doe"] and items[0].venue == "Neural Computation"
@@ -133,7 +146,12 @@ def test_items_of() -> None:
         items[0].words == "Deep ranking for serach (with a typo). J. Doe. Neural Computation, 2021"
     )
     assert items[1].hal == "hal-03700001"
-    assert items[2].doi is None and items[2].years == set()  # (not in the list; not a year)
+    assert items[2].doi is None and items[2].years == set()
+    # A label within a line, after a sentence; a number again (not found): none.
+    sent = "1- First title. A. B. Venue, 2020. 2. Second title. C. D. Venue, 2021."
+    twice = [_ref(title=t, authors=["A. B."], year=2020) for t in ("First", "Second", "Venue")]
+    got = reflist_read.items_of({"references": twice}, sent)
+    assert [i.number for i in got] == [1, 2, None]
     assert reflist_read.items_of({"refs": []}, sent) is None
     assert reflist_read.items_of({"references": [{"title": 3}]}, sent) is None
 
@@ -176,7 +194,7 @@ def test_read(model) -> None:
     second = {
         "references": [
             READ["references"][1],
-            _ref(number=3, title="Deep ranking for search", year=2021),
+            _ref(title="Deep ranking for serach", authors=["J. Doe"], year=2021),
         ]
     }
     seen: list[tuple[int, int]] = []

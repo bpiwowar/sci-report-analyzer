@@ -545,8 +545,9 @@ brings them back):
   other, their wordings side by side with their time (the first run of a model includes its
   loading); “Keep it” takes one, and can make its model the one rewriting the excerpts.
 - **Reading a list of references**: in “Tag from a list”, “Read with the LLM” reads a pasted
-  list into references (title, authors, venue, year, DOI), matched by their title; a long
-  list in parts.
+  list into references (title, authors, year, venue, DOI and link), matched by their title;
+  what is between them (a note about a paper, a heading, labels) is left out, as is a title
+  that is not in the list; each keeps its number in the list (“P3.”: 3); a long list in parts.
 
 When the LLM is off (or a task has no model, or gets no valid answer), the task's page and
 the excerpt dialog and the Tag from a list dialog say so, with a link to turn it on. A folder's settings can use other

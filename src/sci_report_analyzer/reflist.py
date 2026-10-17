@@ -22,7 +22,8 @@ from .sources.hal import document_id
 _MIN_TITLE_TOKENS = 2
 
 # An item's number at the start of a line: "3-", "3.", "3)", "[3]", "(3)".
-_NUMBER = re.compile(r"^\s*(?:\[(\d{1,4})\]|\((\d{1,4})\)|(\d{1,4})\s*[-.)–:])\s*")
+# (a number, maybe after a letter or two: "3.", "[3]", "(3)", "P3.", "C12-")
+_NUMBER = re.compile(r"^\s*(?:\[(\d{1,4})\]|\((\d{1,4})\)|[A-Z]{0,2}(\d{1,4})\s*[-.)–:])\s*")
 _URL = re.compile(r"https?://\S+|\bdoi:\s*\S+|\b10\.\d{4,9}/\S+", re.I)
 _HAL = re.compile(r"\b[a-z][a-z0-9]*-\d{6,}(?:v\d+)?\b", re.I)
 # A link with its label ("Lien : https://…", "DOI: 10.…").
@@ -95,8 +96,15 @@ def join_wrapped(lines: list[str]) -> str:
 
 
 def numbered(line: str) -> bool:
-    """Whether a line starts with an item's number ("3-", "[3]"…)."""
+    """Whether a line starts with an item's number ("3-", "[3]", "P3."…)."""
     return bool(_NUMBER.match(line))
+
+
+def number_of(line: str) -> int | None:
+    """The item's number a line starts with (none: not numbered)."""
+    if m := _NUMBER.match(line):
+        return next(int(g) for g in m.groups() if g)
+    return None
 
 
 def split_items(text: str) -> list[Item]:
