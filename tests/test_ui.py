@@ -3387,6 +3387,34 @@ async def test_move_a_person_to_another_folder(user: User) -> None:
     assert [f.id for f in folders.folders() if f.members] == [a]
 
 
+async def test_a_person_dragged_onto_a_folder_is_moved_there(user: User) -> None:
+    from sci_report_analyzer import folders
+
+    pid = make_person("Ann Smith")
+    a = folders.save_folder(None, "Committee A")
+    b = folders.save_folder(None, "Committee B")
+    c = folders.save_folder(None, "Committee C")
+    period = folders.add_person(a, pid, 2020, 2024)
+    folders.add_person(c, pid)
+    await user.open(f"/?folder={a}")
+    await user.should_see(marker=f"person-row-{period}")
+    # Onto their own folder, or one they are in already: not moved.
+    user.find(marker=f"folder-node-{a}").trigger("drop", {"id": period, "kind": "person"})
+    user.find(marker=f"folder-node-{c}").trigger("drop", {"id": period, "kind": "person"})
+    await user.should_see("Already in this folder")
+    assert [m.period_id for m in next(f for f in folders.folders() if f.id == a).members] == [
+        period
+    ]
+    # Onto another folder (anywhere on its row): moved there, with their period.
+    user.find(marker=f"folder-node-{b}").trigger(
+        "drop", {"id": period, "kind": "person", "where": "before"}
+    )
+    await user.should_see("No one in this folder yet.")
+    [m] = next(f for f in folders.folders() if f.id == b).members
+    assert (m.period_id, m.person_id, m.start_year, m.end_year) == (period, pid, 2020, 2024)
+    assert [f.id for f in folders.folders() if f.parent_id] == []  # (no folder moved)
+
+
 async def test_a_person_with_excerpts_is_not_moved_to_other_settings(user: User) -> None:
     from sci_report_analyzer import categories, folders
 

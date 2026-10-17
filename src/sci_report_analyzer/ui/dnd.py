@@ -3,6 +3,7 @@ after it (its top or bottom edge) or onto it (its middle; anywhere on a whole dr
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import Any
 
@@ -21,19 +22,24 @@ window.vrDnd = {
   start(ev, data) {
     ev.stopPropagation();
     ev.dataTransfer.setData('text/plain', data);
+    ev.dataTransfer.setData('vr/' + data.split(':')[0], '');  // (its kind, seen while dragged)
     ev.dataTransfer.effectAllowed = 'move';
   },
-  over(ev, zoned) {
+  // ``kind``: zoned only for an item of this kind (others: onto it), if given.
+  over(ev, zoned, kind) {
     ev.preventDefault();
     vrDnd.clear(ev);
+    if (kind && !ev.dataTransfer.types.includes('vr/' + kind)) zoned = false;
     ev.currentTarget.classList.add('vr-drop-' + vrDnd.zone(ev, zoned));
   },
-  // The item dropped (of this kind, else null): {id, where}.
+  // The item dropped (of this kind, or of one of these kinds, else null): {id, where, kind};
+  // zoned only for the first kind (the others: onto it).
   drop(ev, kind, zoned) {
     ev.preventDefault();
     vrDnd.clear(ev);
-    const [k, id] = ev.dataTransfer.getData('text/plain').split(':');
-    return k === kind ? {id: +id, where: vrDnd.zone(ev, zoned)} : null;
+    const kinds = [].concat(kind), [k, id] = ev.dataTransfer.getData('text/plain').split(':');
+    if (!kinds.includes(k)) return null;
+    return {id: +id, where: vrDnd.zone(ev, zoned && k === kinds[0]), kind: k};
   },
 };
 </script>""",
@@ -54,22 +60,31 @@ def drop_zone(
     *,
     middle: str = "on",
     zoned: bool = True,
+    others: dict[str, Callable[[int], Any]] | None = None,
 ) -> None:
     """Items of ``kind`` dropped onto ``el``: ``on_drop(id, where)``, where is "before" or
-    "after" (its top or bottom edge), else ``middle``; not ``zoned``: always ``middle``."""
+    "after" (its top or bottom edge), else ``middle``; not ``zoned``: always ``middle``.
+    ``others``: items of other kinds also dropped onto it (anywhere), ``others[kind](id)``."""
+    others = others or {}
     z = "true" if zoned else "false"
 
     def dropped(e) -> None:
         if isinstance(e.args, dict) and e.args.get("id"):
-            where = e.args.get("where") or "on"
-            on_drop(int(e.args["id"]), middle if where == "on" else where)
+            k = e.args.get("kind") or kind
+            if k in others:
+                others[k](int(e.args["id"]))
+            elif k == kind:
+                where = e.args.get("where") or "on"
+                on_drop(int(e.args["id"]), middle if where == "on" else where)
 
-    el.on("dragover", js_handler=f"(ev) => vrDnd.over(ev, {z})")
+    kinds = json.dumps([kind, *others]).replace('"', "'")
+    main = f", '{kind}'" if others else ""
+    el.on("dragover", js_handler=f"(ev) => vrDnd.over(ev, {z}{main})")
     el.on("dragleave", js_handler="(ev) => vrDnd.clear(ev)")
     el.on(
         "drop",
         dropped,
-        js_handler=f"(ev) => {{ const d = vrDnd.drop(ev, '{kind}', {z}); if (d) emit(d); }}",
+        js_handler=f"(ev) => {{ const d = vrDnd.drop(ev, {kinds}, {z}); if (d) emit(d); }}",
     )
 
 
