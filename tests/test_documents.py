@@ -2348,7 +2348,9 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
 
     async def rewrite(text, before, after):
         asked.append((text, before, after))
-        return excerpt_rewrite.Rewrite(text="Membre du conseil de l'école X", start=2019)
+        return excerpt_rewrite.Rewrite(
+            text="Membre du conseil de l'école X", start=2019, influence=True, days=12
+        )
 
     monkeypatch.setattr(llm, "rewrite_model", lambda: "gemma3:4b")
     monkeypatch.setattr(excerpt_rewrite, "rewrite", rewrite)
@@ -2358,8 +2360,14 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
     assert user.find(marker="excerpt-rewrite-text").elements.pop().value == (
         "Membre du conseil de l'école X"
     )
+    await user.should_see(marker="excerpt-rewrite-years")  # (what it predicts, said)
+    facts = user.find(marker="excerpt-rewrite-years").elements.pop().text
+    assert "2019" in facts and "Influence" in facts and "12 days/year" in facts
+    user.find(marker="excerpt-in-period").elements.pop().value = True
     user.find(marker="excerpt-rewrite-use").click()
     assert user.find(marker="excerpt-end").elements.pop().value is None  # (ongoing)
+    assert user.find(marker="excerpt-days").elements.pop().value == 12
+    assert user.find(marker="excerpt-in-period").elements.pop().value is False
     user.find(marker=f"pick-category-{service}").click()
     await user.should_see("Added to Service")
     [e] = categories.excerpts(period)
@@ -2368,6 +2376,13 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
         "membre du conseil de l'école X",
         2019,
         None,
+    )
+    assert (e.influence, e.salient, e.punctual, e.in_period, e.days) == (
+        True,
+        False,
+        False,
+        False,
+        12.0,
     )
 
 
@@ -2408,7 +2423,9 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
         asked.append((name, text, before))
         if name == "broken":
             return excerpt_rewrite.Trial(name, None, 0.5, "out of memory")
-        r = excerpt_rewrite.Rewrite(text=f"Membre du conseil de l'école X ({name})", start=2018)
+        r = excerpt_rewrite.Rewrite(
+            text=f"Membre du conseil de l'école X ({name})", start=2018, in_period=True, days=0.5
+        )
         return excerpt_rewrite.Trial(name, r, 1.25)
 
     async def models(api, url, api_key=None):
@@ -2438,6 +2455,8 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
         assert [a[0] for a in asked] == ["gemma3:4b", "broken"]
         assert asked[0][1:] == (selection["text"], "Entre 2019 et 2021, j'ai été ")
         await user.should_not_see(marker="change-llm-keep-1")
+        facts = user.find(marker="change-llm-facts-0").elements.pop().text
+        assert "2018" in facts and "Within the period" in facts and "½ day/year" in facts
         user.find(marker="change-llm-default").elements.pop().value = True
         user.find(marker="change-llm-keep-0").click()
         await user.should_not_see(marker="change-llm-models")
@@ -2445,14 +2464,18 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
             "Membre du conseil de l'école X (gemma3:4b)"
         )
         assert user.find(marker="excerpt-start").elements.pop().value == 2018
+        assert user.find(marker="excerpt-in-period").elements.pop().value is True
+        assert user.find(marker="excerpt-days").elements.pop().value == 0.5
         assert llm.stored_settings().rewrite_model == "gemma3:4b"
         user.find(marker=f"pick-category-{service}").click()
         await user.should_see("Added to Service")
         [e] = categories.excerpts(period)
-        assert (e.text, e.original, e.start_year) == (
+        assert (e.text, e.original, e.start_year, e.in_period, e.days) == (
             "Membre du conseil de l'école X (gemma3:4b)",
             "membre du conseil de l'école X",
             2018,
+            True,
+            0.5,
         )
     finally:
         llm.save_settings(llm.OllamaSettings())

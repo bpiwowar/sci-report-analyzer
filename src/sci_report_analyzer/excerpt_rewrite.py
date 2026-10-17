@@ -2,7 +2,9 @@
 the text selected (impersonal, short, in its language, without its dates: « j'ai été membre
 du comité de direction de X » → « Membre du comité de direction de X ») and its years, read
 in it and in the lines around it in the PDF (« Entre 2019 et 2021, j'ai été XXX et YYY », XXX
-selected: 2019–2021), as a structured output (a JSON schema). Proposed, never filed as is;
+selected: 2019–2021), whether it shows the person's influence (« rayonnement »), is a one-off
+event or sometime within their period (no date given), and how many days a year it takes, as
+a structured output (a JSON schema). Proposed, never filed as is;
 no LLM, or no valid answer: none (the years found around it instead: see
 categories.context_years)."""
 
@@ -11,10 +13,17 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
+from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import (
+    BaseModel,
+    Field,
+    ValidationError,
+    ValidatorFunctionWrapHandler,
+    field_validator,
+)
 
-from . import llm
+from . import categories, llm
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +38,27 @@ class Answer(BaseModel):
     start_year: int | None = Field(description="The year it started, if known")
     end_year: int | None = Field(description="The year it ended, if known and not ongoing")
     ongoing: bool = Field(description="Whether it is still going on")
+    influence: bool = Field(
+        False, description="Whether it shows the person's influence (international visibility…)"
+    )
+    punctual: bool = Field(False, description="Whether it is a one-off event (no duration)")
+    in_period: bool = Field(
+        False, description="Whether no date is given: sometime within the person's period"
+    )
+    days: float | None = Field(None, description="Days a year it takes, if it can be estimated")
+
+    @field_validator("influence", "punctual", "in_period", "days", mode="wrap")
+    @classmethod
+    def _lenient(cls, v: Any, handler: ValidatorFunctionWrapHandler, info) -> Any:
+        """(not valid: as if not given, the rest of the answer kept)"""
+        try:
+            return handler(v)
+        except ValidationError:
+            return cls.model_fields[info.field_name].default
 
 
 SCHEMA = Answer.model_json_schema()
+SCHEMA["required"] = list(SCHEMA["properties"])  # (all asked for; missing ones: their default)
 
 PROMPT = """You rewrite a passage selected in a researcher's document (a CV, an application, \
 a report) as an entry of a list.
@@ -57,6 +84,16 @@ funded by an ERC Starting Grant".
 around it when it applies to the passage (e.g. "Between 2019 and 2021, I was A and B", \
 A selected: 2019 and 2021); null if unknown. A single year: both the same.
 - "ongoing": true if it is still going on ("since 2020", "depuis 2020"): "end_year" null then.
+- "influence": true if it shows the person's influence or visibility beyond their own lab \
+("rayonnement"): invited talks, keynotes, prizes, program or steering committees, editorial \
+boards, expertise for agencies, international collaborations…; else false.
+- "punctual": true if it is a one-off event, a moment with no duration (a talk, a prize, a \
+defence, an event organised on given days); else false.
+- "in_period": true if no date or year is given for it (in the passage or around it): it \
+happened sometime within the period of the document; else false. Not both "punctual" and \
+"in_period".
+- "days": an estimate of how many days a year it takes (e.g. 0.5 for a talk, 3 for a jury, \
+10 for a committee, 180 for half a job); null if it cannot be estimated.
 """
 
 
@@ -93,11 +130,17 @@ def _year(y: int | None) -> int | None:
 
 
 class Rewrite(BaseModel):
-    """A rewrite proposed: its text and years (an end none: ongoing or unknown)."""
+    """A rewrite proposed: its text and years (an end none: ongoing or unknown), whether it
+    shows the person's influence, is a one-off event or within their period (not both), and
+    its days a year (none: not estimated; see categories.clean_days)."""
 
     text: str
     start: int | None = None
     end: int | None = None
+    influence: bool = False
+    punctual: bool = False
+    in_period: bool = False
+    days: float | None = None
 
 
 def proposal(answer: dict) -> Rewrite | None:
@@ -113,7 +156,15 @@ def proposal(answer: dict) -> Rewrite | None:
     start, end = _year(a.start_year), None if a.ongoing else _year(a.end_year)
     if start and end and end < start:
         start, end = end, start
-    return Rewrite(text=text, start=start, end=end)
+    return Rewrite(
+        text=text,
+        start=start,
+        end=end,
+        influence=a.influence,
+        punctual=a.punctual,
+        in_period=a.in_period and not a.punctual,
+        days=categories.clean_days(a.days),
+    )
 
 
 async def rewrite(

@@ -1056,7 +1056,9 @@ def excerpt_properties(
     (not both: one on, the other off), markers (see MARKER_ICONS), level (one of the
     folder's, see reports.levels; none: its default) and tags (those of papers and excerpts,
     or new ones typed); returns their values (the keywords of categories.add_excerpt /
-    update_excerpt; its ``set_years``, a function setting the years)."""
+    update_excerpt; its ``set_years``, ``set_days``, ``set_timing`` (one-off, within the
+    period) and ``set_marker`` (none: ""), functions setting them, e.g. from a rewrite: see
+    apply_rewrite)."""
 
     def clear() -> None:
         start_in.set_value(None)
@@ -1138,8 +1140,53 @@ def excerpt_properties(
         start_in.set_value(start)
         end_in.set_value(end)
 
+    def set_days(days: float | None) -> None:
+        days_in.set_value(categories.clean_days(days))
+
+    def set_timing(punctual: bool, in_period: bool) -> None:
+        punctual_in.set_value(punctual)
+        in_period_in.set_value(in_period and not punctual)
+
+    def set_marker(marker: str) -> None:
+        marker_in.value = marker if marker in MARKER_ICONS else ""
+        marker_in.show()
+
     values.set_years = set_years  # type: ignore[attr-defined]
+    values.set_days = set_days  # type: ignore[attr-defined]
+    values.set_timing = set_timing  # type: ignore[attr-defined]
+    values.set_marker = set_marker  # type: ignore[attr-defined]
+    values.marker = lambda: marker_in.value  # type: ignore[attr-defined]
     return values
+
+
+def apply_rewrite(props: Callable[[], dict], r: excerpt_rewrite.Rewrite) -> None:
+    """A rewrite's predictions set in an excerpt's fields (``props``: see excerpt_properties):
+    its years and days a year if it has them, whether a one-off event or within the period,
+    the influence marker if it shows it (else cleared, if it was the one: another kept)."""
+    if r.start or r.end:
+        props.set_years(r.start, r.end)  # type: ignore[attr-defined]
+    if r.days is not None:
+        props.set_days(r.days)  # type: ignore[attr-defined]
+    props.set_timing(r.punctual, r.in_period)  # type: ignore[attr-defined]
+    if r.influence:
+        props.set_marker("influence")  # type: ignore[attr-defined]
+    elif props.marker() == "influence":  # type: ignore[attr-defined]
+        props.set_marker("")  # type: ignore[attr-defined]
+
+
+def rewrite_facts(r: excerpt_rewrite.Rewrite) -> str:
+    """What a rewrite predicts besides its wording, e.g. “2019–2021 · Influence · One-off
+    event · 3 days/year” (nothing predicted: "")."""
+    facts = [categories.years_label(r.start, r.end)] if r.start or r.end else []
+    if r.influence:
+        facts.append(_(MARKER_ICONS["influence"][0]))
+    if r.punctual:
+        facts.append(_("One-off event"))
+    elif r.in_period:
+        facts.append(_("Within the period"))
+    if r.days:
+        facts.append(categories.days_label(r.days))
+    return " · ".join(facts)
 
 
 class MarkerBadges(ui.row):
@@ -1433,8 +1480,9 @@ def category_picker(
     ``merge``: or merge it with an excerpt (called with it, and whether only its place is
     cited), the similar ones shown with a warning; ``around``: its years when its text has
     none (found around it: see categories.context_years); ``suggest``: a neutral wording of
-    it and its years (see excerpt_rewrite), asked for once the dialog is open and proposed
-    there, edited, then used (its text filed, the text selected kept as its original) or not;
+    it, its years, days a year and flags (see excerpt_rewrite, apply_rewrite), asked for once
+    the dialog is open and proposed there, edited, then used (its text filed, the text
+    selected kept as its original) or not;
     ``rewriter``: its rewrite by a given model, to try others (see change_llm_dialog; none:
     the local LLM off, said there). The category chosen last (here, else that
     of the excerpt filed last) is proposed: marked, scrolled to, and Enter picks it (nothing
@@ -1495,8 +1543,8 @@ def category_picker(
             if wording := " ".join(wording.split()):
                 show(wording)
                 rewritten = True
-            if r.start or r.end:
-                props.set_years(r.start, r.end)  # type: ignore[attr-defined]
+            if properties:
+                apply_rewrite(props, r)
             if hint is not None:
                 hint.set_visibility(False)
 
@@ -1527,15 +1575,13 @@ def category_picker(
                         .classes("grow")
                         .mark("excerpt-rewrite-text")
                     )
-                    if r.start or r.end:
-                        ui.label(categories.years_label(r.start, r.end)).classes(
-                            "text-xs text-grey"
-                        ).mark("excerpt-rewrite-years")
+                    if facts := rewrite_facts(r):
+                        ui.label(facts).classes("text-xs text-grey").mark("excerpt-rewrite-years")
                     ui.button(_("Use it"), on_click=lambda: use(wording.value or "", r)).props(
                         "flat dense no-caps"
-                    ).tooltip(_("File this wording and these years (the text selected kept)")).mark(
-                        "excerpt-rewrite-use"
-                    )
+                    ).tooltip(
+                        _("File this wording, these years, days and flags (the text selected kept)")
+                    ).mark("excerpt-rewrite-use")
 
             background_tasks.create(proposed(), name="excerpt-rewrite")
         elif properties:  # (no rewriting: said, with where to turn it on)
@@ -1702,13 +1748,13 @@ def change_llm_dialog(
                         ).classes("text-xs text-negative").mark(f"change-llm-failed-{i}")
                         continue
                     ui.label(t.rewrite.text).classes("text-sm").mark(f"change-llm-text-{i}")
-                    if t.rewrite.start or t.rewrite.end:
-                        ui.label(categories.years_label(t.rewrite.start, t.rewrite.end)).classes(
-                            "text-xs text-grey"
-                        )
+                    if facts := rewrite_facts(t.rewrite):
+                        ui.label(facts).classes("text-xs text-grey").mark(f"change-llm-facts-{i}")
                     ui.button(_("Keep it"), on_click=lambda t=t: chosen(t)).props(
                         "flat dense no-caps"
-                    ).tooltip(_("Use this wording and these years")).mark(f"change-llm-keep-{i}")
+                    ).tooltip(_("Use this wording, these years, days and flags")).mark(
+                        f"change-llm-keep-{i}"
+                    )
             status.set_text(_("Done: keep the best one"))
         finally:
             if not run.is_deleted:
