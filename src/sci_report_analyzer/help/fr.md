@@ -451,9 +451,9 @@ dossier** (son onglet Rapport ; ses extraits par catégorie : l'onglet Extrait
 son titre. Son onglet **Chronologie** dessine ce qui est daté à son sujet le long d'un axe vertical des années, les plus
 récentes en haut (chaque année marquée, pour que les trous se voient ; sa période dans le dossier en grisé), une
 flèche partant de l'axe vers chaque élément. À gauche, sa **carrière** (onglet Profil) : une ligne de son CV en
-barre le long de ses années (un poste actuel : jusqu'à aujourd'hui), les lignes qui se chevauchent côte à côte ;
-à droite, ses **extraits** dans le dossier (de la couleur de leur catégorie), les **thèses qu'elle a dirigées**
-(theses.fr : à la soutenance, celles en cours à leur début) et ses **articles** (une petite marque chacun, leurs
+barre le long de ses années (un poste actuel : jusqu'à aujourd'hui), et au-delà les **thèses qu'elle a dirigées**, chacune
+en barre de son début à sa soutenance (en cours : jusqu'à aujourd'hui), celles qui se chevauchent côte à côte ;
+à droite, ses **extraits** dans le dossier (de la couleur de leur catégorie) et ses **articles** (une petite marque chacun, leurs
 titres au survol). Chaque sorte s'affiche ou se masque par son interrupteur ; celle dont elle n'a aucun élément
 est signalée. Un extrait est à sa première année (l'extrait d'un article sans années : à l'année de l'article) ;
 cliqué, il est montré dans l'onglet Extraits (où ses années se modifient), son icône PDF ouvrant son PDF à côté de

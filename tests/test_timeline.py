@@ -124,8 +124,14 @@ def test_supervised_and_papers() -> None:
     )
     jury = replace(thesis("t3", "rapporteur", "Elsewhere"), defence_date="2021-01-01")
     add_source(pid, "thesesfr", "1", theses=[done, running, jury])
-    got = [(t.year, t.student, t.years, t.in_progress) for t in timeline.supervised(pid)]
-    assert got == [(2023, "B Student", "2023", True), (2020, "A Student", "2017–2020", False)]
+    got = [
+        (t.first, t.last, t.student, t.years, t.in_progress)
+        for t in timeline.supervised(pid, today=date(2025, 3, 1))
+    ]  # (a span: from its start to its defence; in progress, to this year)
+    assert got == [
+        (2023, 2025, "B Student", "2023", True),
+        (2017, 2020, "A Student", "2017–2020", False),
+    ]
     add_source(pid, "dblp", "x/2", [pub("a", "Alpha", 2019), pub("b", "Beta", 2019)])
     assert timeline.papers_by_year(pid) == {2019: ["Alpha", "Beta"]}
 
@@ -148,3 +154,15 @@ async def test_timeline_tab_career_and_theses(user: User) -> None:
     user.find(marker="timeline-show-career").click()
     await user.should_not_see(marker=f"timeline-career-{lead}")
     await user.should_see("Led a project.", marker="timeline-2021")
+
+
+def test_lanes_from_a_start() -> None:
+    """Spans side by side when they overlap, in lanes from ``start`` on (the theses: beyond
+    the career's)."""
+    spans = [
+        timeline.Supervised(1, 2020, "A", "", "", False, 2017, 2020),
+        timeline.Supervised(2, 2022, "B", "", "", False, 2019, 2022),
+        timeline.Supervised(3, 2016, "C", "", "", False, 2013, 2016),
+    ]
+    assert timeline.lanes(spans, start=2) == 4
+    assert [t.lane for t in spans] == [3, 2, 2]

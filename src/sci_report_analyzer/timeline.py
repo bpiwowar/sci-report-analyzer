@@ -1,6 +1,6 @@
-"""A person's timeline: what is dated about them, by year. Their career (its lines as spans
-of years, side by side when they overlap), their excerpts in a folder (see
-categories.timeline), the theses they supervised and their papers (by year)."""
+"""A person's timeline: what is dated about them, by year. Their career and the theses they
+supervised (spans of years, side by side when they overlap), their excerpts in a folder (see
+categories.timeline) and their papers (by year)."""
 
 from __future__ import annotations
 
@@ -43,25 +43,28 @@ def career_spans(
             last = max(this_year, first)
         first, last = first or last, last or first
         spans.append(CareerSpan(e, min(first, last), max(first, last)))
-    _lanes(spans)
+    lanes(spans)
     return spans, undated
 
 
-def _lanes(spans: list[CareerSpan]) -> None:
-    """Each span in the first lane free over its years (from the most recent down)."""
+def lanes(spans: list, start: int = 0) -> int:
+    """Each span (its ``first``, ``last`` years) in the first lane free over its years (from
+    the most recent down), from ``start`` on; returns the lanes taken, ``start`` included."""
     lowest: list[int] = []  # (each lane: the first year of its last span)
     for sp in sorted(spans, key=lambda x: (-x.last, -x.first)):
         lane = next((i for i, low in enumerate(lowest) if sp.last < low), len(lowest))
         if lane == len(lowest):
             lowest.append(sp.first)
         lowest[lane] = sp.first
-        sp.lane = lane
+        sp.lane = start + lane
+    return start + len(lowest)
 
 
 @dataclass
 class Supervised:
-    """A thesis the person directed (theses.fr): at its defence, else (in progress) at its
-    start."""
+    """A thesis the person directed: from its start to its defence (in progress: to this
+    year), as a span; ``year``: its last, none without a date; ``lane``: its column (see
+    lanes)."""
 
     id: int
     year: int | None
@@ -69,10 +72,14 @@ class Supervised:
     title: str
     years: str  # e.g. “2019–2022”, “since 2023”
     in_progress: bool
+    first: int = 0
+    last: int = 0
+    lane: int = 0
 
 
-def supervised(person_id: int) -> list[Supervised]:
+def supervised(person_id: int, today: date | None = None) -> list[Supervised]:
     """The theses the person directed, the most recent first (those without a date last)."""
+    this_year = (today or date.today()).year
     found = []
     for t in persons.theses(person_id, "director"):
         sp = theses.span(t)
@@ -81,8 +88,18 @@ def supervised(person_id: int) -> list[Supervised]:
             years = f"{first}–{last}" if first and first != last else str(last)
         else:
             years = str(first or "")
+            last = max(this_year, first) if first else None
         found.append(
-            Supervised(t.id, last or first, t.student or "", t.title or "", years, last is None)
+            Supervised(
+                t.id,
+                last or first,
+                t.student or "",
+                t.title or "",
+                years,
+                sp.end_year is None,
+                min(first or last or 0, last or first or 0),
+                max(first or last or 0, last or first or 0),
+            )
         )
     return sorted(found, key=lambda x: x.year or 0, reverse=True)
 

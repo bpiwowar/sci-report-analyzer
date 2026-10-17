@@ -1,12 +1,13 @@
 """A person's timeline within a folder: a vertical axis of years, the most recent at the top
 (every year a tick, the gaps seen), with arrows from it to what is dated about them. On the
-left, their career (see timeline.career_spans): its lines as bars along their years; on the
-right, their excerpts (see categories.timeline), the theses they supervised and their
-papers (small marks). Each kind shown or hidden; what is without a date listed apart."""
+left, their career (see timeline.career_spans) and the theses they supervised: bars along
+their years; on the right, their excerpts (see categories.timeline) and their papers (small
+marks). Each kind shown or hidden; what is without a date listed apart."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 
 from nicegui import ui
 
@@ -125,9 +126,9 @@ def timeline_view(
     with ui.column().classes("w-full gap-2").mark("timeline"):
         ui.label(
             _(
-                "What is dated about them, the most recent first: their career on the left "
-                "(a line of their CV: a bar along its years), their excerpts, the theses they "
-                "supervised and their papers on the right. An excerpt is at its first year "
+                "What is dated about them, the most recent first: their career and the theses "
+                "they supervised on the left (a bar along its years), their excerpts and their "
+                "papers on the right. An excerpt is at its first year "
                 "(a paper's excerpt without years: at the paper's); clicked, it is shown in "
                 "the Excerpts tab, where its years are edited (its pencil)."
             )
@@ -204,9 +205,8 @@ def _axis(
     """The axis of years, from the latest to the earliest of the items; the career on its
     left, the rest on its right."""
     years = (
-        [y for sp in spans for y in (sp.first, sp.last)]
+        [y for sp in [*spans, *directed] for y in (sp.first, sp.last)]
         + [y for y, _items in dated]
-        + [t.year for t in directed]
         + list(papers)
     )
     if not years:
@@ -215,11 +215,9 @@ def _axis(
         )
         return
     top, bottom = max(years), min(years)
-    lanes = max((sp.lane + 1 for sp in spans), default=0)
+    # (the theses in the lanes beyond the career's)
+    lanes = tl.lanes(directed, max((sp.lane + 1 for sp in spans), default=0))
     excerpts = dict(dated)
-    by_year: dict[int, list[tl.Supervised]] = {}
-    for t in directed:
-        by_year.setdefault(t.year, []).append(t)
 
     def row(year: int) -> int:
         return top - year + 1
@@ -238,12 +236,12 @@ def _axis(
             f"grid-column:{lanes + 1};grid-row:1/{row(bottom) + 1}"
         )
         for year in range(top, bottom - 1, -1):
-            full = year in excerpts or year in by_year or year in papers
-            full = full or any(sp.first <= year <= sp.last for sp in spans)
+            full = year in excerpts or year in papers
+            full = full or any(sp.first <= year <= sp.last for sp in [*spans, *directed])
             ui.label(str(year)).classes("vr-tl-year" + (" full" if full else "")).style(
                 f"grid-column:{lanes + 1};grid-row:{row(year)}"
             ).mark(f"timeline-tick-{year}")
-            if year in excerpts or year in by_year or year in papers:
+            if year in excerpts or year in papers:
                 with (
                     ui.column()
                     .classes("vr-tl-items gap-2")
@@ -252,60 +250,63 @@ def _axis(
                 ):
                     for d in excerpts.get(year, []):
                         _item(d.excerpt, paths, select, open_pdf, d.paper_year)
-                    for t in by_year.get(year, []):
-                        _thesis(t, show_tab)
                     if titles := papers.get(year):
                         _papers(year, titles)
         for sp in spans:
             _span(sp, lanes, row, show_tab)
+        for t in directed:
+            _thesis(t, lanes, row, show_tab)
+
+
+@contextmanager
+def _bar(
+    colour: str, sp, now: bool, lanes: int, row: Callable[[int], int], mark: str
+) -> Iterator[ui.column]:
+    """A span (``sp``: its ``first``, ``last`` years, its ``lane``) on the left of the axis:
+    its bar along its years (``now``: still going on), its card at their top (within),
+    an arrow to it from the axis."""
+    with (
+        ui.element("div")
+        .classes("vr-tl-span" + (" now" if now else ""))
+        .style(
+            f"--c:{colour};--k:{sp.lane};grid-column:{lanes - sp.lane};"
+            f"grid-row:{row(sp.last)}/{row(sp.first) + 1}"
+        )
+        .mark(mark)
+    ):
+        ui.element("div").classes("vr-tl-bar")
+        ui.element("div").classes("vr-tl-link")
+        with ui.column().classes("vr-tl-card gap-0 cursor-pointer") as card:
+            yield card
 
 
 def _span(
     sp: tl.CareerSpan, lanes: int, row: Callable[[int], int], show_tab: Callable[[str], None]
 ) -> None:
-    """A line of the career: its bar along its years, its card at their top, an arrow to it
-    from the axis."""
+    """A line of the career, along its years."""
     e = sp.entry
     colour = KIND_COLOUR["diploma" if e.kind == "diploma" else "position"]
-    with (
-        ui.element("div")
-        .classes("vr-tl-span" + (" now" if e.current else ""))
-        .style(
-            f"--c:{colour};--k:{sp.lane};grid-column:{lanes - sp.lane};"
-            f"grid-row:{row(sp.last)}/{row(sp.first) + 1}"
+    with _bar(colour, sp, e.current, lanes, row, f"timeline-career-{e.id}") as card:
+        card.on("click", lambda: show_tab("profile")).tooltip(
+            _("Edited in the Profile tab (Career)")
         )
-        .mark(f"timeline-career-{e.id}")
-    ):
-        ui.element("div").classes("vr-tl-bar")
-        ui.element("div").classes("vr-tl-link")
-        with (
-            ui.column()
-            .classes("vr-tl-card gap-0 cursor-pointer")
-            .on("click", lambda: show_tab("profile"))
-            .tooltip(_("Edited in the Profile tab (Career)"))
-        ):
-            with ui.row().classes("items-center gap-1 no-wrap"):
-                ui.icon("school" if e.kind == "diploma" else "work", size="xs").style(
-                    f"color:{colour}"
-                )
-                ui.label(e.when()).classes("text-xs text-grey-8")
-                if e.current:
-                    ui.badge(_("current"), color="primary").props("outline")
-            ui.label(e.line()).classes("text-sm font-medium line-clamp-3")
-            if e.details:
-                ui.label(e.details).classes("text-xs text-grey line-clamp-2")
+        with ui.row().classes("items-center gap-1 no-wrap"):
+            ui.icon("school" if e.kind == "diploma" else "work", size="xs").style(f"color:{colour}")
+            ui.label(e.when()).classes("text-xs text-grey-8")
+            if e.current:
+                ui.badge(_("current"), color="primary").props("outline")
+        ui.label(e.line()).classes("text-sm font-medium line-clamp-3")
+        if e.details:
+            ui.label(e.details).classes("text-xs text-grey line-clamp-2")
 
 
-def _thesis(t: tl.Supervised, show_tab: Callable[[str], None]) -> None:
-    """A thesis they supervised, at its defence (in progress: at its start)."""
-    with (
-        ui.column()
-        .classes("vr-tl-card gap-0 cursor-pointer")
-        .style(f"--c:{KIND_COLOUR['thesis']}")
-        .on("click", lambda: show_tab("theses"))
-        .tooltip(_("See it in the Theses tab"))
-        .mark(f"timeline-thesis-{t.id}")
-    ):
+def _thesis(
+    t: tl.Supervised, lanes: int, row: Callable[[int], int], show_tab: Callable[[str], None]
+) -> None:
+    """A thesis they supervised, from its start to its defence (in progress: to now)."""
+    colour = KIND_COLOUR["thesis"]
+    with _bar(colour, t, t.in_progress, lanes, row, f"timeline-thesis-{t.id}") as card:
+        card.on("click", lambda: show_tab("theses")).tooltip(_("See it in the Theses tab"))
         with ui.row().classes("items-center gap-1 no-wrap"):
             ui.icon("school", size="xs").style(f"color:{KIND_COLOUR['thesis']}")
             ui.label(

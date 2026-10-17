@@ -443,10 +443,10 @@ An excerpt's dialog names its category under its title. Their **Timeline** tab d
 what is dated about them along a vertical axis of years, the most recent at the top (every
 year a tick, so that the gaps show; their period in the folder shaded), an arrow from the
 axis to each item. On the left, their **career** (Profile tab): a line of their CV as a bar
-along its years (a current position: up to now), overlapping lines side by side; on the
-right, their **excerpts** in the folder (in their category's colour), the **theses they
-supervised** (theses.fr: at the defence, those in progress at their start) and their
-**papers** (a small mark each, their titles hovered). Each kind is shown or hidden with its
+along its years (a current position: up to now), and beyond it the **theses they
+supervised**, each a bar from its start to its defence (in progress: up to now), overlapping
+ones side by side; on the right, their **excerpts** in the folder (in their category's
+colour) and their **papers** (a small mark each, their titles hovered). Each kind is shown or hidden with its
 switch; one they have none of is said so. An excerpt is at its first year (a paper's
 excerpt without years: at the paper's year); clicked, it is shown in the Excerpts tab (where
 its years are edited), its PDF icon opening its PDF beside the page; a line of the career
