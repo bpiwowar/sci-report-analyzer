@@ -478,6 +478,7 @@ window.vrPdf = {
     i: () => vrPdf.mode(13),  // (an image)
     c: () => vrPdf.mode(16),  // (the comments)
     a: () => vrPdf.areaMode(),
+    r: () => vrPdf.areaMode(),  // (a rectangle)
     // (and those on the selection: vrKeys.selection)
   },
   key(ev) {

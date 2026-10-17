@@ -217,13 +217,26 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
                     ).mark("current-position")
                 elif person.affiliation:
                     ui.label(person.affiliation).classes("text-sm text-grey")
-        with ui.tabs(value=tab).props("inline-label dense").classes("grow") as tabs:
-            ui.tab("publications", _("Publications"), icon="article")
-            ui.tab("profile", _("Profile"), icon="manage_accounts").mark("tab-profile")
-            ui.tab("theses", _("Theses"), icon="school")
-            ui.tab("report", _("Report"), icon="description").mark("tab-report")
-            ui.tab("excerpts", _("Excerpts"), icon="format_quote").mark("tab-excerpts")
+        with ui.tabs(value=tab).props("inline-label dense").classes("grow vr-tabs") as tabs:
+            for name, label, icon in (
+                ("publications", _("Publications"), "article"),
+                ("profile", _("Profile"), "manage_accounts"),
+                ("theses", _("Theses"), "school"),
+                ("report", _("Report"), "description"),
+                ("excerpts", _("Excerpts"), "format_quote"),
+            ):
+                ui.tab(name, label, icon=icon).mark(f"tab-{name}").tooltip(label)
     return tabs
+
+
+# The tabs of a person's header: only their icons when narrow (e.g. the PDFs beside the page);
+# on a line of their own when narrower still.
+ui.add_css(
+    ".vr-tabs{container-type:inline-size;min-width:15rem}"
+    "@container (max-width:620px){.vr-tabs .q-tab__label{display:none}"
+    ".vr-tabs .q-tab__icon{margin-right:0 !important}}",
+    shared=True,
+)
 
 
 def _person_actions(person: Person) -> None:

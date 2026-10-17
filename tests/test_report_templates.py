@@ -8,7 +8,7 @@ import pytest
 from helpers import make_person, note_status
 from nicegui.testing import User
 
-from sci_report_analyzer import folders, report_templates, reports
+from sci_report_analyzer import folders, report_templates
 from sci_report_analyzer.report_templates import ReportTemplate, outline
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
@@ -95,20 +95,16 @@ async def test_templates_edited_with_the_settings(user: User):
     await user.should_see(marker="folder-settings-help", content="report templates")
     user.find(marker=f"settings-report-{sid}").click()
     await user.should_see(marker="settings-panel-report")
-    await user.should_see(marker="settings-edit-categories")
+    await user.should_see(marker="settings-section-categories")
     await user.should_see(marker="report-skeleton-0")
     user.find(marker="report-skeleton-add").click()
     await user.should_see(marker="report-skeleton-name-1")
     user.find(marker="report-skeleton-name-1").clear().type("Prize")
     user.find(marker="report-skeleton-text-1").clear().type("## Why\n[]{.excerpts}")
-    # (the new one: at once among those the starting notes are copied from)
-    user.find(marker="folder-skeleton-template").click()
-    user.find(marker="folder-skeleton-template-1").click()
     user.find(marker="settings-save").click()
     await user.should_not_see(marker="settings-save")
     ref = folders.SettingsRef(sid)
     assert report_templates.load(ref)[1] == ReportTemplate("Prize", "## Why\n[]{.excerpts}\n")
-    assert reports.skeleton(ref) == "## Why\n[]{.excerpts}\n"
     # Two of the same name: refused, said.
     user.find(marker=f"settings-report-{sid}").click()
     await user.should_see(marker="report-skeleton-name-1")
@@ -151,19 +147,3 @@ async def test_report_from_and_to_a_template(user: User):
     user.find(marker="report-skeleton-replace").click()
     await asyncio.sleep(0.1)
     assert report_templates.text_of(folder, "Prize") == "## Why\n\n## More\n"
-
-
-async def test_folder_starting_notes_from_a_template(user: User):
-    fid = folders.save_folder(None, "Hiring 2026")
-    report_templates.add(fid, "Prize", "## Why\n")
-    await user.open(f"/?folder={fid}")
-    user.find(marker="folder-edit").click()
-    await user.should_see(marker="folder-tab-notes")
-    user.find(marker="folder-tab-notes").click()
-    user.find(marker="folder-skeleton-template").click()
-    user.find(marker="folder-skeleton-template-1").click()
-    assert user.find(marker="folder-skeleton").elements.pop().value == "## Why\n"
-    user.find(marker="folder-save").click()
-    await user.should_not_see(marker="folder-save")
-    await asyncio.sleep(0.3)
-    assert reports.skeleton(fid) == "## Why\n"

@@ -362,7 +362,7 @@ class FolderSettings(Base):
     is_default: Mapped[bool] = mapped_column(default=False, server_default="0")
     # How the notes cite papers: {"cite": the template of [@key], "format": the number of a
     # paper in no star list (see Tag), "templates": [{"name", "attrs"}] (over the general
-    # ones), "skeleton": the starting notes, "influence_mode",
+    # ones), "influence_mode",
     # "markers": {marker: {"tag", "first"}}}; see reports.py.
     citations: Mapped[dict[str, Any] | None] = mapped_column(JSON(none_as_null=True))
     # The source a paper must be in to count ("none": no such source; None: the default

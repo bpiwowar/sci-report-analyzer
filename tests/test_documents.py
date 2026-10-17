@@ -187,19 +187,16 @@ async def test_document_page(user: User, monkeypatch, fake_viewer):
     user.find(marker=f"document-open-{doc}").click()
     await user.should_see(marker=f"dock-frame-d{doc}")
     await user.should_see(marker="folder-note")
-    # Left open: there again, whatever the tab; minimized, still listed; closed, gone from the
-    # view only.
+    # Left open: there again, whatever the tab; minimized, still listed (a document of the
+    # folder: always, not to close).
     await user.open(f"/person/{pid}")
     await user.should_see(marker=f"dock-frame-d{doc}")
     user.find(marker="dock-minimize").click()
     await user.should_not_see(marker=f"dock-frame-d{doc}")
+    await user.should_see(marker=f"dock-tab-d{doc}")
+    await user.should_not_see(marker=f"dock-close-d{doc}")
     user.find(marker=f"dock-show-d{doc}").click()
     await user.should_see(marker=f"dock-frame-d{doc}")
-    user.find(marker=f"dock-close-d{doc}").click()
-    await user.should_not_see(marker=f"dock-tab-d{doc}")
-    assert documents.info(doc) is not None
-    await user.open(f"/person/{pid}")
-    await user.should_not_see(marker=f"dock-tab-d{doc}")
     # Its former address from the Report tab: there, beside it.
     await user.open(f"/doc/{doc}?report=1")
     await user.should_see(marker=f"dock-frame-d{doc}")
@@ -2341,7 +2338,8 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
 
 async def test_pdfs_beside_the_person_page(user: User, fake_viewer):
     """The PDFs open beside a person's page (from the address, else as left): one shown, the
-    others listed below; shown, minimized, restored, closed (from the view only)."""
+    others listed below, the person's documents within the folder always; shown, minimized,
+    restored, closed (from the view only); on the left, or the right."""
     pid, period, ids = _person()
     a = ids["a"]
     pdfs.save(a, PDF, None)
@@ -2376,9 +2374,26 @@ async def test_pdfs_beside_the_person_page(user: User, fake_viewer):
     await user.should_see(marker=f"dock-tab-p{a}")
     await user.should_not_see(marker=f"dock-frame-p{a}")
     user.find(marker=f"dock-close-p{a}").click()
-    user.find(marker=f"dock-close-d{doc}").click()
-    await user.should_not_see(marker=f"dock-tab-d{doc}")
+    await user.should_not_see(marker=f"dock-tab-p{a}")
+    # (a document of the folder: always listed, not to close)
+    await user.should_see(marker=f"dock-tab-d{doc}")
+    await user.should_not_see(marker=f"dock-close-d{doc}")
     assert pdfs.file_of(a) is not None and documents.info(doc) is not None
+    # Its tab double-clicked: renamed.
+    user.find(marker=f"dock-show-d{doc}").trigger("dblclick")
+    await user.should_see(marker="document-name")
+    user.find(marker="document-name").clear().type("Letter.pdf")
+    user.find(marker="document-rename-ok").click()
+    await user.should_see("Letter.pdf")
+    assert documents.info(doc).name == "Letter.pdf"
+    # Moved to the left (the page built again), and back.
+    user.find(marker="dock-move").click()
+    await asyncio.sleep(0.1)
+    assert annotations.ui_state("ui.dock.side") == "left"
+    await user.open(f"/person/{pid}")
+    user.find(marker="dock-move").click()
+    await asyncio.sleep(0.1)
+    assert annotations.ui_state("ui.dock.side") == "right"
     # Embedded, a paper's viewer: without the menu bar nor the person's header.
     await user.open(f"/pdf/{a}?embed=1")
     await user.should_see(marker="pdf-own-window")

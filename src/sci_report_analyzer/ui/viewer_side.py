@@ -174,7 +174,8 @@ class Side:
 
     def select(self, name: str) -> None:
         self.back()
-        self.box.set_visibility(True)
+        if not self.embedded:  # (embedded: the person's page beside it, in its place)
+            self.box.set_visibility(True)
         self.tab_bar.value = name
 
     @property
@@ -237,6 +238,8 @@ class Side:
         self.details.clear()
         self.overview.visible = True
         self._fit()
+        if self.embedded:  # (beside a person's page: only a paper's details, over the PDF)
+            self.box.set_visibility(False)
 
     def _fit(self) -> None:
         """Wider for the details of a paper."""
@@ -594,8 +597,7 @@ class Side:
 
         def start(text: str) -> None:
             e = self.folder_editor
-            written = e.value.strip()
-            if not written or written == reports.skeleton(self.folder[0]).strip():
+            if not e.value.strip():
                 e.value = text
                 return
             confirm(

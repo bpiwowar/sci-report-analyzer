@@ -45,7 +45,7 @@ const vrDockProxy = (name) => new Proxy({}, {
 window.vrPdf = vrDockProxy('vrPdf');
 window.vrDoc = vrDockProxy('vrDoc');
 
-// Dragging the left edge of the PDFs resizes them (the frames covered meanwhile, else they
+// Dragging the inner edge of the PDFs (the left one; the right one, on the left) resizes them (the frames covered meanwhile, else they
 // swallow the mouse events); the width is sent on release.
 document.addEventListener('mousedown', (ev) => {
   const bar = ev.target.closest && ev.target.closest('.vr-dock-splitter');
@@ -54,13 +54,17 @@ document.addEventListener('mousedown', (ev) => {
   const cover = document.createElement('div');
   cover.style.cssText = 'position:fixed;inset:0;z-index:9999;cursor:col-resize';
   document.body.appendChild(cover);
-  const width = (x) => Math.round(Math.max(vrConfig.dockMin, Math.min(innerWidth - x,
+  const left = vrConfig.dockLeft;
+  const width = (x) => Math.round(Math.max(vrConfig.dockMin, Math.min(left ? x : innerWidth - x,
     innerWidth * 0.8)));
   const line = document.createElement('div');
   line.style.cssText = 'position:fixed;top:0;bottom:0;width:3px;z-index:10000;'
     + 'background:var(--q-primary);pointer-events:none';
   document.body.appendChild(line);
-  const move = (e) => { line.style.left = (innerWidth - width(e.clientX)) + 'px'; };
+  const move = (e) => {
+    const w = width(e.clientX);
+    line.style.left = (left ? w : innerWidth - w) + 'px';
+  };
   move(ev);
   const up = (e) => {
     document.removeEventListener('mousemove', move);

@@ -973,11 +973,12 @@ async def test_settings_dialog_in_sections(user: User) -> None:
     ref = folders.SettingsRef(sid)
     await user.open("/settings?tab=folders")
     user.find(marker=f"settings-edit-{sid}").click()
-    for key in ("report", "excerpts", "citations", "models"):
+    for key in ("categories", "report", "excerpts", "citations", "models"):
         await user.should_see(marker=f"settings-section-{key}")
-    await user.should_see(marker="settings-panel-report")
-    await user.should_see("What a report holds")  # (what the section is for)
-    await user.should_see(marker="settings-categories-summary", content="1 category: Research")
+    await user.should_see(marker="settings-panel-categories")
+    await user.should_see("Drag to order and nest them")  # (what the section is for)
+    [research] = categories.tree(ref)
+    await user.should_see(marker=f"category-name-{research.id}")
     user.find(marker="settings-section-excerpts").click()
     user.find(marker="folder-influence-mode").elements.pop().value = "mark"
     user.find(marker="folder-language").elements.pop().value = "fr"
@@ -992,7 +993,7 @@ async def test_settings_dialog_in_sections(user: User) -> None:
     await user.should_see(marker="folder-tab-notes")
     user.find(marker="folder-tab-notes").click()
     await user.should_see(marker="settings-section-citations")
-    await user.should_see(marker="settings-edit-categories")
+    await user.should_see(marker=f"category-name-{research.id}")
 
 
 async def test_settings_search(user: User) -> None:

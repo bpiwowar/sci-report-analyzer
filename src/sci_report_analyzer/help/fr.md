@@ -279,11 +279,10 @@ comme citées (ou là où se trouve `[[references]]`, seul sur sa ligne : le men
 d'outils ; `[[references notes tags]]` : avec leurs notes, leurs étiquettes). Les blocs
 s'écrivent `[[nom]]` (autrefois `[]{.nom}`, toujours lu).
 
-**Modèles de rapport** (Paramètres → Modèles de rapport) : les textes dont un rapport part,
+**Modèles de rapport** (avec les catégories, dans les réglages des dossiers) : les textes dont un rapport part,
 ses titres, ses blocs (`[[publications]]`, `[[excerpts]]`, `[[cv]]`, `[[references]]`) et des
-consignes en commentaires (`%% … %%`, omis à l'affichage et à la copie) ; un est fourni. Les
-notes de départ d'un dossier (ses réglages, onglet Rapports : « D'un modèle ») sont copiées
-de l'un d'eux ; le bouton 📄 de la barre d'outils des notes du dossier les fait partir de l'un
+consignes en commentaires (`%% … %%`, omis à l'affichage et à la copie) ; un est fourni. Le
+bouton 📄 de la barre d'outils des notes du dossier les fait partir de l'un
 d'eux (en demandant d'abord quand elles sont écrites), ou enregistre leur structure comme
 modèle (« Enregistrer comme modèle… » : leurs titres et leurs blocs, sans ce qui est écrit).
 
@@ -316,11 +315,11 @@ bouton plein écran les masque (pour tous les PDF, jusqu'à les afficher à nouv
 (y compris celles d'une période), ses détails (comme dans le panneau des publications) et ses signets ; 🔖+ crée un signet sur la sélection (sinon sur l'endroit affiché), et 🔍 trouve l'article du
 texte sélectionné (parmi les articles de la personne, sinon sur HAL, pour l'ajouter) ; les actions nécessitant une
 sélection sont grisées en l'absence de sélection. Une zone d'une page sert aussi de sélection (une figure, un tableau, un
-passage sur plusieurs colonnes) : activez l'outil zone (le cadre en pointillés dans l'en-tête, ou **A**) et
+passage sur plusieurs colonnes) : activez l'outil zone (le cadre en pointillés dans l'en-tête, ou **A** ou **R**) et
 tracez un rectangle, ou Alt+glisser ; son texte constitue la sélection, et le rectangle son emplacement
 (Escape, ou un clic ailleurs, l'abandonne). Raccourcis (une seule touche, sauf pendant la saisie) : **H** surligne
 la sélection (sinon active ou désactive l'outil de surlignage), **T** texte, **D** dessin, **I**
-image (activer ou désactiver), **A** zone, **B** signet, **F** trouver l'article, **E** ajouter à une
+image (activer ou désactiver), **A** ou **R** zone, **B** signet, **F** trouver l'article, **E** ajouter à une
 catégorie, **Q** citer dans la dernière note utilisée (une citation Markdown, avec sa page), **Maj+Q**
 citer au curseur, dans la phrase (`"…" %% [Application, p. 4](lien) %%` : l'emplacement dans un
 commentaire Obsidian, renvoyant à la page du PDF, masqué dans l'aperçu ; le bouton de citation des barres d'outils des notes, avec Maj+clic ; cliqué : comme Q) ; ceux de PDF.js : ⌘F / Ctrl+F recherche, + / − zoom, N / P (ou J / K) page suivante et
@@ -452,7 +451,7 @@ reste en haut ; « Toutes les personnes (nettoyage) » liste chaque personne. Gl
 dedans (sur son haut ou son bas : à côté), ou sur « Déposer ici » pour le premier niveau. Le menu ⋮ de chaque
 dossier le renomme, ajoute un dossier dedans, le déplace (« Déplacer vers… ») et choisit ses réglages. Un dossier
 utilise les **réglages** du dossier où il est, ou les siens (une icône dans l'arbre) : tous, ses catégories, ses listes
-étoilées et les citations dans ses notes (les formats des numéros, ses modèles, les notes de départ).
+étoilées et les citations dans ses notes (les formats des numéros, ses modèles), ses modèles de rapport.
 Choisir ses propres réglages part d'une copie de ceux de son parent ; revenir à ceux de son parent supprime les
 siens (sauf si d'autres dossiers les utilisent), les extraits de ses personnes allant dans les catégories de mêmes
 noms (ajoutées si elles manquent), comme quand un dossier utilisant les réglages de son parent est déplacé.

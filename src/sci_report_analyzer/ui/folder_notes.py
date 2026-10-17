@@ -10,7 +10,7 @@ from weakref import WeakSet
 from fastapi.responses import RedirectResponse
 from nicegui import app, ui
 
-from .. import folders, reports, urls
+from .. import folders, urls
 from ..i18n import N_, _
 from .dialogs import ok_handler, transient_dialog
 from .mdedit import MarkdownEditor
@@ -50,16 +50,13 @@ def folder_notes_editor(
     side: Callable[[], None] | None = None,
 ) -> MarkdownEditor:
     """The editor of a person's notes within a folder, saved as typed (as the other notes);
-    ``side``: the pane of the papers to cite (in place of the preview). Empty notes start
-    with the folder's skeleton (saved once edited).
+    ``side``: the pane of the papers to cite (in place of the preview).
 
     A save is refused if the notes changed since the editor loaded them (saved elsewhere:
     another window…), and clearing them all asks first."""
     holder: list[MarkdownEditor] = []
     base = {"text": folders.notes_of(period_id)}  # (the notes as last loaded or saved here)
     text = base["text"]
-    if not text.strip() and (found := folders.folder_of_period(period_id)):
-        text = reports.skeleton(found[0]) or text
 
     def store(text: str) -> bool:
         if not folders.set_notes(period_id, text, base=base["text"]):

@@ -32,9 +32,9 @@ def test_folders_use_the_default_settings_unless_chosen():
     other = folders.save_folder(None, "Prize")
     categories.add(top, "Research")
     categories.add(sub, "Teaching")  # (the same settings: shared)
-    reports.save_skeleton(sub, "# Notes")
+    reports.save_language(sub, "fr")
     assert _cats(top) == _cats(other) == ["Research", "Teaching"]
-    assert reports.skeleton(other) == "# Notes\n"
+    assert reports.language(other) == "fr"
     assert folders.sharing(sub) == ["Hiring", "Prize"]
     default = folders.default_settings()
     assert _named() == {"Default": (True, ["Hiring", "Hiring › Hiring 2026", "Prize"])}
@@ -65,7 +65,7 @@ def test_settings_created_renamed_copied_and_deleted():
     a = folders.save_folder(None, "A")
     research = categories.add(a, "Research")
     categories.add(a, "Projects", research)
-    reports.save_skeleton(a, "# Start")
+    reports.save_language(a, "fr")
     folders.set_primary_source(a, "hal")
     annotations.save_list(folders.settings_of(a), "shortlist")
     default = folders.default_settings()
@@ -73,7 +73,7 @@ def test_settings_created_renamed_copied_and_deleted():
     copy = folders.create_settings("Copy", default)
     ref = folders.SettingsRef(copy)
     assert _cats(ref) == ["Research", "Research › Projects"]
-    assert reports.skeleton(ref) == "# Start\n" and folders.primary_source(ref) == "hal"
+    assert reports.language(ref) == "fr" and folders.primary_source(ref) == "hal"
     assert [t.name for t in annotations.star_lists(settings_id=copy)][-1] == "shortlist"
     categories.add(ref, "Teaching")  # (apart from the source's)
     assert "Teaching" not in _cats(a)
@@ -112,14 +112,14 @@ def test_excerpts_follow_the_settings_chosen():
     research = categories.add(top, "Research")
     projects = categories.add(top, "Projects", research)
     categories.add(top, "Projects", research)  # (two of the same name: told apart)
-    reports.save_skeleton(top, "# Start")
+    reports.save_language(top, "fr")
     period = folders.add_person(sub, ann)
     categories.add_excerpt(projects, period, "Led a project.", 1, [])
     categories.set_section_text(period, research, "Some research.")  # (without excerpts)
     # A copy chosen: the excerpts filed in the copies of their categories.
     own = own_settings(sub, copy=True)
     assert folders.sharing(sub) == [] and _cats(sub) == _cats(top)
-    assert reports.skeleton(sub) == "# Start\n"
+    assert reports.language(sub) == "fr"
     [e] = categories.excerpts(period)
     assert e.category_id != projects and _filed(period) == [
         ("Research › Projects", "Led a project.")

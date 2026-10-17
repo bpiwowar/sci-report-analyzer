@@ -1,7 +1,8 @@
 """The PDFs open beside a person's page (their documents, their papers), whatever its tab:
-each in a frame on the right (its viewer's page, embedded: see pdf_viewer.viewer_frame), one
-shown at a time; a strip at the bottom lists them, to show one, minimize them, or close one
-(from the view only: nothing is deleted). What the page's notes and excerpts ask of a PDF goes
+each in a frame on the right, or the left (its viewer's page, embedded: see
+pdf_viewer.viewer_frame), one shown at a time; a strip at the bottom lists them, to show one,
+minimize them, or close one (from the view only: nothing is deleted), but the person's
+documents within the folder, always there. What the page's notes and excerpts ask of a PDF goes
 to the one shown (static/dock.js), and a link to a PDF opens it there."""
 
 from __future__ import annotations
@@ -14,11 +15,12 @@ from nicegui import context, ui
 
 from .. import annotations, documents, persons
 from ..i18n import _
-from .documents_page import page_url_of
+from .documents_page import page_url_of, rename_dialog
 from .pdf_viewer import page_url, pdf_icon, scripts
 
 WIDTH = "ui.dock.width"  # AppSetting: the width (px) of the PDFs beside a person's page
 WIDTH_DEFAULT, WIDTH_MIN = 720, 320
+SIDE = "ui.dock.side"  # AppSetting: where the PDFs are, "right" (the default) or "left"
 KEY = re.compile(r"([dp])([0-9]{1,9})")  # (a document: d3; a paper: p12)
 
 
@@ -55,17 +57,20 @@ class PdfDock:
         self.keys = [k for k in dict.fromkeys(keys) if isinstance(k, str) and self._known(k)]
         self.shown = shown if shown in self.keys else None
         self.frames: dict[str, ui.element] = {}
+        self.docs: list[str] = []  # (the person's documents within the folder: always listed)
         self.last: str | None = None  # (the PDF shown last)
-        scripts({"dockMin": WIDTH_MIN}, "dock.js")
+        self.left = annotations.ui_state(SIDE, "right") == "left"
+        scripts({"dockMin": WIDTH_MIN, "dockLeft": self.left}, "dock.js")
         width = max(WIDTH_MIN, int(annotations.ui_state(WIDTH, WIDTH_DEFAULT) or WIDTH_DEFAULT))
         with context.client.content:
             self.drawer = (
-                ui.right_drawer(value=False, bordered=True)
+                (ui.left_drawer if self.left else ui.right_drawer)(value=False, bordered=True)
                 .props(f"width={width} behavior=desktop")
                 .classes("p-0 gap-0")
                 .mark("dock")
             )
-            with self.drawer, ui.row().classes("w-full h-full no-wrap gap-0"):
+            row = "flex-row-reverse" if self.left else ""  # (the splitter on the page's side)
+            with self.drawer, ui.row().classes(f"w-full h-full no-wrap gap-0 {row}"):
                 ui.element("div").classes(
                     "vr-dock-splitter shrink-0 h-full bg-grey-4 hover:bg-primary"
                 ).style("width:5px; cursor:col-resize").tooltip(_("Drag to resize the PDFs"))
@@ -78,6 +83,22 @@ class PdfDock:
         ui.on("vr-dock-open", lambda e: self.open(str(e.args.get("key")), e.args.get("page")))
         ui.on("vr-dock-width", lambda e: self._width(int(e.args)))
         self._update(changed=False)
+
+    def set_documents(self, docs: list[documents.DocView]) -> None:
+        """The person's documents within the folder of the page: always in the strip."""
+        self.docs = [f"d{d.id}" for d in docs]
+        for d in docs:
+            self.labels[f"d{d.id}"] = (d.name, d.name)
+        for key in [k for k in self.keys if k[0] == "d" and k not in self.docs]:
+            if documents.info(int(key[1:])) is None:  # (deleted meanwhile)
+                self.close(key)
+        self.footer.value = bool(self.keys or self.docs)
+        self._strip()
+
+    def move(self) -> None:
+        """The PDFs on the other side of the page (it is built again)."""
+        annotations.save_ui_state(SIDE, "right" if self.left else "left")
+        ui.navigate.reload()
 
     def _known(self, key: str) -> bool:
         """Whether ``key`` is a PDF of the person (its name, then, in ``labels``)."""
@@ -138,9 +159,9 @@ class PdfDock:
         self._update()
 
     def restore(self) -> None:
-        """The PDF last shown (else the first one) shown again."""
-        if self.keys:
-            self.open(self.last if self.last in self.keys else self.keys[0])
+        """The PDF last shown (else the first one, or the first document) shown again."""
+        if self.keys or self.docs:
+            self.open(self.last if self.last in self.keys else (self.keys or self.docs)[0])
 
     def close(self, key: str) -> None:
         """Out of the view (nothing deleted)."""
@@ -177,7 +198,7 @@ class PdfDock:
         for key, frame in self.frames.items():
             frame.set_visibility(key == self.shown)
         self.drawer.value = self.shown is not None
-        self.footer.value = bool(self.keys)
+        self.footer.value = bool(self.keys or self.docs)
         self._strip()
         self.footer.client.run_javascript(f"vrDock.shown = {json.dumps(self.shown)}")
         if not changed:
@@ -193,7 +214,7 @@ class PdfDock:
     def _strip(self) -> None:
         self.footer.clear()
         with self.footer:
-            for key in self.keys:
+            for key in self.docs + [k for k in self.keys if k not in self.docs]:
                 name, title = self.labels.get(key, (key, key))
                 on = key == self.shown
                 with (
@@ -202,29 +223,50 @@ class PdfDock:
                     .classes("bg-white text-primary" if on else "")
                     .mark(f"dock-tab-{key}")
                 ):
+                    tip = _("Click: minimize") if on else _("Click: show")
+                    if key[0] == "d":
+                        tip += " · " + _("Double-click: rename")
                     with (
                         ui.button(on_click=lambda k=key: self.toggle(k))
                         .props(f"flat dense no-caps color={'primary' if on else 'white'}")
-                        .tooltip(title + " · " + (_("Click: minimize") if on else _("Click: show")))
+                        .tooltip(title + " · " + tip)
                         .mark(f"dock-show-{key}")
-                    ):
+                    ) as button:
+                        if key[0] == "d":
+                            button.on("dblclick", lambda k=key: self.rename(k))
                         if key[0] == "d":
                             ui.icon("description", size="xs").classes("mr-1")
                         else:
                             pdf_icon().classes("mr-1")
                         ui.label(name).classes("ellipsis max-w-56 text-sm")
-                    ui.button(icon="close", on_click=lambda k=key: self.close(k)).props(
-                        f"flat dense round size=xs color={'primary' if on else 'white'}"
-                    ).tooltip(_("Close it (from the view only)")).mark(f"dock-close-{key}")
+                    if key not in self.docs:  # (a document of the folder: always there)
+                        ui.button(icon="close", on_click=lambda k=key: self.close(k)).props(
+                            f"flat dense round size=xs color={'primary' if on else 'white'}"
+                        ).tooltip(_("Close it (from the view only)")).mark(f"dock-close-{key}")
             ui.space()
+            ui.button(icon="swap_horiz", on_click=self.move).props(
+                "flat dense round size=sm color=white"
+            ).tooltip(
+                _("Move the PDFs to the right") if self.left else _("Move the PDFs to the left")
+            ).mark("dock-move")
+            arrows = ("left", "right") if self.left else ("right", "left")
             if self.shown is not None:
-                ui.button(icon="keyboard_double_arrow_right", on_click=self.minimize).props(
+                ui.button(icon=f"keyboard_double_arrow_{arrows[0]}", on_click=self.minimize).props(
                     "flat dense round size=sm color=white"
                 ).tooltip(_("Minimize the PDFs")).mark("dock-minimize")
-            elif self.keys:
-                ui.button(icon="keyboard_double_arrow_left", on_click=self.restore).props(
+            elif self.keys or self.docs:
+                ui.button(icon=f"keyboard_double_arrow_{arrows[1]}", on_click=self.restore).props(
                     "flat dense round size=sm color=white"
                 ).tooltip(_("Show the PDF again")).mark("dock-restore")
+
+    def rename(self, key: str) -> None:
+        """A document's (its tab double-clicked: the two clicks undone)."""
+
+        def renamed(name: str) -> None:
+            self.labels[key] = (name, name)
+            self._strip()
+
+        rename_dialog(int(key[1:]), self.labels.get(key, (key, key))[0], renamed)
 
     def _width(self, width: int) -> None:
         width = max(WIDTH_MIN, width)

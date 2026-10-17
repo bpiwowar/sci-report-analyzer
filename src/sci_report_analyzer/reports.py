@@ -668,16 +668,6 @@ def star_lists(period_id: int | None = None, *, settings_id: int | None = None) 
     ]
 
 
-def skeleton(folder_id: int | None) -> str:
-    """The starting text of a person's notes in the folder (while empty), e.g. its headings
-    and blocks."""
-    return _citations(folder_id).get("skeleton") or ""
-
-
-def save_skeleton(folder_id: int, text: str) -> None:
-    _save_citations(folder_id, skeleton=text.strip() and text.rstrip() + "\n")
-
-
 def language(folder_id: int | None) -> str | None:
     """The language of what is generated in the reports of a folder (references, excerpts,
     summary…); none: the interface's."""

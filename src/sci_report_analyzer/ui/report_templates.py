@@ -1,6 +1,5 @@
 """The report templates (see report_templates): edited with a folder's settings (next to
-their categories), picked to fill its starting notes or a report, made from a written
-report."""
+their categories), picked to start a report, made from a written report."""
 
 from __future__ import annotations
 
@@ -17,9 +16,8 @@ HELP = N_(
     "summary of the publications), `[[excerpts]]` (the excerpts by category; "
     "`[[excerpts#id]]`: those of the category of that id, then left out of the others), "
     "`[[cv]]` (the person's career), `[[references]]` (the papers cited), and guidance as "
-    "comments `%% … %%` (left out when shown or copied). The starting notes are copied from "
-    "one, and a report from one (its toolbar), which also makes one from a report: its "
-    "headings and blocks."
+    "comments `%% … %%` (left out when shown or copied). A report starts from one (its "
+    "toolbar), which also makes one from a report: its headings and blocks."
 )
 
 

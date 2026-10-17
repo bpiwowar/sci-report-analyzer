@@ -313,11 +313,11 @@ full-screen button hides them (for every PDF, until shown again). The side panel
 to it; 🔖+ bookmarks the selection (else the place shown), and 🔍 finds the paper of the
 selected text (among the person's papers, else on HAL, to add); the actions needing a
 selection are greyed out without one. An area of a page selects too (a figure, a table, a
-passage over columns): turn the area tool on (the dashed box in the header, or **A**) and
+passage over columns): turn the area tool on (the dashed box in the header, or **A** or **R**) and
 draw a rectangle, or Alt+drag; its text is the selection, and the rectangle its place
 (Escape, or a click elsewhere, drops it). Keys (single, but when typing): **H** highlights
 the selection (else turns the highlighting tool on or off), **T** text, **D** drawing, **I**
-image (on or off), **A** area, **B** bookmark, **F** find the paper, **E** add to a
+image (on or off), **A** or **R** area, **B** bookmark, **F** find the paper, **E** add to a
 category, **Q** quote into the note last used (a Markdown quote, with its page), **Shift+Q**
 quote there at the cursor, within the sentence (`"…" %% [Application, p. 4](link) %%`: the
 place in an Obsidian comment, linking back to the PDF's page, not shown in the preview; the
@@ -443,7 +443,7 @@ put it within it (onto its top or bottom: next to it), or onto "Drop here" for t
 Each folder's ⋮ menu renames it, adds a folder within it, moves it ("Move to…") and chooses
 its settings. The **folder settings** are named, in Settings → Folder settings: their
 categories, their star lists and the citations in the notes (the number formats, the
-templates, the starting notes), the language of the reports, the primary source… There they
+templates), the report templates, the language of the reports, the primary source… There they
 are created (empty, or a copy of others), renamed, edited, made the default, and deleted
 (once no folder uses them and no excerpt is filed in their categories). Each folder uses the
 settings chosen in its dialog or its menu (an icon in the tree when not the default ones),

@@ -3,9 +3,8 @@ from, their headings and blocks (``[[excerpts]]``…) with, if any, guidance in 
 comments (``%% … %%``, left out when shown or copied).
 
 Those of a folder's settings (with their categories, which ``[[excerpts#id]]`` names; edited
-with them, Parameters → Folder settings): a folder's starting notes (its skeleton, see
-reports.skeleton) are copied from one, and a report from one when it starts; a template is
-also made from a written report, its structure only (``outline``)."""
+with them, Parameters → Folder settings): a report is started from one; a template is also
+made from a written report, its structure only (``outline``)."""
 
 from __future__ import annotations
 

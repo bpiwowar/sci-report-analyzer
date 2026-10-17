@@ -229,6 +229,7 @@ class DocumentPage:
             page=page,
             pane=pane,
             embed=embed,
+            rename=lambda title: rename_dialog(d.id, title.text, title.set_text),
         )
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
@@ -521,6 +522,7 @@ class ReportTabs:
         )
         self.boxes = boxes
         self.sides: dict[str, Side] = {}
+        self._documents_of()
         dock.on_shown.append(self._shown)
         ui.on("vr-pdf-quote", lambda: self._quote(inline=False))
         ui.on("vr-pdf-quote-inline", lambda: self._quote(inline=True))
@@ -566,11 +568,18 @@ class ReportTabs:
         if p.folder and p.folder.hidden:
             ui.badge(_("archived"), color="grey")
         if which == "report":
-            _documents(p, lambda d: self.dock.open(f"d{d.id}"))
+            _documents(p, lambda d: self.dock.open(f"d{d.id}"), self.dock.set_documents)
+
+    def _documents_of(self) -> None:
+        """Those of the period, always in the strip of the PDFs (within a folder)."""
+        p = self.period
+        docs = documents.of_person(self.person_id).get(p.id, []) if p and p.folder else []
+        self.dock.set_documents(docs)
 
     def choose(self, period_id: int) -> None:
         """Another period: the tabs filled again."""
         self.period = next((p for p in self.periods if p.id == period_id), self.period)
+        self._documents_of()
         self.sides.clear()
         for which, box in self.boxes.items():
             if box.default_slot.children:
@@ -604,9 +613,10 @@ class ReportTabs:
             side.select_excerpt(excerpt_id)
 
 
-def _documents(p, open_doc) -> None:
+def _documents(p, open_doc, on_change=None) -> None:
     """A menu of the documents of the person within a period / folder (an application, a
-    CV…): open (or rename, delete…: their ⋮), and the last item to add some."""
+    CV…): open (or rename, delete…: their ⋮), and the last item to add some; ``on_change``:
+    given them, once listed."""
     button = (
         ui.button(icon="description")
         .props("flat dense no-caps icon-right=arrow_drop_down")
@@ -617,6 +627,8 @@ def _documents(p, open_doc) -> None:
     def listing() -> None:
         docs = documents.of_person(p.person_id).get(p.id, [])
         button.text = _("Documents ({n})").format(n=len(docs))
+        if on_change is not None:
+            on_change(docs)
         for d in docs:
             _doc_item(d, listing.refresh, open_doc)
         if not docs:
@@ -653,20 +665,27 @@ def _documents(p, open_doc) -> None:
             ui.label(_("Add…"))
 
 
+def rename_dialog(doc_id: int, name: str, then: Callable[[str], None]) -> None:
+    """A document renamed, once its new name is given (``then``: with it)."""
+    with transient_dialog(width="w-96") as (dlg, _card):
+        field = ui.input(_("Name"), value=name).classes("w-full").mark("document-name")
+
+        def ok() -> bool | None:
+            if not (field.value or "").strip():
+                return False
+            documents.rename(doc_id, field.value.strip())
+            then(field.value.strip())
+
+        field.on("keydown.enter", ok_handler(dlg, ok))
+        actions(dlg, _("Rename"), ok, mark="document-rename-ok")
+
+
 def _doc_item(d: documents.DocView, refresh, open_doc) -> None:
     """A document in the menu: opened when clicked; its ⋮ to open it in a new tab, download,
     rename or delete it."""
 
     def rename() -> None:
-        with transient_dialog(width="w-96") as (dlg, _card):
-            name = ui.input(_("Name"), value=d.name).classes("w-full").mark("document-name")
-
-            def ok() -> None:
-                documents.rename(d.id, name.value)
-                refresh()
-
-            name.on("keydown.enter", ok_handler(dlg, ok))
-            actions(dlg, _("Rename"), ok, mark="document-rename-ok")
+        rename_dialog(d.id, d.name, lambda _name: refresh())
 
     def delete() -> None:
         def ok() -> None:

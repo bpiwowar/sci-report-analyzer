@@ -33,6 +33,11 @@ NO_CONFIRM = "ui.pdf.no_confirm"  # AppSetting: download without asking first
 SIDE_WIDTH = "ui.pdf.side_width"  # AppSetting: the width (px) of the side column
 FULL_SCREEN = "ui.pdf.full_screen"  # AppSetting: PDF windows without the menu bar
 SIDE_DEFAULT, SIDE_MIN = 384, 240
+# (embedded beside a person's page: a paper's details, over the PDF)
+ui.add_css(
+    ".vr-pdf-over{background:white}body.body--dark .vr-pdf-over{background:var(--q-dark-page)}",
+    shared=True,
+)
 HEADER_HEIGHT = 36  # (px: the header of a PDF)
 PANE_TOKEN = re.compile(r"[a-z0-9]{1,40}")  # (of a PDF window, its side panel elsewhere)
 _no_confirm: bool | None = None  # (cached NO_CONFIRM)
@@ -210,6 +215,7 @@ def viewer_frame(
     page: int | None = None,
     pane: str | None = None,
     embed: bool = False,
+    rename: Callable[[ui.label], None] | None = None,
 ) -> ui.column:
     """The page of a stored PDF, under the menu bar (see theme.bare_page) and the header of
     its ``person``'s page (id, period, tab; both hidden in full screen): a header (its
@@ -219,7 +225,8 @@ def viewer_frame(
     With ``pane`` (the token of a PDF window): only the side column, in its own window, kept
     in sync with that one. ``embed``: beside the person's page (see pdf_dock), without its
     header, the side column hidden at first: meanwhile, that page's notes and excerpts are
-    its own (quotes, excerpts: see vrDock)."""
+    its own (quotes, excerpts: see vrDock). ``rename``: its title double-clicked (given the
+    label)."""
     if pane and PANE_TOKEN.fullmatch(pane):
         return _pane_frame(title, home, side, bookmarked, pane)
     _fill_window()
@@ -254,7 +261,10 @@ def viewer_frame(
     ):
         if not embed:
             ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
-        ui.label(title).classes("ellipsis grow min-w-0 font-medium")
+        label = ui.label(title).classes("ellipsis grow min-w-0 font-medium").mark("pdf-title")
+        if rename is not None:
+            label.classes("cursor-text").tooltip(_("Double-click: rename"))
+            label.on("dblclick", lambda: rename(label))
         ui.label("").classes("text-sm opacity-80").props("id=vr-pdf-status").mark("pdf-status")
         for icon, step, tip in (
             ("arrow_back", "back", _("Back (after following a link; also ⌥← or ⌘[)")),
@@ -306,17 +316,21 @@ def viewer_frame(
                 box.set_visibility(not box.visible)
                 splitter.set_visibility(box.visible)
 
-        ui.button(icon="view_sidebar", on_click=toggle_side).props(
-            "flat dense round color=white"
-        ).tooltip(_("Side panel (notes, bookmarks, papers)")).mark("pdf-toggle-notes")
-        if not embed:
+        if not embed:  # (embedded: only a paper clicked, over the PDF)
+            ui.button(icon="view_sidebar", on_click=toggle_side).props(
+                "flat dense round color=white"
+            ).tooltip(_("Side panel (notes, bookmarks, papers)")).mark("pdf-toggle-notes")
             full_screen_button()
     src = f"/pdfjs/web/viewer.html?file={file_url}%3Fv%3D{version}"
     # (at a page asked for, else where it was last read)
     src += f"#page={page}" if page else documents.place_hash(documents.last_place(*bookmarked))
     ui.on("vr-pdf-at", lambda e: documents.save_last_place(*bookmarked, e.args or {}))
     # (the room left in the window)
-    with ui.row().classes("w-full no-wrap gap-0 grow min-h-0").style("align-items:stretch"):
+    with (
+        ui.row()
+        .classes("w-full no-wrap gap-0 grow min-h-0" + (" relative" if embed else ""))
+        .style("align-items:stretch")
+    ):
         ui.element("iframe").props(f'id=vr-pdf-frame src="{src}"').classes("grow").style(
             "border:0"
         ).mark("pdf-frame")
@@ -332,11 +346,13 @@ def viewer_frame(
             .props("id=vr-pdf-side")
             .mark("pdf-side")
         )
+        if embed:  # (over the PDF, at its right)
+            box.classes("absolute right-0 top-0 bottom-0 z-10 shadow-xl vr-pdf-over")
         ui.on(
             "vr-pdf-side-width",
             lambda e: annotations.save_ui_state(SIDE_WIDTH, max(SIDE_MIN, int(e.args))),
         )
-    if embed:  # (the person's page beside it, in its place)
+    if embed:  # (the person's page beside it, in its place; a paper clicked: over the PDF)
         box.set_visibility(False)
         splitter.set_visibility(False)
 
@@ -419,7 +435,7 @@ def _selection_actions(side: Side, bookmarked: tuple[str, int], *, here: bool) -
         # An area (a rectangle) of a page, selected: its text, as a text selection.
         with ui.element("span").tooltip(
             _(
-                "Select an area of a page (A, or Alt+drag): draw a rectangle on the page, the "
+                "Select an area of a page (A or R, or Alt+drag): draw a rectangle on the page, the "
                 "text inside it becomes the selection, to quote (Q), add as an excerpt (E), find "
                 "its paper (F), tag the papers of a list (L), read a career (V) or copy (⌘C / "
                 "Ctrl+C). Shift+drag "
