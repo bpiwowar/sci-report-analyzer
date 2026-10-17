@@ -117,6 +117,7 @@ ui.add_head_html(
     """<script>
 window.vrTimelineScroll = (id, keep) => {
   if (!keep) window.vrTlAt = null;  // (another timeline's: not this one's)
+  else if (window.vrTlAt == null) keep = false;  // (drawn again before scrolled: as at first)
   const go = () => {
     const w = getHtmlElement(id);
     if (!w) return;
