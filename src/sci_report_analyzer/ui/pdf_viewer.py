@@ -690,21 +690,21 @@ STORED_TIP = N_("View and annotate the stored PDF (beside the page; ⌘/Ctrl-cli
 EDITED_TIP = N_("View the stored PDF, annotated (beside the page; ⌘/Ctrl-click: a new tab)")
 
 
-def pdf_button(panel: PublicationsPanel, s: PubStat) -> None:
+def pdf_button(panel: PublicationsPanel, s: PubStat, mark: str = "") -> None:
     """Next to a paper's title: its stored PDF (opened beside the person's page, see
     pdf_dock; elsewhere in a new window), else a button to download it (after confirmation)
-    and open it."""
+    and open it (``mark``: before its markers)."""
     period = panel.period_id
     if s.pdf:
         edited = s.pdf == "edited"
-        with ui.link(target=page_url(s.id, period), new_tab=True).mark(f"view-pdf-{s.id}"):
+        with ui.link(target=page_url(s.id, period), new_tab=True).mark(f"{mark}view-pdf-{s.id}"):
             pdf_icon(edited).tooltip(_(EDITED_TIP) if edited else _(STORED_TIP))
     elif can_download(s):
         icon = (
             ui.icon("picture_as_pdf", size="xs", color="grey-6")
             .classes("vr-src cursor-pointer")
             .tooltip(_("Download the PDF (open access) to view and annotate it"))
-            .mark(f"get-pdf-{s.id}")
+            .mark(f"{mark}get-pdf-{s.id}")
         )
         if no_confirm():
             icon.on("click", lambda: None, js_handler=_open_js(s.id, period))

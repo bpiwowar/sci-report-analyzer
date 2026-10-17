@@ -2866,8 +2866,12 @@ async def test_tag_from_a_pasted_list(user: User) -> None:
     with session_scope() as s:
         rows = {r.publication_id: r.number for r in s.scalars(select(PeriodTag))}
     assert rows[pub_id] == 2 and sorted(rows.values()) == [1, 2]
-    # The panel shows the starred papers, in the list's order.
-    await user.should_see("In the order of the list")
+    # The Starred tab shows them, in the list's order.
+    star = annotations.starred_tag_id()
+    (tab,) = user.find("tab-publications").elements
+    assert tab.parent_slot.parent.value == "starred"
+    await user.should_see("2", marker=f"starred-count-{star}")
+    await user.should_see("#2", marker=f"starred-{star}-pub-tag-number-{pub_id}-{star}")
 
 
 async def test_tag_from_a_list_edit_an_item(user: User) -> None:
@@ -2894,7 +2898,7 @@ async def test_tag_from_a_list_edit_an_item(user: User) -> None:
 
 
 async def test_tag_from_a_list_outside_the_period(user: User) -> None:
-    """Papers of the list outside the period's years: tagged, and said not shown."""
+    """Papers of the list outside the period's years: tagged, all in the Starred tab."""
     from test_reflist import REPORT, REPORT_PAPERS
 
     from sci_report_analyzer import annotations
@@ -2917,20 +2921,11 @@ async def test_tag_from_a_list_outside_the_period(user: User) -> None:
     user.find("reflist-find").click()
     await user.should_see("10 of 10 items matched")
     user.find("reflist-apply").click()
-    await user.should_see("“starred” put on 10 papers (not shown: 3 outside the years 2017–2024)")
-    await user.should_see("In the order of the list")
-    await user.should_see("7 publications")
-    for title, _, year in papers:
-        if 2017 <= year <= 2024:
-            await user.should_see(title)
-        else:
-            await user.should_not_see(title)
-    await user.should_see("Not shown: 3 outside the years 2017–2024")
-    user.find("list-all-years").click()
-    await user.should_see("10 publications")
+    await user.should_see("“starred” put on 10 papers")
+    star = annotations.starred_tag_id()
+    await user.should_see("10", marker=f"starred-count-{star}")
     for title, _, _ in papers:
-        await user.should_see(title)
-    await user.should_not_see(marker="list-not-shown")
+        await user.should_see(title, marker=f"starred-list-{star}")
 
 
 async def test_author_lookup_links(user: User) -> None:
@@ -3178,14 +3173,14 @@ def test_earlier_ui_states_normalized() -> None:
     from sci_report_analyzer.pubview import save_summary_settings, summary_settings
 
     pid = make_person("Jane Doe")
-    annotations.save_panel_state(pid, {"period_id": None, "starred_only": True})
+    star = annotations.starred_tag_id()
+    annotations.save_panel_state(
+        pid, {"period_id": None, "starred_only": True, "list_filter": [star], "tag_filter": [star]}
+    )
     save_summary_settings({"off_categories": ["q4"], "details": {"q1": "count"}, "years": True})
     annotations.normalize_ui_state()
     annotations.normalize_ui_state()  # (idempotent)
-    assert annotations.panel_state(pid) == {
-        "period_id": None,
-        "list_filter": [annotations.starred_tag_id()],
-    }
+    assert annotations.panel_state(pid) == {"period_id": None, "tag_filter": []}
     assert summary_settings() == {"details": {"q4": "off", "q1": "count"}, "years": True}
 
 

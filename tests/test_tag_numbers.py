@@ -46,6 +46,24 @@ def _numbers(_pid: int, tag: int, period: int | None) -> dict[int, int | None]:
         return {r.publication_id: r.number for r in rows}
 
 
+def _rows(user: User, tag: int) -> list[int]:
+    """The papers of a star list's section in the Starred tab, in order."""
+    (box,) = user.find(f"starred-list-{tag}").elements
+    prefix = f"starred-{tag}-pub-"
+    return [
+        int(m.removeprefix(prefix))
+        for e in box.descendants()
+        for m in e._markers
+        if m.startswith(prefix) and m.removeprefix(prefix).isdigit()
+    ]
+
+
+def _tab(user: User) -> str:
+    """The person's page's tab shown."""
+    (tab,) = user.find("tab-publications").elements
+    return tab.parent_slot.parent.value
+
+
 def test_set_clear_and_renumber():
     pid, period, (a, b, c) = _setup()
     tag = annotations.save_list(None, "discuss")
@@ -142,55 +160,59 @@ def test_moved():
     assert moved([1, 2, 3], 4, 2) == [1, 2, 3]
 
 
-async def test_star_filter_apart_from_the_tags(user: User) -> None:
-    """The star list filter and the tag filter both apply (earlier links: one filter)."""
+async def test_starred_tab(user: User) -> None:
+    """The Starred tab: each star list of the folder, its papers in the list's order (with
+    their numbers); reordered there; a star toggled in the panel shows up there."""
     pid, period, (a, b, c) = _setup()
     star = annotations.starred_tag_id()
-    for p in (a, b):
-        annotations.toggle_tag(p, star, period)
-    tag = annotations.save_tag("neural")
-    annotations.put_tag(tag, [b, c])
-    await user.open(f"/person/{pid}/{period}?tags={tag},{star}")
-    await user.should_see(TITLES[1])  # starred and tagged
-    await user.should_not_see(TITLES[0])  # starred only
-    await user.should_not_see(TITLES[2])  # tagged only
-    # The ★ toggle off: the tagged papers, starred or not.
-    user.find("list-filter").click()
-    await user.should_see(TITLES[2])
-    await user.should_not_see(TITLES[0])
-    state = annotations.panel_state(pid)
-    assert state["tag_filter"] == [tag] and state["list_filter"] == []
-
-
-async def test_a_toggle_per_star_list(user: User) -> None:
-    """Several star lists: a ★ toggle each, the papers in one of those on."""
-    pid, period, (a, b, _c) = _setup()
-    star = annotations.starred_tag_id()
     short = annotations.save_list(None, "shortlist")
+    annotations.number_in_order(star, [b, a], period)
+    await user.open(f"/person/{pid}/{period}?tab=starred")
+    await user.should_see(marker=f"starred-list-{star}")
+    await user.should_see("2", marker=f"starred-count-{star}")
+    await user.should_see("0", marker=f"starred-count-{short}")
+    assert _rows(user, star) == [b, a]
+    await user.should_see("#1", marker=f"starred-{star}-pub-tag-number-{b}-{star}")
+    await user.should_see("#2", marker=f"starred-{star}-pub-tag-number-{a}-{star}")
+    # Reordered: the dialog of the list.
+    user.find(f"starred-order-{star}").click()
+    await user.should_see(marker=f"tag-order-row-{a}")
+    user.find(f"tag-order-down-{b}").click()
+    await asyncio.sleep(0.1)
+    assert _numbers(pid, star, period) == {a: 1, b: 2}
+    await user.should_see("#1", marker=f"starred-{star}-pub-tag-number-{a}-{star}")
+    assert _rows(user, star) == [a, b]
+    # A star toggled in the panel's list: in the tab.
+    user.find(f"star-{c}").click()
+    await user.should_see("3", marker=f"starred-count-{star}")
+    await user.should_see(marker=f"starred-{star}-pub-{c}")
+    # (the panel's own rows: no star list filter any more)
+    await user.should_not_see(marker="list-filter")
+
+
+async def test_earlier_star_links_open_the_starred_tab(user: User) -> None:
+    pid, period, (a, _b, c) = _setup()
+    star = annotations.starred_tag_id()
     annotations.toggle_tag(a, star, period)
-    annotations.toggle_tag(b, short, period)
-    await user.open(f"/person/{pid}/{period}")
-    await user.should_see(TITLES[2])
-    user.find(f"list-filter-{short}").click()
-    await user.should_see(TITLES[1])
-    await user.should_not_see(TITLES[0])
-    await user.should_not_see(TITLES[2])
-    user.find(f"list-filter-{star}").click()
-    await user.should_see(TITLES[0])
-    await user.should_see(TITLES[1])
-    await user.should_not_see(TITLES[2])
-    assert annotations.panel_state(pid)["list_filter"] == [short, star]
+    annotations.save_panel_state(pid, {"period_id": period, "list_filter": [star]})
+    await user.open(f"/person/{pid}/{period}?lists={star}")
+    assert _tab(user) == "starred"
+    await user.should_see(marker=f"starred-{star}-pub-{a}")
+    # The panel unfiltered (the earlier saved filter ignored).
+    await user.should_see(marker=f"pub-{c}")
+    await user.open(f"/person/{pid}/{period}?starred=1")
+    assert _tab(user) == "starred"
 
 
-async def test_order_dialog_from_the_panel(user: User) -> None:
+async def test_order_dialog_from_the_starred_tab(user: User) -> None:
     pid, period, (a, b, c) = _setup()
     star = annotations.starred_tag_id()
     for p in (a, b, c):
         annotations.toggle_tag(p, star, period)
     annotations.set_tag_number(c, star, 1, period)
-    await user.open(f"/person/{pid}/{period}?tags={star}")
-    await user.should_see(TITLES[0])
-    user.find("tag-order").click()
+    await user.open(f"/person/{pid}/{period}?tab=starred")
+    await user.should_see(marker=f"starred-order-{star}")
+    user.find(f"starred-order-{star}").click()
     await user.should_see(marker=f"tag-order-row-{c}")
     # Numbered first, then by year: c (#1), b (2022), a (2021). Moving one numbers them all.
     user.find(f"tag-order-down-{c}").click()

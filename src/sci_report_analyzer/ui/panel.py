@@ -30,6 +30,7 @@ from ..pubview import (
     save_summary_settings,
     summary_lines,
     summary_settings,
+    tag_order,
     year_bin_defs,
     year_counts,
 )
@@ -142,10 +143,8 @@ class PublicationsPanel:
         # Cross-filter selections: papers matching one of each facet's (e.g. Q1 or CORE A*).
         self.sels: list[Sel] = []
         self.period_id: int | None = None
-        # Tags to show (any of them), and star lists (within the period; any of them): a
-        # paper must pass both.
+        # Tags to show (any of them); the star lists have their own tab (see starred.py).
         self.tag_filter: list[int] = []
-        self.list_filter: list[int] = []
         # Tracks to show (any of them; tracks.MAIN: the main track).
         self.track_filter: list[str] = []
         self.text = ""
@@ -162,6 +161,8 @@ class PublicationsPanel:
         self.to_check_only = False  # papers whose rank is to check (no decision on it)
         self.venue_filter: int | None = None  # only the papers of a venue
         self.open_pub: int | None = None  # a publication to open once loaded
+        # Shows the star lists' tab (set by the person's page), e.g. after a list was tagged.
+        self.show_starred: Callable[[], None] | None = None
         # Called on each render (e.g. the Theses tab, which follows the period).
         self.on_render: list[Callable[[], None]] = []
         self.tags = annotations.all_tags()
@@ -187,19 +188,15 @@ class PublicationsPanel:
         self._from_query(query or {})
 
     def _load_filters(self, state: dict) -> None:
-        self._set_filters([*state.get("tag_filter", []), *state.get("list_filter", [])])
+        self._set_filters(state.get("tag_filter", []))  # (an earlier "list_filter": ignored)
 
     def _set_filters(self, ids) -> None:
-        """The tag and star list filters from tag ids (earlier, the star lists were in the
-        tag filter)."""
-        ids = self._known_tags(ids)
-        lists = set(self.star_lists())
-        self.tag_filter = [i for i in ids if i not in lists]
-        self.list_filter = [i for i in ids if i in lists]
+        """The tag filter from tag ids (the star lists left out: they have their own tab)."""
+        self.tag_filter = [t.id for t in self.tags if not t.per_period and t.id in set(ids)]
 
     def _keep_known(self) -> None:
-        """Drop the tags and star lists that can no longer filter (e.g. another period's)."""
-        self._set_filters([*self.tag_filter, *self.list_filter])
+        """Drop the tags that can no longer filter (e.g. deleted)."""
+        self._set_filters(self.tag_filter)
 
     def star_lists(self) -> list[int]:
         """The star lists of the period's folder (none without a period), in order."""
@@ -218,21 +215,12 @@ class PublicationsPanel:
         lists = set(self.star_lists())
         return [t for t in self.tags if not t.per_period or t.id in lists]
 
-    def _known_tags(self, ids) -> list[int]:
-        """The tags that can filter: the tags, and the star lists of the period's folder."""
-        usable = {t.id for t in self.usable_tags()}
-        return [i for i in ids if i in usable]
-
     # ---- URL state ----------------------------------------------------------------------
 
     def _from_query(self, q: dict[str, str]) -> None:
-        if "tags" in q or "lists" in q:
-            self._set_filters(
-                int_or_none(x) for k in ("tags", "lists") for x in q.get(k, "").split(",") if x
-            )
-        elif "starred" in q and self.period_id:  # earlier links
-            self.tag_filter = []
-            self.list_filter = [self.starred_id] if q["starred"] == "1" else []
+        # (earlier links' star lists, ``lists=`` or ``starred=1``: the Starred tab, see person.py)
+        if "tags" in q:
+            self._set_filters(int_or_none(x) for x in q["tags"].split(",") if x)
         self.track_filter = [t for t in q.get("tracks", "").split(",") if t]
         if "from" in q:
             self.lo = int_or_none(q["from"])
@@ -254,8 +242,6 @@ class PublicationsPanel:
         p = next((p for p in self.periods if p.id == self.period_id), None)
         if self.tag_filter:
             out["tags"] = ",".join(map(str, self.tag_filter))
-        if self.list_filter:
-            out["lists"] = ",".join(map(str, self.list_filter))
         if self.track_filter:
             out["tracks"] = ",".join(self.track_filter)
         if self.lo is not None and (not p or self.lo != p.start_year):
@@ -347,7 +333,6 @@ class PublicationsPanel:
             {
                 "period_id": self.period_id,
                 "tag_filter": self.tag_filter,
-                "list_filter": self.list_filter,
             },
         )
 
@@ -366,8 +351,6 @@ class PublicationsPanel:
             if not self.in_years(s):
                 continue
             if self.tag_filter and not s.tags_in(self.period_id) & set(self.tag_filter):
-                continue
-            if self.list_filter and not s.tags_in(self.period_id) & set(self.list_filter):
                 continue
             if self.track_filter and (s.track or tracks.MAIN) not in self.track_filter:
                 continue
@@ -441,7 +424,6 @@ class PublicationsPanel:
         return bool(
             self.sels
             or self.tag_filter
-            or self.list_filter
             or self.track_filter
             or self.text
             or not self.hide_preprints
@@ -457,7 +439,6 @@ class PublicationsPanel:
         """Clear the filters (but the period and its years)."""
         self.sels = []
         self.tag_filter = []
-        self.list_filter = []
         self.track_filter = []
         self.text = ""
         self.hide_preprints = True
@@ -590,7 +571,6 @@ class PublicationsPanel:
                     placeholder=str(max(years)),
                     on_change=lambda e: set_year("hi", e.value),
                 ).props("dense outlined debounce=600").classes("w-24")
-            self._list_filter_ui()
             tag_options = {t.id: t.name for t in self.usable_tags() if not t.per_period}
             if tag_options:
 
@@ -1348,73 +1328,9 @@ class PublicationsPanel:
                         f"authorcat-{c.id}"
                     )
 
-    def _list_filter_ui(self) -> None:
-        """The star list filter, apart from the tags: a ★ toggle per list of the folder (the
-        papers in one of those on), its name shown when there are several; with the button
-        ordering the one filtered on."""
-        lists = [t for t in self.usable_tags() if t.per_period]
-
-        def toggle(tid: int) -> None:
-            on = tid in self.list_filter
-            self.list_filter = [i for i in self.list_filter if i != tid] + ([] if on else [tid])
-            self.sels = []
-            self._save_state()
-            self.render()
-
-        for t in lists:
-            on = t.id in self.list_filter
-            ui.button(
-                None if len(lists) == 1 else t.name,
-                icon="star" if on else "star_border",
-                on_click=lambda tid=t.id: toggle(tid),
-            ).props(
-                f"flat dense no-caps {'round' if len(lists) == 1 else ''} "
-                f"color={'amber-8' if on else 'grey'}"
-            ).tooltip(
-                _("All the papers, in “{name}” or not").format(name=t.name)
-                if on
-                else _("Only the papers in “{name}” (within the period)").format(name=t.name)
-            ).mark(f"list-filter-{t.id}" if len(lists) > 1 else "list-filter")
-        if len(self.list_filter) == 1:
-            ui.button(icon="format_list_numbered", on_click=self.order_tag).props(
-                "flat round dense"
-            ).tooltip(_("Order the papers of this star list (their numbers)")).mark("tag-order")
-
-    def list_tag(self) -> int | None:
-        """The star list filtered on (else the tag), when it is the only one and was put
-        from a list (the papers are then in the list's order)."""
-        ids = self.list_filter or self.tag_filter
-        if len(ids) != 1:
-            return None
-        tid = ids[0]
-        return tid if any(s.number_of(tid, self.period_id) for s in self.stats) else None
-
     def _list(self, rows: list[PubStat]) -> None:
         rows = sorted(rows, key=lambda s: (-(s.year or 0), (s.title or "").lower()))
         period = next((p for p in self.periods if p.id == self.period_id), None)
-        if (tid := self.list_tag()) is not None:
-
-            def order(s: PubStat) -> tuple[bool, int]:
-                n = s.number_of(tid, self.period_id)
-                return n is None, n or 0
-
-            shown = {s.id for s in rows}
-            rest = [s for s in self.stats if s.id not in shown and tid in s.tags_in(self.period_id)]
-            with ui.column().classes("w-full gap-0"):
-                ui.label(_("In the order of the list")).classes("text-sm text-grey mt-4")
-                for s in sorted(rows, key=order):
-                    self._row(s, period)
-                if rest:
-                    with ui.row().classes("items-center gap-2 mt-2"):
-                        ui.icon("visibility_off", color="orange-8")
-                        ui.label(_("Not shown: {why}").format(why=self.not_shown(rest))).classes(
-                            "text-sm text-orange-9"
-                        ).mark("list-not-shown")
-                        if any(not self.in_years(s) for s in rest):
-                            ui.button(_("Show all years"), on_click=self._all_years).props(
-                                "flat dense"
-                            ).mark("list-all-years")
-            return
         with ui.column().classes("w-full gap-0"):
             for year, group in groupby(rows, key=lambda s: s.year):
                 group = list(group)
@@ -1424,14 +1340,11 @@ class PublicationsPanel:
                     ui.label(str(year or _("Unknown year"))).classes("font-bold")
                     ui.label(f"{len(group)}").classes("text-grey text-sm")
                 for s in group:
-                    self._row(s, period)
+                    self.row(s, period)
 
-    def _all_years(self) -> None:
-        self.lo = self.hi = None
-        self.sels = []
-        self.render()
-
-    def _row(self, s: PubStat, period) -> None:
+    def row(self, s: PubStat, period, star_id: int | None = None, prefix: str = "") -> None:
+        """A paper's row (a click: its details); ``star_id``: the star list of its ★ toggle
+        (else the folder's first); ``prefix``: before its markers (shown elsewhere too)."""
         row = ui.row().classes(
             "vr-row w-full items-start no-wrap gap-2 py-1 border-b cursor-pointer"
         )
@@ -1444,7 +1357,7 @@ class PublicationsPanel:
                 "'a, button, .q-btn, .vr-src, .vr-venue-link, .vr-problems, .vr-num-edit'))"
                 " emit(); }"
             ),
-        ).mark(f"pub-{s.id}")
+        ).mark(f"{prefix}pub-{s.id}")
         with row:
             with ui.element("div").classes("w-28 shrink-0"):
                 rank_chip(s.badge, s.track, s.kind)
@@ -1455,17 +1368,18 @@ class PublicationsPanel:
                 if self.outside(s):
                     ui.icon("cloud_off", size="xs", color="orange-8").tooltip(
                         _("Not in {source}").format(source=ADAPTERS[self.primary].label)
-                    ).mark(f"outside-{s.id}")
+                    ).mark(f"{prefix}outside-{s.id}")
                 if problems := s.problems:
                     # Clicking it opens the details on the tab where they are settled.
                     with (
                         ui.icon("warning", size="xs", color="orange-8")
                         .classes("vr-problems cursor-pointer")
                         .on("click", lambda pub=s: open_details(self, pub, pub.problem_tab))
-                        .mark(f"problems-{s.id}")
+                        .mark(f"{prefix}problems-{s.id}")
                     ):
                         ui.tooltip("\n".join(problems)).style("white-space:pre-line")
-            if period and (star_id := self.starred_id) is not None:
+            star_id = star_id or self.starred_id
+            if period and star_id is not None:
                 starred = star_id in s.period_tags.get(period.id, set())
 
                 def star(pub=s, p=period, star_id=star_id) -> None:
@@ -1478,14 +1392,14 @@ class PublicationsPanel:
 
                 ui.button(icon="star" if starred else "star_border", on_click=star).props(
                     f"flat round dense size=sm color={'amber-8' if starred else 'grey'}"
-                ).mark(f"star-{s.id}")
+                ).mark(f"{prefix}star-{s.id}")
             with ui.column().classes("gap-0 grow min-w-0"):
                 # 1. title (the title opens the details: row click)
                 with ui.row().classes("items-center gap-1 no-wrap"):
                     title = escape(s.title or _("(untitled)"))
                     year = f' <span class="text-grey">({s.year})</span>' if s.year else ""
                     span(f'<span class="font-medium">{title}</span>{year}')
-                    pdf_button(self, s)
+                    pdf_button(self, s, prefix)
                     if s.missing:
                         ui.badge(_("missing from sources"), color="grey")
                     if s.archival_only:
@@ -1500,20 +1414,24 @@ class PublicationsPanel:
                             ui.icon("sticky_note_2", size="xs", color="amber-9")
                             .classes("vr-src cursor-pointer")
                             .on("click", lambda pub=s: open_details(self, pub, "notes"))
-                            .mark(f"has-note-{s.id}"),
+                            .mark(f"{prefix}has-note-{s.id}"),
                             ui.tooltip().props("max-width=480px"),
                         ):
                             ui.markdown("\n\n".join(notes), extras=NOTE_EXTRAS)
                 # 2. venue: the source's text → the venue it is matched to
                 orig, mapped = self._venue_html(s)
                 if orig or mapped:
-                    with ui.row().classes("items-center gap-1 text-sm").mark(f"pub-venue-{s.id}"):
+                    with (
+                        ui.row()
+                        .classes("items-center gap-1 text-sm")
+                        .mark(f"{prefix}pub-venue-{s.id}")
+                    ):
                         if orig:
                             span(orig)
                         if mapped and s.venue_id:
                             span(mapped).classes("vr-venue-link cursor-pointer").on(
                                 "click", lambda vid=s.venue_id: self.open_venue(vid)
-                            ).mark(f"pub-venue-link-{s.id}")
+                            ).mark(f"{prefix}pub-venue-link-{s.id}")
                         elif mapped:
                             span(mapped)
                 # 3. authors
@@ -1526,21 +1444,21 @@ class PublicationsPanel:
                     span(f'<span class="text-sm">{", ".join(names)}</span>')
                 # 4. quick links and badges
                 with ui.row().classes("items-center gap-1"):
-                    source_links(s)
+                    source_links(s, prefix)
                     if s.track:
-                        track_chip(s.track, f"pub-track-{s.id}")
+                        track_chip(s.track, f"{prefix}pub-track-{s.id}")
                     pid = period.id if period else None
                     mine = s.tags_in(pid)
                     for tag in self.usable_tags():
                         number = s.number_of(tag.id, pid)
-                        if tag.id in mine and (tag.id != self.starred_id or number is not None):
+                        if tag.id in mine and (tag.id != star_id or number is not None):
                             tag_chip(
                                 tag,
                                 number,
                                 (lambda n, s=s, tag=tag: self.set_number(s, tag, n))
                                 if tag.per_period
                                 else None,
-                                mark=f"pub-tag-number-{s.id}-{tag.id}",
+                                mark=f"{prefix}pub-tag-number-{s.id}-{tag.id}",
                             )
 
     @property
@@ -1557,9 +1475,9 @@ class PublicationsPanel:
         save_number(s, tag, self.period_id, number)
         self.papers_changed()
 
-    def order_tag(self) -> None:
-        """The dialog ordering the papers of the tag filtered on."""
-        tag = next((t for t in self.tags if self.list_filter == [t.id]), None)
+    def order_tag(self, tag_id: int) -> None:
+        """The dialog ordering the papers of a star list (within the period)."""
+        tag = next((t for t in annotations.star_lists(self.period_id) if t.id == tag_id), None)
         if tag is not None:
             with self.dialogs:
                 tag_order_dialog(tag, self.stats, self.period, self.papers_changed)
@@ -1605,6 +1523,66 @@ class PublicationsPanel:
         if orig and venue and orig != venue:
             return f'<i class="text-grey">{escape(orig)}</i> →', mapped
         return ("" if venue else (f"<i>{escape(orig)}</i>" if orig else "")), mapped
+
+
+class StarredView:
+    """The star lists of the period's folder (the publications panel's period), in order:
+    each with its papers in the list's order, their rows as in the panel's list."""
+
+    def __init__(self, panel: PublicationsPanel) -> None:
+        self.panel = panel
+        self.container = ui.column().classes("w-full gap-2").mark("starred")
+        self.render()
+        panel.on_render.append(self.refresh)  # (the period changed, a star toggled…)
+
+    def refresh(self) -> None:
+        if self.container.is_deleted:
+            self.panel.on_render.remove(self.refresh)
+        else:
+            self.render()
+
+    def render(self) -> None:
+        panel = self.panel
+        period = panel.period
+        self.container.clear()
+        with self.container:
+            if not panel.loaded:
+                ui.spinner(size="lg")
+                return
+            if period is None:
+                ui.label(
+                    _("Choose a period (Publications tab): the star lists are its folder's.")
+                ).classes("text-grey").mark("starred-none")
+                return
+            lists = [t for t in annotations.star_lists(period.id) if t.id in panel.star_lists()]
+            if not lists:
+                ui.label(
+                    _("No star list in the folder of {period}.").format(period=period.name)
+                ).classes("text-grey").mark("starred-none")
+                return
+            for tag in lists:
+                rows = tag_order(panel.stats, tag.id, period.id)
+                with ui.row().classes(
+                    "w-full items-center bg-grey-2 dark:bg-grey-9 px-3 py-2 mt-4 mb-2 rounded"
+                ):
+                    ui.label(f"★ {tag.name}").classes("font-bold")
+                    ui.label(f"{len(rows)}").classes("text-grey text-sm").mark(
+                        f"starred-count-{tag.id}"
+                    )
+                    if rows:
+                        ui.button(
+                            icon="format_list_numbered",
+                            on_click=lambda tid=tag.id: panel.order_tag(tid),
+                        ).props("flat round dense").tooltip(
+                            _("Order the papers of this star list (their numbers)")
+                        ).mark(f"starred-order-{tag.id}")
+                with ui.column().classes("w-full gap-0").mark(f"starred-list-{tag.id}"):
+                    if not rows:
+                        ui.label(_("No paper in this list yet (★ on a paper).")).classes(
+                            "text-sm text-grey"
+                        )
+                    for s in rows:
+                        panel.row(s, period, tag.id, f"starred-{tag.id}-")
 
 
 def _kind(s: PubStat) -> str | None:
