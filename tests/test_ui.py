@@ -961,6 +961,70 @@ async def test_folder_settings_in_the_parameters(user: User) -> None:
     assert [x.id for x in folders.named_settings()] == [copy]
 
 
+async def test_settings_dialog_in_sections(user: User) -> None:
+    """The editor of some settings: in sections (each titled, with what it is for), the
+    first one given; everything saved at once, whichever section it is in; the same in a
+    folder's dialog."""
+    from sci_report_analyzer import categories, folders, reports
+
+    fid = folders.save_folder(None, "Hiring")
+    categories.add(fid, "Research")
+    sid = folders.default_settings()
+    ref = folders.SettingsRef(sid)
+    await user.open("/settings?tab=folders")
+    user.find(marker=f"settings-edit-{sid}").click()
+    for key in ("report", "excerpts", "citations", "models"):
+        await user.should_see(marker=f"settings-section-{key}")
+    await user.should_see(marker="settings-panel-report")
+    await user.should_see("What a report holds")  # (what the section is for)
+    await user.should_see(marker="settings-categories-summary", content="1 category: Research")
+    user.find(marker="settings-section-excerpts").click()
+    user.find(marker="folder-influence-mode").elements.pop().value = "mark"
+    user.find(marker="folder-language").elements.pop().value = "fr"
+    user.find(marker="folder-primary").elements.pop().value = "hal"
+    user.find(marker="settings-save").click()
+    await user.should_not_see(marker="settings-save")
+    assert reports.influence_mode(ref) == "mark" and reports.language(ref) == "fr"
+    assert folders.primary_source(ref) == "hal"
+    # In a folder's dialog (its Settings tab).
+    await user.open(f"/?folder={fid}")
+    user.find(marker="folder-edit").click()
+    await user.should_see(marker="folder-tab-notes")
+    user.find(marker="folder-tab-notes").click()
+    await user.should_see(marker="settings-section-citations")
+    await user.should_see(marker="settings-edit-categories")
+
+
+async def test_settings_search(user: User) -> None:
+    """The settings searched (headers, labels, help texts): only the screens with a match
+    (counted), in them the sections with one; cleared: all back."""
+    await user.open("/settings?tab=sources")
+    [tags_header] = [
+        e for e in user.find(kind=ui.label, content="Tags").elements if e.text == "Tags"
+    ]
+    user.find(marker="settings-search").type("groups of co-authors")  # (a help text)
+    await user.should_see(marker="settings-tags")
+    await user.should_see(marker="settings-search-count-tags", content="1")
+    await user.should_not_see(marker="settings-matching")
+    await user.should_not_see(marker="settings-sources")
+    await user.should_see(marker="settings-search-found", content="Found in 1 screen")
+    await user.should_see("Co-author categories")  # (its section, now shown)
+    assert not tags_header.visible  # (another section of the screen)
+    # A tab's name: all of it.
+    user.find(marker="settings-search").clear().type("tags & cat")
+    await user.should_see(marker="settings-tags")
+    assert tags_header.visible
+    user.find(marker="settings-search").clear().type("no such setting, surely")
+    await user.should_see(marker="settings-search-found", content="No setting matches")
+    await user.should_not_see(marker="settings-tags")
+    # Cleared: everything back.
+    user.find(marker="settings-search").clear()
+    await user.should_see(marker="settings-matching")
+    await user.should_see(marker="settings-tags")
+    await user.should_not_see(marker="settings-search-count-tags")
+    assert tags_header.visible
+
+
 async def test_folder_notes_without_a_document(user: User) -> None:
     from sci_report_analyzer import categories, folders
 

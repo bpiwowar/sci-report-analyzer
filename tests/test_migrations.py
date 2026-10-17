@@ -258,3 +258,42 @@ def test_named_settings_without_any_e2a6c8f4b1d9(tmp_path):
     _upgrade(db, "e2a6c8f4b1d9")
     with sqlite3.connect(db) as c:
         assert list(c.execute("SELECT name, is_default FROM folder_settings")) == [("Default", 1)]
+
+
+def test_settings_report_templates_a7d3f9c2e5b8(tmp_path):
+    """The general report templates copied into every settings set, then dropped; back,
+    those of the default settings are the general ones."""
+    db = tmp_path / "db.sqlite"
+    _upgrade(db, "e2a6c8f4b1d9")
+    items = [{"name": "Prize", "text": "## Why\n\n[[excerpts]]\n"}]
+    with sqlite3.connect(db) as c:
+        c.execute("INSERT INTO folder_settings (id, name, is_default) VALUES (5, 'Prizes', 0)")
+        c.execute(
+            "INSERT INTO app_setting (key, value) VALUES ('report_skeletons', ?)",
+            (json.dumps({"items": items}),),
+        )
+    _upgrade(db, "a7d3f9c2e5b8")
+    with sqlite3.connect(db) as c:
+        saved = [
+            json.loads(t) for (t,) in c.execute("SELECT report_templates FROM folder_settings")
+        ]
+        keys = [k for (k,) in c.execute("SELECT key FROM app_setting")]
+        c.execute(
+            "UPDATE folder_settings SET report_templates = ? WHERE is_default",
+            (json.dumps([{"name": "Hiring", "text": "## Summary\n"}]),),
+        )
+    assert saved == [items, items] and "report_skeletons" not in keys
+    _downgrade(db, "e2a6c8f4b1d9")
+    with sqlite3.connect(db) as c:
+        [(value,)] = c.execute("SELECT value FROM app_setting WHERE key = 'report_skeletons'")
+        columns = {r[1] for r in c.execute("PRAGMA table_info(folder_settings)")}
+    assert json.loads(value) == {"items": [{"name": "Hiring", "text": "## Summary\n"}]}
+    assert "report_templates" not in columns
+
+
+def test_settings_report_templates_never_saved_a7d3f9c2e5b8(tmp_path):
+    """Never saved: none (the default ones) in each settings set."""
+    db = tmp_path / "db.sqlite"
+    _upgrade(db, "a7d3f9c2e5b8")
+    with sqlite3.connect(db) as c:
+        assert list(c.execute("SELECT report_templates FROM folder_settings")) == [(None,)]

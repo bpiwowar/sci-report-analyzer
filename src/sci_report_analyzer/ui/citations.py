@@ -11,7 +11,6 @@ from .. import annotations, reports
 from ..i18n import N_, _
 from . import unsaved
 from .mdedit import MarkdownEditor
-from .report_templates import pick_menu
 
 TEMPLATES_HELP = N_(
     "How a paper is cited: `[@key]` followed by the template. `{.notes}`, `{.tags}`, "
@@ -115,7 +114,7 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
     """A folder's settings of its notes (in its dialog): its star lists (their papers
     numbered there, as each says; to cite or not), how the other papers cited are numbered,
     the template of ``[@key]``, with examples; its own templates (over the general ones, by
-    name), the notes it starts with. Returns its save (False: refused, said)."""
+    name). Returns its save (False: refused, said)."""
     from .. import folders
 
     settings = folders.settings_of(folder_id)
@@ -341,32 +340,6 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
         ).classes("text-sm text-grey")
         with ui.column().classes("gap-1"):
             refresh = template_rows(own, mark="folder-template", labels=False)
-        skeleton = (
-            ui.textarea(
-                _("Starting notes"),
-                value=reports.skeleton(folder_id),
-                placeholder=f"## {_('Publications')}\n[[publications]]\n\n"
-                f"## {_('Activities')}\n[[excerpts]]",
-            )
-            .props("dense outlined autogrow")
-            .classes("w-full font-mono text-sm mt-2")
-            .tooltip(
-                _(
-                    "The text a person's notes start with, while empty (e.g. headings and the "
-                    "blocks [[publications]]: the summary of their publications, "
-                    "[[excerpts]]: their excerpts by category, [[cv]]: their career)"
-                )
-            )
-            .mark("folder-skeleton")
-        )
-        with (
-            ui.button(_("From a template"), icon="article")
-            .props("flat dense no-caps icon-right=arrow_drop_down")
-            .tooltip(_("The starting notes copied from a report template (Settings)"))
-            .mark("folder-skeleton-template"),
-            ui.menu(),
-        ):
-            pick_menu(lambda text: skeleton.set_value(text), "folder-skeleton-template")
 
         def add() -> None:
             own.append(reports.Template("", "{.number (.short-venue .year)}", ""))
@@ -415,7 +388,6 @@ def folder_citations_section(folder_id: int) -> Callable[[], bool | None]:
                 annotations.delete_tag(list_id)
             annotations.order_lists(ids)
             reports.save_numbering(folder_id, reports.Numbering(fmt.value or "", cite.value or ""))
-            reports.save_skeleton(folder_id, skeleton.value or "")
             return None
 
         ui.button(_("Add a template"), icon="add", on_click=add).props("flat").mark(

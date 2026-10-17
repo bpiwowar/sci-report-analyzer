@@ -42,6 +42,7 @@ from ..sources import ADAPTERS
 from . import scimago_years, shared_settings, unsaved
 from .colours import ColourInput
 from .dialogs import actions, confirm, transient_dialog
+from .settings_search import Search
 from .theme import fmt_dt, frame, level_hint, level_options, track_chip
 
 # The settings, in groups: (group, [(tab, label)]).
@@ -66,7 +67,6 @@ NAV = (
         (
             ("folders", N_("Folder settings")),
             ("contribution", N_("Contribution roles")),
-            ("skeletons", N_("Report templates")),
             ("reports", N_("Citation templates")),
             ("copy", N_("Copy filters")),
         ),
@@ -81,6 +81,8 @@ NAV = (
         ),
     ),
 )
+# The tabs that were elsewhere (their links kept): where they are now.
+MOVED = {"skeletons": "folders"}  # (the report templates: with each folder settings)
 PANELS = {
     "sources": lambda: _publication_sources(),
     "keys": lambda: keys_tab(),
@@ -92,7 +94,6 @@ PANELS = {
     "tags": lambda: tags_tab(),
     "folders": lambda: folder_settings_tab(),
     "contribution": lambda: contribution_tab(),
-    "skeletons": lambda: skeletons_tab(),
     "reports": lambda: report_templates_tab(),
     "copy": lambda: copy_filters_tab(),
     "llm": lambda: llm_tab(),
@@ -119,35 +120,48 @@ ui.add_css(
 def register() -> None:
     @ui.page("/settings")
     def settings_page(tab: str = "sources") -> None:
+        tab = MOVED.get(tab, tab)
         if tab not in PANELS:
             tab = "sources"
         with frame(_("Settings")):
             ui.label(_("Settings")).classes("text-2xl")
             edits = unsaved.Edits()
             labels = {name: label for _g, entries in NAV for name, label in entries}
+            groups: list[tuple[ui.label, list[str]]] = []
+            panels: dict[str, ui.tab_panel] = {}
             with ui.row().classes("w-full no-wrap items-start gap-4"):
-                with ui.column().classes("shrink-0 w-56 gap-0"):
+                with ui.column().classes("shrink-0 w-56 gap-1"):
+                    search_slot = ui.column().classes("w-full gap-0")
                     with (
                         ui.tabs(value=tab)
                         .props("vertical dense")
                         .classes("vr-settings-nav w-full") as tabs
                     ):
                         for group, entries in NAV:
-                            ui.label(_(group)).classes(
-                                "text-xs text-grey-7 uppercase font-bold mt-3 mb-1 px-2"
+                            title = ui.label(_(group)).classes(
+                                "vr-settings-group text-xs uppercase font-bold mt-3 mb-1 px-2"
                             )
+                            groups.append((title, [name for name, _label in entries]))
                             for name, label in entries:
                                 edits.tabs[name] = (
                                     ui.tab(name, _(label)).classes("pl-2").mark(f"settings-{name}")
                                 )
                     # The screens with unsaved changes, and their Save / Cancel.
                     edits_panel = ui.element("div").classes("w-full")
-                with ui.tab_panels(tabs, value=tab).props("vertical").classes("grow min-w-0"):
+                with (
+                    ui.tab_panels(tabs, value=tab)
+                    .props("vertical")
+                    .classes("vr-settings-panels grow min-w-0")
+                ):
                     for name, panel in PANELS.items():
-                        with ui.tab_panel(name):
+                        with ui.tab_panel(name) as panels[name]:
                             edits.screen(name, labels[name], panel)
                 with edits_panel:
                     edits.panel()
+            with search_slot:
+                Search(
+                    tabs, panels, edits.tabs, {n: _(lb) for n, lb in labels.items()}, groups
+                ).box()
 
 
 def contribution_tab() -> None:
@@ -319,16 +333,6 @@ def folder_settings_tab() -> None:
     from .folder_settings import settings_tab
 
     settings_tab()
-
-
-# ---- report templates ----------------------------------------------------------------------
-
-
-def skeletons_tab() -> None:
-    """The texts a report starts from (a folder's starting notes, a report)."""
-    from .report_templates import settings_section
-
-    settings_section()
 
 
 # ---- citation templates --------------------------------------------------------------------

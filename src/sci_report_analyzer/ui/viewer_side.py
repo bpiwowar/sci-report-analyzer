@@ -589,6 +589,7 @@ class Side:
     def template_tools(self) -> None:
         """In the toolbar of the folder's notes: start them from a report template (asked
         first when they are written), or save their headings and blocks as one."""
+        from .. import report_templates
         from .report_templates import pick_menu, save_dialog
 
         def start(text: str) -> None:
@@ -612,10 +613,11 @@ class Side:
             ui.menu(),
         ):
             ui.label(_("Start from")).classes("text-xs text-grey uppercase px-4 pt-2")
-            pick_menu(start, "folder-note-template")
+            pick_menu(start, "folder-note-template", report_templates.load(self.folder[0]))
             ui.separator()
             ui.menu_item(
-                _("Save as a template…"), on_click=lambda: save_dialog(self.folder_editor.value)
+                _("Save as a template…"),
+                on_click=lambda: save_dialog(self.folder_editor.value, self.folder[0]),
             ).mark("folder-note-save-template")
 
     def note_context(self) -> reports.Context:
