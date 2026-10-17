@@ -439,11 +439,19 @@ categories (added if missing).
 The 📝 button of a person's line (also next to the folder's name on their page) opens their
 **notes in the folder** (their Report tab; their excerpts by category: the Excerpts tab), as
 next to their PDFs: to write them without opening any document (e.g. when they have none).
-An excerpt's dialog names its category under its title. Their **Timeline** tab places
-their excerpts in the folder by year, the most recent first: each at its first year (a
-paper's excerpt without years: at the paper's year), those without years listed apart;
-clicked, an excerpt is shown in the Excerpts tab (where its years are edited), its PDF icon
-opening its PDF beside the page.
+An excerpt's dialog names its category under its title. Their **Timeline** tab draws
+what is dated about them along a vertical axis of years, the most recent at the top (every
+year a tick, so that the gaps show; their period in the folder shaded), an arrow from the
+axis to each item. On the left, their **career** (Profile tab): a line of their CV as a bar
+along its years (a current position: up to now), overlapping lines side by side; on the
+right, their **excerpts** in the folder (in their category's colour), the **theses they
+supervised** (theses.fr: at the defence, those in progress at their start) and their
+**papers** (a small mark each, their titles hovered). Each kind is shown or hidden with its
+switch; one they have none of is said so. An excerpt is at its first year (a paper's
+excerpt without years: at the paper's year); clicked, it is shown in the Excerpts tab (where
+its years are edited), its PDF icon opening its PDF beside the page; a line of the career
+clicked shows the Profile tab, a thesis the Theses tab. The excerpts without years, and the
+lines of the career without dates, are listed apart, below.
 
 Folders can be **within other folders**: the Reports page shows them as a **tree**, each
 folder expanded showing the folders within it then its people, one line each (their period,
