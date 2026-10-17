@@ -236,10 +236,13 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
     return tabs
 
 
-# The tabs of a person's header: only their icons when narrow (e.g. the PDFs beside the page);
-# on a line of their own when narrower still. Only icons: smaller, closer together.
+# The tabs of a person's header: the label of the selected one only; only their icons when
+# narrow (e.g. the PDFs beside the page), smaller and closer together; on a line of their own
+# when narrower still.
 ui.add_css(
     ".vr-tabs{container-type:inline-size;min-width:15rem}"
+    ".vr-tabs .q-tab:not(.q-tab--active) .q-tab__label{display:none}"
+    ".vr-tabs .q-tab:not(.q-tab--active) .q-tab__icon{margin-right:0 !important}"
     "@container (max-width:620px){.vr-tabs .q-tab__label{display:none}"
     ".vr-tabs .q-tab__icon{margin-right:0 !important;font-size:18px;width:18px;height:18px}"
     ".vr-tabs .q-tab{padding:0 6px;min-width:0;min-height:32px}}",
