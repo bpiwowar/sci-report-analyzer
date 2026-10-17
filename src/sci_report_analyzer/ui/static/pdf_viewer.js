@@ -553,10 +553,25 @@ window.vrPane = {
   // An event of the side panel (a shortcut, a link clicked): to the pane while it has the
   // panel (``both``: here too).
   emit(name, args, both) {
+    if (this.toDock(name, args)) return;
     if (this.away) this.post({kind: 'emit', name, args});
     if (!this.away || both) emitEvent(name, args);
   },
+  // Embedded beside a person's page (see vrDock there), its side column hidden: the quotes
+  // and excerpts go to that page's notes and excerpts.
+  toDock(name, args) {
+    const dock = this.dock(), side = document.getElementById('vr-pdf-side');
+    if (!dock || (side && side.offsetParent) || !dock.takes.includes(name)) return false;
+    dock.emit(name, args);
+    return true;
+  },
+  dock() {
+    if (!vrConfig.embedded) return null;
+    try { return window.parent !== window ? window.parent.vrDock : null; } catch (e) { return null; }
+  },
 };
+// (embedded: a link to another PDF opens it beside the person's page too)
+document.addEventListener('click', (ev) => vrPane.dock()?.click(ev), true);
 // The papers found in a document (links), and the excerpts filed in categories: drawn on
 // the pages; the one selected (clicked, here or in the side panel) stands out.
 window.vrDoc = {

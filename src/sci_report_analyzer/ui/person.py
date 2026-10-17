@@ -43,12 +43,14 @@ from ..sync import (
     sync_link,
 )
 from .dialogs import actions, close_then, ok_handler, transient_dialog
-from .documents_page import LINES_JS, open_document, page_url_of, report_view
+from .documents_page import LINES_JS, ReportTabs, page_url_of
 from .folder_notes import NOTES_TIP
 from .panel import PublicationsPanel, period_label
+from .pdf_dock import PdfDock
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
 PROFILE_TABS = ("career", "periods", "sources")  # (the Profile tab's, in order)
+REPORT_TABS = ("report", "excerpts")  # (filled once shown, see ReportTabs)
 
 
 def register() -> None:
@@ -96,38 +98,24 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
         tabs = _header(person, tab, folder)
         stale_banner(person_id)
 
-        def report() -> None:  # (built once shown: its notes, excerpts and documents)
-            # (that of the folder seen from, else of the period)
-            shown = next(
-                (
-                    p.id
-                    for p in annotations.periods(person_id, include_hidden_folders=True)
-                    if folder and p.folder_id == folder[0]
-                ),
-                state_period,
-            )
-            if (doc := open_document(shown)) is not None:  # (left open: back to it)
-                url = json.dumps(f"{page_url_of(doc)}?report=1")
-                ui.run_javascript(f"location.replace({url})")
-                return
-            if not report_box.default_slot.children:
-                with report_box:
-                    report_view(person_id, shown)
+        def address() -> None:  # (the tab, the PDFs beside the page)
+            shown = profile_tabs.value if tabs.value == "profile" else tabs.value
+            panel.url_extra = {
+                **({} if shown == "publications" else {"tab": shown}),
+                **dock.params(),
+            }
+            panel.push_url()
 
         def tab_changed(e) -> None:
-            shown = profile_tabs.value if e.value == "profile" else e.value
-            panel.url_extra = {} if e.value == "publications" else {"tab": shown}
-            panel.push_url()
-            if e.value == "report":
-                report()
-                ui.run_javascript("window.vrFitNotes?.()")  # (resized meanwhile)
+            address()
+            if e.value in REPORT_TABS:
+                report.fill(e.value)
+                ui.run_javascript("window.vrFit?.()")  # (resized meanwhile)
 
         tabs.on_value_change(tab_changed)
         with ui.tab_panels(tabs, value=tab).classes("w-full"):
             with ui.tab_panel("publications"):
                 panel = PublicationsPanel(person_id, period, dict(request.query_params))
-                if tab != "publications":
-                    panel.url_extra = {"tab": profile_tab if tab == "profile" else tab}
                 panel.build()
             with ui.tab_panel("profile"):
                 _person_actions(person)
@@ -140,11 +128,7 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
                     ui.tab("periods", _("Periods"), icon="date_range").mark("tab-periods")
                     ui.tab("sources", _("Sources"), icon="travel_explore").mark("tab-sources")
 
-                def profile_tab_changed(e) -> None:
-                    panel.url_extra = {"tab": e.value}
-                    panel.push_url()
-
-                profile_tabs.on_value_change(profile_tab_changed)
+                profile_tabs.on_value_change(address)
                 with ui.tab_panels(profile_tabs, value=profile_tab).classes("w-full"):
                     with ui.tab_panel("career").classes("px-0"):
                         career_view(person_id)
@@ -156,10 +140,27 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
                         sources_view(person_id, on_change=panel.reload)
             with ui.tab_panel("theses"):
                 ThesesView(person_id, panel)
-            with ui.tab_panel("report").classes("px-0 py-1"):
-                report_box = ui.column().classes("w-full")
-        if tab == "report":
-            report()
+            boxes = {}
+            for which in REPORT_TABS:
+                with ui.tab_panel(which).classes("px-0 py-1"):
+                    boxes[which] = ui.column().classes("w-full").mark(f"{which}-tab")
+        dock = PdfDock(person_id, lambda: panel.period_id, dict(request.query_params), address)
+        # (the folder's seen from, else the period's)
+        shown = next(
+            (
+                p.id
+                for p in annotations.periods(person_id, include_hidden_folders=True)
+                if folder and p.folder_id == folder[0]
+            ),
+            state_period,
+        )
+        report = ReportTabs(person_id, shown, dock, boxes, tabs.set_value)
+        panel.url_extra = {
+            **({} if tab == "publications" else {"tab": profile_tab if tab == "profile" else tab}),
+            **dock.params(),
+        }
+        if tab in REPORT_TABS:
+            report.fill(tab)
 
 
 def page_header(person_id: int, period_id: int | None, tab: str) -> None:
@@ -212,6 +213,7 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
             ui.tab("profile", _("Profile"), icon="manage_accounts").mark("tab-profile")
             ui.tab("theses", _("Theses"), icon="school")
             ui.tab("report", _("Report"), icon="description").mark("tab-report")
+            ui.tab("excerpts", _("Excerpts"), icon="format_quote").mark("tab-excerpts")
     return tabs
 
 

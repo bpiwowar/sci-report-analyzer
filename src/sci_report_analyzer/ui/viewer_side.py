@@ -7,8 +7,9 @@ import inspect
 import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING
+from weakref import WeakSet
 
-from nicegui import ui
+from nicegui import app, ui
 
 from .. import (
     annotations,
@@ -31,7 +32,7 @@ from .dialogs import actions, close, confirm, ok_handler, transient_dialog
 from .dnd import draggable, drop_zone
 from .mdedit import MarkdownEditor, inline_quote, quote, tool_group
 from .panel import PublicationsPanel
-from .pdf_viewer import changed, page_url, watch
+from .pdf_viewer import changed, gone, page_url, watch
 from .pub_details import show_details
 from .reflist import tag_from_list
 from .theme import NOTE_EXTRAS, chip_html, fmt_dt, int_or_none, span
@@ -79,6 +80,14 @@ class _Host(PublicationsPanel):
         await PublicationsPanel.reload(self)
 
 
+def _sides() -> dict[int, WeakSet[Side]]:
+    """Period id -> the open sides showing its excerpts (in any window: one changed in one,
+    the others show it). Kept on the app (one registry)."""
+    if not hasattr(app.state, "excerpt_sides"):
+        app.state.excerpt_sides = {}
+    return app.state.excerpt_sides
+
+
 class Side:
     """The column next to a PDF: tabs (filled by the page: papers, categories, bookmarks,
     notes…), or the details of a paper (with the way back)."""
@@ -120,6 +129,15 @@ class Side:
         self.detached = False
         self.on_attach: list[Callable[[], object]] = []
         self.folder_refresh: Callable[[], None] | None = None  # (their preview and status)
+        # Within a person's page, beside it (see pdf_dock), its side column hidden: its quotes
+        # and excerpts go to that page's.
+        self.embedded = False
+        # A person's page, the PDFs beside it (see dock): its source, the one shown; its quote
+        # buttons, shown with one.
+        self.docked = False
+        self.quote_buttons: list[ui.button] = []
+        if period_id is not None:
+            _sides().setdefault(period_id, WeakSet()).add(self)
 
     def attach(self, box: ui.column) -> None:
         self.box = box
@@ -160,6 +178,17 @@ class Side:
     def has_pdf(self) -> bool:
         return self.source[0] in ("doc", "pub")
 
+    def dock(self, source: tuple[str, int] | None) -> None:
+        """On a person's page: the PDF shown beside it (``None``: none), where its quotes and
+        excerpts are from."""
+        self.docked = True
+        self.source = source or ("notes", 0)
+        for b in self.quote_buttons:
+            if not b.is_deleted:
+                b.set_visibility(self.has_pdf)
+        if self.categories:  # (those of the PDF shown: gone to there)
+            self.categories()
+
     @property
     def stats(self) -> list[PubStat]:
         return self.host.stats
@@ -175,7 +204,7 @@ class Side:
         await self.load()
         if self.bookmarks:
             self.bookmarks()
-        self.refresh_excerpts()
+        self.refresh_excerpts(others=False)
         for f in self.on_attach:
             if inspect.isawaitable(done := f()):
                 await done
@@ -326,9 +355,14 @@ class Side:
                 ui.notify(_("Merged with the excerpt"))
         self.refresh_excerpts()
 
-    def refresh_excerpts(self) -> None:
+    def refresh_excerpts(self, *, others: bool = True) -> None:
         """The categories' tab, the preview of the folder's notes (its excerpts), and the
-        excerpts of this PDF tinted on its pages."""
+        excerpts of this PDF tinted on its pages; ``others``: those of the period's other
+        sides too (other windows, a PDF beside the person's page…)."""
+        if others and self.period_id is not None:
+            for side in list(_sides().get(self.period_id, ())):
+                if side is not self and hasattr(side, "box") and not gone(side.box):
+                    side.refresh_excerpts(others=False)
         if self.categories:
             self.categories()
         if self.folder_refresh is not None:
@@ -470,7 +504,7 @@ class Side:
         """The toolbar of the folder's notes: quote, cite a paper, copy with the references
         (numbered as the folder says), insert a block (the publications, the excerpts)."""
         with tool_group():
-            if self.has_pdf:
+            if self.has_pdf or self.docked:
                 self.quote_tool(lambda: self.folder_editor, first=True)
             self.cite_tools(lambda: self.folder_editor, "folder-note")
         with tool_group():
@@ -684,6 +718,7 @@ class Side:
 
         button = ui.button(icon="post_add").props("flat dense round size=sm")
         button.on("click", click, ["shiftKey"])
+        self.quote_buttons.append(button)
         button.tooltip(
             _(
                 "Quote the text selected in the PDF (or the highlight clicked), with its page "
@@ -705,6 +740,8 @@ class Side:
         quotation marks, with a link back to its page in an Obsidian comment."""
         if editor is None:  # (Q: the notes' tab shown)
             notes = [e for e in self.notes if not e.editor.is_deleted]
+            if not notes and self.folder_editor is not None:  # (none used yet)
+                notes = [self.folder_editor]
             if not notes:
                 return
             editor = notes[0]
@@ -1657,9 +1694,9 @@ class _ExcerptsSection:
                         js_handler=f"() => {{ vrPdf.go({x.page}, {y}); vrDoc.select({x.id}); "
                         "emit(); }",
                     )
-                else:
+                else:  # (beside a person's page: there; else in a new window)
                     url = excerpt_url(x)
-                    label.on("click", js_handler=f"() => window.open({json.dumps(url)})")
+                    label.on("click", js_handler=f"() => vrLink.open({json.dumps(url)})")
                 where = (
                     _("p. {page}").format(page=x.page)
                     if here
@@ -1927,9 +1964,8 @@ class _ExcerptsSection:
                     ).tooltip(
                         _("Add it to the text") if e.members else _("Back to it (as selected)")
                     ).mark(f"excerpt-original-use-{x.id}")
-                    ui.button(
-                        icon="open_in_new",
-                        on_click=lambda x=x: ui.navigate.to(excerpt_url(x), new_tab=True),
+                    ui.button(icon="open_in_new").on(
+                        "click", js_handler=f"() => vrLink.open({json.dumps(excerpt_url(x))})"
                     ).props("flat dense round size=xs color=grey-7").tooltip(
                         _("Open its document (at its page)")
                     ).mark(f"excerpt-original-open-{x.id}")
@@ -1940,6 +1976,7 @@ class _ExcerptsSection:
         side = self.side
         title = _("Commentary on the merged excerpts") if e.members else _("Commentary")
         with side.host.dialogs, transient_dialog(title, width="w-[48rem] max-w-full") as (dlg, _c):
+            self.category_line(e)
             ui.label(e.quoted).classes("text-sm text-grey-8 italic line-clamp-3")
             editor = MarkdownEditor(
                 e.comment or "",
@@ -1965,6 +2002,16 @@ class _ExcerptsSection:
             actions(dlg, _("Save"), save, mark="excerpt-comment-save")
         editor.focus()
 
+    def category_line(self, e: categories.ExcerptView) -> None:
+        """Under the title of an excerpt's dialog: its category (its path, in its colour)."""
+        nodes = categories.tree(self.side.folder[0]) if self.side.folder else []
+        path = next((n.path for n in nodes if n.id == e.category_id), None)
+        if path is None:
+            return
+        with ui.row().classes("items-center gap-1 no-wrap -mt-3").mark("excerpt-category"):
+            ui.icon("circle", size="0.7rem").style(f"color: {e.colour}")
+            ui.label(path).classes("text-sm text-grey-8")
+
     def edit_excerpt(self, e: categories.ExcerptView) -> None:
         """Its text (that of a group), years, "influence" flag and tags; the passages as
         selected shown."""
@@ -1974,6 +2021,7 @@ class _ExcerptsSection:
                 _("Merged excerpts") if e.members else _("Excerpt"), width="w-[32rem]"
             ) as (dialog, _card),
         ):
+            self.category_line(e)
             text = (
                 ui.textarea(_("Text of the group") if e.members else _("Text"), value=e.quoted)
                 .props("outlined autogrow")

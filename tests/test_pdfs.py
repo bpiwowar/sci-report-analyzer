@@ -254,7 +254,7 @@ async def test_viewer_changes_reach_the_panel(user: User):
         await asyncio.sleep(0.05)
         with user.client:
             tips = [e.text for e in ElementFilter(kind=ui.tooltip)]
-        if "View the PDF (annotated)" in tips:
+        if pdf_viewer.EDITED_TIP in tips:
             break
     else:
         raise AssertionError("not shown as annotated")

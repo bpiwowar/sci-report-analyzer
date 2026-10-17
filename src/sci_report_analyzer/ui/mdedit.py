@@ -138,7 +138,8 @@ window.vrCite = {
   },
 };
 // The link at a place of a line ([text](url), <url> or a bare URL), and following one: to
-// the PDF shown (e.g. a quote's, /doc/2?page=15), its page there; else in a new tab.
+// the PDF shown (e.g. a quote's, /doc/2?page=15), its page there; to another PDF, beside a
+// person's page (see vrDock: also from a PDF embedded there); else in a new tab.
 window.vrLink = {
   KINDS: [/\[[^\[\]]*\]\(\s*<?([^()\s<>]+)>?(?:\s+"[^"]*")?\s*\)/g,
           /<(https?:\/\/[^\s<>]+)>/g, /https?:\/\/[^\s<>()\[\]]*[^\s<>()\[\].,;:!?'"]/g],
@@ -155,7 +156,11 @@ window.vrLink = {
     if (u.origin !== location.origin) { window.open(u.href, '_blank', 'noopener'); return; }
     const page = parseInt(u.searchParams.get('page'));
     if (u.pathname === location.pathname && page && window.vrPdf) vrPdf.go(page, null);
-    else window.open(u.href, '_blank');
+    else if (!this.dock()?.openUrl(u.href)) window.open(u.href, '_blank');
+  },
+  dock() {
+    try { return window.vrDock || (window.parent !== window ? window.parent.vrDock : null); }
+    catch (e) { return null; }
   },
 };
 // (a link in a rendered note, e.g. the preview: followed so, this page kept)
