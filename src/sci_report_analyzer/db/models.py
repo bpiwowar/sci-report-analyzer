@@ -343,9 +343,9 @@ class Folder(Base):
 
 
 class FolderSettings(Base):
-    """Named settings of folders: their categories (Category), star lists (Tag) and how the
-    notes cite papers. Each folder uses one (Folder.settings_id), else the default one
-    (exactly one is)."""
+    """Named settings of folders: their categories (Category), star lists (Tag), how the
+    notes cite papers and the report templates. Each folder uses one (Folder.settings_id),
+    else the default one (exactly one is)."""
 
     __tablename__ = "folder_settings"
     __table_args__ = (
@@ -368,6 +368,9 @@ class FolderSettings(Base):
     # The source a paper must be in to count ("none": no such source; None: the default
     # one, see source_settings).
     primary_source: Mapped[str | None] = mapped_column(String(32))
+    # The report templates (the texts a report starts from, see report_templates):
+    # [{"name", "text"}]; None: never saved (the default ones).
+    report_templates: Mapped[list[Any] | None] = mapped_column(JSON(none_as_null=True))
 
 
 class Category(Base):

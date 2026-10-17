@@ -332,7 +332,7 @@ def _named(s, name: str, settings_id: int | None = None) -> str:
 
 def create_settings(name: str, source_id: int | None = None) -> int:
     """New settings: empty, or a copy of others (``source_id``: their citations, primary
-    source, categories and star lists). Refused (``ValueError``): see _named."""
+    source, report templates, categories and star lists). Refused (``ValueError``): see _named."""
     from . import annotations, categories
 
     with session_scope() as s:
@@ -342,6 +342,7 @@ def create_settings(name: str, source_id: int | None = None) -> int:
         if (source := s.get(FolderSettings, source_id or 0)) is not None:
             new.citations = dict(source.citations or {}) or None
             new.primary_source = source.primary_source
+            new.report_templates = source.report_templates
             categories.copy_settings(s, source.id, new.id)
             annotations.copy_lists(s, source.id, new.id)
         return new.id

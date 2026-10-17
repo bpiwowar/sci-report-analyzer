@@ -1,15 +1,17 @@
 """The settings of folders (named; a folder uses those it chose, else the default ones): their
 list in the Parameters (created, copied, renamed, made the default, deleted), their editor
-(the reports' language, the excerpts' markers and levels, the primary source, the star lists
-and citations, the models; their categories), and the choice of a folder's."""
+in sections (their categories, starting notes, report templates and language; the excerpts'
+markers and levels; the primary source, the star lists and citations; the models), and the
+choice of a folder's."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 
 from nicegui import ui
 
-from .. import folders, i18n, llm, reports, source_settings
+from .. import categories, folders, i18n, llm, report_templates, reports, source_settings
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
 from .categories_editor import categories_dialog
@@ -72,7 +74,6 @@ def models_section(folder_id: int) -> Callable[[], tuple[str, str]]:
     their values."""
     st = llm.settings()
     model, embed = llm.folder_models(folder_id)
-    ui.label(_("Models")).classes("text-base mt-2")
     with ui.row().classes("w-full gap-2 no-wrap"):
         inputs = [
             ui.select(
@@ -197,11 +198,136 @@ def levels_section(folder_id: int) -> Callable[[], tuple[list[reports.Level], st
     return values
 
 
-def settings_fields(settings_id: int) -> Callable[[], bool | None]:
-    """The editors of some settings (changed for every folder using them): the language of
-    the reports, where the excerpts flagged "rayonnement" go, the markers and levels of the
-    excerpts, the primary source, the star lists and citations, the models. Returns their
-    save (False: refused, said)."""
+# The sections of the editor of some settings: (key, icon, title, what they are for).
+SECTIONS = (
+    (
+        "report",
+        "article",
+        N_("Categories & report"),
+        N_(
+            "What a report holds: the categories its excerpts are filed in, the notes it "
+            "starts with, the templates it can start from (their blocks name the categories), "
+            "and the language of what is generated."
+        ),
+    ),
+    (
+        "excerpts",
+        "format_quote",
+        N_("Excerpts"),
+        N_(
+            "How the excerpts are written in the reports: their markers and levels (as "
+            "#tags), and where those flagged “rayonnement” go."
+        ),
+    ),
+    (
+        "citations",
+        "format_list_numbered",
+        N_("Citations & sources"),
+        N_(
+            "Which papers count (the primary source), the star lists, and how the notes "
+            "number and cite the papers."
+        ),
+    ),
+    (
+        "models",
+        "smart_toy",
+        N_("Models (local AI)"),
+        N_(
+            "The local AI models used for these folders instead of the default ones (Settings "
+            "→ Local LLM); blank: the default."
+        ),
+    ),
+)
+
+
+def subtitle(text: str) -> ui.label:
+    """The title of a group of fields within a section."""
+    return ui.label(text).classes("text-sm font-medium text-primary mt-2")
+
+
+def report_section(ref: folders.SettingsRef) -> Callable[[], bool | None]:
+    """The categories (edited in their dialog), the starting notes (copied from a template if
+    wished), the report templates; returns their save (False: refused, said)."""
+    from .report_templates import HELP, pick_menu, templates_editor
+
+    subtitle(_("Categories"))
+
+    @ui.refreshable
+    def summary() -> None:
+        nodes = categories.tree(ref)
+        top = [n.name for n in nodes if n.depth == 0]
+        ui.label(
+            ngettext("{n} category: {names}", "{n} categories: {names}", len(nodes)).format(
+                n=len(nodes), names=", ".join(top)
+            )
+            if nodes
+            else _("No category yet")
+        ).classes("text-sm text-grey").mark("settings-categories-summary")
+
+    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+        with ui.column().classes("grow min-w-0"):
+            summary()
+        ui.button(
+            _("Edit the categories"),
+            icon="category",
+            on_click=lambda: categories_dialog(ref, summary.refresh),
+        ).props("flat dense no-caps").mark("settings-edit-categories")
+
+    items = report_templates.load(ref)
+    subtitle(_("Starting notes"))
+    ui.label(
+        _(
+            "The text a person's notes start with, while empty (e.g. headings and the "
+            "blocks [[publications]]: the summary of their publications, "
+            "[[excerpts]]: their excerpts by category, [[cv]]: their career)"
+        )
+    ).classes("text-sm text-grey")
+    skeleton = (
+        ui.textarea(
+            value=reports.skeleton(ref),
+            placeholder=f"## {_('Publications')}\n[[publications]]\n\n"
+            f"## {_('Activities')}\n[[excerpts]]",
+        )
+        .props("dense outlined autogrow")
+        .classes("w-full font-mono text-sm")
+        .mark("folder-skeleton")
+    )
+
+    @ui.refreshable
+    def picks() -> None:
+        pick_menu(lambda text: skeleton.set_value(text), "folder-skeleton-template", items)
+
+    with (
+        ui.button(_("From a template"), icon="article")
+        .props("flat dense no-caps icon-right=arrow_drop_down")
+        .tooltip(_("The starting notes copied from one of the report templates below"))
+        .mark("folder-skeleton-template"),
+        ui.menu(),
+    ):
+        picks()
+
+    subtitle(_("Report templates"))
+    ui.markdown(_(HELP)).classes("text-sm text-grey")
+    templates_editor(items, picks.refresh)
+
+    def save() -> bool | None:
+        try:
+            report_templates.save(ref, items)
+        except ValueError as e:
+            ui.notify(str(e), type="negative")
+            return False
+        reports.save_skeleton(ref, skeleton.value or "")
+        return None
+
+    return save
+
+
+def settings_fields(settings_id: int, section: str = "report") -> Callable[[], bool | None]:
+    """The editors of some settings (changed for every folder using them), in sections (see
+    SECTIONS; ``section``: the one shown first): their categories, starting notes, report
+    templates and language; the excerpts' markers and levels, where those flagged
+    "rayonnement" go; the primary source, the star lists and citations; the models. Returns
+    their save (False: refused, said)."""
     from .citations import folder_citations_section
 
     ref = folders.SettingsRef(settings_id)
@@ -211,54 +337,90 @@ def settings_fields(settings_id: int) -> Callable[[], bool | None]:
         if users
         else _("Used by no folder")
     ).classes("text-sm text-primary" if users else "text-sm text-grey").mark("settings-users")
-    lang = (
-        ui.select(
-            {"": _("That of the interface"), **i18n.LANGUAGES},
-            value=reports.language(ref) or "",
-            label=_("Language"),
+    with ui.row().classes("w-full no-wrap items-start gap-4"):
+        with ui.tabs(value=section).props("vertical dense no-caps").classes("shrink-0") as tabs:
+            for key, icon, title, _help in SECTIONS:
+                ui.tab(key, _(title), icon=icon).mark(f"settings-section-{key}")
+        panels = ui.tab_panels(tabs, value=section).props("vertical").classes("grow min-w-0")
+
+    @contextmanager
+    def panel(key: str) -> Iterator[None]:
+        """A section's panel, under its title and what it is for."""
+        icon, title, help_text = next(x[1:] for x in SECTIONS if x[0] == key)
+        with panels, ui.tab_panel(key).classes("p-0 gap-2").mark(f"settings-panel-{key}"):
+            with ui.row().classes("items-center gap-2 no-wrap"):
+                ui.icon(icon, color="primary")
+                ui.label(_(title)).classes("text-base font-medium text-primary")
+            ui.label(_(help_text)).classes("text-sm text-grey")
+            yield
+
+    with panel("report"):
+        report_save = report_section(ref)
+        subtitle(_("Language"))
+        lang = (
+            ui.select(
+                {"": _("That of the interface"), **i18n.LANGUAGES},
+                value=reports.language(ref) or "",
+                label=_("Language"),
+            )
+            .props("dense")
+            .classes("w-64")
+            .tooltip(_("Of what is generated: references, excerpts, summary…"))
+            .mark("folder-language")
         )
-        .classes("w-64")
-        .tooltip(_("Of what is generated: references, excerpts, summary…"))
-        .mark("folder-language")
-    )
-    influence = (
-        ui.select(
-            {k: _(v) for k, v in INFLUENCE_MODES.items()},
-            value=reports.influence_mode(ref),
-            label=_("Rayonnement excerpts"),
+    with panel("excerpts"):
+        subtitle(_("Markers"))
+        marker_fields = markers_section(ref)
+        subtitle(_("Levels"))
+        level_fields = levels_section(ref)
+        subtitle(_("Rayonnement"))
+        influence = (
+            ui.select(
+                {k: _(v) for k, v in INFLUENCE_MODES.items()},
+                value=reports.influence_mode(ref),
+                label=_("Rayonnement excerpts"),
+            )
+            .props("dense")
+            .classes("w-96")
+            .mark("folder-influence-mode")
         )
-        .classes("w-96")
-        .tooltip(_(INFLUENCE_TIP))
-        .mark("folder-influence-mode")
-    )
-    marker_fields = markers_section(ref)
-    level_fields = levels_section(ref)
-    default = source_settings.default_primary()
-    primary = (
-        ui.select(
-            {
-                None: _("Default ({source})").format(
-                    source=ADAPTERS[default].label if default in ADAPTERS else _("none")
-                ),
-                source_settings.NO_PRIMARY: _("None"),
-                **{
-                    n: a.label
-                    for n, a in ADAPTERS.items()
-                    if a.linkable and a.provides_publications
+        ui.markdown(_(INFLUENCE_TIP)).classes("text-sm text-grey")
+    with panel("citations"):
+        subtitle(_("Primary source"))
+        default = source_settings.default_primary()
+        primary = (
+            ui.select(
+                {
+                    None: _("Default ({source})").format(
+                        source=ADAPTERS[default].label if default in ADAPTERS else _("none")
+                    ),
+                    source_settings.NO_PRIMARY: _("None"),
+                    **{
+                        n: a.label
+                        for n, a in ADAPTERS.items()
+                        if a.linkable and a.provides_publications
+                    },
                 },
-            },
-            value=folders.primary_source(ref),
-            label=_("Primary source"),
+                value=folders.primary_source(ref),
+                label=_("Primary source"),
+            )
+            .props("dense")
+            .classes("w-96")
+            .mark("folder-primary")
         )
-        .classes("w-full")
-        .tooltip(_("Papers this source doesn't list for a person are not counted"))
-        .mark("folder-primary")
-    )
-    citations_save = folder_citations_section(ref)
-    model_fields = models_section(ref)
+        ui.label(_("Papers this source doesn't list for a person are not counted")).classes(
+            "text-sm text-grey"
+        )
+        citations_save = folder_citations_section(ref)
+    with panel("models"):
+        model_fields = models_section(ref)
 
     def save() -> bool | None:
+        if report_save() is False:
+            tabs.set_value("report")
+            return False
         if citations_save() is False:
+            tabs.set_value("citations")
             return False
         reports.save_influence_mode(ref, influence.value)
         reports.save_markers(ref, marker_fields())
@@ -271,14 +433,17 @@ def settings_fields(settings_id: int) -> Callable[[], bool | None]:
     return save
 
 
-def settings_dialog(settings_id: int, changed: Callable[[], None] | None = None) -> None:
-    """Edit some settings (see settings_fields); ``changed``: once saved."""
+def settings_dialog(
+    settings_id: int, changed: Callable[[], None] | None = None, section: str = "report"
+) -> None:
+    """Edit some settings (see settings_fields; ``section``: the one shown first);
+    ``changed``: once saved."""
     name = next((x.name for x in folders.named_settings() if x.id == settings_id), "")
-    with transient_dialog(_("Settings “{name}”").format(name=name), width="w-full max-w-4xl") as (
+    with transient_dialog(_("Settings “{name}”").format(name=name), width="w-full max-w-5xl") as (
         dlg,
         _card,
     ):
-        save = settings_fields(settings_id)
+        save = settings_fields(settings_id, section)
 
         def ok() -> bool | None:
             if save() is False:
@@ -335,14 +500,20 @@ def _name_dialog(title: str, value: str, ok_label: str, apply: Callable[[str], N
 def settings_tab() -> None:
     """The settings of folders, the default ones first: each one's name and the folders
     using it; created (empty, or a copy of others), renamed, made the default, edited (with
-    their categories), deleted (unless used, or holding excerpts)."""
+    their categories, their report templates), deleted (unless used, or holding
+    excerpts)."""
     ui.label(
         _(
             "A folder uses the settings chosen in its dialog (its categories, star lists, how "
             "its notes cite papers…), else the default ones; changing them changes them for "
             "every folder using them."
         )
-    ).classes("text-sm text-grey")
+        + " "
+        + _(
+            "The report templates (the texts a report starts from) are with their categories, "
+            "in each settings' “Categories & report”."
+        )
+    ).classes("text-sm text-grey").mark("folder-settings-help")
 
     def create(source: folders.NamedSettings | None = None) -> None:
         def apply(name: str) -> None:
@@ -427,6 +598,12 @@ def settings_tab() -> None:
                     _("Their categories"),
                     f"settings-categories-{x.id}",
                     lambda x=x: categories_dialog(folders.SettingsRef(x.id)),
+                )
+                button(
+                    "article",
+                    _("Their report: starting notes and templates"),
+                    f"settings-report-{x.id}",
+                    lambda x=x: settings_dialog(x.id, listing.refresh, "report"),
                 )
                 button(
                     "content_copy",

@@ -1,21 +1,22 @@
-"""Report templates (Settings → Report templates): named texts a report (the notes of a
-person within a folder) starts from, their headings and blocks (``[[excerpts]]``…) with,
-if any, guidance in Obsidian comments (``%% … %%``, left out when shown or copied).
+"""Report templates: named texts a report (the notes of a person within a folder) starts
+from, their headings and blocks (``[[excerpts]]``…) with, if any, guidance in Obsidian
+comments (``%% … %%``, left out when shown or copied).
 
-General (an AppSetting, as the citation templates): a folder's starting notes (its
-skeleton, see reports.skeleton) are copied from one, and a report from one when it starts;
-a template is also made from a written report, its structure only (``outline``)."""
+Those of a folder's settings (with their categories, which ``[[excerpts#id]]`` names; edited
+with them, Parameters → Folder settings): a folder's starting notes (its skeleton, see
+reports.skeleton) are copied from one, and a report from one when it starts; a template is
+also made from a written report, its structure only (``outline``)."""
 
 from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass
 
-from .db.app_settings import get_setting, set_setting
+from . import folders
+from .db.session import session_scope
 from .i18n import _
 from .reports import _BLOCK, _HEADING
 
-KEY = "report_skeletons"  # an AppSetting (not "report_templates": the citation templates')
 _FENCE = re.compile(r"^[ \t]*(```|~~~)")
 
 
@@ -50,16 +51,22 @@ def default_templates() -> list[ReportTemplate]:
     ]
 
 
-def load() -> list[ReportTemplate]:
-    """The templates (never saved: the default ones)."""
-    saved = get_setting(KEY)
+def load(folder_id: int | None) -> list[ReportTemplate]:
+    """The templates of a folder's settings (a folders.SettingsRef: those; never saved: the
+    default ones)."""
+    saved = None
+    if folder_id:
+        with session_scope() as s:
+            if (x := folders.used_settings(s, folder_id)) is not None:
+                saved = x.report_templates
     if saved is None:
         return default_templates()
-    return [ReportTemplate(t.get("name") or "", t.get("text") or "") for t in saved["items"]]
+    return [ReportTemplate(t.get("name") or "", t.get("text") or "") for t in saved]
 
 
-def save(items: list[ReportTemplate]) -> None:
-    """Refused (``ValueError``) when one has no name, or two the same."""
+def save(folder_id: int, items: list[ReportTemplate]) -> None:
+    """The templates of a folder's settings (those sharing them too). Refused
+    (``ValueError``) when one has no name, or two the same."""
     for t in items:
         t.name = t.name.strip()
         t.text = t.text.strip() and t.text.rstrip() + "\n"
@@ -68,22 +75,24 @@ def save(items: list[ReportTemplate]) -> None:
     names = [t.name for t in items]
     if len(set(names)) < len(names):
         raise ValueError(_("Two report templates have the same name"))
-    set_setting(KEY, {"items": [asdict(t) for t in items]})
+    with session_scope() as s:
+        if (x := folders.used_settings(s, folder_id)) is not None:
+            x.report_templates = [asdict(t) for t in items]
 
 
-def text_of(name: str) -> str | None:
-    return next((t.text for t in load() if t.name == name), None)
+def text_of(folder_id: int, name: str) -> str | None:
+    return next((t.text for t in load(folder_id) if t.name == name), None)
 
 
-def add(name: str, text: str) -> None:
-    """A template (that of the same name replaced, in its place)."""
-    items = load()
+def add(folder_id: int, name: str, text: str) -> None:
+    """A template of a folder's settings (that of the same name replaced, in its place)."""
+    items = load(folder_id)
     same = next((t for t in items if t.name == name.strip()), None)
     if same is not None:
         same.text = text
     else:
         items.append(ReportTemplate(name, text))
-    save(items)
+    save(folder_id, items)
 
 
 def outline(report: str) -> str:
