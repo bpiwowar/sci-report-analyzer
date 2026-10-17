@@ -346,6 +346,8 @@ extraits de la page sont les siens, Q citant dans les notes (l'onglet Rapport), 
 Extraits), F trouvant l'article de la sélection et L marquant les articles d'une liste (depuis l'onglet Rapport), B
 ajoutant un signet à l'endroit lu, un extrait cliqué sur ses pages sélectionné dans l'onglet Extraits, et un extrait
 cliqué là montré sur sa page. Un document renommé depuis son titre (double-clic) l'est aussi dans le bandeau.
+Dans un dossier, le bandeau est toujours là, quel que soit l'onglet : son + y ajoute un document (PDF) de la
+personne, comme des fichiers PDF déposés dessus.
 
 **Documents** (onglet Rapport de la personne, menu « Documents ») : PDF concernant la personne au sein d'un dossier ou
 d'une période (un dossier de candidature, un CV…), téléversés là et lus dans la même visionneuse (annotations, signets,

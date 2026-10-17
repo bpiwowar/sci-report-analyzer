@@ -2657,3 +2657,26 @@ async def test_papers_beside_the_notes_with_their_pdfs(user: User, fake_viewer):
     while not any(m.startswith("folder-papers-row-") for m in row._markers):
         row = row.parent_slot.parent
     assert any(m.startswith("source-") for e in row.descendants() for m in e._markers)
+
+
+async def test_document_added_from_the_strip(user: User, fake_viewer):
+    """Whatever the tab, the strip below the page: its + adds a document within the folder
+    (shown beside the page, and in the Report tab's menu)."""
+    pid, period, _ = _person()
+    await user.open(f"/person/{pid}?tab=publications")
+    await user.should_see(marker="dock-add")
+    upload = user.find(marker="dock-upload").elements.pop()
+    await upload.handle_uploads(
+        [SmallFileUpload(name="Application.pdf", content_type="application/pdf", _data=PDF)]
+    )
+    await user.should_see("Application")  # (its tab in the strip, shown beside the page)
+    [doc] = documents.of_person(pid)[period]
+    await user.should_see(marker=f"dock-frame-d{doc.id}")
+    await upload.handle_uploads(
+        [SmallFileUpload(name="notes.txt", content_type="text/plain", _data=b"hello")]
+    )
+    await user.should_see("notes.txt: not a PDF file")
+    # Not in a folder: no + (the documents are within one).
+    other = make_person("Jane Roe")
+    await user.open(f"/person/{other}?tab=publications")
+    await user.should_not_see(marker="dock-add")

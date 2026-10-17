@@ -345,6 +345,8 @@ tab), F finding the selection's paper and L tagging the papers of a list (from t
 B bookmarking the place read, an excerpt clicked on its pages selected in the Excerpts tab,
 and an excerpt clicked there shown on its page. A document renamed from its title (double-click)
 is renamed in the strip too.
+Within a folder, the strip is always there, whatever the tab: its + adds a document (PDF) of
+the person there, as do PDF files dropped onto it.
 
 **Documents** (person's Report tab, “Documents” menu): PDFs of the person within a folder or
 a period (an application, a CV…), uploaded there and read in the same viewer (annotations,

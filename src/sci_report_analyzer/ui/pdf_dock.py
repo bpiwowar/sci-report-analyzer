@@ -2,7 +2,8 @@
 each in a frame on the right, or the left (its viewer's page, embedded: see
 pdf_viewer.viewer_frame), one shown at a time; a strip at the bottom lists them, to show one,
 minimize them, or close one (from the view only: nothing is deleted), but the person's
-documents within the folder, always there. What the page's notes and excerpts ask of a PDF goes
+documents within the folder, always there, and its + (or PDF files dropped onto it) to add
+some. What the page's notes and excerpts ask of a PDF goes
 to the one shown (static/dock.js), and a link to a PDF opens it there."""
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from collections.abc import Callable
 
 from nicegui import context, ui
 
-from .. import annotations, documents, persons
+from .. import annotations, documents, pdfs, persons
 from ..i18n import _
 from .documents_page import page_url_of, rename_dialog
 from .pdf_viewer import page_url, pdf_icon, scripts
@@ -22,6 +23,10 @@ WIDTH = "ui.dock.width"  # AppSetting: the width (px) of the PDFs beside a perso
 WIDTH_DEFAULT, WIDTH_MIN = 720, 320
 SIDE = "ui.dock.side"  # AppSetting: where the PDFs are, "right" (the default) or "left"
 KEY = re.compile(r"([dp])([0-9]{1,9})")  # (a document: d3; a paper: p12)
+
+
+# The strip, PDF files dragged over it: outlined.
+ui.add_css(".vr-dock-drop{outline:2px dashed white;outline-offset:-4px}", shared=True)
 
 
 def _state_key(person_id: int) -> str:
@@ -58,6 +63,8 @@ class PdfDock:
         self.shown = shown if shown in self.keys else None
         self.frames: dict[str, ui.element] = {}
         self.docs: list[str] = []  # (the person's documents within the folder: always listed)
+        self.folder: int | None = None  # (the period, within a folder, documents are added to)
+        self.on_added: Callable[[], None] | None = None  # (a document added: the menu's listing)
         self.last: str | None = None  # (the PDF shown last)
         self.left = annotations.ui_state(SIDE, "right") == "left"
         scripts({"dockMin": WIDTH_MIN, "dockLeft": self.left}, "dock.js")
@@ -80,6 +87,29 @@ class PdfDock:
                 .classes("vr-dock-strip items-center gap-1 py-0 px-2")
                 .mark("dock-strip")
             )
+            # (the file picker of its +, and PDF files dropped onto it)
+            self.picker = (
+                ui.upload(multiple=True, auto_upload=True, on_upload=self._upload)
+                .props('accept=".pdf,application/pdf"')
+                .classes("hidden")
+                .mark("dock-upload")
+            )
+        # (files only: not what is dragged within the page)
+        files = "e.dataTransfer.types.includes('Files')"
+        self.footer.on(
+            "dragover",
+            js_handler=f"(e) => {{ if ({files}) {{ e.preventDefault(); "
+            "e.currentTarget.classList.add('vr-dock-drop'); } }",
+        )
+        self.footer.on(
+            "dragleave", js_handler="(e) => e.currentTarget.classList.remove('vr-dock-drop')"
+        )
+        self.footer.on(
+            "drop",
+            js_handler=f"(e) => {{ e.currentTarget.classList.remove('vr-dock-drop'); "
+            f"if ({files}) {{ e.preventDefault(); getElement({self.picker.id})"
+            ".$refs.qRef.addFiles(e.dataTransfer.files); } }",
+        )
         ui.on("vr-dock-open", lambda e: self.open(str(e.args.get("key")), e.args.get("page")))
         ui.on("vr-dock-width", lambda e: self._width(int(e.args)))
         # (a document renamed from its title above its PDF: its tab too)
@@ -94,8 +124,33 @@ class PdfDock:
         for key in [k for k in self.keys if k[0] == "d" and k not in self.docs]:
             if documents.info(int(key[1:])) is None:  # (deleted meanwhile)
                 self.close(key)
-        self.footer.value = bool(self.keys or self.docs)
+        self.footer.value = self._strip_shown()
         self._strip()
+
+    def set_folder(self, period_id: int | None) -> None:
+        """The period (within a folder) of the page: its documents added from the strip; none,
+        not in a folder."""
+        self.folder = period_id
+        self.footer.value = self._strip_shown()
+        self._strip()
+
+    def _strip_shown(self) -> bool:
+        return bool(self.keys or self.docs or self.folder is not None)
+
+    async def _upload(self, e) -> None:
+        """A PDF added to the person's documents within the folder, and shown."""
+        if self.folder is None:
+            ui.notify(_("Not in a folder: the documents are added within one"), type="warning")
+            return
+        try:
+            doc_id = documents.add(self.folder, e.file.name, await e.file.read())
+        except pdfs.PdfError as err:
+            ui.notify(f"{e.file.name}: {err}", type="warning")
+            return
+        self.set_documents(documents.of_person(self.person_id).get(self.folder, []))
+        if self.on_added is not None:
+            self.on_added()
+        self.open(f"d{doc_id}")
 
     def move(self) -> None:
         """The PDFs on the other side of the page (it is built again)."""
@@ -200,7 +255,7 @@ class PdfDock:
         for key, frame in self.frames.items():
             frame.set_visibility(key == self.shown)
         self.drawer.value = self.shown is not None
-        self.footer.value = bool(self.keys or self.docs)
+        self.footer.value = self._strip_shown()
         self._strip()
         self.footer.client.run_javascript(
             f"vrDock.shown = {json.dumps(self.shown)}; "  # (the page narrower: see panel.py)
@@ -248,6 +303,12 @@ class PdfDock:
                         ui.button(icon="close", on_click=lambda k=key: self.close(k)).props(
                             f"flat dense round size=xs color={'primary' if on else 'white'}"
                         ).tooltip(_("Close it (from the view only)")).mark(f"dock-close-{key}")
+            if self.folder is not None:
+                ui.button(icon="add", on_click=lambda: self.picker.run_method("pickFiles")).props(
+                    "flat dense round size=sm color=white"
+                ).tooltip(
+                    _("Add a document (PDF) within the folder; or drop PDFs on this bar")
+                ).mark("dock-add")
             ui.space()
             ui.button(icon="swap_horiz", on_click=self.move).props(
                 "flat dense round size=sm color=white"

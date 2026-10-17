@@ -588,13 +588,16 @@ class ReportTabs:
         if p.folder and p.folder.hidden:
             ui.badge(_("archived"), color="grey")
         if which == "report":
-            _documents(p, lambda d: self.dock.open(f"d{d.id}"), self.dock.set_documents)
+            self.dock.on_added = _documents(
+                p, lambda d: self.dock.open(f"d{d.id}"), self.dock.set_documents
+            )
 
     def _documents_of(self) -> None:
         """Those of the period, always in the strip of the PDFs (within a folder)."""
         p = self.period
         docs = documents.of_person(self.person_id).get(p.id, []) if p and p.folder else []
         self.dock.set_documents(docs)
+        self.dock.set_folder(p.id if p and p.folder else None)
 
     def choose(self, period_id: int) -> None:
         """Another period: the tabs filled again."""
@@ -666,10 +669,10 @@ class ReportTabs:
             await bookmark_here(*source)
 
 
-def _documents(p, open_doc, on_change=None) -> None:
+def _documents(p, open_doc, on_change=None) -> Callable[[], None]:
     """A menu of the documents of the person within a period / folder (an application, a
     CV…): open (or rename, delete…: their ⋮), and the last item to add some; ``on_change``:
-    given them, once listed."""
+    given them, once listed. Returns what lists them again (one added elsewhere)."""
     button = (
         ui.button(icon="description")
         .props("flat dense no-caps icon-right=arrow_drop_down")
@@ -716,6 +719,7 @@ def _documents(p, open_doc, on_change=None) -> None:
         ):
             ui.icon("add", color="primary")
             ui.label(_("Add…"))
+    return listing.refresh
 
 
 def rename_dialog(doc_id: int, name: str, then: Callable[[str], None]) -> None:
