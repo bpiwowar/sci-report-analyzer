@@ -2,8 +2,9 @@
 its items, and the person's papers they match.
 
 An item is matched by its HAL id or DOI when it has one, else by its words: the share of a
-paper's title words found in the item (the authors and the venue around it do not matter),
-the year as a tie-breaker.
+paper's title words found in the item (the authors and the venue around it do not matter;
+its title only, when known: an item read by the LLM, see reflist_read), the year as a
+tie-breaker.
 """
 
 from __future__ import annotations
@@ -39,6 +40,10 @@ class Item:
     doi: str | None = None
     url: str | None = None
     years: set[int] = field(default_factory=set)
+    # Its parts, when known (read by the LLM: see reflist_read); none: only its text.
+    title: str | None = None
+    authors: list[str] = field(default_factory=list)
+    venue: str | None = None
 
     @property
     def ref(self) -> str | None:
@@ -49,6 +54,11 @@ class Item:
     def words(self) -> str:
         """The item's text without its links."""
         return re.sub(r"\s+", " ", _LINK.sub(" ", self.text)).strip(" .,;")
+
+    @property
+    def matched_words(self) -> frozenset[str]:
+        """The words a paper's title is matched with: its title's, else its text's."""
+        return title_tokens(self.title or self.words)
 
 
 @dataclass
@@ -82,6 +92,11 @@ def join_wrapped(lines: list[str]) -> str:
         else:
             text = f"{text} {line}" if text else line
     return text
+
+
+def numbered(line: str) -> bool:
+    """Whether a line starts with an item's number ("3-", "[3]"…)."""
+    return bool(_NUMBER.match(line))
 
 
 def split_items(text: str) -> list[Item]:
@@ -159,7 +174,7 @@ def match(items: list[Item], rows: list[PubStat]) -> list[Match]:
             if (item.hal and item.hal in hal) or (item.doi and item.doi in dois):
                 cands[r.id] = Candidate(r.id, r.title, r.year, 1.0, by_id=True)
         if not cands:
-            words = title_tokens(item.words)
+            words = item.matched_words
             for r in rows:
                 if (score := title_score(titles[r.id], words)) >= service.settings.reflist_suggest:
                     cands[r.id] = Candidate(r.id, r.title, r.year, score)
@@ -193,7 +208,7 @@ async def search(item: Item) -> list[Found]:
     """HAL documents for an item that matches none of the person's papers, best first."""
     from .sources import hal
 
-    words = title_tokens(item.words)
+    words = item.matched_words
     docs = await hal.search_documents(sorted(words))
     out = []
     for d in docs:
