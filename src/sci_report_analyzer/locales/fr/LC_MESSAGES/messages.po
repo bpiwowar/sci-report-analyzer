@@ -2741,6 +2741,9 @@ msgstr "Liste Markdown"
 msgid "Marked as the {track} track"
 msgstr "Marqué comme session {track}"
 
+msgid "Marker"
+msgstr "Marqueur"
+
 msgid "Marmotte (CNRS)"
 msgstr "Marmotte (CNRS)"
 

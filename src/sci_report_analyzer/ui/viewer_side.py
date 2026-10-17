@@ -970,12 +970,8 @@ def excerpt_properties(
         ui.button(icon="event_busy", on_click=clear).props("flat dense round size=sm").classes(
             "-ml-1"
         ).tooltip(_("Clear the years")).mark("excerpt-years-clear")
-    flags = {}
-    with ui.row().classes("items-center gap-2 -mt-2"):
-        for key, value in (("salient", salient), ("influence", influence), ("caveat", caveat)):
-            label, tip, icon, colour = MARKER_ICONS[key]
-            flags[key] = ui.checkbox(_(label), value=value).tooltip(_(tip)).mark(f"excerpt-{key}")
-            ui.icon(icon, size="xs", color=colour).classes("-ml-2")
+    on = {"salient": salient, "influence": influence, "caveat": caveat}
+    marker_in = MarkerBadges(next((k for k, v in on.items() if v), "")).classes("-mt-2")
     level_in = LevelBadges(folder_id, level).classes("-mt-2")
     tags_in = (
         ui.select(
@@ -995,10 +991,43 @@ def excerpt_properties(
     return lambda: {
         "start": int_or_none(start_in.value),
         "end": int_or_none(end_in.value),
-        **{k: bool(f.value) for k, f in flags.items()},
+        **{k: k == marker_in.value for k in MARKER_ICONS},
         "tags": list(tags_in.value or []),
         "level": level_in.value or None,
     }
+
+
+class MarkerBadges(ui.row):
+    """An excerpt's marker (see MARKER_ICONS), as badges: at most one (like its level),
+    clicked to choose it, clicked again to clear it; its ``value``, the marker (none: "")."""
+
+    def __init__(self, marker: str) -> None:
+        super().__init__()
+        self.classes("items-center gap-1").mark("excerpt-marker")
+        self.value = marker
+        self.chips: dict[str, ui.chip] = {}
+        with self:
+            ui.label(_("Marker")).classes("text-sm text-grey-8")
+            for key, (label, tip, icon, _colour) in MARKER_ICONS.items():
+                self.chips[key] = (
+                    ui.chip(_(label), icon=icon, on_click=lambda key=key: self.pick(key))
+                    .props("dense clickable")
+                    .tooltip(_(tip))
+                    .mark(f"excerpt-{key}")
+                )
+        self.show()
+
+    def pick(self, key: str) -> None:
+        self.value = "" if self.value == key else key
+        self.show()
+
+    def show(self) -> None:
+        for key, chip in self.chips.items():
+            colour = MARKER_ICONS[key][3]
+            chosen = key == self.value
+            chip.props(f"color={colour if chosen else 'grey-3'}")
+            chip.props(f"text-color={'white' if chosen else 'grey-9'}")
+            chip.props(f"icon-color={'white' if chosen else colour}")
 
 
 class LevelBadges(ui.row):
@@ -1189,10 +1218,13 @@ def category_suggestions(folder_id: int, text: str, pick: Callable[[int], None])
                     .tooltip(_("Similarity: {score:.0%}").format(score=score))
                     .mark(f"category-suggested-{cat}")
                 ):
-                    with ui.element("div").classes("grow min-w-0 ellipsis text-sm"):
+                    # (the parents cut first, so that the category itself shows)
+                    with ui.element("div").classes("grow min-w-0 flex no-wrap text-sm"):
                         if up:
-                            ui.label(" › ".join(up) + " › ").classes("inline text-grey-7")
-                        ui.label(leaf).classes("inline text-purple text-weight-medium")
+                            ui.label(" › ".join(up) + " ›\u00a0").classes(
+                                "min-w-0 ellipsis text-grey-7"
+                            ).style("flex-shrink: 1000")
+                        ui.label(leaf).classes("min-w-0 ellipsis text-purple text-weight-medium")
                     ui.label(f"{score:.0%}").classes("text-xs text-grey shrink-0")
 
     async def train() -> None:
