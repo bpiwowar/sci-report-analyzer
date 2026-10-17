@@ -38,7 +38,7 @@ from .panel import PublicationsPanel
 from .pdf_viewer import changed, gone, page_url, watch
 from .pub_details import show_details
 from .reflist import tag_from_list
-from .theme import NOTE_EXTRAS, chip_html, fmt_dt, int_or_none, span
+from .theme import NOTE_EXTRAS, chip_html, float_or_none, fmt_dt, int_or_none, span
 
 ui.add_css(
     ".vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
@@ -1049,13 +1049,14 @@ def excerpt_properties(
     level: str | None = None,
     punctual: bool = False,
     in_period: bool = False,
+    days: float | None = None,
 ) -> Callable[[], dict]:
-    """The fields of an excerpt's years (a button clears them, then calls ``cleared``), whether
-    it is a one-off event or within the person's period (not both: one on, the other off),
-    markers (see MARKER_ICONS), level (one of the folder's, see reports.levels; none: its
-    default) and tags (those of papers and excerpts, or new ones typed); returns their values
-    (the keywords of categories.add_excerpt / update_excerpt; its ``set_years``, a function
-    setting the years)."""
+    """The fields of an excerpt's years (a button clears them, then calls ``cleared``), how
+    many days a year it takes, whether it is a one-off event or within the person's period
+    (not both: one on, the other off), markers (see MARKER_ICONS), level (one of the
+    folder's, see reports.levels; none: its default) and tags (those of papers and excerpts,
+    or new ones typed); returns their values (the keywords of categories.add_excerpt /
+    update_excerpt; its ``set_years``, a function setting the years)."""
 
     def clear() -> None:
         start_in.set_value(None)
@@ -1071,6 +1072,18 @@ def excerpt_properties(
         ui.button(icon="event_busy", on_click=clear).props("flat dense round size=sm").classes(
             "-ml-1"
         ).tooltip(_("Clear the years")).mark("excerpt-years-clear")
+        days_in = (
+            ui.number(_("Days a year"), value=days, min=0, max=categories.MAX_DAYS, step=0.5)
+            .props("dense outlined clearable")
+            .classes("w-32")
+            .tooltip(
+                _(
+                    "How many days a year it takes (e.g. 10 for a committee, 180 for half a "
+                    "job): the thicker and darker its bar on the timeline. Empty: not said."
+                )
+            )
+            .mark("excerpt-days")
+        )
     with ui.row().classes("items-center gap-x-4 gap-y-0 -mt-2"):
         punctual_in = (
             ui.switch(_("One-off event"), value=punctual)
@@ -1118,6 +1131,7 @@ def excerpt_properties(
             "level": level_in.value or None,
             "punctual": bool(punctual_in.value),
             "in_period": bool(in_period_in.value),
+            "days": categories.clean_days(float_or_none(days_in.value)),
         }
 
     def set_years(start: int | None, end: int | None) -> None:
@@ -2119,6 +2133,10 @@ class _ExcerptsSection:
                         ui.label(lead.years).classes("text-xs text-grey-8 shrink-0").mark(
                             f"excerpt-years-{x.id}"
                         )
+                    if not member and lead.days:
+                        ui.label(categories.days_label(lead.days)).classes(
+                            "text-xs text-grey-8 shrink-0"
+                        ).mark(f"excerpt-days-{x.id}")
                     for key, (label, _tip, icon, colour) in MARKER_ICONS.items():
                         if not member and getattr(lead, key):
                             ui.icon(icon, size="xs", color=colour).classes("shrink-0").tooltip(
@@ -2459,6 +2477,7 @@ def excerpt_dialog(
                     level=e.level,
                     punctual=e.punctual,
                     in_period=e.in_period,
+                    days=e.days,
                 )
             with ui.tab_panel("move").classes("p-1 gap-2"):
                 path = next(

@@ -572,3 +572,70 @@ async def test_timeline_papers_by_rank(user: User, fake_viewer) -> None:
     assert tab.parent_slot.parent.value == "timeline"
     user.find(marker="timeline-papers-close").click()
     await user.should_not_see(marker="timeline-papers-details")
+
+
+def test_excerpt_days() -> None:
+    """An excerpt's days a year: stored cleaned (none if not positive, at most a year), kept
+    when not given, passed to the next lead of its group; weighed on a logarithmic scale."""
+    from sci_report_analyzer.ui import timeline as tl_ui
+
+    _pid, period, cats, _paper = _seed()
+    add = categories.add_excerpt
+    lead = add(cats["Research"], period, "A committee.", 1, [], start=2021, days=12)
+    other = add(cats["Research"], period, "Another one.", 2, [], days=0)
+    views = {e.id: e for e in categories.excerpts(period)}
+    assert views[lead].days == 12 and views[other].days is None
+    categories.update_excerpt(lead, start=2021)  # (not given: kept)
+    assert next(e for e in categories.excerpts(period) if e.id == lead).days == 12
+    categories.update_excerpt(lead, start=2021, days=1000)
+    assert next(e for e in categories.excerpts(period) if e.id == lead).days == 366
+    categories.update_excerpt(lead, start=2021, days=None)
+    assert next(e for e in categories.excerpts(period) if e.id == lead).days is None
+    categories.update_excerpt(lead, start=2021, days=0.5)
+    categories.merge_excerpts(other, lead)
+    categories.remove_excerpt(lead)
+    (left,) = categories.excerpts(period)
+    assert left.id == other and left.days == 0.5
+
+    assert categories.days_label(0.5) == "½ day/year"
+    assert categories.days_label(12) == "12 days/year"
+    assert categories.days_label(None) == ""
+    w = tl_ui.days_weight
+    assert w(None) is None and w(0.5) == 0 and w(1) == 0
+    assert w(180) == 1 and w(366) == 1
+    assert 0.4 < w(10) < 0.5  # (log scale: ten days, nearly half way)
+    assert w(5) < w(10) < w(60) < w(180)
+
+
+async def test_timeline_days(user: User) -> None:
+    """The more days a year an excerpt takes, the thicker its bar on the timeline; set from
+    its dialog, said in its details."""
+    pid, period, cats, _paper = _seed()
+    add = categories.add_excerpt
+    few = add(cats["Research"], period, "Reviews.", 1, [], start=2021, end=2022, days=2)
+    many = add(cats["Research"], period, "Half a job.", 1, [], start=2021, end=2022, days=150)
+    plain = add(cats["Teaching"], period, "Taught.", 1, [], start=2021, end=2022)
+
+    def bar(eid: int):
+        span = user.find(marker=f"timeline-span-{eid}").elements.pop()
+        return next(c for c in span.default_slot.children if "vr-tl-bar" in c.classes)
+
+    def height(eid: int) -> float | None:
+        h = bar(eid)._style.get("height")
+        return float(h.removesuffix("px")) if h else None
+
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see(marker=f"timeline-span-{few}")
+    assert height(few) < height(many)
+    assert height(plain) is None  # (not said: as before)
+    user.find(marker=f"timeline-span-{many}").click()
+    await user.should_see("150 days/year", marker=f"timeline-days-{many}")
+
+    user.find(marker=f"timeline-span-{plain}").click()
+    await user.should_see(marker=f"timeline-edit-{plain}")
+    user.find(marker=f"timeline-edit-{plain}").click()
+    await user.should_see(marker="excerpt-days")
+    user.find(marker="excerpt-days").type("30")
+    user.find(marker="excerpt-edit-save").click()
+    await user.should_see(marker=f"timeline-span-{plain}")
+    assert next(e for e in categories.excerpts(period) if e.id == plain).days == 30

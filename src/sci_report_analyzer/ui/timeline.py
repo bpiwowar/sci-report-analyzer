@@ -3,7 +3,8 @@
 a row for each kind of what is dated about them. Their career (see timeline.career_spans)
 and the PhDs they supervised: bars along their years, one above the other when they
 overlap; their excerpts (see categories.timeline): the beginning of their text above a
-thin bar along their years (one above the other too); their papers: a small bar a year, as
+thin bar along their years (one above the other too; the more days a year one takes, the
+thicker and the stronger its colour, see days_weight); their papers: a small bar a year, as
 high as their number. An excerpt, or a year's, clicked: shown in the details below (there,
 its PDF opened beside the page at it, clicked; edited, its pencil). Each kind shown or
 hidden; what is without a date listed apart."""
@@ -45,6 +46,11 @@ NAMED_YEARS = 16
 # scrolled), from fitting it to four times as wide.
 ZOOM_MIN, ZOOM_MAX, ZOOM_STEP = 1.0, 4.0, 0.1
 ZOOM_START = 2.0  # (twice: scrolled to the period in the folder, else to this year)
+# An excerpt's days a year (see categories.clean_days), on a logarithmic scale: from a day
+# (the thinnest bar, faint) to FULL_DAYS (about half a year: the thickest, its colour in
+# full) or more. Its bar's height (px) and colour's strength (%) between these.
+FULL_DAYS = 180.0
+DAYS_PX, DAYS_PCT = (2.5, 12.0), (30.0, 100.0)
 # The width of the column of the rows' names, of a year named.
 LABEL_PX, NAMED_PX = 84, 34  # (a year at least: .95rem, see _CSS)
 
@@ -790,11 +796,13 @@ def _bar(
     mark: str,
     classes: str = "",
     dot: float | None = None,
+    height: float | None = None,
 ) -> ui.element:
     """A span (``sp``: its ``first``, ``last`` years, its ``lane``; see timeline.bounds) in
     its row's lane, over the years it is in: its ``text`` (as far as ``end``, where the next
-    one in its lane begins) above its bar along its time (``now``: still going on); ``dot``:
-    a moment instead (where, in years: e.g. the middle of one), a dot there."""
+    one in its lane begins) above its bar along its time (``now``: still going on; ``height``,
+    in px: its own); ``dot``: a moment instead (where, in years: e.g. the middle of one), a
+    dot there."""
     begin, stop = tl.bounds(sp)
     cell = max(sp.last + 1, math.ceil(end - 1e-9))  # (the year its cell ends at, excluded)
     span = cell - sp.first
@@ -819,6 +827,7 @@ def _bar(
         else:
             ui.element("div").classes("vr-tl-bar").style(
                 f"margin-left:{pct(begin - sp.first)};width:{pct(stop - begin)}"
+                + (f";height:{height:.1f}px" if height is not None else "")
             )
     return item
 
@@ -931,6 +940,24 @@ def _jury(
     return item
 
 
+def days_weight(days: float | None) -> float | None:
+    """How much an excerpt's days a year weigh, from 0 (a day or less) to 1 (FULL_DAYS or
+    more), on a logarithmic scale (none: not said)."""
+    if not days:
+        return None
+    return min(1.0, max(0.0, math.log(max(days, 1.0)) / math.log(FULL_DAYS)))
+
+
+def _weighted(colour: str, weight: float | None) -> tuple[str, float | None]:
+    """An excerpt's colour and bar height (px) for its weight (see days_weight): fainter and
+    thinner the fewer its days a year; none said: as they are."""
+    if weight is None:
+        return colour, None
+    pct = DAYS_PCT[0] + (DAYS_PCT[1] - DAYS_PCT[0]) * weight
+    px = DAYS_PX[0] + (DAYS_PX[1] - DAYS_PX[0]) * weight
+    return f"color-mix(in srgb, {colour} {pct:.0f}%, transparent)", px
+
+
 def _excerpt(
     x: _Span,
     row: int,
@@ -941,8 +968,10 @@ def _excerpt(
 ) -> ui.element:
     """An excerpt: the beginning of its text above a thin bar along its years (a single
     one: that year; at its paper's: hollow; within the period: dotted; since a year: up to
-    now, fading), or a dot (a one-off event); clicked shown below."""
+    now, fading; the more days a year it takes, the thicker and the stronger its colour), or
+    a dot (a one-off event); clicked shown below."""
     e = x.d.excerpt
+    colour, height = _weighted(e.colour, days_weight(e.days))
     classes = (
         " thin"
         + (" paper" if x.d.paper_year else "")
@@ -951,7 +980,7 @@ def _excerpt(
         + (" picked" if picked.get("excerpt") == e.id else "")
     )
     item = _bar(
-        e.colour,
+        colour,
         x,
         row,
         col,
@@ -961,6 +990,7 @@ def _excerpt(
         f"timeline-span-{e.id}",
         classes,
         dot=x.first + 0.5 if x.dot else None,
+        height=height,
     )
     item.on("click", lambda: pick("excerpt", e.id))
     with item, ui.tooltip().classes("max-w-sm"):
@@ -970,6 +1000,8 @@ def _excerpt(
             when = _when(e, x.d.period or (None, None))
         if e.punctual:
             when += f" · {_('one-off event')}"
+        if e.days:
+            when += f" · {categories.days_label(e.days)}"
         ui.label(when).classes("font-medium")
         ui.label(e.quoted).classes("line-clamp-4")
     return item
@@ -1315,6 +1347,10 @@ def _item(
             if e.punctual:
                 ui.badge(_("one-off event"), color="blue-grey").props("outline").mark(
                     f"timeline-punctual-{e.id}"
+                )
+            if e.days:
+                ui.badge(categories.days_label(e.days), color="blue-grey").props("outline").mark(
+                    f"timeline-days-{e.id}"
                 )
             for key, (label, _tip, icon, colour) in MARKER_ICONS.items():
                 if getattr(e, key):
