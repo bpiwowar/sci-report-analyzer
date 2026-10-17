@@ -957,6 +957,33 @@ def test_excerpts_of_a_category_block():
     assert reports.render("[]{.excerpts}", ctx).text == reports.render("[[excerpts]]", ctx).text
 
 
+def test_line_marks():
+    """The source lines marked in the preview (for its scrolling to follow the editor's): a
+    block (one line, a long section once rendered) between two marks, its line's and the
+    next's; once rendered, the same text without them."""
+    from sci_report_analyzer import categories
+    from sci_report_analyzer.ui.mdedit import _MARKS_RE, _Preview, line_marks
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    doc = documents.add(period, "Dossier.pdf", PDF)
+    categories.add_excerpt(research, period, "Ten papers.", 1, [], document_id=doc)
+    text = "# Notes\nSome text,\non two lines.\n\n[[excerpts]]\nAfter.\n\n```\n# code\n```\n- a"
+    marked = line_marks(text)
+    assert _MARKS_RE.sub("", marked) == text
+    assert marked.startswith('# <span data-vr-line="1"></span>Notes\nSome text,<span data-vr-')
+    assert '<div data-vr-line="5"></div>\n\n[[excerpts]]\n\n<div data-vr-line="6" data-vr' in marked
+    assert "# code\n" in marked and marked.endswith('- a<span data-vr-line="11"></span>')
+    ctx = reports.folder_context([], period)
+    out = reports.render(marked, ctx).text
+    assert "- Ten papers." in out and _MARKS_RE.sub("", out) == reports.render(text, ctx).text
+    # The preview: its content without the marks, shown with them.
+    preview = _Preview()
+    preview.show(out)
+    assert "data-vr" not in preview.content and 'data-vr-line="5"' in preview.props["innerHTML"]
+
+
 def test_excerpt_markers():
     """Salient and caveat excerpts tagged (the folder's tags, by default in its language);
     marked (or no longer), moved first in their categories (salient, influence, caveat) unless
@@ -1860,8 +1887,7 @@ async def test_split_scroll_sync_installed(user: User, monkeypatch, fake_viewer)
     doc = documents.add(period, "Application.pdf", PDF)
     await user.open(f"/doc/{doc}")
     await user.should_see(marker="doc-note")
-    sync = [c for c in scripts if "follow(p, e)" in c]  # (the preview drives the editor too)
-    assert sync and "requestAnimationFrame" in sync[0]
+    assert any("vrSync.attach(v, p)" in c for c in scripts)
 
 
 async def test_folder_notes_sync(user: User):

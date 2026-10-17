@@ -12,6 +12,7 @@ from nicegui import ui
 from .. import categories
 from ..copy_filters import strip_comments
 from ..i18n import N_, _
+from ..reports import _BLOCK
 from .theme import NOTE_EXTRAS, chip_html
 
 # (icon, tooltip, kind, args): kind "wrap" (before, after, placeholder) or "line" (prefix).
@@ -166,6 +167,55 @@ document.addEventListener('click', (ev) => {
   ev.preventDefault();
   vrLink.open(a.href);
 });
+// An editor's and its preview's scrolling kept together: at the lines marked in the preview
+// (data-vr-line: see line_marks), in proportion in between (a block, one line long in the
+// editor, long once rendered: its line kept in the editor while scrolling over it). The pane
+// last pointed at (or typed in) leads; the other's scroll (following) is ignored.
+window.vrSync = {
+  attach(v, p) {
+    const e = v.scrollDOM;
+    let lead = e;
+    // (editor's offset, preview's) of the marks, both increasing; from the tops to the ends
+    const pairs = () => {
+      const eMax = e.scrollHeight - e.clientHeight, pMax = p.scrollHeight - p.clientHeight;
+      if (eMax <= 0 || pMax <= 0) return null;
+      const doc = v.state.doc, top = p.getBoundingClientRect().top - p.scrollTop;
+      const off = v.documentTop - e.getBoundingClientRect().top + e.scrollTop;
+      const out = [[0, 0]];
+      for (const m of p.querySelectorAll('[data-vr-line]')) {
+        const n = +m.dataset.vrLine;
+        const a = off + (n > doc.lines ? v.lineBlockAt(doc.length).bottom
+          : v.lineBlockAt(doc.line(Math.max(1, n)).from).top);
+        const at = m.tagName === 'DIV' ? m : m.closest('p, li, h1, h2, h3, h4, h5, h6') || m;
+        const b = at.getBoundingClientRect().top - top, [a0, b0] = out[out.length - 1];
+        if (a > a0 && b >= b0 && a < eMax && b < pMax) out.push([a, b]);
+      }
+      out.push([eMax, pMax]);
+      return out;
+    };
+    // (the offset x on one side, i, on the other, j)
+    const map = (x, pts, i, j) => {
+      let k = 1;
+      while (k < pts.length - 1 && x > pts[k][i]) k++;
+      const [x0, x1, y0, y1] = [pts[k - 1][i], pts[k][i], pts[k - 1][j], pts[k][j]];
+      return x1 > x0 ? y0 + (Math.min(x, x1) - x0) / (x1 - x0) * (y1 - y0) : y0;
+    };
+    const follow = (from) => {
+      const pts = from === lead && pairs();
+      if (!pts) return;
+      const [to, i, j] = from === e ? [p, 0, 1] : [e, 1, 0];
+      const y = Math.round(map(from.scrollTop, pts, i, j));
+      if (Math.abs(to.scrollTop - y) > 1) to.scrollTop = y;
+    };
+    for (const x of [e, p]) {
+      for (const k of ['pointerenter', 'pointerdown', 'wheel', 'touchstart', 'keydown']) {
+        x.addEventListener(k, () => { lead = x; }, {passive: true});
+      }
+      x.addEventListener('scroll', () => follow(x));
+    }
+    new MutationObserver(() => follow(e)).observe(p, {childList: true, subtree: true});
+  },
+};
 </script>""",
     shared=True,
 )
@@ -187,6 +237,67 @@ def tags_as_chips(text: str) -> str:
 
     parts = _CODE_RE.split(text)
     return "".join(p if i % 2 else _TAG_RE.sub(chip, p) for i, p in enumerate(parts))
+
+
+# The marks of the source lines in a preview (see line_marks): after a line, around a block.
+_MARK = '<span data-vr-line="{n}"></span>'
+_BEFORE = '\n{indent}<div data-vr-line="{n}"></div>\n\n'
+_AFTER = '\n\n{indent}<div data-vr-line="{n}" data-vr-end></div>\n'
+_MARKS_RE = re.compile(
+    r'<span data-vr-line="\d+"></span>|\n[ \t]*<div data-vr-line="\d+"></div>\n\n'
+    r'|\n\n[ \t]*<div data-vr-line="\d+" data-vr-end></div>\n'
+)
+_FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
+_HEADING_RE = re.compile(r"^ {0,3}#{1,6}[ \t]+(?=\S)")
+_ITEM_RE = re.compile(r"^[ \t]*(?:[-*+]|\d+[.)])[ \t]+\S")
+_RULE_RE = re.compile(r"^ {0,3}([-*_=])(?:[ \t]*\1){2,}[ \t]*$")
+_PARAGRAPH_RE = re.compile(r"^ {0,3}[^\s|<$]")  # (not a table, HTML, display LaTeX)
+
+
+def line_marks(text: str) -> str:
+    """``text`` with its lines marked, for the preview to follow the editor (see vrSync): a
+    heading, a list item, a paragraph's first line: an empty span (with its line, from 1); a
+    block (``[[excerpts]]``…: one line, long once rendered): an empty div before it, one after
+    it (with the next line). Not in code."""
+    out, code, text_before = [], False, False
+    for n, line in enumerate(text.split("\n"), 1):
+        mark, prose = _MARK.format(n=n), False
+        if _FENCE_RE.match(line):
+            code = not code
+        elif code or not line.strip() or _RULE_RE.match(line):
+            pass
+        elif _BLOCK.match(line):
+            indent = line[: len(line) - len(line.lstrip())]
+            before, after = (
+                _BEFORE.format(indent=indent, n=n),
+                _AFTER.format(indent=indent, n=n + 1),
+            )
+            line = before + line + after
+        elif m := _HEADING_RE.match(line):
+            line = m[0] + mark + line[m.end() :]
+        else:
+            prose = True
+            if _ITEM_RE.match(line) or (not text_before and _PARAGRAPH_RE.match(line)):
+                line += mark
+        out.append(line)
+        text_before = prose
+    return "\n".join(out)
+
+
+class _Preview(ui.markdown):
+    """The rendered text: shown with its source lines marked (see line_marks), its content
+    without them."""
+
+    marked = ""
+
+    def show(self, marked: str) -> None:
+        self.marked = marked
+        self.content = _MARKS_RE.sub("", marked)
+        self._handle_content_change(self.content)  # (the marks moved only: shown too)
+
+    def _handle_content_change(self, content: str) -> None:
+        marked = self.marked if _MARKS_RE.sub("", self.marked) == content else content
+        super()._handle_content_change(marked)
 
 
 _SHARE = "; flex:1 1 0; min-height:6rem"  # (a stacked editor and preview, sharing the height)
@@ -278,7 +389,7 @@ class MarkdownEditor:
                 if mark:
                     self.editor.mark(mark)
                 self.preview = (
-                    ui.markdown(extras=NOTE_EXTRAS)
+                    _Preview(extras=NOTE_EXTRAS)
                     .classes("w-full vr-note overflow-auto border rounded px-3")
                     .style(f"height:{height}" + (_SHARE if fill and stacked else ""))
                 )
@@ -298,21 +409,14 @@ class MarkdownEditor:
         self._cite_clicks()
 
     def _sync_scroll(self) -> None:
-        """The preview and the editor follow each other's scrolling (at the same proportion);
-        the scroll caused by following is ignored, else they would chase each other."""
+        """The preview and the editor follow each other's scrolling, line by line (see
+        vrSync)."""
         self.editor.client.run_javascript(
             "(() => { let n = 0; const t = setInterval(() => {"
             f" const v = getElement({self.editor.id})?.editor,"
             f" p = getHtmlElement({self.preview.id});"
             " if (++n > 50) clearInterval(t); if (!v || !p) return; clearInterval(t);"
-            " const e = v.scrollDOM; let busy = false;"
-            " const frac = (x) => x.scrollTop / Math.max(1, x.scrollHeight - x.clientHeight);"
-            " const follow = (from, to) => { if (busy) return; busy = true;"
-            " to.scrollTop = frac(from) * (to.scrollHeight - to.clientHeight);"
-            " requestAnimationFrame(() => { busy = false; }); };"
-            " e.addEventListener('scroll', () => follow(e, p));"
-            " p.addEventListener('scroll', () => follow(p, e));"
-            " }, 100); })()"
+            " vrSync.attach(v, p); }, 100); })()"
         )
 
     def _cite_clicks(self) -> None:
@@ -364,8 +468,8 @@ class MarkdownEditor:
 
     def refresh_preview(self) -> None:
         """The rendered text, without its Obsidian comments (``%% … %%``), its #tags as
-        chips."""
-        self.preview.content = tags_as_chips(strip_comments(self._render(self.value)))
+        chips; its source lines marked (to scroll along)."""
+        self.preview.show(tags_as_chips(strip_comments(self._render(line_marks(self.value)))))
 
     def _layout(self) -> None:
         mode = self.mode.value or "edit"
