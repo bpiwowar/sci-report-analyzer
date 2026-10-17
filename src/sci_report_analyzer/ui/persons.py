@@ -34,12 +34,14 @@ from ..sync import (
 )
 from .categories_editor import categories_dialog
 from .dialogs import close_then, ok_handler, transient_dialog
+from .dnd import draggable
 from .folder_notes import NOTES_TIP, notes_url
 from .folders_editor import ALL, categories_added, delete_dialog, expand_to, folders_tree
 from .person import (
     candidate_details,
     deletion_dialog,
     link_url,
+    move_to_folder,
     move_to_folder_dialog,
     orcid_badge,
     purge_dialog,
@@ -433,12 +435,23 @@ def _tree(current: int, changed: Callable[[], None], view: dict) -> None:
         if f.id == current:
             _add_people(f, indent)
 
+    periods = {m.period_id: (m.person_id, f.id) for f in known.values() for m in f.members}
+
+    def person_dropped(period_id: int, n: folders.FolderNode) -> None:
+        """A person dragged onto a folder: moved there (as from their Move button)."""
+        if period_id not in periods:
+            return
+        person_id, from_id = periods[period_id]
+        if from_id != n.id and move_to_folder(from_id, person_id, n.id):
+            ui.navigate.reload()
+
     folders_tree(
         current,
         _goto,
         changed,
         people=people,
         counts={f.id: len(f.members) for f in known.values()},
+        person_dropped=person_dropped,
     )
     ui.label(_("Each person has their own period in the folder (click it to set it).")).classes(
         "text-xs text-grey"
@@ -646,8 +659,13 @@ def _person_row(
         .mark(f"person-row-{member.period_id}")
     ):
         with ui.row().classes("items-center gap-x-2 gap-y-0 min-w-0 grow"):
-            ui.icon("person", color="grey-7").classes("shrink-0")
-            ui.label(person.name).classes("text-sm font-medium whitespace-nowrap")
+            # (dragged by its icon or name onto a folder: moved there; not the whole row,
+            # with its fields)
+            icon = ui.icon("person", color="grey-7").classes("shrink-0 cursor-move")
+            name = ui.label(person.name).classes("text-sm font-medium whitespace-nowrap")
+            for handle in (icon, name):
+                draggable(handle, "person", member.period_id)
+            icon.tooltip(_("Drag onto a folder to move them there"))
             if person.affiliation:
                 ui.label(person.affiliation).classes(
                     "text-xs text-grey ellipsis min-w-0 max-w-xs"

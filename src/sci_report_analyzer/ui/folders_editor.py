@@ -48,12 +48,14 @@ def folders_tree(
     changed: Callable[[], None],
     people: Callable[[folders.FolderNode, int], None] | None = None,
     counts: dict[int, int] | None = None,
+    person_dropped: Callable[[int, folders.FolderNode], None] | None = None,
 ) -> None:
     """The folders as a tree, ``current`` (a folder id, or ALL) shown selected; ``select``:
     called with the folder clicked (ALL: the All people view); ``changed``: once something
     changed (the tree is shown again by it); ``people``: shows an expanded folder's people
     (after the folders within it), at a depth; ``counts``: the number of people of each
-    folder (shown once collapsed)."""
+    folder (shown once collapsed); ``person_dropped``: a person (of ``people``: their
+    period's id, see dnd "person") dropped onto a folder."""
     expanded: set[int] = set(annotations.ui_state(EXPANDED) or [])
     counts = counts or {}
 
@@ -109,7 +111,8 @@ def folders_tree(
         ui.icon("help_outline", color="grey").tooltip(
             _(
                 "Click a folder to show it. Drag a folder onto another one to put it within it "
-                "(onto its top or bottom: next to it). A folder uses the settings chosen in its "
+                "(onto its top or bottom: next to it); a person onto a folder to move them "
+                "there. A folder uses the settings chosen in its "
                 "menu (its categories, the citations in its notes…; named, in the Parameters), "
                 "else the default ones (those not: marked)."
             )
@@ -134,7 +137,13 @@ def folders_tree(
             .mark(f"folder-node-{n.id}")
         )
         draggable(row, "folder", n.id)
-        drop_zone(row, "folder", lambda i, w, n=n: dropped(i, n, w), middle="inside")
+        drop_zone(
+            row,
+            "folder",
+            lambda i, w, n=n: dropped(i, n, w),
+            middle="inside",
+            others={"person": lambda i, n=n: person_dropped(i, n)} if person_dropped else None,
+        )
         row.on(
             "click",
             lambda n=n: select(n.id),

@@ -2081,24 +2081,30 @@ def move_to_folder_dialog(folder_id: int, person_id: int, done) -> None:
         )
 
         def move() -> bool | None:
-            if target.value is None:
+            if target.value is None or not move_to_folder(folder_id, person_id, target.value):
                 return False
-            try:
-                added = folders.move_person(person_id, folder_id, target.value)
-            except ValueError as e:
-                ui.notify(str(e), type="warning")
-                return False
-            if added:
-                ui.notify(
-                    ngettext(
-                        "{n} category added to the folder's settings for their excerpts",
-                        "{n} categories added to the folder's settings for their excerpts",
-                        added,
-                    ).format(n=added)
-                )
             done(target.value)
 
         actions(dlg, _("Move"), move, mark="move-ok", icon="drive_file_move")
+
+
+def move_to_folder(folder_id: int, person_id: int, to_id: int) -> bool:
+    """Move a person to another folder (from the dialog, or dragged onto it): whether it was
+    done (refused: says why)."""
+    try:
+        added = folders.move_person(person_id, folder_id, to_id)
+    except ValueError as e:
+        ui.notify(str(e), type="warning")
+        return False
+    if added:
+        ui.notify(
+            ngettext(
+                "{n} category added to the folder's settings for their excerpts",
+                "{n} categories added to the folder's settings for their excerpts",
+                added,
+            ).format(n=added)
+        )
+    return True
 
 
 # ---- theses --------------------------------------------------------------------------------
