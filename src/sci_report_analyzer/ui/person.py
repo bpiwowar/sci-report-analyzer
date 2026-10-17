@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import Callable
 from html import escape
 
@@ -243,17 +244,25 @@ def career_view(person_id: int) -> None:
         ui.button(
             _("Add"), icon="add", on_click=lambda: _career_dialog(person_id, None, listing.refresh)
         ).props("flat dense").mark("career-add")
-        if llm.model():
-            ui.button(
-                _("Read in their documents"),
-                icon="auto_awesome",
-                on_click=lambda: _extract_dialog(person_id, listing.refresh),
-            ).props("flat dense color=purple").tooltip(
-                _(
-                    "The local LLM reads their documents (the passages about a career) and "
-                    "profiles, and suggests lines of their CV, to check"
+        on = bool(llm.model(task="career"))
+        with ui.element("span").tooltip(  # (a disabled button shows no tooltip)
+            _(
+                "The local LLM reads their documents (the passages about a career) and "
+                "profiles, and suggests lines of their CV, to check"
+            )
+            if on
+            else _("Turn on the local LLM and choose a model (Settings → Local LLM)")
+        ):
+            button = (
+                ui.button(
+                    _("Read in their documents"),
+                    icon="auto_awesome",
+                    on_click=lambda: _extract_dialog(person_id, listing.refresh),
                 )
-            ).mark("career-extract")
+                .props("flat dense color=purple")
+                .mark("career-extract")
+            )
+            button.set_enabled(on)
 
     @ui.refreshable
     def listing() -> None:
@@ -308,6 +317,19 @@ def career_view(person_id: int) -> None:
     listing()
 
 
+def _page_chips(found: list[career_extract.Passage], mark: str) -> None:
+    """Pages of documents (each opening it there, in a new tab) or the profiles, as chips."""
+    with ui.row().classes("gap-1 items-center").mark(mark):
+        for p in found:
+            if p.doc_id is None:
+                ui.chip(p.source, icon="person").props("dense outline")
+                continue
+            url = f"{page_url_of(p.doc_id)}?page={p.page}"
+            ui.chip(
+                p.source, icon="description", on_click=lambda url=url: ui.navigate.to(url, True)
+            ).props("dense outline clickable").tooltip(_("Open it at this page"))
+
+
 def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
     """The lines of the CV the LLM reads in the person's documents (see career_extract): the
     documents chosen first (those not read yet, never opened in the viewer, to open); then
@@ -316,9 +338,13 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
         dlg,
         _card,
     ):
-        ui.label(_("Model: {model}").format(model=llm.model())).classes(
-            "text-xs text-grey -mt-2"
-        ).mark("career-extract-model")
+        with ui.row().classes("items-center gap-1 -mt-2 text-xs text-grey"):
+            ui.icon("lock", size="xs")
+            ui.label(
+                _(
+                    "Model: {model} (local: nothing leaves this machine or the local network)"
+                ).format(model=llm.model(task="career"))
+            ).mark("career-extract-model")
         body = ui.column().classes("w-full gap-1").mark("career-extract-body")
         footer = ui.row().classes("w-full items-center")
     ticks: dict[int, ui.checkbox] = {}
@@ -341,13 +367,17 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
         _career_dialog(person_id, found[i].entry, on_change)
 
     boxes: dict[int, ui.checkbox] = {}
+    profiles: dict[str, ui.checkbox] = {}  # (whether their profiles' affiliations are sent)
+
+    def with_profiles() -> bool:
+        return bool(profiles and profiles["box"].value)
 
     @ui.refreshable
     def sent() -> None:
         """The messages of each part (for the documents ticked), the constrained output's
         schema (that of the answer) said."""
         chosen = [i for i, b in boxes.items() if b.value]
-        parts = career_extract.requests(person_id, chosen)
+        parts = career_extract.requests(person_id, chosen, with_profiles())
         if not parts:
             ui.label(_("Nothing to read")).classes("text-sm text-grey")
         for i, (_piece, chat) in enumerate(parts, 1):
@@ -369,23 +399,48 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
             )
         ).classes("text-xs text-grey mt-1")
 
+    @ui.refreshable
+    def pages() -> None:
+        """The pages sent (of the documents ticked), and those left out (beyond the limit)."""
+        chosen = [i for i, b in boxes.items() if b.value]
+        sent_ = [p for piece, _chat in career_extract.requests(person_id, chosen) for p in piece]
+        sent_ = [p for p in sent_ if p.doc_id is not None]
+        with ui.row().classes("items-center gap-1 w-full"):
+            ui.label(_("Pages sent:")).classes("text-sm text-grey-8")
+            if not sent_:
+                ui.label(_("none (no page about a career found)")).classes("text-sm text-grey")
+            _page_chips(sent_, "career-extract-pages")
+        if out := career_extract.left_out(person_id, chosen):
+            with ui.row().classes("items-center gap-1 w-full"):
+                ui.label(_("Left out (beyond the limit):")).classes("text-sm text-grey")
+                _page_chips(out, "career-extract-left-out")
+
     def choose() -> None:
         """The documents to read: those read already ticked; the others, to open first."""
         docs = career_extract.person_documents(person_id)
         body.clear()
         footer.clear()
         boxes.clear()
+        profiles.clear()
+        known = career_extract.affiliations(person_id)
         with body:
-            ui.label(
-                _(
-                    "The documents to read (their passages about a career), with their "
-                    "profiles' affiliations and their notes:"
+            ui.label(_("What to read (only the passages about a career are sent):")).classes(
+                "text-sm text-grey-8"
+            )
+            profiles["box"] = (
+                ui.checkbox(
+                    _("Their profiles' affiliations: {list}").format(list="; ".join(known))
+                    if known
+                    else _("Their profiles' affiliations (none)"),
+                    value=bool(known),
                 )
-            ).classes("text-sm text-grey-8")
+                .props("" if known else "disable")
+                .mark("career-extract-profiles")
+            )
             if not docs:
-                ui.label(_("No document: only their profiles and notes are read")).classes(
-                    "text-sm text-grey"
-                ).mark("career-extract-no-document")
+                ui.label(_("No document")).classes("text-sm text-grey").mark(
+                    "career-extract-no-document"
+                )
             for d in docs:
                 with ui.row().classes("w-full items-center gap-2 no-wrap"):
                     boxes[d.id] = (
@@ -405,6 +460,7 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                         ).props("flat round dense size=sm").tooltip(
                             _("Open it (its text is extracted there), then Refresh")
                         ).mark(f"career-extract-open-{d.id}")
+            pages()
             with (
                 ui.expansion(_("What the model is sent"), icon="visibility")
                 .classes("w-full")
@@ -412,8 +468,9 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                 .mark("career-extract-prompt")
             ):
                 sent()
-            for box in boxes.values():
+            for box in [*boxes.values(), profiles["box"]]:
                 box.on_value_change(sent.refresh)
+                box.on_value_change(pages.refresh)
         with footer:
             if any(not d.read for d in docs):
                 ui.button(_("Refresh"), icon="refresh", on_click=choose).props("flat").mark(
@@ -424,28 +481,84 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
             ui.button(
                 _("Read"),
                 icon="auto_awesome",
-                on_click=lambda: run([i for i, b in boxes.items() if b.value]),
+                on_click=lambda: run([i for i, b in boxes.items() if b.value], with_profiles()),
             ).mark("career-extract-read")
 
-    async def run(doc_ids: list[int]) -> None:
+    async def run(doc_ids: list[int], with_profiles: bool) -> None:
         body.clear()
         footer.clear()
         got: list[career_extract.Suggestion] = []
-        with body, ui.row().classes("items-center gap-2 no-wrap"):
-            ui.spinner()
-            status = ui.label(_("Reading their documents (this may take a while)…")).classes(
-                "text-grey"
+        state = {"part": 0, "parts": 0, "phase": "reading", "chars": 0, "start": time.monotonic()}
+        phases = {
+            "reading": _("the model reads the text"),
+            "thinking": _("the model thinks ({n} characters)"),
+            "writing": _("the model writes its answer ({n} characters)"),
+        }
+        with body:
+            with ui.row().classes("items-center gap-2 no-wrap"):
+                ui.spinner()
+                status = (
+                    ui.label(_("Reading their documents…"))
+                    .classes("text-grey-8")
+                    .mark("career-extract-status")
+                )
+            bar = ui.linear_progress(value=0, show_value=False).props("rounded color=purple")
+            detail = ui.label().classes("text-xs text-grey").mark("career-extract-detail")
+            icons = []  # (each part's: waiting, read now, done)
+            for i, (piece, _chat) in enumerate(
+                career_extract.requests(person_id, doc_ids, with_profiles)
+            ):
+                with ui.row().classes("items-center gap-1 no-wrap w-full"):
+                    icons.append(
+                        ui.icon("schedule", size="xs", color="grey").mark(
+                            f"career-extract-part-{i}"
+                        )
+                    )
+                    _page_chips(piece, f"career-extract-part-pages-{i}")
+
+        def show() -> None:
+            n, total = state["part"], state["parts"]
+            if total:
+                status.set_text(
+                    _("Part {i} of {n}: {phase}").format(
+                        i=min(n + 1, total),
+                        n=total,
+                        phase=phases[state["phase"]].format(n=state["chars"]),
+                    )
+                )
+                bar.set_value(n / total)
+            elapsed = int(time.monotonic() - state["start"])
+            detail.set_text(
+                ngettext(
+                    "{s} s · {n} line found so far",
+                    "{s} s · {n} lines found so far",
+                    len(got),
+                ).format(s=elapsed, n=len(got))
             )
 
         def progress(done: int, total: int) -> None:
-            status.set_text(
-                _("Reading their documents: part {i} of {n} (this may take a while)…").format(
-                    i=min(done + 1, total), n=total
+            state.update(part=done, parts=total, phase="reading", chars=0)
+            for i, icon in enumerate(icons):
+                icon.set_name(
+                    "check_circle" if i < done else "pending" if i == done else "schedule"
                 )
-            )
+                icon.props(f"color={'green' if i < done else 'purple' if i == done else 'grey'}")
+            show()
+
+        def phase(name: str, chars: int) -> None:
+            state.update(phase=name, chars=chars)
+
+        ticker = ui.timer(0.5, show)
 
         task = background_tasks.create(
-            career_extract.extract(person_id, doc_ids, out=got, progress=progress),
+            career_extract.extract(
+                person_id,
+                doc_ids,
+                out=got,
+                profiles=with_profiles,
+                progress=progress,
+                phase=phase,
+            ),
             name="career-extract",
         )
         stopped = False
@@ -476,6 +589,8 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
             with footer:
                 ui.button(_("Back"), icon="arrow_back", on_click=choose).props("flat")
             return
+        finally:
+            ticker.cancel()
         footer.clear()
         found[:] = got
         ticks.clear()
@@ -504,7 +619,9 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                                 ui.icon("warning", color="warning", size="xs").tooltip(
                                     _("Its words are not in the documents: to check")
                                 )
-                            ui.label(f"{sug.source}: “{sug.quote}”").classes("italic ellipsis")
+                            _page_chips(sug.pages, f"career-extract-source-{i}")
+                            if sug.quote:
+                                ui.label(f"“{sug.quote}”").classes("italic ellipsis")
                     ui.button(icon="edit", on_click=lambda i=i: edit(i)).props(
                         "flat round dense size=sm"
                     ).tooltip(_("Edit it, then add it")).mark(f"career-extract-edit-{i}")

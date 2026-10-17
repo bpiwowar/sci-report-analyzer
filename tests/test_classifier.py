@@ -63,7 +63,6 @@ def test_embed_apis(monkeypatch) -> None:
             enabled=True,
             embed_api="openai",
             embed_url="http://box:8080/v1/",
-            embed_key="secret",
             embed_model="e5",
         )
     )
@@ -73,7 +72,6 @@ def test_embed_apis(monkeypatch) -> None:
             return_value=httpx.Response(200, json={"data": data})
         )
         assert asyncio.run(llm.embed(["a", "b"])) == [[1.0], [2.0]]
-        assert route.calls[0].request.headers["authorization"] == "Bearer secret"
         respx.get("http://box:8080/v1/models").mock(
             return_value=httpx.Response(200, json={"data": [{"id": "e5"}, {"id": "bge"}]})
         )
@@ -143,3 +141,16 @@ async def test_suggestions_in_the_picker(user: User, fake_viewer, embeddings):
     await user.should_see("Added to Research")
     filed = [e for e in categories.excerpts(period) if e.quoted.startswith("Our ranking")]
     assert [e.category_id for e in filed] == [cats["Research"]]
+
+
+async def test_suggestions_greyed_without_model(user: User, fake_viewer):
+    """Without an embedding model: the suggestions shown greyed, saying what to set."""
+    folder, period, _cats = _folder()
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "Our ranking model", "p": 1, "rects": []}
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    await user.open(f"/doc/{doc}?folder={folder}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker="category-suggestions-off")
+    assert "disable" in user.find(marker="classifier-train").elements.pop().props

@@ -1107,12 +1107,21 @@ def similar_excerpts(
 def category_suggestions(folder_id: int, text: str, pick: Callable[[int], None]) -> None:
     """The categories suggested for a passage (those closest to its embedding: see
     classifier.py), clicked to pick one; when they were learnt (from the excerpts filed), and
-    a button to learn again."""
+    a button to learn again. Without an embedding model: greyed, saying so."""
     names = {n.id: n.path for n in categories.tree(folder_id)}
+    on = bool(llm.embed_model(folder_id))
     with ui.row().classes("w-full items-center gap-1 no-wrap").mark("category-suggestions"):
-        ui.icon("auto_awesome", size="xs", color="purple").tooltip(
+        ui.icon("auto_awesome", size="xs", color="purple" if on else "grey-5").tooltip(
             _("Suggested from the excerpts filed (their embeddings)")
         )
+        if not on:
+            ui.label(
+                _("Suggestions: turn on the local LLM, choose an embedding model (Settings)")
+            ).classes("text-xs text-grey-5 grow").mark("category-suggestions-off")
+            ui.button(_("Train"), icon="model_training").props(
+                "flat dense size=sm no-caps disable"
+            ).mark("classifier-train")
+            return
         chips = ui.row().classes("gap-1 grow items-center min-w-0")
         info = ui.label().classes("text-xs text-grey shrink-0").mark("classifier-trained")
         train_button = (
@@ -1313,8 +1322,7 @@ def category_picker(
 
         search.on_value_change(lambda: listing.refresh())
         search.on("keydown.enter", enter)
-        if llm.embed_model(folder_id):
-            category_suggestions(folder_id, filed, pick)
+        category_suggestions(folder_id, filed, pick)
         with ui.column().classes("w-full gap-0 max-h-96 overflow-auto"):
             listing()
         if last is not None:  # (scrolled to, once shown)

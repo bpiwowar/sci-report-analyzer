@@ -11,6 +11,7 @@ from nicegui import ui
 
 from .. import (
     annotations,
+    career_words,
     config,
     contribution,
     datadir,
@@ -68,7 +69,7 @@ NAV = (
             ("copy", N_("Copy filters")),
         ),
     ),
-    (N_("AI"), (("llm", N_("Local LLM (Ollama)")),)),
+    (N_("AI"), (("llm", N_("Local LLM (Ollama)")), ("career", N_("Reading a career")))),
     (
         N_("Data"),
         (
@@ -92,6 +93,7 @@ PANELS = {
     "reports": lambda: report_templates_tab(),
     "copy": lambda: copy_filters_tab(),
     "llm": lambda: llm_tab(),
+    "career": lambda: career_tab(),
     "data": lambda: data_tab(),
     "io": lambda: io_tab(),
     "shared": lambda: shared_settings.shared_tab(),
@@ -1294,8 +1296,73 @@ def keys_tab() -> None:
         ui.button(_("Save"), on_click=save)
 
 
+def career_words_section() -> Callable[[], dict[str, dict[str, list[str]]]]:
+    """The words finding the pages about a career (see career_words), by language: one per
+    line; returns them."""
+    saved = career_words.words()
+    ui.label(_("The pages sent")).classes("text-lg mt-4")
+    ui.label(
+        _(
+            "Only the pages likely about a career are sent to the model: those with a heading "
+            "below (whole), then those with the most lines having a year and a position or a "
+            "diploma. One word or phrase per line, without case nor accents; * for any "
+            "letters (e.g. recrut*). The words of every language are used together."
+        )
+    ).classes("text-sm text-grey-8 max-w-[48rem]")
+    areas: dict[str, dict[str, ui.textarea]] = {}
+    with ui.tabs().props("dense inline-label align=left") as tabs:
+        for lang, name in career_words.LANGUAGES.items():
+            ui.tab(lang, name).mark(f"career-words-tab-{lang}")
+    with ui.tab_panels(tabs, value=next(iter(career_words.LANGUAGES))).classes("w-full"):
+        for lang in career_words.LANGUAGES:
+            with ui.tab_panel(lang).classes("p-0"), ui.row().classes("w-full gap-2 no-wrap"):
+                areas[lang] = {
+                    g: ui.textarea(_(label), value="\n".join(saved[lang][g]))
+                    .props("outlined rows=10")
+                    .classes("grow font-mono text-xs")
+                    .mark(f"career-words-{lang}-{g}")
+                    for g, label in career_words.GROUPS.items()
+                }
+
+    def reset() -> None:
+        for lang, by_group in areas.items():
+            for g, area in by_group.items():
+                area.set_value("\n".join(career_words.DEFAULTS[lang][g]))
+
+    ui.button(_("Default words"), icon="restart_alt", on_click=reset).props("flat dense").mark(
+        "career-words-reset"
+    )
+    return lambda: {
+        lang: {g: (a.value or "").splitlines() for g, a in by_group.items()}
+        for lang, by_group in areas.items()
+    }
+
+
+def suggested(key: str) -> str:
+    """The kind of model suggested (see llm.SUGGESTED), translated."""
+    return _(llm.SUGGESTED[key])
+
+
+def confidential_note() -> None:
+    """Personal information is confidential: only local models, said."""
+    with (
+        ui.row()
+        .classes("items-center gap-2 no-wrap bg-green-1 rounded p-2 max-w-[48rem]")
+        .mark("llm-local-note")
+    ):
+        ui.icon("lock", color="green-9")
+        ui.label(
+            _(
+                "Personal information is confidential: only local models are used. The servers "
+                "must be on this machine or the local network (others are refused), and "
+                "Ollama's cloud models are never listed nor used."
+            )
+        ).classes("text-sm text-green-10")
+
+
 def llm_tab() -> None:
     st = llm.stored_settings()
+    confidential_note()
     ui.label(
         _(
             "A local LLM served by Ollama (https://ollama.com), for the features that use one "
@@ -1311,12 +1378,10 @@ def llm_tab() -> None:
     ui.label(_("(or set the {env} environment variable)").format(env=llm.URL_ENV)).classes(
         "text-xs text-grey"
     )
-    local_only = ui.switch(_("Local models only"), value=st.local_only).mark("llm-local-only")
     ui.label(
         _(
-            "Ollama's cloud models (e.g. gpt-oss:120b-cloud) send the text to ollama.com: "
-            "they are never listed nor used. To turn them off in Ollama itself, start it "
-            "with {env}=1."
+            "Ollama's cloud models (e.g. gpt-oss:120b-cloud) would send the text to "
+            "ollama.com: to turn them off in Ollama itself too, start it with {env}=1."
         ).format(env=llm.NO_CLOUD_ENV)
     ).classes("text-xs text-grey max-w-[48rem]")
     with ui.row().classes("items-center gap-2"):
@@ -1331,12 +1396,26 @@ def llm_tab() -> None:
         "text-xs text-grey"
     )
     status = ui.label().classes("text-xs")
+    ui.label(suggested("default")).classes("text-xs text-grey-8 max-w-[48rem]").mark(
+        "llm-suggested-default"
+    )
+    ui.label(_("A task can use another model (its own page, e.g. Reading a career)")).classes(
+        "text-xs text-grey"
+    )
+    think = (
+        ui.switch(_("Let the model think before answering (by default)"), value=st.think)
+        .tooltip(
+            _(
+                "For reasoning models (e.g. qwen3, gpt-oss): often much slower, rarely needed "
+                "to read a text"
+            )
+        )
+        .mark("llm-think")
+    )
 
     async def load(notify: bool = False) -> None:
         try:
-            models = await llm.list_models(
-                url.value or llm.DEFAULT_URL, local_only=bool(local_only.value)
-            )
+            models = await llm.list_models(url.value or llm.DEFAULT_URL)
         except Exception as e:
             message = _("Cannot reach Ollama: {error}").format(error=e)
             status.set_text(message)
@@ -1357,7 +1436,6 @@ def llm_tab() -> None:
             ui.notify(message, type="positive" if models else "warning")
 
     refresh.on_click(lambda: load(notify=True))
-    local_only.on_value_change(lambda: load())
     ui.timer(0.1, load, once=True)
 
     ui.label(_("Embeddings")).classes("text-lg mt-4")
@@ -1383,11 +1461,6 @@ def llm_tab() -> None:
             .classes("w-[32rem]")
             .mark("llm-embed-url")
         )
-        embed_key = (
-            ui.input(_("API key (if needed)"), value=st.embed_key, password=True)
-            .classes("w-[32rem]")
-            .mark("llm-embed-key")
-        )
     with ui.row().classes("items-center gap-2"):
         embed_model = (
             ui.select(
@@ -1407,6 +1480,9 @@ def llm_tab() -> None:
         "text-xs text-grey"
     )
     embed_status = ui.label().classes("text-xs")
+    ui.label(suggested("embed")).classes("text-xs text-grey-8 max-w-[48rem]").mark(
+        "llm-suggested-embed"
+    )
 
     async def load_embed(notify: bool = False) -> None:
         openai = embed_api.value == "openai"
@@ -1414,8 +1490,6 @@ def llm_tab() -> None:
             models = await llm.list_embed_models(
                 embed_api.value,
                 (embed_url.value if openai else url.value) or llm.DEFAULT_URL,
-                embed_key.value or "",
-                local_only=bool(local_only.value),
             )
         except Exception as e:
             message = _("Cannot reach the server: {error}").format(error=e)
@@ -1441,21 +1515,113 @@ def llm_tab() -> None:
             enabled=bool(enabled.value),
             url=(url.value or "").strip() or llm.DEFAULT_URL,
             model=model.value or "",
-            local_only=bool(local_only.value),
+            tasks=llm.stored_settings().tasks,  # (on their own pages)
+            task_think=llm.stored_settings().task_think,
+            think=bool(think.value),
             embed_api=embed_api.value or "ollama",
             embed_url=(embed_url.value or "").strip(),
-            embed_key=(embed_key.value or "").strip(),
             embed_model=(embed_model.value or "").strip(),
         )
 
-    def save() -> None:
-        llm.save_settings(values())
+    def save() -> bool | None:
+        st = values()
+        servers = [st.url] + ([st.embed_url] if st.embed_api == "openai" else [])
+        if far := [u for u in servers if not llm.is_local_url(u)]:
+            ui.notify(
+                _("Not a local server (this machine or the local network): {url}").format(
+                    url=far[0]
+                ),
+                type="warning",
+            )
+            return False
+        llm.save_settings(st)
         ui.notify(_("Saved"), type="positive")
 
     save = unsaved.track(values, save)
     with ui.row().classes("gap-2"):
         unsaved.cancel_button()
-        ui.button(_("Save"), on_click=save)
+        ui.button(_("Save"), on_click=save).mark("llm-save")
+
+
+def career_tab() -> None:
+    """Reading a person's career with the LLM (see career_extract): its model, and the words
+    finding the pages sent."""
+    st = llm.settings()
+    confidential_note()
+    ui.label(
+        _(
+            "On a person's Career tab, “Read in their documents”: the local LLM reads the "
+            "pages of their documents about a career, and suggests lines of their CV."
+        )
+    ).classes("text-sm text-grey-8 max-w-[48rem]")
+    task_model = (
+        ui.select(
+            [st.tasks["career"]] if st.tasks.get("career") else [],
+            value=st.tasks.get("career") or None,
+            label=_("Model (blank: the default one, {model})").format(model=st.model or _("none")),
+            clearable=True,
+            with_input=True,
+            new_value_mode="add-unique",
+        )
+        .classes("w-[32rem]")
+        .tooltip(_("A small model (e.g. 4–8B) is often enough, and much faster"))
+        .mark("llm-task-career")
+    )
+    ui.label(suggested("career")).classes("text-xs text-grey-8 max-w-[48rem]").mark(
+        "llm-suggested-career"
+    )
+    default_think = llm.TASK_THINK.get("career", st.think)
+    think = (
+        ui.toggle(
+            {
+                "": _("Default ({choice})").format(
+                    choice=_("thinks") if default_think else _("doesn't think")
+                ),
+                "on": _("Thinks"),
+                "off": _("Doesn't think"),
+            },
+            value={True: "on", False: "off"}.get(st.task_think.get("career"), ""),
+        )
+        .props("dense no-caps")
+        .tooltip(
+            _(
+                "Whether a reasoning model (e.g. qwen3) thinks before answering: much slower, "
+                "rarely better to read facts in a text"
+            )
+        )
+        .mark("llm-task-career-think")
+    )
+
+    async def load() -> None:
+        try:
+            models = await llm.list_models(st.url)
+        except Exception:
+            return  # (the server not running: the model as saved)
+        value = task_model.value
+        task_model.set_options(sorted({*models, *([value] if value else [])}), value=value)
+
+    ui.timer(0.1, load, once=True)
+    words_value = career_words_section()
+
+    def values() -> tuple[str, str, dict]:
+        return task_model.value or "", think.value or "", words_value()
+
+    def save() -> None:
+        chosen, thinking, words = values()
+        stored = llm.stored_settings()
+        stored.tasks = {**stored.tasks, "career": chosen}
+        stored.tasks = {k: v for k, v in stored.tasks.items() if v}
+        stored.task_think = {k: v for k, v in stored.task_think.items() if k != "career"}
+        if thinking:
+            stored.task_think["career"] = thinking == "on"
+        llm.save_settings(stored)
+        career_words.save_words(words)
+        ui.notify(_("Saved"), type="positive")
+
+    save = unsaved.track(values, save)
+    with ui.row().classes("gap-2"):
+        unsaved.cancel_button()
+        ui.button(_("Save"), on_click=save).mark("career-save-settings")
 
 
 # ---- venue kinds ---------------------------------------------------------------------------

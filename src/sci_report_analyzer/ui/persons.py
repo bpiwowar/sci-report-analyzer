@@ -829,14 +829,11 @@ def models_section(folder_id: int) -> Callable[[], tuple[str, str]]:
 
     async def load() -> None:
         for select, listing in (
-            (inputs[0], llm.list_models(st.url, local_only=st.local_only)),
+            (inputs[0], llm.list_models(st.url)),
             (
                 inputs[1],
                 llm.list_embed_models(
-                    st.embed_api,
-                    st.embed_url if st.embed_api == "openai" else st.url,
-                    st.embed_key,
-                    local_only=st.local_only,
+                    st.embed_api, st.embed_url if st.embed_api == "openai" else st.url
                 ),
             ),
         ):

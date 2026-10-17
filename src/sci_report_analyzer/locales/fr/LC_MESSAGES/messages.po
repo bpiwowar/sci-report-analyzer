@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-17 08:50+0200\n"
+"POT-Creation-Date: 2026-10-17 09:12+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -317,6 +317,11 @@ msgstr "Une règle ajoutée à la main"
 msgid "A single conference: its texts name others too"
 msgstr "Une seule conférence : ses textes en nomment d'autres aussi"
 
+msgid "A small model (e.g. 4–8B) is often enough, and much faster"
+msgstr ""
+"Un petit modèle (p. ex. 4 à 8 B) suffit souvent, et il est bien plus "
+"rapide"
+
 msgid "A star list needs a name"
 msgstr "Une liste étoilée doit avoir un nom"
 
@@ -328,6 +333,11 @@ msgstr "Une synchronisation est déjà en cours"
 
 msgid "A sync is running and would be interrupted."
 msgstr "Une synchronisation est en cours et serait interrompue."
+
+msgid "A task can use another model (its own page, e.g. Reading a career)"
+msgstr ""
+"Une tâche peut utiliser un autre modèle (sa propre page, p. ex. Lecture "
+"d'un parcours)"
 
 msgid "A title is needed"
 msgstr "Il faut un intitulé"
@@ -453,9 +463,6 @@ msgstr ""
 
 msgid "AI"
 msgstr "IA"
-
-msgid "API key (if needed)"
-msgstr "Clé d'API (si nécessaire)"
 
 msgid "API keys"
 msgstr "Clés d’API"
@@ -1363,6 +1370,10 @@ msgid "Declared by"
 msgstr "Déclaré par"
 
 #, python-brace-format
+msgid "Default ({choice})"
+msgstr "Par défaut ({choice})"
+
+#, python-brace-format
 msgid "Default ({source})"
 msgstr "Par défaut ({source})"
 
@@ -1375,6 +1386,9 @@ msgstr "Niveau par défaut de {name}"
 
 msgid "Default level per kind"
 msgstr "Niveau par défaut selon le type"
+
+msgid "Default words"
+msgstr "Mots par défaut"
 
 msgid "Defaults"
 msgstr "Valeurs par défaut"
@@ -1483,6 +1497,9 @@ msgstr "Diplôme"
 msgid "Diploma (e.g. PhD in computer science, HDR)"
 msgstr "Diplôme (p. ex. doctorat en informatique, HDR)"
 
+msgid "Diplomas (a line with a year)"
+msgstr "Diplômes (une ligne avec une année)"
+
 msgid "Discard"
 msgstr "Abandonner"
 
@@ -1498,6 +1515,9 @@ msgstr "Document"
 #, python-brace-format
 msgid "Documents ({n})"
 msgstr "Documents ({n})"
+
+msgid "Doesn't think"
+msgstr "Ne réfléchit pas"
 
 msgid "Don't ask again"
 msgstr "Ne plus demander"
@@ -1866,6 +1886,13 @@ msgstr "Dossier"
 msgid "Folders"
 msgstr "Dossiers"
 
+msgid ""
+"For reasoning models (e.g. qwen3, gpt-oss): often much slower, rarely "
+"needed to read a text"
+msgstr ""
+"Pour les modèles qui raisonnent (p. ex. qwen3, gpt-oss) : souvent bien "
+"plus lent, rarement utile pour lire un texte"
+
 msgid "For the features using the local LLM"
 msgstr "Pour les fonctions utilisant le LLM local"
 
@@ -2007,6 +2034,9 @@ msgstr "HTTP {status} de {url}"
 
 msgid "Heading"
 msgstr "Titre"
+
+msgid "Headings (the page is sent whole)"
+msgstr "Titres (la page est envoyée entière)"
 
 msgid "Help"
 msgstr "Aide"
@@ -2539,8 +2569,14 @@ msgstr ""
 "Le laisser hors du texte généré (les notes, les rapports) : toujours "
 "conservé, et listé ici"
 
+msgid "Left out (beyond the limit):"
+msgstr "Laissées de côté (au-delà de la limite) :"
+
 msgid "Left out of the generated text (the notes, the reports)"
 msgstr "Laissé hors du texte généré (les notes, les rapports)"
+
+msgid "Let the model think before answering (by default)"
+msgstr "Laisser le modèle réfléchir avant de répondre (par défaut)"
 
 msgid "Level"
 msgstr "Niveau"
@@ -2603,9 +2639,6 @@ msgstr "Listés comme similaires"
 
 msgid "Local LLM (Ollama)"
 msgstr "LLM local (Ollama)"
-
-msgid "Local models only"
-msgstr "Modèles locaux uniquement"
 
 msgid "Look up on…"
 msgstr "Rechercher sur…"
@@ -2830,8 +2863,14 @@ msgid "Model"
 msgstr "Modèle"
 
 #, python-brace-format
-msgid "Model: {model}"
-msgstr "Modèle : {model}"
+msgid "Model (blank: the default one, {model})"
+msgstr "Modèle (vide : celui par défaut, {model})"
+
+#, python-brace-format
+msgid "Model: {model} (local: nothing leaves this machine or the local network)"
+msgstr ""
+"Modèle : {model} (local : rien ne sort de cette machine ni du réseau "
+"local)"
 
 msgid "Models"
 msgstr "Modèles"
@@ -3021,9 +3060,6 @@ msgstr "Aucun filtre de copie activé : voir Paramètres → Filtres de copie"
 
 msgid "No document"
 msgstr "Aucun document"
-
-msgid "No document: only their profiles and notes are read"
-msgstr "Aucun document : seuls ses profils et ses notes sont lus"
 
 msgid "No excerpt filed yet: nothing to learn from"
 msgstr "Aucun extrait classé : rien à apprendre"
@@ -3216,6 +3252,10 @@ msgstr "Pas un canal conjoint"
 
 msgid "Not a joint venue (on saving)."
 msgstr "Pas un canal conjoint (à l'enregistrement)."
+
+#, python-brace-format
+msgid "Not a local server (this machine or the local network): {url}"
+msgstr "Pas un serveur local (cette machine ou le réseau local) : {url}"
 
 msgid "Not a person within a folder"
 msgstr "Pas une personne dans un dossier"
@@ -3414,13 +3454,21 @@ msgstr "URL du serveur Ollama"
 
 #, python-brace-format
 msgid ""
-"Ollama's cloud models (e.g. gpt-oss:120b-cloud) send the text to "
-"ollama.com: they are never listed nor used. To turn them off in Ollama "
-"itself, start it with {env}=1."
+"Ollama's cloud models (e.g. gpt-oss:120b-cloud) would send the text to "
+"ollama.com: to turn them off in Ollama itself too, start it with {env}=1."
 msgstr ""
-"Les modèles cloud d’Ollama (p. ex. gpt-oss:120b-cloud) envoient le texte "
-"à ollama.com : ils ne sont ni listés ni utilisés. Pour les désactiver "
-"dans Ollama lui-même, lancez-le avec {env}=1."
+"Les modèles cloud d'Ollama (p. ex. gpt-oss:120b-cloud) enverraient le "
+"texte à ollama.com : pour les désactiver aussi dans Ollama, le lancer "
+"avec {env}=1."
+
+msgid ""
+"On a person's Career tab, “Read in their documents”: the local LLM reads "
+"the pages of their documents about a career, and suggests lines of their "
+"CV."
+msgstr ""
+"Dans l'onglet Parcours d'une personne, « Lire dans ses documents » : le "
+"LLM local lit les pages de ses documents sur un parcours, et suggère des "
+"lignes de son CV."
 
 msgid "One of its workshops"
 msgstr "Un de ses ateliers"
@@ -3450,6 +3498,20 @@ msgstr "Seul son emplacement est cité (fusionné comme référence)"
 msgid "Only people tagged"
 msgstr "Seulement les personnes étiquetées"
 
+msgid ""
+"Only the pages likely about a career are sent to the model: those with a "
+"heading below (whole), then those with the most lines having a year and a"
+" position or a diploma. One word or phrase per line, without case nor "
+"accents; * for any letters (e.g. recrut*). The words of every language "
+"are used together."
+msgstr ""
+"Seules les pages qui parlent probablement d'un parcours sont envoyées au "
+"modèle : celles avec un titre ci-dessous (entières), puis celles avec le "
+"plus de lignes ayant une année et un poste ou un diplôme. Un mot ou une "
+"expression par ligne, sans casse ni accents ; * pour n'importe quelles "
+"lettres (p. ex. recrut*). Les mots de toutes les langues sont utilisés "
+"ensemble."
+
 #, python-brace-format
 msgid "Only the papers in “{name}” (within the period)"
 msgstr "Seulement les articles de « {name} » (dans la période)"
@@ -3473,6 +3535,9 @@ msgstr "Ouvrir dans un nouvel onglet"
 
 msgid "Open it (its text is extracted there), then Refresh"
 msgstr "L'ouvrir (son texte y est extrait), puis Actualiser"
+
+msgid "Open it at this page"
+msgstr "L'ouvrir à cette page"
 
 msgid "Open its document (at its page)"
 msgstr "Ouvrir son document (à sa page)"
@@ -3576,6 +3641,9 @@ msgstr "PDF supprimé"
 msgid "Page {page}, {kind}"
 msgstr "Page {page}, {kind}"
 
+msgid "Pages sent:"
+msgstr "Pages envoyées :"
+
 msgid "Paper"
 msgstr "Article"
 
@@ -3654,6 +3722,10 @@ msgstr ""
 msgid "Part {i} of {n}"
 msgstr "Partie {i} sur {n}"
 
+#, python-brace-format
+msgid "Part {i} of {n}: {phase}"
+msgstr "Partie {i} sur {n} : {phase}"
+
 msgid ""
 "Paste a list of publications (e.g. numbered, copied from a PDF): each "
 "item is matched with the papers by its HAL id or DOI, else by its title. "
@@ -3684,6 +3756,16 @@ msgstr "Période enregistrée"
 msgid "Periods"
 msgstr "Périodes"
 
+msgid ""
+"Personal information is confidential: only local models are used. The "
+"servers must be on this machine or the local network (others are "
+"refused), and Ollama's cloud models are never listed nor used."
+msgstr ""
+"Les informations personnelles sont confidentielles : seuls des modèles "
+"locaux sont utilisés. Les serveurs doivent être sur cette machine ou le "
+"réseau local (les autres sont refusés), et les modèles cloud d'Ollama ne "
+"sont jamais proposés ni utilisés."
+
 msgid "PhD"
 msgstr "Doctorat"
 
@@ -3710,6 +3792,9 @@ msgstr "Poste"
 
 msgid "Position (e.g. Associate professor)"
 msgstr "Poste (p. ex. maître de conférences)"
+
+msgid "Positions (a line with a year)"
+msgstr "Postes (une ligne avec une année)"
 
 msgid "Predatory list"
 msgstr "Liste des prédateurs"
@@ -3982,14 +4067,14 @@ msgstr "Lire"
 msgid "Read in their documents"
 msgstr "Lire dans ses documents"
 
-msgid "Reading their documents (this may take a while)…"
-msgstr "Lecture de ses documents (cela peut prendre un moment)…"
+msgid "Reading a career"
+msgstr "Lecture d'un parcours"
 
-#, python-brace-format
-msgid "Reading their documents: part {i} of {n} (this may take a while)…"
-msgstr ""
-"Lecture de ses documents : partie {i} sur {n} (cela peut prendre un "
-"moment)…"
+msgid "Reading a person's career"
+msgstr "Lecture du parcours d'une personne"
+
+msgid "Reading their documents…"
+msgstr "Lecture de ses documents…"
 
 msgid "Record removed from the venue: matched automatically"
 msgstr "Entrée retirée du canal : correspondance automatique"
@@ -4764,8 +4849,42 @@ msgstr "Suggérées d'après les extraits classés (leurs embeddings)"
 msgid "Suggested related venues"
 msgstr "Canaux liés suggérés"
 
+msgid ""
+"Suggested: a multilingual embedding model (French and English), small "
+"(0.3–0.6B) and fast, e.g. bge-m3, qwen3-embedding:0.6b, embeddinggemma; "
+"nomic-embed-text is mostly English."
+msgstr ""
+"Suggéré : un modèle d'embeddings multilingue (français et anglais), petit"
+" (0,3 à 0,6 B) et rapide, p. ex. bge-m3, qwen3-embedding:0.6b, "
+"embeddinggemma ; nomic-embed-text est surtout anglais."
+
+msgid ""
+"Suggested: a small instruction model (4–8B) is enough to copy facts from "
+"a text into JSON, and much faster: e.g. qwen3:8b (without thinking), "
+"gemma3:4b; 12–14B if it misses lines or mixes people (e.g. gemma3:12b, "
+"qwen3:14b)."
+msgstr ""
+"Suggéré : un petit modèle d'instruction (4 à 8 B) suffit pour recopier "
+"des faits d'un texte en JSON, et il est bien plus rapide : p. ex. "
+"qwen3:8b (sans réflexion), gemma3:4b ; 12 à 14 B s'il oublie des lignes "
+"ou mélange des personnes (p. ex. gemma3:12b, qwen3:14b)."
+
+msgid ""
+"Suggested: an instruction model of 4–14B parameters, multilingual "
+"(French), good at structured outputs, e.g. qwen3:8b, gemma3:12b, mistral-"
+"small3.2 (24B: more precise, slower)."
+msgstr ""
+"Suggéré : un modèle d'instruction de 4 à 14 B de paramètres, multilingue "
+"(français), bon en sorties structurées, p. ex. qwen3:8b, gemma3:12b, "
+"mistral-small3.2 (24 B : plus précis, plus lent)."
+
 msgid "Suggestion"
 msgstr "Suggestion"
+
+msgid "Suggestions: turn on the local LLM, choose an embedding model (Settings)"
+msgstr ""
+"Suggestions : activer le LLM local, choisir un modèle d'embeddings "
+"(Paramètres)"
 
 #, python-brace-format
 msgid "Summarised by its text, its excerpts not listed ({count})"
@@ -4938,13 +5057,6 @@ msgstr "La couleur de ses extraits (leur teinte dans les PDF)"
 msgid "The conferences found in its texts (on saving)."
 msgstr "Les conférences trouvées dans ses textes (à l'enregistrement)."
 
-msgid ""
-"The documents to read (their passages about a career), with their "
-"profiles' affiliations and their notes:"
-msgstr ""
-"Les documents à lire (leurs passages sur un parcours), avec les "
-"affiliations de ses profils et ses notes :"
-
 msgid "The excerpts, as selected"
 msgstr "Les extraits, tels que sélectionnés"
 
@@ -5076,6 +5188,9 @@ msgstr "Dans l'autre sens"
 
 msgid "The overall opinion, and the points to raise."
 msgstr "L'avis d'ensemble, et les points à soulever."
+
+msgid "The pages sent"
+msgstr "Les pages envoyées"
 
 msgid ""
 "The paper will no longer be in the person's list of papers, nor in the "
@@ -5384,6 +5499,13 @@ msgstr ""
 msgid "Their papers at this venue"
 msgstr "Ses articles dans ce canal"
 
+msgid "Their profiles' affiliations (none)"
+msgstr "Les affiliations de ses profils (aucune)"
+
+#, python-brace-format
+msgid "Their profiles' affiliations: {list}"
+msgstr "Les affiliations de ses profils : {list}"
+
 #, python-brace-format
 msgid "Their publications are marked {track}."
 msgstr "Leurs publications sont marquées {track}."
@@ -5449,6 +5571,9 @@ msgstr ""
 "Ils forment un seul élément (dans l'ordre de leurs PDF), avec la "
 "catégorie, les années, le rayonnement et le texte du second (son crayon "
 "modifie le texte du groupe)."
+
+msgid "Thinks"
+msgstr "Réfléchit"
 
 msgid "This cannot be undone."
 msgstr "Cette action est irréversible."
@@ -5590,6 +5715,9 @@ msgid "Turn into a venue rule (to edit): its near variants match too"
 msgstr ""
 "En faire une règle du canal (à modifier) : ses variantes proches sont "
 "aussi reconnues"
+
+msgid "Turn on the local LLM and choose a model (Settings → Local LLM)"
+msgstr "Activer le LLM local et choisir un modèle (Paramètres → LLM local)"
 
 msgid "Two report templates have the same name"
 msgstr "Deux modèles de rapport ont le même nom"
@@ -5925,6 +6053,9 @@ msgstr ""
 "un article du canal de publication) ; automatique : d'après le canal et "
 "les types de document des sources"
 
+msgid "What to read (only the passages about a career are sent):"
+msgstr "Ce qu'il faut lire (seuls les passages sur un parcours sont envoyés) :"
+
 msgid ""
 "When copied through a filter, a tag replaced on its line by a text before"
 " it (e.g. an icon) and one after, in a colour (or highlighted), in bold, "
@@ -5936,6 +6067,13 @@ msgstr ""
 "surlignés), en gras, aussi le texte de la ligne si coché ; par ex. "
 "#influence, l'étiquette des extraits de « rayonnement » marqués dans "
 "leurs catégories."
+
+msgid ""
+"Whether a reasoning model (e.g. qwen3) thinks before answering: much "
+"slower, rarely better to read facts in a text"
+msgstr ""
+"Si un modèle qui raisonne (p. ex. qwen3) réfléchit avant de répondre : "
+"bien plus lent, rarement meilleur pour lire des faits dans un texte"
 
 msgid "Why (required for this paper only)"
 msgstr "Pourquoi (obligatoire pour cet article seulement)"
@@ -6201,6 +6339,9 @@ msgstr "description"
 
 msgid "detected from the venue text, document type and ranking"
 msgstr "détecté à partir du texte du canal, du type de document et du classement"
+
+msgid "doesn't think"
+msgstr "ne réfléchit pas"
 
 msgid "e.g. ICLR"
 msgstr "p. ex. ICLR"
@@ -6558,6 +6699,9 @@ msgstr "sans année"
 msgid "none"
 msgstr "aucune"
 
+msgid "none (no page about a career found)"
+msgstr "aucune (aucune page sur un parcours trouvée)"
+
 msgid "not a JSON object"
 msgstr "pas un objet JSON"
 
@@ -6864,6 +7008,17 @@ msgstr "le niveau commun à ses conférences"
 msgid "the level of the conference chosen in the venue"
 msgstr "le niveau de la conférence choisie dans le canal de publication"
 
+msgid "the model reads the text"
+msgstr "le modèle lit le texte"
+
+#, python-brace-format
+msgid "the model thinks ({n} characters)"
+msgstr "le modèle réfléchit ({n} caractères)"
+
+#, python-brace-format
+msgid "the model writes its answer ({n} characters)"
+msgstr "le modèle écrit sa réponse ({n} caractères)"
+
 msgid "the number"
 msgstr "le numéro"
 
@@ -6898,6 +7053,9 @@ msgstr "le canal de publication de {source}, session {track}"
 #, python-brace-format
 msgid "the workshop rather than its main conference ({names})"
 msgstr "l'atelier plutôt que sa conférence principale ({names})"
+
+msgid "thinks"
+msgstr "réfléchit"
 
 msgid "this person"
 msgstr "cette personne"
@@ -7338,6 +7496,12 @@ msgstr "{source}, p. {page}"
 #, python-brace-format
 msgid "{start}–{end}"
 msgstr "{start}–{end}"
+
+#, python-brace-format
+msgid "{s} s · {n} line found so far"
+msgid_plural "{s} s · {n} lines found so far"
+msgstr[0] "{s} s · {n} ligne trouvée pour l'instant"
+msgstr[1] "{s} s · {n} lignes trouvées pour l'instant"
 
 #, python-brace-format
 msgid "{tag}, number {number} in its list"

@@ -163,6 +163,7 @@ async def test_period_filter(user: User) -> None:
         "data",
         "keys",
         "llm",
+        "career",
         "io",
     ],
 )

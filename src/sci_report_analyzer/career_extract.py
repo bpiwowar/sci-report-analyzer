@@ -1,46 +1,35 @@
 """A person's career read by the LLM in their documents and profiles (see career.py): lines
 of a CV suggested, to be checked before being added.
 
-The documents are long (an application: tens of pages) and a local LLM's context short, so
-only their passages likely about the career are sent: a page headed as a CV (“Curriculum
-vitae”, “Parcours”…) whole, else the lines with a year and a word of a career (a position, a
-diploma…), with the lines around them; in pieces of a few thousand characters, each read
-apart (a structured output: the lines of the CV, each with the words it comes from). A line
-whose words are not in the text is marked unchecked; those already in the CV are left
-out."""
+The documents are long (an application: tens of pages) and a local LLM slow with a long
+text, so only their pages likely about the career are sent (see career_words for the
+words, editable by language): those headed as a CV (“Curriculum vitae”, “Parcours”…) first,
+whole; then the others by the number of their lines with a year and a position or a
+diploma (those lines sent, with the lines around them), within BUDGET characters; in pieces
+of PIECE characters, each read apart (a structured output: the lines of the CV, each with
+the words it comes from). A line whose words are not in the text is marked unchecked; those
+already in the CV are left out."""
 
 from __future__ import annotations
 
 import re
-import unicodedata
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy import select
 
-from . import career, documents, llm
+from . import career, career_words, documents, llm
 from .db.models import Period, Person, SourceLink
 from .db.session import session_scope
 from .source_settings import active_links
 
-BUDGET = 16000  # (characters sent, at most, over all the pieces)
+BUDGET = 6000  # (characters sent, at most, over all the pieces: one piece)
 PIECE = 6000  # (characters of a piece)
 AROUND = 2  # (lines kept around a line about the career)
+HEADING_LENGTH = 60  # (a heading: a short line)
+HEADING_LINES = 8  # (… or among the first lines of its page)
 
 _YEAR = re.compile(r"\b(19[5-9]\d|20[0-4]\d)\b")
-_CAREER = re.compile(
-    r"\b(professor|professeure?|lecturer|ma[iî]tre de conf[ée]rences?|mcf|charg[ée]e? de "
-    r"recherche|directeur|directrice|research(er)?|chercheu(r|se)|scientist|engineer|"
-    r"ing[ée]nieure?|post-?doc\w*|ph\.?d|doctora[lt]\w*|th[èe]se|thesis|hdr|habilitation|"
-    r"ater|fellow\w*|assistant|associate|master|dipl[ôo]m\w*|degree|lauréat|recruited|"
-    r"recrut[ée]e?|since|depuis|position|poste)\b",
-    re.IGNORECASE,
-)
-_CV_HEADING = re.compile(
-    r"^\s*(\d+[.)]?\s*)?(curriculum vit(ae|æ)|cv\b|parcours|career|carri[èe]re|"
-    r"positions?\b|employment|education|formation|dipl[ôo]mes|situation professionnelle)",
-    re.IGNORECASE,
-)
 
 SCHEMA = {
     "type": "object",
@@ -83,18 +72,19 @@ class Suggestion:
     quote: str  # (the words it comes from)
     source: str  # (where: a document and its page, a profile)
     checked: bool  # (whether the quote is in the text sent)
+    # Where: the page with the quote (else those of the piece it was read in).
+    pages: list[Passage] = field(default_factory=list)
 
 
 @dataclass
 class Passage:
     source: str  # “Application, p. 3”
     text: str
+    doc_id: int | None = None  # (where: a document's page; none: the profiles)
+    page: int | None = None
 
 
-def _fold(text: str) -> str:
-    """(compared: lower case, no accents, single spaces)"""
-    text = unicodedata.normalize("NFKD", text.casefold())
-    return " ".join("".join(c for c in text if not unicodedata.combining(c)).split())
+_fold = career_words.fold
 
 
 def _pages(lines: list[dict]) -> dict[int, list[str]]:
@@ -105,21 +95,50 @@ def _pages(lines: list[dict]) -> dict[int, list[str]]:
     return pages
 
 
-def passages(name: str, lines: list[dict]) -> list[Passage]:
-    """A document's passages likely about the career (see the module), in order."""
+@dataclass
+class Candidate:
+    """A page's passage about the career: its rank (a heading's first, then by score)."""
+
+    passage: Passage
+    heading: bool
+    score: int  # (its lines with a year and a position or diploma)
+
+
+def candidates(name: str, lines: list[dict], doc_id: int | None = None) -> list[Candidate]:
+    """A document's pages likely about the career (see the module), in order."""
+    heading, about = (
+        career_words.pattern("headings"),
+        [p for g in ("positions", "diplomas") if (p := career_words.pattern(g))],
+    )
     out = []
     for page, texts in sorted(_pages(lines).items()):
         where = f"{name}, p. {page}"
-        if any(_CV_HEADING.match(t) for t in texts[:8]):
-            out.append(Passage(where, "\n".join(texts)))
+        folded = [_fold(t) for t in texts]
+        if heading and any(
+            heading.match(t) and (i < HEADING_LINES or len(t) <= HEADING_LENGTH)
+            for i, t in enumerate(folded)
+        ):
+            hits = sum(1 for t in folded if _YEAR.search(t))
+            out.append(Candidate(Passage(where, "\n".join(texts), doc_id, page), True, hits))
             continue
-        keep = set()
-        for i, t in enumerate(texts):
-            if _YEAR.search(t) and _CAREER.search(t):
-                keep.update(range(max(0, i - AROUND), min(len(texts), i + AROUND + 1)))
+        hits = [
+            i for i, t in enumerate(folded) if _YEAR.search(t) and any(p.search(t) for p in about)
+        ]
+        keep = {j for i in hits for j in range(max(0, i - AROUND), min(len(texts), i + AROUND + 1))}
         if keep:
-            out.append(Passage(where, "\n".join(texts[i] for i in sorted(keep))))
+            text = "\n".join(texts[i] for i in sorted(keep))
+            out.append(Candidate(Passage(where, text, doc_id, page), False, len(hits)))
     return out
+
+
+def passages(name: str, lines: list[dict]) -> list[Passage]:
+    """A document's passages about the career, the most likely first (see candidates)."""
+    return [c.passage for c in ranked(candidates(name, lines))]
+
+
+def ranked(found: list[Candidate]) -> list[Candidate]:
+    """The pages headed as a CV first (in order), then the others by score."""
+    return sorted(found, key=lambda c: (not c.heading, -c.score if not c.heading else 0))
 
 
 @dataclass
@@ -143,25 +162,36 @@ def person_documents(person_id: int) -> list[Document]:
     ]
 
 
-def sources(person_id: int, doc_ids: list[int] | None = None) -> tuple[str, list[Passage]]:
-    """The person's name and the passages to read: their profiles' affiliations, their
-    notes, then those of their documents (``doc_ids``; none: all of them) read already."""
+def affiliations(person_id: int) -> list[str]:
+    """The person's affiliation, and those of their validated profiles (with their source)."""
     with session_scope() as s:
         person = s.get(Person, person_id)
-        name, notes = person.name, person.notes
         known = [person.affiliation] if person.affiliation else []
         for link in s.scalars(
             select(SourceLink).where(SourceLink.person_id == person_id, active_links())
         ):
             if aff := (link.evidence or {}).get("affiliation"):
                 known.append(f"{aff} ({link.source})")
+    return known
+
+
+def sources(
+    person_id: int, doc_ids: list[int] | None = None, profiles: bool = True
+) -> tuple[str, list[Passage]]:
+    """The person's name and the passages to read: their profiles' affiliations (if
+    ``profiles``), then those of their documents (``doc_ids``; none: all of them) read
+    already. (Not the notes: one's own, not facts.)"""
+    with session_scope() as s:
+        name = s.get(Person, person_id).name
+    known = affiliations(person_id) if profiles else []
     found = [Passage("profiles", "Affiliations: " + "; ".join(known))] if known else []
-    if notes:
-        found.append(Passage("notes", notes))
-    for d in person_documents(person_id):
-        if d.read and (doc_ids is None or d.id in doc_ids):
-            found += passages(d.name, documents.lines_of(d.id) or [])
-    return name, found
+    pages = [
+        c
+        for d in person_documents(person_id)
+        if d.read and (doc_ids is None or d.id in doc_ids)
+        for c in candidates(d.name, documents.lines_of(d.id) or [], d.id)
+    ]
+    return name, found + [c.passage for c in ranked(pages)]
 
 
 def pieces(found: list[Passage]) -> list[list[Passage]]:
@@ -175,7 +205,7 @@ def pieces(found: list[Passage]) -> list[list[Passage]]:
         if not out or size + len(text) > PIECE:
             out.append([])
             size = 0
-        out[-1].append(Passage(p.source, text))
+        out[-1].append(Passage(p.source, text, p.doc_id, p.page))
         size += len(text)
         total += len(text)
     return out
@@ -220,16 +250,24 @@ def _suggestions(answer: dict, piece: list[Passage]) -> list[Suggestion]:
         quote = " ".join((x.get("quote") or "").split())
         where = next((p for p in piece if quote and _fold(quote) in _fold(p.text)), None)
         source = where.source if where else ", ".join(dict.fromkeys(p.source for p in piece))
-        out.append(Suggestion(entry, quote, source, where is not None))
+        pages = [where] if where else piece
+        out.append(Suggestion(entry, quote, source, where is not None, pages))
     return out
 
 
+def left_out(person_id: int, doc_ids: list[int] | None = None) -> list[Passage]:
+    """The pages about the career not sent (beyond BUDGET), the most likely first."""
+    _name, found = sources(person_id, doc_ids, profiles=False)
+    sent = {(p.doc_id, p.page) for piece in pieces(found) for p in piece}
+    return [p for p in found if (p.doc_id, p.page) not in sent]
+
+
 def requests(
-    person_id: int, doc_ids: list[int] | None = None
+    person_id: int, doc_ids: list[int] | None = None, profiles: bool = True
 ) -> list[tuple[list[Passage], list[dict[str, str]]]]:
     """What the LLM is sent (see extract): each piece of the passages, and its messages (the
     instructions, then the passages)."""
-    name, found = sources(person_id, doc_ids)
+    name, found = sources(person_id, doc_ids, profiles)
     return [
         (
             piece,
@@ -247,20 +285,22 @@ async def extract(
     doc_ids: list[int] | None = None,
     folder_id: int | None = None,
     out: list[Suggestion] | None = None,
+    profiles: bool = True,
     progress: Callable[[int, int], None] | None = None,
+    phase: Callable[[str, int], None] | None = None,
 ) -> list[Suggestion]:
     """The lines of a CV the LLM reads in the person's profiles and documents (``doc_ids``;
     none: all those read), without those already in it (nor twice). Raises if no LLM.
     ``out``: where they are added, piece after piece (those found so far, if stopped);
     ``progress``: called with the pieces read and their number, before each one and at the
-    end."""
+    end; ``phase``: with the model's phase in a piece (see llm.chat_json)."""
     have = career.entries(person_id)
     out = [] if out is None else out
-    split = requests(person_id, doc_ids)
+    split = requests(person_id, doc_ids, profiles)
     for i, (piece, chat) in enumerate(split):
         if progress:
             progress(i, len(split))
-        answer = await llm.chat_json(chat, SCHEMA, folder_id)
+        answer = await llm.chat_json(chat, SCHEMA, folder_id, task="career", progress=phase)
         for sug in _suggestions(answer, piece):
             if not any(_same(sug.entry, e) for e in [*have, *(x.entry for x in out)]):
                 out.append(sug)
