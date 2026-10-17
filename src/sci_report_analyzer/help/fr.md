@@ -503,7 +503,7 @@ listée en dessous, avec ses Enregistrer / Annuler.
 
 **IA locale** (facultative : Paramètres → IA). Les informations personnelles sont confidentielles : seuls des
 modèles locaux sont utilisés, servis sur cette machine ou le réseau local (les autres serveurs sont refusés, les
-modèles cloud d'Ollama jamais listés ni utilisés). **LLM local (Ollama)** l'active, avec son serveur, le modèle
+modèles cloud d'Ollama jamais listés ni utilisés). **LLM local** l'active, avec son serveur (Ollama, ou un serveur à l'API compatible OpenAI, `/v1/chat/completions`, avec une clé d'API facultative, lue aussi dans `SCI_REPORT_ANALYZER_LLM_API_KEY`), le modèle
 général, s'il réfléchit avant de répondre (par défaut), et les **embeddings** (d'Ollama ou d'un serveur à l'API
 compatible OpenAI) qui suggèrent la catégorie d'un extrait (le plus proche des groupes d'extraits de chaque
 catégorie : combien de groupes au plus, combien d'extraits dans un groupe au moins ; « Entraîner », dans le
@@ -518,6 +518,9 @@ réfléchit (« Par défaut » : non ; « Réfléchit » ; « Ne réflé
 - **Réécriture des extraits** : un nouvel extrait est reformulé (court, impersonnel, sans ses dates) et ses années
   lues en lui et autour, proposé dans sa fenêtre, où son texte se modifie aussi tout de suite (la sélection gardée
   comme son original). « Aucun (pas de réécriture) » : seulement ses années, trouvées autour.
+  Son bouton « Changer de LLM » fait la même réécriture avec d'autres modèles, l'un après l'autre, leurs
+  formulations côte à côte avec leur durée (le premier passage d'un modèle compte son chargement) ; « Garder »
+  en prend une, et peut faire de son modèle celui qui réécrit les extraits.
 
 Quand le LLM est désactivé (ou qu'une tâche n'a pas de modèle, ou n'obtient pas de réponse valide), la page de la
 tâche et la fenêtre de l'extrait le disent, avec un lien pour l'activer. Les réglages d'un dossier peuvent

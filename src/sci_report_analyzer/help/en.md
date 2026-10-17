@@ -496,8 +496,9 @@ listed below them, with its Save / Cancel.
 
 **Local AI** (optional: Settings → AI). Personal information is confidential: only local
 models are used, served on this machine or the local network (other servers are refused,
-Ollama's cloud models never listed nor used). **Local LLM (Ollama)** turns it on, with its
-server, the general model, whether it thinks before answering (by default), and the
+Ollama's cloud models never listed nor used). **Local LLM** turns it on, with its server
+(Ollama, or an OpenAI-compatible one, `/v1/chat/completions`, with an optional API key, also
+read from `SCI_REPORT_ANALYZER_LLM_API_KEY`), the general model, whether it thinks before answering (by default), and the
 **embeddings** (from Ollama or an OpenAI-compatible server) suggesting an excerpt's category
 (the closest of each category's clusters of excerpts: how many clusters at most, how many
 excerpts in one at least; the category picker's “Train” learns again from the excerpts
@@ -513,6 +514,9 @@ brings them back):
   dates) and its years read in it and around it, proposed in its dialog, where its text can
   also be edited at once (the selection kept as its original). “None (no rewriting)”: only
   its years, found around it.
+  Its “Change LLM” button runs the same rewriting through other models, one after the
+  other, their wordings side by side with their time (the first run of a model includes its
+  loading); “Keep it” takes one, and can make its model the one rewriting the excerpts.
 
 When the LLM is off (or a task has no model, or gets no valid answer), the task's page and
 the excerpt dialog say so, with a link to turn it on. A folder's settings can use other
