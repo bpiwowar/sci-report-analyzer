@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date
+from functools import partial
 from html import escape
 
+from fastapi.responses import RedirectResponse
 from nicegui import ui
 
 from .. import (
@@ -18,6 +20,7 @@ from .. import (
     pubview,
     reports,
     source_settings,
+    urls,
 )
 from ..db.models import Person
 from ..i18n import N_, _, ngettext
@@ -53,11 +56,16 @@ LAST_IN_TREE = "ui.people.tree"  # the last folder selected in the tree (sticky)
 
 def register() -> None:
     @ui.page("/")
-    def index(folder: int | None = None) -> None:
+    def index(folder: str | None = None) -> RedirectResponse | None:
+        """The folder chosen (``folder``: its path, see urls.folder_url; the former ids:
+        redirected), else the last one."""
         known = {f.id: f for f in folders.folders()}
         last = annotations.ui_state(LAST_FOLDER)
-        if folder is None:
-            folder = last
+        if folder is not None:
+            chosen = urls.resolve_folder(folder)
+            if chosen in known and (url := urls.folder_url(chosen)) != f"/?folder={folder}":
+                return RedirectResponse(url)
+        folder = last if folder is None else chosen
         if folder not in known:
             folder = ALL
         if folder != last:
@@ -74,6 +82,7 @@ def register() -> None:
 
             body()
             ui.timer(2.0, lambda: _refresh_if_running())
+        return None
 
 
 def _reports(folder: int, changed) -> None:
@@ -104,7 +113,7 @@ def _refresh_if_running() -> None:
 
 
 def _goto(folder_id: int) -> None:
-    ui.navigate.to(f"/?folder={folder_id}")
+    ui.navigate.to(urls.folder_url(folder_id))
 
 
 def _header(current: folders.FolderView | None, known: dict[int, folders.FolderView]) -> None:
@@ -349,7 +358,7 @@ def _candidates(
                 ).format(n=len(chosen)),
                 type="positive",
             )
-        ui.navigate.to(f"/person/{pid}" if chosen else f"/person/{pid}?tab=sources")
+        ui.navigate.to(urls.person_url(pid, tab=None if chosen else "sources"))
         dialog.close()
 
     buttons.clear()
@@ -363,7 +372,7 @@ def _candidates(
 
 
 def _later(pid: int, dialog: ui.dialog) -> None:
-    ui.navigate.to(f"/person/{pid}?tab=sources")
+    ui.navigate.to(urls.person_url(pid, tab="sources"))
     dialog.close()
 
 
@@ -568,7 +577,7 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
     filt.bind_value(table, "filter")
     table.on(
         "rowClick",
-        lambda e: ui.navigate.to(f"/person/{e.args[1]['id']}"),
+        lambda e: ui.navigate.to(urls.person_url(e.args[1]["id"])),
     )
 
     def orphans(e) -> None:
@@ -625,14 +634,14 @@ def _person_row(
     ]
     pending = [ln for ln in person.links if ln.status == "candidate"]
     stale = [ln for ln in validated if ln.is_stale or ln.sync_state == "error"]
-    url = f"/person/{person.id}/{member.period_id}"
+    url = partial(urls.person_url, person.id, member.period_id)
     with (
         ui.row()
         .classes("w-full items-center gap-x-3 gap-y-0 rounded cursor-pointer vr-row py-0.5 pr-1")
         .style(f"padding-left:{1.1 * depth + 1.5}rem")
         .on(
             "click",
-            lambda: ui.navigate.to(url),
+            lambda: ui.navigate.to(url()),
             js_handler=(
                 "(e) => { if (!e.target.closest('a, button, .q-btn, .q-field, .q-menu')) emit(); }"
             ),
@@ -713,7 +722,7 @@ def _person_row(
                     ngettext("{n} problem", "{n} problems", problems).format(n=problems),
                     color="orange-8",
                 ).classes("cursor-pointer").on(
-                    "click.stop", lambda: ui.navigate.to(f"{url}?problems=1")
+                    "click.stop", lambda: ui.navigate.to(url(problems=1))
                 ).tooltip(_("{tip} — click to list them").format(tip=_(_PROBLEMS_TIP))).mark(
                     f"problems-{person.id}"
                 )

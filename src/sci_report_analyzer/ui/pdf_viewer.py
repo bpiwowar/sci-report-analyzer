@@ -19,7 +19,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import Client, app, background_tasks, ui
 
-from .. import annotations, documents, llm, pdfs, pdftext, persons
+from .. import annotations, documents, llm, pdfs, pdftext, persons, urls
 from ..i18n import N_, _, ngettext
 from .dialogs import transient_dialog
 from .theme import APP_NAME, bare_page
@@ -158,7 +158,7 @@ def register() -> None:
         side = Side(person_id, period, ("pub", pub_id))
         box = viewer_frame(
             title,
-            (APP_NAME, f"/person/{person_id}"),
+            (APP_NAME, urls.person_url(person_id)),
             (person_id, period, "publications"),
             f"/pdf-file/{pub_id}",
             int(file.stat().st_mtime) if file else 0,

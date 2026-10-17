@@ -9,11 +9,10 @@ import logging
 from collections.abc import Callable
 from html import escape
 from itertools import groupby
-from urllib.parse import urlencode
 
 from nicegui import background_tasks, ui
 
-from .. import annotations, contribution, manual, persons, source_settings
+from .. import annotations, contribution, manual, persons, source_settings, urls
 from ..authors import fold_name
 from ..i18n import N_, _, ngettext
 from ..pubview import (
@@ -173,7 +172,6 @@ class PublicationsPanel:
             self._load_filters(state)
             self._apply_period()
         # Filters from the URL (so that a reload gives back the same view).
-        self.base_url = f"/person/{person_id}"
         self.url_extra: dict[str, str] = {}
         self._from_query(query or {})
 
@@ -277,9 +275,7 @@ class PublicationsPanel:
 
     def push_url(self) -> None:
         """Show the current filters in the address bar (without reloading)."""
-        query = urlencode(self.url_params())
-        path = self.base_url + (f"/{self.period_id}" if self.period_id else "")
-        url = path + (f"?{query}" if query else "")
+        url = urls.person_url(self.person_id, self.period_id, **self.url_params())
         with contextlib.suppress(Exception):  # e.g. the page was left meanwhile
             ui.run_javascript(f"history.replaceState(history.state, '', {json.dumps(url)})")
 

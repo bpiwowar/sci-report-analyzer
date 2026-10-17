@@ -10,6 +10,7 @@ from collections.abc import Callable
 from html import escape
 
 from fastapi import Request
+from fastapi.responses import RedirectResponse
 from nicegui import background_tasks, ui
 
 from .. import (
@@ -23,6 +24,7 @@ from .. import (
     persons,
     source_settings,
     theses,
+    urls,
 )
 from ..db.models import Person, SourceLink, Thesis
 from ..i18n import _, ngettext
@@ -52,18 +54,25 @@ PROFILE_TABS = ("career", "periods", "sources")  # (the Profile tab's, in order)
 
 
 def register() -> None:
-    @ui.page("/person/{person_id}")
+    @ui.page("/person/{path:path}")
     def person_page(
-        request: Request, person_id: int, tab: str = "publications", period: int | None = None
-    ) -> None:
-        _person_page(request, person_id, tab, period)
-
-    @ui.page("/person/{person_id}/{period_id}")
-    def person_period_page(
-        request: Request, person_id: int, period_id: int, tab: str = "publications"
-    ) -> None:
-        """A person's page with a period selected (e.g. opened from a folder)."""
+        request: Request, path: str, tab: str = "publications", period: int | None = None
+    ) -> RedirectResponse | None:
+        """A person's page, within a folder or not (see urls.person_url; the former numeric
+        addresses: redirected)."""
+        found = urls.resolve_person(path)
+        if found is None:
+            with frame(_("Not found")):
+                ui.label(_("Unknown person"))
+            return None
+        person_id, period_id = found
+        period_id = period_id or period
+        url = urls.person_url(person_id, period_id)
+        if url.split("?")[0] != request.url.path:
+            query = {k: v for k, v in request.query_params.items() if k != "period"}
+            return RedirectResponse(urls.person_url(person_id, period_id, **query))
         _person_page(request, person_id, tab, period_id)
+        return None
 
 
 def _person_page(request: Request, person_id: int, tab: str, period: int | None) -> None:
@@ -171,8 +180,8 @@ def page_header(person_id: int, period_id: int | None, tab: str) -> None:
     tabs = _header(person, tab, folders.folder_of_period(period_id))
 
     def go(e) -> None:
-        url = f"/person/{person_id}" + (f"/{period_id}" if period_id else "")
-        ui.navigate.to(url if e.value == "publications" else f"{url}?tab={e.value}")
+        tab = None if e.value == "publications" else e.value
+        ui.navigate.to(urls.person_url(person_id, period_id, tab=tab))
 
     tabs.on_value_change(go)
 
@@ -184,7 +193,7 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
             if folder:
                 with ui.row().classes("items-center gap-1 no-wrap"):
                     with (
-                        ui.link(target=f"/?folder={folder[0]}")
+                        ui.link(target=urls.folder_url(folder[0]))
                         .classes("flex items-center gap-1 text-sm no-underline")
                         .mark("folder-title")
                     ):
@@ -1877,7 +1886,7 @@ def folders_section(person_id: int, on_change) -> None:
         for p in mine:
             with ui.row().classes("items-center gap-2"):
                 ui.icon("folder", color="amber-8")
-                ui.link(p.folder.name, f"/?folder={p.folder_id}").classes("w-56")
+                ui.link(p.folder.name, urls.folder_url(p.folder_id)).classes("w-56")
                 if p.folder.date:
                     ui.label(p.folder.date.isoformat()).classes("text-sm text-grey")
                 if p.folder.hidden:

@@ -1122,6 +1122,7 @@ async def test_author_menu_alias_and_category(user: User) -> None:
 
 async def test_filters_in_url(user: User, monkeypatch) -> None:
     from sci_report_analyzer.ui import panel
+    from sci_report_analyzer.urls import person_url
 
     pid = _seed()
     urls: list[str] = []
@@ -1135,7 +1136,7 @@ async def test_filters_in_url(user: User, monkeypatch) -> None:
     await user.should_see("A workshop contribution")
     await user.should_not_see("Deep ranking for search")
     # ... and the address bar follows the current filters.
-    assert urls and urls[-1] == f"/person/{pid}?q=workshop"
+    assert urls and urls[-1] == f"{person_url(pid)}?q=workshop"
 
 
 def test_source_badges_link_to_the_record() -> None:
