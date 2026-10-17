@@ -19,6 +19,7 @@ from .. import (
     folders,
     llm,
     manual,
+    pdfs,
     persons,
     source_settings,
     theses,
@@ -330,10 +331,69 @@ def _page_chips(found: list[career_extract.Passage], mark: str) -> None:
             ).props("dense outline clickable").tooltip(_("Open it at this page"))
 
 
+_SENT = "text-xs font-mono whitespace-pre-wrap bg-grey-2 rounded p-2 w-full overflow-auto"
+# Draws a page of a PDF in a canvas, small (with PDF.js, as the viewer; one at a time).
+_THUMBS_JS = """
+window.sraThumb = window.sraThumb || (() => {
+  const docs = {};
+  let queue = Promise.resolve(), lib;
+  return (id, url, page) => {
+    queue = queue.then(async () => {
+      if (!lib) {
+        lib = await import('/pdfjs/build/pdf.mjs');
+        lib.GlobalWorkerOptions.workerSrc = '/pdfjs/build/pdf.worker.mjs';
+      }
+      await new Promise(requestAnimationFrame);
+      const canvas = document.getElementById(id);
+      if (!canvas) return;
+      docs[url] = docs[url] || lib.getDocument(url).promise;
+      const p = await (await docs[url]).getPage(page);
+      const width = (canvas.clientWidth || 184) * devicePixelRatio;
+      const scale = width / p.getViewport({scale: 1}).width;
+      const viewport = p.getViewport({scale});
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.aspectRatio = 'auto';
+      await p.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+    }).catch(e => console.warn('thumbnail', e));
+  };
+})();
+"""
+_AROUND_QUOTE = 160  # (characters shown around the words a line comes from)
+
+
+def _source_view(sug: career_extract.Suggestion, mark: str) -> None:
+    """Where a suggested line comes from: its page(s), and its words in the text sent (with
+    those around them)."""
+    with ui.column().classes("gap-1 w-full pl-2 border-l-4 border-purple-200"):
+        with ui.row().classes("items-center gap-1 text-xs text-grey"):
+            if not sug.checked:
+                ui.icon("warning", color="warning", size="xs").tooltip(
+                    _("Its words are not in the documents: to check")
+                )
+            _page_chips(sug.pages, mark)
+        span = career_extract.quoted(sug.pages[0].text, sug.quote) if sug.checked else None
+        if span:
+            text, (a, b) = sug.pages[0].text, span
+            before, after = text[max(0, a - _AROUND_QUOTE) : a], text[b : b + _AROUND_QUOTE]
+            ui.html(
+                ("…" if a > _AROUND_QUOTE else "")
+                + escape(before)
+                + f"<mark>{escape(text[a:b])}</mark>"
+                + escape(after)
+                + ("…" if b + _AROUND_QUOTE < len(text) else ""),
+                sanitize=False,
+            ).classes("text-xs text-grey-8 whitespace-pre-wrap").mark(f"{mark}-text")
+        elif sug.quote:
+            ui.label(f"“{sug.quote}”").classes("text-xs italic text-grey-8").mark(f"{mark}-text")
+
+
 def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
-    """The lines of the CV the LLM reads in the person's documents (see career_extract): the
-    documents chosen first (those not read yet, never opened in the viewer, to open); then
-    the ticked lines added, or one edited then added; each with the words it comes from."""
+    """The lines of the CV the LLM reads in the person's documents (see career_extract), in
+    steps: the documents and their pages (those likely about a career ticked; read in parts,
+    see career_extract.batches); the instructions (to change, and save); the parts read, each
+    shown; the lines found, each with the words it comes from in its page: the ticked ones
+    added, or one edited then added."""
     with transient_dialog(_("Career read by the LLM"), width="w-full max-w-3xl") as (
         dlg,
         _card,
@@ -345,10 +405,36 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                     "Model: {model} (local: nothing leaves this machine or the local network)"
                 ).format(model=llm.model(task="career"))
             ).mark("career-extract-model")
-        body = ui.column().classes("w-full gap-1").mark("career-extract-body")
+        steps = ui.label().classes("text-xs text-grey-8 font-medium").mark("career-extract-step")
+        # (scrolled: the buttons always seen)
+        body = (
+            ui.column()
+            .classes("w-full gap-1 max-h-[65vh] overflow-auto no-wrap")
+            .mark("career-extract-body")
+        )
         footer = ui.row().classes("w-full items-center")
     ticks: dict[int, ui.checkbox] = {}
     found: list[career_extract.Suggestion] = []
+    docs = career_extract.person_documents(person_id)
+    known = career_extract.affiliations(person_id)
+    # What is chosen (kept going back): the documents, their profiles' affiliations, the
+    # pages (their keys), the instructions.
+    chosen_docs = {d.id for d in docs if d.read}
+    keys = career_extract.ticked(career_extract.pages(person_id, list(chosen_docs)))
+    # (all the pages shown, else those ticked)
+    state = {"profiles": bool(known), "instructions": career_extract.prompt(), "all": False}
+    names = [
+        _("1. Pages"),
+        _("2. Instructions"),
+        _("3. Reading"),
+        _("4. Lines found"),
+    ]
+
+    def step(i: int) -> None:
+        steps.set_text(" › ".join(f"[{n}]" if j == i else n for j, n in enumerate(names)))
+
+    def chosen_pages() -> list[career_extract.Page]:
+        return [p for p in career_extract.pages(person_id, list(chosen_docs)) if p.key in keys]
 
     def add_ticked() -> None:
         n = 0
@@ -366,88 +452,158 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
         dlg.close()
         _career_dialog(person_id, found[i].entry, on_change)
 
-    boxes: dict[int, ui.checkbox] = {}
-    profiles: dict[str, ui.checkbox] = {}  # (whether their profiles' affiliations are sent)
-
-    def with_profiles() -> bool:
-        return bool(profiles and profiles["box"].value)
-
     @ui.refreshable
-    def sent() -> None:
-        """The messages of each part (for the documents ticked), the constrained output's
-        schema (that of the answer) said."""
-        chosen = [i for i, b in boxes.items() if b.value]
-        parts = career_extract.requests(person_id, chosen, with_profiles())
-        if not parts:
-            ui.label(_("Nothing to read")).classes("text-sm text-grey")
-        for i, (_piece, chat) in enumerate(parts, 1):
-            ui.label(
-                _("Part {i} of {n}").format(i=i, n=len(parts))
-                + f" · {sum(len(m['content']) for m in chat)} "
-                + _("characters")
-            ).classes("text-xs text-grey-8 font-medium mt-1")
-            for m in chat:
-                ui.label(m["role"]).classes("text-xs text-grey")
-                ui.label(m["content"]).classes(
-                    "text-xs font-mono whitespace-pre-wrap bg-grey-2 rounded p-2 w-full "
-                    "max-h-64 overflow-auto"
-                ).mark(f"career-extract-sent-{i}-{m['role']}")
+    def summary() -> None:
+        chosen = chosen_pages()
+        parts = career_extract.batches([p.passage() for p in chosen])
         ui.label(
-            _(
-                "The answer is constrained to a JSON schema (Ollama's structured outputs): "
-                "the lines, each with its kind, title, institution, dates, details and quote."
-            )
-        ).classes("text-xs text-grey mt-1")
+            ngettext("{n} page ticked", "{n} pages ticked", len(chosen)).format(n=len(chosen))
+            + " · "
+            + _("{n} characters").format(n=sum(len(p.text) for p in chosen))
+            + " · "
+            + ngettext("read in {n} part", "read in {n} parts", len(parts)).format(n=len(parts))
+        ).classes("text-sm text-grey-8").mark("career-extract-summary")
+
+    def tick(key: tuple, on: bool) -> None:
+        if on:
+            keys.add(key)
+        else:
+            keys.discard(key)
+        summary.refresh()
+
+    def page_card(p: career_extract.Page, thumbs: list[str]) -> None:
+        """A page: its thumbnail (clicked: ticked or not), whether likely about a career."""
+        mark = f"career-extract-page-{p.doc_id}-{p.page}"
+
+        def ticked(on: bool) -> None:
+            card.classes(add="bg-purple-1" if on else "", remove="" if on else "bg-purple-1")
+            tick(p.key, on)
+
+        with ui.column().classes("gap-0 items-center w-48 rounded p-1") as card:
+            if pdfs.has_viewer():
+                canvas = (
+                    ui.element("canvas")
+                    .classes("w-full bg-white shadow-1 cursor-pointer")
+                    .style("aspect-ratio: 210 / 297")
+                )
+                canvas.on("click", lambda: box.set_value(not box.value))
+                thumbs.append(f"sraThumb('c{canvas.id}', '/doc-file/{p.doc_id}', {p.page});")
+            with ui.row().classes("items-center gap-0 no-wrap"):
+                box = (
+                    ui.checkbox(
+                        _("p. {page}").format(page=p.page),
+                        value=p.key in keys,
+                        on_change=lambda e: ticked(e.value),
+                    )
+                    .props("dense")
+                    .classes("text-xs")
+                    .mark(mark)
+                )
+                with (
+                    ui.button(icon="notes")
+                    .props("flat round dense size=xs")
+                    .tooltip(_("What is sent of it"))
+                    .mark(f"{mark}-show"),
+                    ui.menu(),
+                ):
+                    ui.label(p.text).classes(_SENT + " max-h-64 max-w-md").mark(f"{mark}-text")
+                url = f"{page_url_of(p.doc_id)}?page={p.page}"
+                ui.button(icon="open_in_new", on_click=lambda: ui.navigate.to(url, True)).props(
+                    "flat round dense size=xs"
+                ).tooltip(_("Open it at this page"))
+            if p.reason == "heading":
+                ui.badge(_("CV"), color="purple").props("outline").tooltip(
+                    _("Headed as a CV: sent whole")
+                )
+            elif p.reason == "lines":
+                ui.badge(
+                    ngettext("{n} line", "{n} lines", p.score).format(n=p.score),
+                    color="blue-grey",
+                ).props("outline").tooltip(
+                    _(
+                        "Its lines with a year and a position or diploma: sent, with the "
+                        "lines around them"
+                    )
+                )
+        ticked(box.value)
 
     @ui.refreshable
-    def pages() -> None:
-        """The pages sent (of the documents ticked), and those left out (beyond the limit)."""
-        chosen = [i for i, b in boxes.items() if b.value]
-        sent_ = [p for piece, _chat in career_extract.requests(person_id, chosen) for p in piece]
-        sent_ = [p for p in sent_ if p.doc_id is not None]
-        with ui.row().classes("items-center gap-1 w-full"):
-            ui.label(_("Pages sent:")).classes("text-sm text-grey-8")
-            if not sent_:
-                ui.label(_("none (no page about a career found)")).classes("text-sm text-grey")
-            _page_chips(sent_, "career-extract-pages")
-        if out := career_extract.left_out(person_id, chosen):
-            with ui.row().classes("items-center gap-1 w-full"):
-                ui.label(_("Left out (beyond the limit):")).classes("text-sm text-grey")
-                _page_chips(out, "career-extract-left-out")
+    def page_list() -> None:
+        found_ = career_extract.pages(person_id, list(chosen_docs))
+        if not found_:
+            ui.label(_("No page (no document ticked, or read)")).classes("text-sm text-grey")
+        thumbs: list[str] = []
+        for d in docs:
+            mine = [p for p in found_ if p.doc_id == d.id]
+            if not mine:
+                continue
+            ui.label(d.name).classes("text-sm font-medium mt-1")
+            if not any(p.reason for p in mine):
+                ui.label(_("No page about a career found")).classes("text-xs text-grey")
+            if not state["all"]:
+                mine = [p for p in mine if p.key in keys]
+                if not mine:
+                    ui.label(_("No page ticked")).classes("text-xs text-grey")
+            with ui.row().classes("w-full gap-1").mark(f"career-extract-pages-{d.id}"):
+                for p in mine:
+                    page_card(p, thumbs)
+        if thumbs:
+            ui.run_javascript(_THUMBS_JS + "".join(thumbs))
+
+    def choose_doc(d: career_extract.Document, on: bool) -> None:
+        mine = career_extract.pages(person_id, [d.id])
+        if on:
+            chosen_docs.add(d.id)
+            keys.update(career_extract.ticked(mine))
+        else:
+            chosen_docs.discard(d.id)
+            keys.difference_update(p.key for p in mine)
+        page_list.refresh()
+        summary.refresh()
 
     def choose() -> None:
-        """The documents to read: those read already ticked; the others, to open first."""
-        docs = career_extract.person_documents(person_id)
+        """Step 1: the documents (those not read yet, to open first) and their pages."""
+        step(0)
         body.clear()
         footer.clear()
-        boxes.clear()
-        profiles.clear()
-        known = career_extract.affiliations(person_id)
         with body:
-            ui.label(_("What to read (only the passages about a career are sent):")).classes(
-                "text-sm text-grey-8"
-            )
-            profiles["box"] = (
-                ui.checkbox(
-                    _("Their profiles' affiliations: {list}").format(list="; ".join(known))
-                    if known
-                    else _("Their profiles' affiliations (none)"),
-                    value=bool(known),
+            ui.label(
+                _(
+                    "The pages to read: those likely about a career are ticked (a page headed "
+                    "as a CV whole; else its lines with a year and a position or diploma). "
+                    "The pages following each other are read together, the others apart."
                 )
-                .props("" if known else "disable")
-                .mark("career-extract-profiles")
-            )
+            ).classes("text-sm text-grey-8")
+            with ui.row().classes("w-full items-center gap-1 no-wrap"):
+                ui.checkbox(
+                    ngettext(
+                        "{n} affiliation from their profiles (HAL, OpenAlex…)",
+                        "{n} affiliations from their profiles (HAL, OpenAlex…)",
+                        len(known),
+                    ).format(n=len(known)),
+                    value=state["profiles"],
+                    on_change=lambda e: state.update(profiles=e.value),
+                ).props("" if known else "disable").tooltip(
+                    _(
+                        "The affiliations of their validated profiles, as each source gives "
+                        "it (OpenAlex, HAL, Google Scholar…), each once with its sources"
+                    )
+                ).mark("career-extract-profiles")
+                if known:
+                    with ui.expansion(_("show")).props("dense").classes("text-xs grow"):
+                        for a in known:
+                            ui.label(a).classes("text-xs text-grey-8")
             if not docs:
                 ui.label(_("No document")).classes("text-sm text-grey").mark(
                     "career-extract-no-document"
                 )
             for d in docs:
                 with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                    boxes[d.id] = (
-                        ui.checkbox(d.name, value=d.read)
-                        .props("" if d.read else "disable")
-                        .mark(f"career-extract-doc-{d.id}")
-                    )
+                    ui.checkbox(
+                        d.name,
+                        value=d.id in chosen_docs,
+                        on_change=lambda e, d=d: choose_doc(d, e.value),
+                    ).props("" if d.read else "disable").mark(f"career-extract-doc-{d.id}")
                     if d.period:
                         ui.label(d.period).classes("text-xs text-grey")
                     if not d.read:
@@ -460,40 +616,144 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                         ).props("flat round dense size=sm").tooltip(
                             _("Open it (its text is extracted there), then Refresh")
                         ).mark(f"career-extract-open-{d.id}")
-            pages()
-            with (
-                ui.expansion(_("What the model is sent"), icon="visibility")
-                .classes("w-full")
-                .props("dense")
-                .mark("career-extract-prompt")
-            ):
-                sent()
-            for box in [*boxes.values(), profiles["box"]]:
-                box.on_value_change(sent.refresh)
-                box.on_value_change(pages.refresh)
+            ui.separator()
+            with ui.row().classes("w-full items-center"):
+                summary()
+                ui.space()
+                ui.switch(
+                    _("All the pages"),
+                    value=state["all"],
+                    on_change=lambda e: (state.update(all=e.value), page_list.refresh()),
+                ).props("dense").tooltip(
+                    _("Show all the pages, to tick others (else only those ticked)")
+                ).mark("career-extract-all-pages")
+            with ui.column().classes("w-full gap-0"):
+                page_list()
         with footer:
             if any(not d.read for d in docs):
-                ui.button(_("Refresh"), icon="refresh", on_click=choose).props("flat").mark(
+                ui.button(_("Refresh"), icon="refresh", on_click=refresh_docs).props("flat").mark(
                     "career-extract-refresh"
                 )
+            ui.space()
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(_("Next"), icon="arrow_forward", on_click=review).mark("career-extract-next")
+
+    def refresh_docs() -> None:
+        docs[:] = career_extract.person_documents(person_id)
+        for d in docs:  # (those read since: ticked, their likely pages too)
+            if d.read and d.id not in chosen_docs:
+                choose_doc(d, True)
+        choose()
+
+    @ui.refreshable
+    def parts_view() -> None:
+        parts = career_extract.requests(
+            person_id, chosen_pages(), state["profiles"], state["instructions"]
+        )
+        if not parts:
+            ui.label(_("Nothing to read")).classes("text-sm text-grey").mark(
+                "career-extract-nothing"
+            )
+        for i, (part, chat) in enumerate(parts, 1):
+            with ui.row().classes("items-center gap-2 mt-1"):
+                ui.label(
+                    _("Part {i} of {n}").format(i=i, n=len(parts))
+                    + f" · {sum(len(m['content']) for m in chat)} "
+                    + _("characters")
+                ).classes("text-xs text-grey-8 font-medium")
+                _page_chips(part, f"career-extract-part-pages-{i}")
+            ui.label(chat[1]["content"]).classes(_SENT + " max-h-48").mark(
+                f"career-extract-sent-{i}-user"
+            )
+
+    def review() -> None:
+        """Step 2: the instructions (to change for this time, or save), what is sent."""
+        step(1)
+        body.clear()
+        footer.clear()
+        with body:
+            ui.label(_("The instructions ({name}: their name), sent with each part:")).classes(
+                "text-sm text-grey-8"
+            )
+            area = (
+                ui.textarea(value=state["instructions"])
+                .props("outlined autogrow input-class=text-xs")
+                .classes("w-full font-mono")
+                .mark("career-extract-instructions")
+            )
+
+            def changed(e) -> None:
+                state["instructions"] = e.value
+                parts_view.refresh()
+
+            area.on_value_change(changed)
+
+            def save() -> None:
+                career_extract.save_prompt(area.value or "")
+                ui.notify(_("Saved as the default instructions"), type="positive")
+
+            with ui.row().classes("gap-2"):
+                ui.button(
+                    _("Default instructions"),
+                    icon="restart_alt",
+                    on_click=lambda: area.set_value(career_extract.PROMPT),
+                ).props("flat dense no-caps").mark("career-extract-prompt-default")
+                ui.button(_("Save as the default"), icon="save", on_click=save).props(
+                    "flat dense no-caps"
+                ).tooltip(_("Also in Settings → Reading a career")).mark(
+                    "career-extract-prompt-save"
+                )
+            with (
+                ui.expansion(_("The answer's format"), icon="data_object")
+                .classes("w-full")
+                .props("dense")
+            ):
+                ui.label(
+                    _(
+                        "The answer is constrained to this JSON schema (Ollama's structured "
+                        "outputs): as the career's lines, a position or a diploma and its thesis."
+                    )
+                ).classes("text-xs text-grey")
+                ui.label(json.dumps(career_extract.SCHEMA, indent=1)).classes(_SENT + " max-h-64")
+            parts_view()
+        with footer:
+            ui.button(_("Back"), icon="arrow_back", on_click=choose).props("flat").mark(
+                "career-extract-back-pages"
+            )
             ui.space()
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(
                 _("Read"),
                 icon="auto_awesome",
-                on_click=lambda: run([i for i, b in boxes.items() if b.value], with_profiles()),
+                on_click=lambda: run(chosen_pages(), state["profiles"], state["instructions"]),
             ).mark("career-extract-read")
 
-    async def run(doc_ids: list[int], with_profiles: bool) -> None:
+    async def run(chosen: list[career_extract.Page], profiles: bool, instructions: str) -> None:
+        """Step 3: the parts read, the one read now shown."""
+        step(2)
         body.clear()
         footer.clear()
         got: list[career_extract.Suggestion] = []
-        state = {"part": 0, "parts": 0, "phase": "reading", "chars": 0, "start": time.monotonic()}
+        parts = career_extract.requests(person_id, chosen, profiles, instructions)
+        state_ = {"part": 0, "parts": 0, "phase": "reading", "chars": 0, "start": time.monotonic()}
         phases = {
             "reading": _("the model reads the text"),
             "thinking": _("the model thinks ({n} characters)"),
             "writing": _("the model writes its answer ({n} characters)"),
         }
+
+        @ui.refreshable
+        def current() -> None:
+            """The part read now: its pages, and what is sent of them."""
+            i = state_["part"]
+            if i >= len(parts):
+                return
+            part = parts[i][0]
+            _page_chips(part, "career-extract-current-pages")
+            ui.label("\n\n".join(f"[{p.source}]\n{p.text}" for p in part)).classes(
+                _SENT + " max-h-64"
+            ).mark("career-extract-current")
+
         with body:
             with ui.row().classes("items-center gap-2 no-wrap"):
                 ui.spinner()
@@ -505,29 +765,29 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
             bar = ui.linear_progress(value=0, show_value=False).props("rounded color=purple")
             detail = ui.label().classes("text-xs text-grey").mark("career-extract-detail")
             icons = []  # (each part's: waiting, read now, done)
-            for i, (piece, _chat) in enumerate(
-                career_extract.requests(person_id, doc_ids, with_profiles)
-            ):
+            for i, (part, _chat) in enumerate(parts):
                 with ui.row().classes("items-center gap-1 no-wrap w-full"):
                     icons.append(
                         ui.icon("schedule", size="xs", color="grey").mark(
                             f"career-extract-part-{i}"
                         )
                     )
-                    _page_chips(piece, f"career-extract-part-pages-{i}")
+                    _page_chips(part, f"career-extract-part-pages-{i}")
+            ui.label(_("Read now:")).classes("text-xs text-grey-8 font-medium mt-1")
+            current()
 
         def show() -> None:
-            n, total = state["part"], state["parts"]
+            n, total = state_["part"], state_["parts"]
             if total:
                 status.set_text(
                     _("Part {i} of {n}: {phase}").format(
                         i=min(n + 1, total),
                         n=total,
-                        phase=phases[state["phase"]].format(n=state["chars"]),
+                        phase=phases[state_["phase"]].format(n=state_["chars"]),
                     )
                 )
                 bar.set_value(n / total)
-            elapsed = int(time.monotonic() - state["start"])
+            elapsed = int(time.monotonic() - state_["start"])
             detail.set_text(
                 ngettext(
                     "{s} s · {n} line found so far",
@@ -537,25 +797,27 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
             )
 
         def progress(done: int, total: int) -> None:
-            state.update(part=done, parts=total, phase="reading", chars=0)
+            state_.update(part=done, parts=total, phase="reading", chars=0)
             for i, icon in enumerate(icons):
                 icon.set_name(
                     "check_circle" if i < done else "pending" if i == done else "schedule"
                 )
                 icon.props(f"color={'green' if i < done else 'purple' if i == done else 'grey'}")
+            current.refresh()
             show()
 
         def phase(name: str, chars: int) -> None:
-            state.update(phase=name, chars=chars)
+            state_.update(phase=name, chars=chars)
 
         ticker = ui.timer(0.5, show)
 
         task = background_tasks.create(
             career_extract.extract(
                 person_id,
-                doc_ids,
+                chosen,
                 out=got,
-                profiles=with_profiles,
+                profiles=profiles,
+                instructions=instructions,
                 progress=progress,
                 phase=phase,
             ),
@@ -587,10 +849,15 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                     "text-negative"
                 )
             with footer:
-                ui.button(_("Back"), icon="arrow_back", on_click=choose).props("flat")
+                ui.button(_("Back"), icon="arrow_back", on_click=review).props("flat")
             return
         finally:
             ticker.cancel()
+        results(got, stopped)
+
+    def results(got: list[career_extract.Suggestion], stopped: bool) -> None:
+        """Step 4: the lines found, as the career's, each with its source."""
+        step(3)
         footer.clear()
         found[:] = got
         ticks.clear()
@@ -610,23 +877,22 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                         "mt-2"
                     )
                     ui.label(e.when()).classes("w-28 shrink-0 text-grey mt-2")
-                    with ui.column().classes("gap-0 grow min-w-0 mt-1"):
-                        ui.label(e.line()).classes("font-medium")
+                    with ui.column().classes("gap-1 grow min-w-0 mt-1"):
+                        ui.label(e.line()).classes("font-medium").mark(f"career-extract-line-{i}")
                         if e.details:
-                            ui.label(e.details).classes("text-sm text-grey")
-                        with ui.row().classes("items-center gap-1 text-xs text-grey"):
-                            if not sug.checked:
-                                ui.icon("warning", color="warning", size="xs").tooltip(
-                                    _("Its words are not in the documents: to check")
-                                )
-                            _page_chips(sug.pages, f"career-extract-source-{i}")
-                            if sug.quote:
-                                ui.label(f"“{sug.quote}”").classes("italic ellipsis")
+                            ui.label(
+                                _("Thesis: {title}").format(title=e.details)
+                                if e.kind == "diploma"
+                                else e.details
+                            ).classes(
+                                "text-sm text-grey" + (" italic" if e.kind == "diploma" else "")
+                            ).mark(f"career-extract-details-{i}")
+                        _source_view(sug, f"career-extract-source-{i}")
                     ui.button(icon="edit", on_click=lambda i=i: edit(i)).props(
                         "flat round dense size=sm"
                     ).tooltip(_("Edit it, then add it")).mark(f"career-extract-edit-{i}")
         with footer:
-            ui.button(_("Back"), icon="arrow_back", on_click=choose).props("flat").mark(
+            ui.button(_("Back"), icon="arrow_back", on_click=review).props("flat").mark(
                 "career-extract-back"
             )
             ui.space()

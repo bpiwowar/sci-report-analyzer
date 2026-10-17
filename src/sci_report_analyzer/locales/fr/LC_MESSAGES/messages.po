@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-17 09:12+0200\n"
+"POT-Creation-Date: 2026-10-17 09:29+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -87,11 +87,17 @@ msgstr "+ étiquette"
 msgid "1- Title. Authors. Venue, 2023. Lien : https://hal.science/…"
 msgstr "1- Titre. Auteurs. Canal, 2023. Lien : https://hal.science/…"
 
+msgid "1. Pages"
+msgstr "1. Pages"
+
 msgid "1. Which venue is the primary one?"
 msgstr "1. Quel est le canal principal ?"
 
 msgid "10.1145/…, hal-01234567, or a doi.org, publisher or HAL URL"
 msgstr "10.1145/…, hal-01234567, ou une URL doi.org, d'éditeur ou HAL"
+
+msgid "2. Instructions"
+msgstr "2. Instructions"
 
 #, python-brace-format
 msgid "2. What is “{name}” for the primary venue?"
@@ -100,6 +106,12 @@ msgstr "2. Que représente « {name} » pour le canal principal ?"
 #, python-brace-format
 msgid "2y mean citedness {value:.2f}"
 msgstr "citations moyennes sur 2 ans {value:.2f}"
+
+msgid "3. Reading"
+msgstr "3. Lecture"
+
+msgid "4. Lines found"
+msgstr "4. Lignes trouvées"
 
 msgid "; preprints and ORCID venues are only used when nothing else is available"
 msgstr ""
@@ -667,6 +679,9 @@ msgstr "Toutes les personnes"
 msgid "All people (cleanup)"
 msgstr "Toutes les personnes (nettoyage)"
 
+msgid "All the pages"
+msgstr "Toutes les pages"
+
 #, python-brace-format
 msgid "All the papers, in “{name}” or not"
 msgstr "Tous les articles, dans « {name} » ou non"
@@ -687,6 +702,9 @@ msgstr "Déjà dans ce dossier"
 
 msgid "Already together"
 msgstr "Déjà regroupés"
+
+msgid "Also in Settings → Reading a career"
+msgstr "Aussi dans Paramètres → Lire un parcours"
 
 msgid "Also in the Rayonnement section"
 msgstr "Aussi dans la section Rayonnement"
@@ -937,6 +955,9 @@ msgstr "CORE C : conférence classée satisfaisant les exigences minimales."
 #, python-brace-format
 msgid "CORE {rank} until {year}"
 msgstr "CORE {rank} jusqu'en {year}"
+
+msgid "CV"
+msgstr "CV"
 
 msgid "Cancel"
 msgstr "Annuler"
@@ -1376,6 +1397,9 @@ msgstr "Par défaut ({choice})"
 #, python-brace-format
 msgid "Default ({source})"
 msgstr "Par défaut ({source})"
+
+msgid "Default instructions"
+msgstr "Instructions par défaut"
 
 msgid "Default level"
 msgstr "Niveau par défaut"
@@ -2032,6 +2056,9 @@ msgstr "Document HAL {id} introuvable"
 msgid "HTTP {status} from {url}"
 msgstr "HTTP {status} de {url}"
 
+msgid "Headed as a CV: sent whole"
+msgstr "Titrée comme un CV : envoyée entière"
+
 msgid "Heading"
 msgstr "Titre"
 
@@ -2223,6 +2250,10 @@ msgstr "Installation de la visionneuse PDF (PDF.js, une seule fois)…"
 msgid "Institution"
 msgstr "Établissement"
 
+#, python-brace-format
+msgid "Instructions ({name}: the person's name)"
+msgstr "Instructions ({name} : le nom de la personne)"
+
 msgid "International conference"
 msgstr "Conférence internationale"
 
@@ -2346,6 +2377,13 @@ msgstr ""
 
 msgid "Its level (the folder's default)"
 msgstr "Son niveau (celui par défaut du dossier)"
+
+msgid ""
+"Its lines with a year and a position or diploma: sent, with the lines "
+"around them"
+msgstr ""
+"Ses lignes avec une année et un poste ou un diplôme : envoyées, avec les "
+"lignes autour"
 
 msgid "Its main conference (it is a workshop of this venue)"
 msgstr "Sa conférence principale (c'est un atelier de ce canal)"
@@ -2568,9 +2606,6 @@ msgid ""
 msgstr ""
 "Le laisser hors du texte généré (les notes, les rapports) : toujours "
 "conservé, et listé ici"
-
-msgid "Left out (beyond the limit):"
-msgstr "Laissées de côté (au-delà de la limite) :"
 
 msgid "Left out of the generated text (the notes, the reports)"
 msgstr "Laissé hors du texte généré (les notes, les rapports)"
@@ -3025,6 +3060,9 @@ msgid_plural "New version available ({n} files changed)"
 msgstr[0] "Nouvelle version disponible ({n} fichier modifié)"
 msgstr[1] "Nouvelle version disponible ({n} fichiers modifiés)"
 
+msgid "Next"
+msgstr "Suivant"
+
 msgid "No"
 msgstr "Non"
 
@@ -3108,6 +3146,15 @@ msgstr "Personne dans ce dossier pour l'instant."
 
 msgid "No other category: create one first"
 msgstr "Aucune autre catégorie : créez-en une d'abord"
+
+msgid "No page (no document ticked, or read)"
+msgstr "Aucune page (aucun document coché, ou lu)"
+
+msgid "No page about a career found"
+msgstr "Aucune page sur un parcours trouvée"
+
+msgid "No page ticked"
+msgstr "Aucune page cochée"
 
 #, python-brace-format
 msgid "No paper cited as @{key}"
@@ -3641,9 +3688,6 @@ msgstr "PDF supprimé"
 msgid "Page {page}, {kind}"
 msgstr "Page {page}, {kind}"
 
-msgid "Pages sent:"
-msgstr "Pages envoyées :"
-
 msgid "Paper"
 msgstr "Article"
 
@@ -4067,6 +4111,9 @@ msgstr "Lire"
 msgid "Read in their documents"
 msgstr "Lire dans ses documents"
 
+msgid "Read now:"
+msgstr "Lu en ce moment :"
+
 msgid "Reading a career"
 msgstr "Lecture d'un parcours"
 
@@ -4327,6 +4374,9 @@ msgstr "Enregistrer comme modèle de rapport"
 msgid "Save as a template…"
 msgstr "Enregistrer comme modèle…"
 
+msgid "Save as the default"
+msgstr "Enregistrer par défaut"
+
 msgid "Save rule"
 msgstr "Enregistrer la règle"
 
@@ -4346,6 +4396,9 @@ msgstr "Enregistré"
 
 msgid "Saved (reload a person's page to see it)"
 msgstr "Enregistré (rechargez la page d’une personne pour le voir)"
+
+msgid "Saved as the default instructions"
+msgstr "Enregistrées comme instructions par défaut"
 
 #, python-brace-format
 msgid "Saved as “{name}”"
@@ -4651,6 +4704,11 @@ msgstr "Noms courts"
 
 msgid "Show"
 msgstr "Afficher"
+
+msgid "Show all the pages, to tick others (else only those ticked)"
+msgstr ""
+"Montrer toutes les pages, pour en cocher d'autres (sinon seulement celles"
+" cochées)"
 
 msgid "Show all years"
 msgstr "Afficher toutes les années"
@@ -5031,13 +5089,22 @@ msgid "The PDF window is closed"
 msgstr "La fenêtre du PDF est fermée"
 
 msgid ""
-"The answer is constrained to a JSON schema (Ollama's structured outputs):"
-" the lines, each with its kind, title, institution, dates, details and "
-"quote."
+"The affiliations of their validated profiles, as each source gives it "
+"(OpenAlex, HAL, Google Scholar…), each once with its sources"
 msgstr ""
-"La réponse est contrainte par un schéma JSON (les sorties structurées "
-"d'Ollama) : les lignes, chacune avec son type, son intitulé, son "
-"établissement, ses dates, ses détails et sa citation."
+"Les affiliations de ses profils validés, telles que chaque source les "
+"donne (OpenAlex, HAL, Google Scholar…), chacune une fois avec ses sources"
+
+msgid ""
+"The answer is constrained to this JSON schema (Ollama's structured "
+"outputs): as the career's lines, a position or a diploma and its thesis."
+msgstr ""
+"La réponse est contrainte par ce schéma JSON (sorties structurées "
+"d'Ollama) : comme les lignes du parcours, un poste ou un diplôme et sa "
+"thèse."
+
+msgid "The answer's format"
+msgstr "Le format de la réponse"
 
 msgid "The career (CV)"
 msgstr "Le parcours (CV)"
@@ -5124,6 +5191,10 @@ msgstr ""
 "Les anciens noms restent des variantes, leurs textes sont donc toujours "
 "reconnus"
 
+#, python-brace-format
+msgid "The instructions ({name}: their name), sent with each part:"
+msgstr "Les instructions ({name} : son nom), envoyées avec chaque partie :"
+
 msgid "The language of the rule's words"
 msgstr "La langue des mots de la règle"
 
@@ -5191,6 +5262,16 @@ msgstr "L'avis d'ensemble, et les points à soulever."
 
 msgid "The pages sent"
 msgstr "Les pages envoyées"
+
+msgid ""
+"The pages to read: those likely about a career are ticked (a page headed "
+"as a CV whole; else its lines with a year and a position or diploma). The"
+" pages following each other are read together, the others apart."
+msgstr ""
+"Les pages à lire : celles qui parlent probablement d'un parcours sont "
+"cochées (une page titrée comme un CV entière ; sinon ses lignes avec une "
+"année et un poste ou un diplôme). Les pages qui se suivent sont lues "
+"ensemble, les autres à part."
 
 msgid ""
 "The paper will no longer be in the person's list of papers, nor in the "
@@ -5499,13 +5580,6 @@ msgstr ""
 msgid "Their papers at this venue"
 msgstr "Ses articles dans ce canal"
 
-msgid "Their profiles' affiliations (none)"
-msgstr "Les affiliations de ses profils (aucune)"
-
-#, python-brace-format
-msgid "Their profiles' affiliations: {list}"
-msgstr "Les affiliations de ses profils : {list}"
-
 #, python-brace-format
 msgid "Their publications are marked {track}."
 msgstr "Leurs publications sont marquées {track}."
@@ -5559,6 +5633,10 @@ msgstr "Thèse (doctorat et autres)"
 
 msgid "Thesis (its title, supervisors…)"
 msgstr "Thèse (son titre, ses directeurs…)"
+
+#, python-brace-format
+msgid "Thesis: {title}"
+msgstr "Thèse : {title}"
 
 msgid "They are already in every folder."
 msgstr "Elle est déjà dans tous les dossiers."
@@ -6038,12 +6116,12 @@ msgstr "Quoi et pourquoi (le message du commit)"
 msgid "What became of them (position, employer…)"
 msgstr "Devenir (poste, employeur…)"
 
+msgid "What is sent of it"
+msgstr "Ce qui en est envoyé"
+
 #, python-brace-format
 msgid "What is this venue for “{name}”?"
 msgstr "Qu'est ce canal pour « {name} » ?"
-
-msgid "What the model is sent"
-msgstr "Ce qui est envoyé au modèle"
 
 msgid ""
 "What this publication is (e.g. edited proceedings: not ranked as a paper "
@@ -6052,9 +6130,6 @@ msgstr ""
 "Ce qu'est cette publication (p. ex. des actes édités : pas classés comme "
 "un article du canal de publication) ; automatique : d'après le canal et "
 "les types de document des sources"
-
-msgid "What to read (only the passages about a career are sent):"
-msgstr "Ce qu'il faut lire (seuls les passages sur un parcours sont envoyés) :"
 
 msgid ""
 "When copied through a filter, a tag replaced on its line by a text before"
@@ -6699,9 +6774,6 @@ msgstr "sans année"
 msgid "none"
 msgstr "aucune"
 
-msgid "none (no page about a career found)"
-msgstr "aucune (aucune page sur un parcours trouvée)"
-
 msgid "not a JSON object"
 msgstr "pas un objet JSON"
 
@@ -6866,6 +6938,12 @@ msgid "rate limited by {url} (retry in {wait}s)"
 msgstr "trop de requêtes pour {url} (réessayez dans {wait} s)"
 
 #, python-brace-format
+msgid "read in {n} part"
+msgid_plural "read in {n} parts"
+msgstr[0] "lu en {n} partie"
+msgstr[1] "lu en {n} parties"
+
+#, python-brace-format
 msgid "record chosen by hand on the venue “{venue}”"
 msgstr "entrée choisie à la main sur le canal « {venue} »"
 
@@ -6925,6 +7003,9 @@ msgstr "indiquez d'abord votre e-mail dans Paramètres → Clés d'API"
 
 msgid "short name"
 msgstr "sigle"
+
+msgid "show"
+msgstr "voir"
 
 msgid "show all"
 msgstr "tout afficher"
@@ -7204,6 +7285,12 @@ msgid "{n} PDFs ({size:.1f} MB) in {path}"
 msgstr "{n} PDF ({size:.1f} Mo) dans {path}"
 
 #, python-brace-format
+msgid "{n} affiliation from their profiles (HAL, OpenAlex…)"
+msgid_plural "{n} affiliations from their profiles (HAL, OpenAlex…)"
+msgstr[0] "{n} affiliation tirée de ses profils (HAL, OpenAlex…)"
+msgstr[1] "{n} affiliations tirées de ses profils (HAL, OpenAlex…)"
+
+#, python-brace-format
 msgid "{n} candidate to review"
 msgid_plural "{n} candidates to review"
 msgstr[0] "{n} candidat à examiner"
@@ -7234,6 +7321,10 @@ msgstr[0] "{n} changement du groupe"
 msgstr[1] "{n} changements du groupe"
 
 #, python-brace-format
+msgid "{n} characters"
+msgstr "{n} caractères"
+
+#, python-brace-format
 msgid "{n} conflict: changed here and by the group"
 msgid_plural "{n} conflicts: changed here and by the group"
 msgstr[0] "{n} conflit : modifié ici et par le groupe"
@@ -7260,6 +7351,12 @@ msgstr[1] "{n} décisions que le groupe n'a pas"
 #, python-brace-format
 msgid "{n} hidden by the filters"
 msgstr "{n} masqués par les filtres"
+
+#, python-brace-format
+msgid "{n} line"
+msgid_plural "{n} lines"
+msgstr[0] "{n} ligne"
+msgstr[1] "{n} lignes"
 
 #, python-brace-format
 msgid "{n} line added to the career"
@@ -7290,6 +7387,12 @@ msgstr "{n} thèses sur {total} dans {where}"
 #, python-brace-format
 msgid "{n} outside the years {start}–{end}"
 msgstr "{n} hors des années {start}–{end}"
+
+#, python-brace-format
+msgid "{n} page ticked"
+msgid_plural "{n} pages ticked"
+msgstr[0] "{n} page cochée"
+msgstr[1] "{n} pages cochées"
 
 #, python-brace-format
 msgid "{n} paper"

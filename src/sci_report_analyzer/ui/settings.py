@@ -11,6 +11,7 @@ from nicegui import ui
 
 from .. import (
     annotations,
+    career_extract,
     career_words,
     config,
     contribution,
@@ -1601,13 +1602,25 @@ def career_tab() -> None:
         task_model.set_options(sorted({*models, *([value] if value else [])}), value=value)
 
     ui.timer(0.1, load, once=True)
+    ui.label(_("Instructions ({name}: the person's name)")).classes("text-sm text-grey-8 mt-2")
+    instructions = (
+        ui.textarea(value=career_extract.prompt())
+        .props("outlined autogrow input-class=text-xs")
+        .classes("w-full max-w-[48rem] font-mono")
+        .mark("career-prompt")
+    )
+    ui.button(
+        _("Default instructions"),
+        icon="restart_alt",
+        on_click=lambda: instructions.set_value(career_extract.PROMPT),
+    ).props("flat dense no-caps").mark("career-prompt-default")
     words_value = career_words_section()
 
-    def values() -> tuple[str, str, dict]:
-        return task_model.value or "", think.value or "", words_value()
+    def values() -> tuple[str, str, dict, str]:
+        return task_model.value or "", think.value or "", words_value(), instructions.value or ""
 
     def save() -> None:
-        chosen, thinking, words = values()
+        chosen, thinking, words, prompt = values()
         stored = llm.stored_settings()
         stored.tasks = {**stored.tasks, "career": chosen}
         stored.tasks = {k: v for k, v in stored.tasks.items() if v}
@@ -1616,6 +1629,7 @@ def career_tab() -> None:
             stored.task_think["career"] = thinking == "on"
         llm.save_settings(stored)
         career_words.save_words(words)
+        career_extract.save_prompt(prompt)
         ui.notify(_("Saved"), type="positive")
 
     save = unsaved.track(values, save)

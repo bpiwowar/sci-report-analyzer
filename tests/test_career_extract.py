@@ -77,13 +77,27 @@ def test_pages_ranked_and_words() -> None:
     assert career_words.words() == career_words.DEFAULTS
 
 
-def test_pieces(monkeypatch) -> None:
-    monkeypatch.setattr(career_extract, "PIECE", 10)
-    monkeypatch.setattr(career_extract, "BUDGET", 25)
-    found = [career_extract.Passage(f"d{i}", "x" * 8) for i in range(5)]
-    split = career_extract.pieces(found)
-    assert [[p.source for p in piece] for piece in split] == [["d0"], ["d1"], ["d2", "d3"]]
-    assert sum(len(p.text) for piece in split for p in piece) == 25
+def test_batches(monkeypatch) -> None:
+    """The pages following each other in a document read together, up to PIECE characters;
+    the others apart; a page too long, cut between lines."""
+    monkeypatch.setattr(career_extract, "PIECE", 20)
+    P = career_extract.Passage
+    found = [
+        P("a, p. 1", "x" * 8, 1, 1),
+        P("a, p. 2", "x" * 8, 1, 2),
+        P("a, p. 4", "x" * 8, 1, 4),  # (not following)
+        P("b, p. 5", "x" * 8, 2, 5),  # (another document)
+        P("b, p. 6", "\n".join(["y" * 9] * 3), 2, 6),  # (too long: cut)
+    ]
+    split = career_extract.batches(found)
+    assert [[p.source for p in part] for part in split] == [
+        ["a, p. 1", "a, p. 2"],
+        ["a, p. 4"],
+        ["b, p. 5"],  # (with the first piece of p. 6: too long)
+        ["b, p. 6"],
+        ["b, p. 6"],
+    ]
+    assert [p.text for p in split[3] + split[4]] == ["y" * 9 + "\n" + "y" * 9, "y" * 9]
 
 
 def test_chat_json(monkeypatch) -> None:
@@ -145,7 +159,9 @@ ANSWER = {
         {
             "kind": "diploma",
             "title": "PhD",
-            "end": "June 2015",
+            "institution": "",
+            "obtained": "June 2015",
+            "thesis": "On wombats",
             "quote": "PhD in Wombat Studies",  # (not in the text)
         },
         {"kind": "position", "title": "Postdoc", "start": "2013", "end": "2014", "quote": ""},
@@ -190,6 +206,8 @@ def test_extract(answering) -> None:
     found = asyncio.run(career_extract.extract(pid))
     assert "Jane Doe" in answering[0][0]["content"]
     assert "[Application, p. 2]" in answering[0][1]["content"]
+    assert "[Application, p. 3]" in answering[0][1]["content"]  # (following: together)
+    assert len(answering) == 1
     assert "too junior" not in json.dumps(answering)
     # (the postdoc known; the award not a line of a CV)
     assert [(s.entry.title, s.entry.start, s.entry.end) for s in found] == [
@@ -198,14 +216,16 @@ def test_extract(answering) -> None:
     ]
     assert [(s.checked, s.source) for s in found] == [
         (True, "Application, p. 2"),
-        (False, "Application, p. 3, Application, p. 2"),
+        (False, "Application, p. 2, Application, p. 3"),
     ]
     assert found[1].entry.elapsed  # (a diploma: the years since)
+    assert found[1].entry.details == "On wombats"  # (a diploma's thesis)
     assert [p.page for p in found[0].pages] == [2]
-    # Only the documents chosen: none (no passage of theirs sent).
+    # Only the pages chosen: none (nothing sent).
     answering.clear()
-    asyncio.run(career_extract.extract(pid, [letters]))
-    assert answering == []  # (nothing to read: no profile, no note, no document read)
+    asyncio.run(career_extract.extract(pid, []))
+    assert answering == []  # (nothing to read: no profile, no note, no page)
+    assert [p.page for p in career_extract.pages(pid, [letters])] == []  # (not read)
 
 
 async def test_extract_dialog(user: User, answering) -> None:
@@ -217,30 +237,53 @@ async def test_extract_dialog(user: User, answering) -> None:
     try:
         await user.open(f"/person/{pid}?tab=career")
         user.find(marker="career-extract").click()
-        # The documents chosen: that never opened, not (to open first).
+        # 1. The documents: that never opened, not (to open first); their pages, those likely
+        # about a career ticked, the others to tick.
         await user.should_see(marker=f"career-extract-doc-{doc}")
         assert user.find(marker=f"career-extract-doc-{doc}").elements.pop().value
         unread = user.find(marker=f"career-extract-doc-{letters}").elements.pop()
         assert not unread.value and "disable" in unread.props
         await user.should_see(marker=f"career-extract-open-{letters}")
-        # The pages sent (each opening it there), shown.
-        await user.should_see(marker="career-extract-pages")
-        await user.should_see("Application, p. 3")
-        # What the model is sent: the instructions, the passages (of the documents ticked).
-        await user.should_see(marker="career-extract-sent-1-user")
-        sent = user.find(marker="career-extract-sent-1-user").elements.pop().text
-        assert "[Application, p. 2]" in sent
-        prompt = user.find(marker="career-extract-sent-1-system").elements.pop().text
-        assert "Jane Doe" in prompt
+        await user.should_see("2 pages ticked")
+
+        def page(n: int):
+            return user.find(marker=f"career-extract-page-{doc}-{n}").elements.pop()
+
+        assert page(2).value and page(3).value
+        # (only the pages ticked shown; all of them, to tick others)
+        await user.should_not_see(marker=f"career-extract-page-{doc}-4")
+        user.find(marker="career-extract-all-pages").elements.pop().value = True
+        await user.should_see(marker=f"career-extract-page-{doc}-4")
+        assert not page(4).value
+        await user.should_see(marker=f"career-extract-pages-{doc}")
         box = user.find(marker=f"career-extract-doc-{doc}").elements.pop()
         box.value = False
-        await user.should_see("Nothing to read")
+        await user.should_see("0 pages ticked")
         box.value = True
+        await user.should_see("2 pages ticked")
+        page(3).value = False
+        await user.should_see("1 page ticked")
+        page(3).value = True
+        # 2. The instructions (changed, saved), and what is sent.
+        user.find(marker="career-extract-next").click()
         await user.should_see(marker="career-extract-sent-1-user")
+        sent = user.find(marker="career-extract-sent-1-user").elements.pop().text
+        assert "[Application, p. 2]" in sent and "[Application, p. 3]" in sent
+        area = user.find(marker="career-extract-instructions").elements.pop()
+        assert "{name}" in area.value
+        area.value = "Read the CV of {name}."
+        user.find(marker="career-extract-prompt-save").click()
+        await user.should_see("Saved as the default instructions")
+        assert career_extract.prompt() == "Read the CV of {name}."
+        # 3. Read; 4. the lines found, each with its source.
         user.find(marker="career-extract-read").click()
         await user.should_see(marker="career-extract-add")
+        assert answering[0][0]["content"] == "Read the CV of Jane Doe."
         await user.should_see("Quokka University")
+        await user.should_see("Thesis: On wombats")
         await user.should_see(marker="career-extract-source-0")  # (its page, to open)
+        quote = user.find(marker="career-extract-source-0-text").elements.pop()
+        assert "<mark>recruited as an associate professor" in quote.content
         tick = user.find(marker="career-extract-tick-1").elements.pop()
         assert not tick.value  # (its words not in the documents: not ticked)
         user.find(marker="career-extract-add").click()
@@ -248,12 +291,13 @@ async def test_extract_dialog(user: User, answering) -> None:
         assert [e.title for e in career.entries(pid)] == ["Associate professor"]
     finally:
         llm.save_settings(llm.OllamaSettings())
+        career_extract.save_prompt("")
+    assert career_extract.prompt() == career_extract.PROMPT
 
 
 async def test_extract_stopped(user: User, monkeypatch) -> None:
     """Reading stopped: the lines found so far (here, in the first part); the model named."""
-    pid, _doc, _letters = _person_with_document()
-    monkeypatch.setattr(career_extract, "PIECE", 100)  # (the two passages: two parts)
+    pid, doc, _letters = _person_with_document()
     calls = []
 
     async def chat_json(messages, schema, folder_id=None, task=None, progress=None):
@@ -268,11 +312,20 @@ async def test_extract_stopped(user: User, monkeypatch) -> None:
         await user.open(f"/person/{pid}?tab=career")
         user.find(marker="career-extract").click()
         await user.should_see("Model: qwen3 (local")
+        # (pages 2 and 4, not following each other: two parts)
+        user.find(marker="career-extract-all-pages").elements.pop().value = True
+        await user.should_see(marker=f"career-extract-page-{doc}-4")
+        user.find(marker=f"career-extract-page-{doc}-3").elements.pop().value = False
+        user.find(marker=f"career-extract-page-{doc}-4").elements.pop().value = True
+        user.find(marker="career-extract-next").click()
+        await user.should_see(marker="career-extract-sent-2-user")
         user.find(marker="career-extract-read").click()
         await user.should_see("Part 2 of 2: the model reads the text")
         icons = [user.find(marker=f"career-extract-part-{i}").elements.pop() for i in (0, 1)]
         assert [i.props["name"] for i in icons] == ["check_circle", "pending"]
         await user.should_see("3 lines found so far")
+        shown = user.find(marker="career-extract-current").elements.pop().text
+        assert shown.startswith("[Application, p. 4]")  # (the part read now)
         user.find(marker="career-extract-stop").click()
         await user.should_see(marker="career-extract-stopped")
         await user.should_see("Quokka University")
@@ -294,25 +347,63 @@ async def test_career_settings_page(user: User) -> None:
         area = user.find(marker="career-words-fr-headings").elements.pop()
         area.value = "parcours\nmon cv"
         user.find(marker="llm-task-career-think").elements.pop().value = "on"
+        user.find(marker="career-prompt").elements.pop().value = "Mine: {name}"
         user.find(marker="career-save-settings").click()
         await user.should_see("Saved")
         assert llm.stored_settings().tasks == {"career": "gemma3:4b"}
         assert llm.model() == "qwen3"  # (the default one unchanged)
         assert llm.stored_settings().task_think == {"career": True}
         assert career_words.words()["fr"]["headings"] == ["parcours", "mon cv"]
+        assert career_extract.prompt() == "Mine: {name}"
         user.find(marker="career-words-reset").click()
+        user.find(marker="career-prompt-default").click()
         user.find(marker="career-save-settings").click()
         await user.should_see("Saved")
         assert career_words.words() == career_words.DEFAULTS
+        assert career_extract.prompt() == career_extract.PROMPT
     finally:
+        career_extract.save_prompt("")
         llm.save_settings(llm.OllamaSettings())
         career_words.save_words(career_words.DEFAULTS)
 
 
-def test_left_out(monkeypatch) -> None:
-    """The pages beyond the limit: not sent, listed (the most likely sent first)."""
+def test_ticked(monkeypatch) -> None:
+    """The pages ticked first: the most likely, within the limit (a page headed as a CV
+    first)."""
     pid, doc, _letters = _person_with_document()
-    assert career_extract.left_out(pid) == []
+    found = career_extract.pages(pid)
+    assert [(p.page, p.reason) for p in found] == [(1, ""), (2, "lines"), (3, "heading"), (4, "")]
+    assert career_extract.ticked(found) == {(doc, 2), (doc, 3)}
     monkeypatch.setattr(career_extract, "BUDGET", 10)
-    (out,) = career_extract.left_out(pid)
-    assert (out.source, out.doc_id, out.page) == ("Application, p. 2", doc, 2)
+    assert career_extract.ticked(found) == {(doc, 3)}
+    assert career_extract.quoted("A b\n  C d", "b c") == (2, 7)
+
+
+def test_affiliations() -> None:
+    """Their validated profiles' affiliations, each once (whatever the case, accents and
+    spaces) with its sources; not the person's own."""
+    from sci_report_analyzer.db.models import SourceLink
+    from sci_report_analyzer.db.session import session_scope
+
+    pid = make_person("Jane Doe")
+    persons.update(pid, name="Jane Doe", affiliation="Own Lab", aliases=[], notes="")
+    with session_scope() as s:
+        for source, aff, status in [
+            ("hal", "Université  Quokka", "validated"),
+            ("openalex", "universite quokka", "validated"),
+            ("orcid", "Wombat Institute", "validated"),
+            ("dblp", "Rejected Inc.", "rejected"),
+        ]:
+            s.add(
+                SourceLink(
+                    person_id=pid,
+                    source=source,
+                    external_id=source,
+                    status=status,
+                    evidence={"affiliation": aff},
+                )
+            )
+    assert career_extract.affiliations(pid) == [
+        "Université Quokka (from hal, openalex)",
+        "Wombat Institute (from orcid)",
+    ]
