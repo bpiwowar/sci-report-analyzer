@@ -317,8 +317,8 @@ class Folder(Base):
     """A named, dated group of people (e.g. a hiring committee), within another one or not.
 
     A person is in a folder when they have a period in it (a Period with this folder): the
-    period of interest of that person for that folder. Its settings (FolderSettings) are
-    those it uses (FolderSettingsUse), else its parent's (see folders.settings_id).
+    period of interest of that person for that folder. Its settings (FolderSettings): those
+    it chose, else the default ones (see folders.settings_id).
     """
 
     __tablename__ = "folder"
@@ -332,6 +332,10 @@ class Folder(Base):
     date: Mapped[date | None]
     hidden: Mapped[bool] = mapped_column(default=False)
     notes: Mapped[str | None]
+    # The settings it uses (none: the default ones).
+    settings_id: Mapped[int | None] = mapped_column(
+        ForeignKey("folder_settings.id", ondelete="SET NULL"), index=True
+    )
 
     periods: Mapped[list[Period]] = relationship(
         back_populates="folder", cascade="all, delete-orphan", passive_deletes=True
@@ -339,12 +343,23 @@ class Folder(Base):
 
 
 class FolderSettings(Base):
-    """Settings of folders: its categories (Category) and how the notes cite papers. Used
-    by some folders (FolderSettingsUse), and the folders within them using their parent's."""
+    """Named settings of folders: their categories (Category), star lists (Tag) and how the
+    notes cite papers. Each folder uses one (Folder.settings_id), else the default one
+    (exactly one is)."""
 
     __tablename__ = "folder_settings"
+    __table_args__ = (
+        Index(
+            "uq_folder_settings_default",
+            "is_default",
+            unique=True,
+            sqlite_where=text("is_default"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(default="", server_default="")
+    is_default: Mapped[bool] = mapped_column(default=False, server_default="0")
     # How the notes cite papers: {"cite": the template of [@key], "format": the number of a
     # paper in no star list (see Tag), "templates": [{"name", "attrs"}] (over the general
     # ones), "skeleton": the starting notes, "influence_mode",
@@ -353,19 +368,6 @@ class FolderSettings(Base):
     # The source a paper must be in to count ("none": no such source; None: the default
     # one, see source_settings).
     primary_source: Mapped[str | None] = mapped_column(String(32))
-
-
-class FolderSettingsUse(Base):
-    """The settings a folder uses (its own); a folder without any uses its parent's."""
-
-    __tablename__ = "folder_settings_use"
-
-    folder_id: Mapped[int] = mapped_column(
-        ForeignKey("folder.id", ondelete="CASCADE"), primary_key=True
-    )
-    settings_id: Mapped[int] = mapped_column(
-        ForeignKey("folder_settings.id", ondelete="CASCADE"), index=True
-    )
 
 
 class Category(Base):

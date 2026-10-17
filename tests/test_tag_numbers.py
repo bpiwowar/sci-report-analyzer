@@ -4,7 +4,7 @@ reordered; the tags have none."""
 import asyncio
 
 import pytest
-from helpers import add_source, make_person, pub
+from helpers import add_source, make_person, own_settings, pub
 from nicegui.testing import User
 from sqlalchemy import select
 
@@ -77,7 +77,7 @@ def test_star_lists_of_a_folder():
     star = annotations.starred_tag_id()
     mine = annotations.save_list(settings, "shortlist", number_format="[{index}]", must_cite=True)
     other = folders.save_folder(None, "Other")
-    theirs = annotations.save_list(folders.settings_of(other), "theirs")
+    theirs = annotations.save_list(own_settings(other), "theirs")
     assert [t.id for t in annotations.star_lists(period)] == [star, mine]
     assert annotations.first_list(period).id == star
     annotations.order_lists([mine, star])
@@ -94,8 +94,9 @@ def test_star_lists_of_a_folder():
 
 
 def test_star_lists_follow_the_settings():
-    """A folder getting its own settings: copies of its lists, its stars in them (numbers
-    kept); back to its parent's: in its lists of the same names (copied there if missing)."""
+    """A folder using a copy of its settings: copies of its lists, its stars in them (numbers
+    kept); back to the first ones: in their lists of the same names (copied there if
+    missing)."""
     _pid, period, (a, b, _c) = _setup()
     fid = folders.folder_of_period(period)[0]
     top = folders.settings_of(fid)
@@ -103,12 +104,11 @@ def test_star_lists_follow_the_settings():
     annotations.number_in_order(short, [b, a], period)
     sub = folders.save_folder(None, "Sub")
     folders.set_parent(sub, fid)
-    folders.use_parent_settings(sub)
+    folders.use_settings(sub, top)
     inner = folders.add_person(sub, _pid)
     assert [t.name for t in annotations.star_lists(inner)] == ["starred", "shortlist"]
     annotations.toggle_tag(a, short, inner)
-    folders.use_own_settings(sub)
-    own = folders.settings_of(sub)
+    own = own_settings(sub, copy=True)
     lists = {t.name: t for t in annotations.star_lists(inner)}
     assert lists["shortlist"].id != short and lists["shortlist"].settings_id == own
     assert lists["shortlist"].number_format == "[{index}]"
@@ -116,7 +116,7 @@ def test_star_lists_follow_the_settings():
     assert _numbers(_pid, short, period) == {b: 1, a: 2}  # (the parent's: as they were)
     mine = annotations.save_list(own, "mine")
     annotations.toggle_tag(b, mine, inner)
-    folders.use_parent_settings(sub)
+    folders.use_settings(sub, top)
     back = {t.name: t.id for t in annotations.star_lists(inner)}
     assert back["shortlist"] == short and _numbers(_pid, short, inner) == {a: None}
     assert _numbers(_pid, back["mine"], inner) == {b: None}  # (copied to the parent's)

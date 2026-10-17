@@ -84,12 +84,14 @@ def set_kind(raw: str, kind: str | None) -> None:
     set_venue(raw, kind=kind)
 
 
-def own_settings(folder_id: int) -> bool:
-    """Whether a folder uses settings of its own (else: its parent's)."""
-    from sci_report_analyzer.db.models import FolderSettingsUse
+def own_settings(folder_id: int, *, copy: bool = False) -> int:
+    """New settings used by a folder (``copy``: of those it used, else empty); their id."""
+    from sci_report_analyzer import folders
 
-    with session_scope() as s:
-        return s.get(FolderSettingsUse, folder_id) is not None
+    source = folders.settings_of(folder_id) if copy else None
+    sid = folders.create_settings(f"Settings of folder {folder_id}", source)
+    folders.use_settings(folder_id, sid)
+    return sid
 
 
 def uncited(ctx, cited) -> list:

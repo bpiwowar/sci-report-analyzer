@@ -1,7 +1,7 @@
 """The tree of folders (collapsible, with their people; expanded or not: sticky), on the
 Reports page: a click selects a folder; drag them to nest and move them; each one's menu
-renames it, adds a folder within it, chooses its settings (its parent's, or its own), moves
-or copies them to another folder, and deletes it."""
+renames it, adds a folder within it, moves it, chooses its settings (named, those of the
+Parameters), and deletes it."""
 
 from __future__ import annotations
 
@@ -30,7 +30,8 @@ def expand_to(folder_id: int) -> None:
     annotations.save_ui_state(EXPANDED, sorted(shown))
 
 
-def _added(n: int) -> None:
+def categories_added(n: int) -> None:
+    """Says how many categories were added to settings, for the excerpts filed in them."""
     if n:
         ui.notify(
             ngettext(
@@ -59,7 +60,7 @@ def folders_tree(
     def move(folder_id: int, parent: int | None, then: Callable[[], None] | None = None) -> None:
         """``then``: before the tree is shown again (e.g. closing the dialog)."""
         try:
-            _added(folders.set_parent(folder_id, parent or None))
+            folders.set_parent(folder_id, parent or None)
         except ValueError as e:
             ui.notify(str(e), type="warning")
         if then:
@@ -108,9 +109,9 @@ def folders_tree(
         ui.icon("help_outline", color="grey").tooltip(
             _(
                 "Click a folder to show it. Drag a folder onto another one to put it within it "
-                "(onto its top or bottom: next to it). A folder uses the settings of the folder "
-                "it is in (its categories, the citations in its notes: all of them), or its own "
-                "ones: see its menu."
+                "(onto its top or bottom: next to it). A folder uses the settings chosen in its "
+                "menu (its categories, the citations in its notes…; named, in the Parameters), "
+                "else the default ones (those not: marked)."
             )
         )
     _entry(
@@ -163,14 +164,10 @@ def folders_tree(
                 ).classes("shrink-0 mr-1").tooltip(
                     ngettext("{n} person", "{n} people", counts[n.id]).format(n=counts[n.id])
                 ).mark(f"folder-count-{n.id}")
-            if n.parent_id is not None and n.own:
+            if not n.default_settings:
                 ui.icon("tune", size="xs", color="grey-7").classes("shrink-0").tooltip(
-                    _("Its own settings")
-                ).mark(f"folder-own-{n.id}")
-            if n.shared_with:
-                ui.icon("share", size="xs", color="primary").classes("shrink-0").tooltip(
-                    _("Same settings as: {folders}").format(folders=", ".join(n.shared_with))
-                ).mark(f"folder-shared-{n.id}")
+                    _("Settings: {name}").format(name=n.settings)
+                ).mark(f"folder-settings-name-{n.id}")
             with (
                 ui.button(icon="more_vert")
                 .props("flat dense round size=sm")
@@ -243,34 +240,7 @@ def _menu(
     item(_("Rename…"), "folder-rename", _rename_dialog, n, changed)
     item(_("Add a folder within it"), "folder-sub", subfolder, n.id)
     item(_("Move to…"), "folder-move", _move_dialog, n, nodes, move)
-    if n.parent_id is not None or len(nodes) > 1:
-        ui.separator()
-    if n.parent_id is not None:
-        if n.own:
-            item(_("Use its parent's settings"), "folder-settings", _parent_settings, n, changed)
-        else:
-            item(
-                _("Use settings of its own (a copy)"), "folder-settings", _own_settings, n, changed
-            )
-        item(
-            _("Move its settings to…"),
-            "folder-move-settings",
-            _settings_dialog,
-            n,
-            nodes,
-            changed,
-            copy=False,
-        )
-    if len(nodes) > 1:
-        item(
-            _("Copy its settings to…"),
-            "folder-copy-settings",
-            _settings_dialog,
-            n,
-            nodes,
-            changed,
-            copy=True,
-        )
+    item(_("Its settings…"), "folder-settings", _settings_dialog, n, changed)
     ui.separator()
     item(
         _("Delete…"),
@@ -406,109 +376,26 @@ def _move_dialog(
         actions(dlg)
 
 
-def _own_settings(n: folders.FolderNode, changed: Callable[[], None]) -> None:
-    folders.use_own_settings(n.id)
-    ui.notify(_("Its own settings: a copy of its parent's"))
-    changed()
+def _settings_dialog(n: folders.FolderNode, changed: Callable[[], None]) -> None:
+    """The settings a folder uses (named, those of the Parameters): its people's excerpts go
+    to the categories of the same names there (added if missing)."""
+    from .folder_settings import settings_choice
 
-
-def _parent_settings(n: folders.FolderNode, changed: Callable[[], None]) -> None:
-
-    def ok() -> None:
-        _added(folders.use_parent_settings(n.id))
-        changed()
-
-    confirm(
-        _(
-            "Use the settings of the folder it is in? Its own ones (categories, "
-            "citations in the notes) are dropped, unless other folders use them; its "
-            "people's excerpts go to the categories of the same names there (added if "
-            "missing)."
-        ),
-        _("Use the parent's"),
-        ok,
-        mark="folder-settings-confirm",
-    )
-
-
-def _settings_dialog(
-    n: folders.FolderNode,
-    nodes: list[folders.FolderNode],
-    changed: Callable[[], None],
-    *,
-    copy: bool,
-) -> None:
-    """Move the settings a folder uses to a folder it is in (e.g. its parent, for all the
-    folders within it to share them), or copy them to any other folder; the folders whose
-    settings change are named before."""
-    by_id = {x.id: x for x in nodes}
-    if copy:
-        targets = {x.id: x.path for x in nodes if x.id != n.id}
-    else:
-        targets, up = {}, n.parent_id
-        while up in by_id and up not in targets:
-            targets[up] = by_id[up].path
-            up = by_id[up].parent_id
-    title = _("Copy the settings of “{folder}”") if copy else _("Move the settings of “{folder}”")
-    with transient_dialog(title.format(folder=n.path), width="w-[36rem] max-w-full") as (
+    chosen = next((f.settings_id for f in folders.folders() if f.id == n.id), None)
+    with transient_dialog(_("Settings of “{folder}”").format(folder=n.path), width="w-[32rem]") as (
         dlg,
         _card,
     ):
         ui.label(
             _(
-                "The folder gets its own copy of these settings (its categories, the citations "
-                "in its notes); its people's excerpts, and those of the folders using its "
-                "settings, go to the categories of the same names there (added if missing)."
+                "Its people's excerpts go to the categories of the same names in the settings "
+                "chosen (added if missing), their starred papers to their star lists."
             )
-            if copy
-            else _(
-                "The folder then uses these settings (its categories, the citations in its "
-                "notes), as do the folders that used its own, and “{folder}” (with those "
-                "between them) uses them from it. Settings no folder uses any more are dropped; "
-                "excerpts go to the categories of the same names (added if missing)."
-            ).format(folder=n.name)
         ).classes("text-sm text-grey")
-        target = (
-            ui.select(
-                targets,
-                value=None if copy else n.parent_id,
-                label=_("To"),
-                with_input=copy,
-                on_change=lambda: who.refresh(),
-            )
-            .props("dense outlined options-dense")
-            .classes("w-full")
-            .mark("folder-settings-target")
-        )
+        choice = settings_choice(chosen)
 
-        @ui.refreshable
-        def who() -> None:
-            if target.value is None:
-                return
-            names = folders.affected(n.id, target.value, copy=copy)
-            ui.label(
-                _("The settings of these folders change: {folders}").format(
-                    folders=", ".join(names)
-                )
-                if names
-                else _("No folder's settings change")
-            ).classes("text-sm").mark("folder-settings-affected")
-
-        who()
-
-        def ok() -> bool | None:
-            if target.value is None:
-                return False
-            try:
-                if copy:
-                    n_added = folders.copy_settings_to(n.id, target.value)
-                else:
-                    n_added = folders.move_settings(n.id, target.value)
-            except ValueError as e:
-                ui.notify(str(e), type="warning")
-                return False
-            _added(n_added)
+        def ok() -> None:
+            categories_added(folders.use_settings(n.id, choice.value))
             changed()
 
-        label = _("Copy") if copy else _("Move")
-        actions(dlg, label, ok, danger=True, mark="folder-settings-apply")
+        actions(dlg, _("Use them"), ok, mark="folder-settings-apply")

@@ -833,15 +833,20 @@ async def test_folders_tree_editor(user: User) -> None:
     user.find(marker="folder-rename-ok").click()
     await user.should_see(marker=f"folder-tree-name-{sub}", content="Session 2026")
     assert [n.path for n in folders.tree() if n.id == sub] == ["Hiring › Session 2026"]
-    # Its own settings (a copy of its parent's), then its parent's again (once confirmed).
+    # Other settings chosen (named): marked; then the default ones again.
+    mine = folders.create_settings("Sessions")
     user.find(marker=f"folder-settings-{sub}").click()
-    await user.should_see("Its own settings: a copy of its parent's")
-    assert own_settings(sub) and [n.name for n in categories.tree(sub)] == ["Research"]
-    await user.should_see(marker=f"folder-own-{sub}")
+    await user.should_see(marker="folder-settings-choice")
+    user.find(marker="folder-settings-choice").elements.pop().value = mine
+    user.find(marker="folder-settings-apply").click()
+    await user.should_see(marker=f"folder-settings-name-{sub}")
+    assert folders.settings_of(sub) == mine and categories.tree(sub) == []
     user.find(marker=f"folder-settings-{sub}").click()
-    user.find(marker="folder-settings-confirm").click()
-    await user.should_see(marker=f"folder-shared-{sub}")
-    assert not own_settings(sub)
+    await user.should_see(marker="folder-settings-choice")
+    user.find(marker="folder-settings-choice").elements.pop().value = None
+    user.find(marker="folder-settings-apply").click()
+    await user.should_not_see(marker=f"folder-settings-name-{sub}")
+    assert folders.settings_of(sub) == folders.default_settings()
     # Moved: with its "Move to" menu, dragged onto a folder, then onto the top level.
     user.find(marker=f"folder-move-{sub}").click()
     user.find(marker=f"folder-parent-{sub}").elements.pop().value = prize
@@ -853,12 +858,12 @@ async def test_folders_tree_editor(user: User) -> None:
     user.find(marker=f"folder-node-{sub}").trigger("drop", {"id": top, "where": "inside"})
     await user.should_see("A folder cannot go within itself")
     user.find(marker="folder-drop-top").trigger("drop", {"id": sub})
-    assert [(n.parent_id, n.own) for n in folders.tree() if n.id == sub] == [(None, True)]
+    assert [n.parent_id for n in folders.tree() if n.id == sub] == [None]
     # A folder within another one, added: shown.
     await user.should_see(marker=f"folder-sub-{prize}")
     user.find(marker=f"folder-sub-{prize}").click()
     await user.should_see(marker="people-title", content="Prize › New folder", retries=50)
-    assert [(n.path, n.own) for n in folders.tree() if n.id == 4] == [("Prize › New folder", False)]
+    assert [n.path for n in folders.tree() if n.id == 4] == ["Prize › New folder"]
     # Within its folder in the tree.
     await user.open(f"/?folder={prize}")
     user.find(marker="folder-node-4").trigger("click")
@@ -901,36 +906,59 @@ async def test_people_in_the_folders_tree(user: User) -> None:
     await user.should_see(marker="people-title", content="Hiring › Session", retries=20)
 
 
-async def test_folder_settings_moved_and_copied_from_the_tree(user: User) -> None:
-    from sci_report_analyzer import categories, folders
+async def test_folder_settings_in_the_parameters(user: User) -> None:
+    """The named settings, in the Parameters: the folders using each, created (a copy),
+    renamed, made the default, edited, deleted; a folder's chosen in its dialog."""
+    from sci_report_analyzer import categories, folders, reports
 
     top = folders.save_folder(None, "Hiring")
-    sub = folders.save_folder(None, "Session 1", parent_id=top)
-    other = folders.save_folder(None, "Session 2", parent_id=top)
     prize = folders.save_folder(None, "Prize")
-    folders.use_own_settings(sub)
-    categories.add(sub, "Research")
-    await user.open(f"/?folder={sub}")
-    # Moved to its parent: the folders whose settings change named first.
-    user.find(marker=f"folder-move-settings-{sub}").click()
-    await user.should_see(marker="folder-settings-affected", content="Hiring, Hiring › Session 2")
-    await user.should_see(marker=f"folder-own-{sub}")
-    user.find(marker="folder-settings-apply").click()
-    await user.should_not_see(marker=f"folder-own-{sub}")
-    assert not own_settings(sub)
-    assert [n.name for n in categories.tree(other)] == ["Research"]
-    # Copied to another folder (chosen in the dialog).
-    user.find(marker=f"folder-copy-settings-{other}").click()
-    await user.should_see(marker="folder-settings-target")
-    user.find(marker="folder-settings-target").elements.pop().value = prize
-    await user.should_see(marker="folder-settings-affected", content="Prize")
-    user.find(marker="folder-settings-apply").click()
-    for _i in range(50):
-        if [n.name for n in categories.tree(prize)] == ["Research"]:
-            break
-        await asyncio.sleep(0.02)
-    assert [n.name for n in categories.tree(prize)] == ["Research"]
-    assert folders.sharing(prize) == []
+    categories.add(top, "Research")
+    default = folders.default_settings()
+    await user.open("/settings?tab=folders")
+    await user.should_see(marker=f"named-settings-default-{default}")
+    await user.should_see(marker=f"named-settings-folders-{default}", content="Hiring, Prize")
+    # A copy (named), then renamed.
+    user.find(marker=f"settings-duplicate-{default}").click()
+    await user.should_see(marker="settings-name-input")
+    user.find(marker="settings-name-input").clear().type("Prizes")
+    user.find(marker="settings-name-ok").click()
+    [copy] = [x.id for x in folders.named_settings() if x.name == "Prizes"]
+    assert categories.tree(folders.SettingsRef(copy))[0].name == "Research"
+    await user.should_see(marker=f"named-settings-folders-{copy}", content="Used by no folder")
+    user.find(marker=f"settings-rename-{copy}").click()
+    await user.should_see(marker="settings-name-input")
+    user.find(marker="settings-name-input").clear().type("Awards")
+    user.find(marker="settings-name-ok").click()
+    await user.should_see(marker=f"named-settings-name-{copy}", content="Awards")
+    # Edited (by their id): their language.
+    user.find(marker=f"settings-edit-{copy}").click()
+    await user.should_see(marker="folder-language")
+    user.find(marker="folder-language").elements.pop().value = "fr"
+    user.find(marker="settings-save").click()
+    await user.should_not_see(marker="settings-save")
+    assert reports.language(folders.SettingsRef(copy)) == "fr" and reports.language(top) is None
+    # Chosen by a folder, in its dialog: then used by it.
+    await user.open(f"/?folder={prize}")
+    user.find(marker="folder-edit").click()
+    await user.should_see(marker="folder-settings-choice")
+    user.find(marker="folder-settings-choice").elements.pop().value = copy
+    user.find(marker="folder-save").click()
+    await user.should_not_see(marker="folder-save")
+    await asyncio.sleep(0.3)  # (then back to the folder: before leaving it)
+    assert folders.settings_of(prize) == copy and reports.language(prize) == "fr"
+    # Made the default; the others deleted once no folder uses them.
+    await user.open("/settings?tab=folders")
+    await user.should_see(marker=f"named-settings-folders-{copy}", content="Prize")
+    user.find(marker=f"settings-make-default-{copy}").click()
+    await user.should_see(marker=f"named-settings-default-{copy}")
+    assert folders.default_settings() == copy
+    folders.use_settings(top, copy)
+    await user.open("/settings?tab=folders")
+    user.find(marker=f"settings-delete-{default}").click()
+    user.find(marker="settings-delete-ok").click()
+    await user.should_not_see(marker=f"named-settings-{default}")
+    assert [x.id for x in folders.named_settings()] == [copy]
 
 
 async def test_folder_notes_without_a_document(user: User) -> None:
@@ -3306,6 +3334,7 @@ async def test_a_person_with_excerpts_is_not_moved_to_other_settings(user: User)
     a = folders.save_folder(None, "Committee A")
     b = folders.save_folder(None, "Committee B")
     research = categories.add(a, "Research")
+    own_settings(b)
     categories.add(b, "Activities")
     period = folders.add_person(a, pid, 2020, 2024)
     categories.add_excerpt(research, period, "A grant.", 1, [])

@@ -1,6 +1,6 @@
 """Folders: named, dated groups of people; each member has their own period in the folder.
-Folders can be within others; a folder uses its own settings (its categories, how its notes
-cite papers), or its parent's (all of them)."""
+Folders can be within others; each uses named settings (its categories, how its notes cite
+papers…) that it chose, else the default ones."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from types import EllipsisType
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from .db.models import (
@@ -16,7 +16,6 @@ from .db.models import (
     Excerpt,
     Folder,
     FolderSettings,
-    FolderSettingsUse,
     Period,
     PeriodDocument,
     PeriodNote,
@@ -52,6 +51,7 @@ class FolderView:
     members: list[Member] = field(default_factory=list)
     parent_id: int | None = None
     path: str = ""  # (with the folders it is in: "Hiring › 2026")
+    settings_id: int | None = None  # (those it chose; none: the default ones)
 
 
 def _paths(s) -> dict[int, str]:
@@ -108,6 +108,7 @@ def folders(*, include_hidden: bool = True) -> list[FolderView]:
                 ),
                 f.parent_id,
                 paths.get(f.id, f.name),
+                f.settings_id,
             )
             for f in s.scalars(q)
         ]
@@ -128,16 +129,19 @@ def save_folder(
     parent_id: int | None = None,
 ) -> int:
     """Create or update a folder; ``notes``: its own short text (``...``: left as it is, e.g.
-    not edited in a dialog showing a stale copy). A new one: in ``parent_id`` (using its
-    settings), else at the top level (with new settings of its own)."""
+    not edited in a dialog showing a stale copy). A new one: in ``parent_id`` (using the
+    settings it chose), else at the top level (using the default ones)."""
     with session_scope() as s:
         f = s.get(Folder, folder_id) if folder_id else None
         if f is None:
-            f = Folder(name=name, parent_id=parent_id if s.get(Folder, parent_id or 0) else None)
+            parent = s.get(Folder, parent_id or 0)
+            f = Folder(
+                name=name,
+                parent_id=parent.id if parent else None,
+                settings_id=parent.settings_id if parent else None,
+            )
             s.add(f)
             s.flush()
-            if f.parent_id is None:
-                _own_new(s, f.id)
         f.name, f.date, f.hidden = name, day, hidden
         if notes is not ...:
             f.notes = notes or None
@@ -185,60 +189,54 @@ def contents(folder_id: int) -> Contents:
 
 def delete_folder(folder_id: int) -> None:
     """Delete a folder with its periods (and their tags and notes on papers); people are kept.
-    The folders within it go up, keeping the settings they used (those of the deleted folder:
-    then used by them)."""
+    The folders within it go up (keeping their settings)."""
     with session_scope() as s:
         if f := s.get(Folder, folder_id):
-            used = settings_id(s, f.id)
             for child in s.scalars(select(Folder).where(Folder.parent_id == f.id)):
-                if s.get(FolderSettingsUse, child.id) is None:
-                    s.add(FolderSettingsUse(folder_id=child.id, settings_id=used))
                 child.parent_id = f.parent_id
             s.flush()
             s.delete(f)
-            s.flush()
-            _drop_unused(s)
 
 
-# ---- The tree of folders, and their settings ------------------------------------------------
+# ---- The settings of folders: named, one of them the default -------------------------------
 
 
-def _own_new(s, folder_id: int, citations: dict | None = None) -> int:
-    """New settings, used by the folder (instead of those it used); returns their id."""
-    new = FolderSettings(citations=citations)
-    s.add(new)
-    s.flush()
-    if (use := s.get(FolderSettingsUse, folder_id)) is not None:
-        use.settings_id = new.id
-    else:
-        s.add(FolderSettingsUse(folder_id=folder_id, settings_id=new.id))
-    s.flush()
-    return new.id
+class SettingsRef(int):
+    """Settings given where a folder is expected (e.g. to their editors, in the Parameters):
+    those settings themselves, not a folder's."""
+
+
+def default_id(s) -> int:
+    """The default settings (made if there are none)."""
+    sid = s.scalar(select(FolderSettings.id).where(FolderSettings.is_default))
+    if sid is None:
+        new = FolderSettings(name=_("Default"), is_default=True)
+        s.add(new)
+        s.flush()
+        sid = new.id
+    return sid
+
+
+def default_settings() -> int:
+    """The default settings (see default_id)."""
+    with session_scope() as s:
+        return default_id(s)
 
 
 def settings_id(s, folder_id: int) -> int:
-    """The settings a folder uses: its own, else its parent's (those of the first folder
-    above it having some; none: new ones, of the top folder)."""
-    f, seen = s.get(Folder, folder_id), set()
-    while True:
-        if (use := s.get(FolderSettingsUse, f.id)) is not None:
-            return use.settings_id
-        seen.add(f.id)
-        if f.parent_id is None or f.parent_id in seen:
-            return _own_new(s, f.id)
-        f = s.get(Folder, f.parent_id)
+    """The settings a folder uses: those it chose, else the default ones (a SettingsRef:
+    those)."""
+    if isinstance(folder_id, SettingsRef):
+        return int(folder_id)
+    f = s.get(Folder, folder_id)
+    return (f.settings_id if f is not None else None) or default_id(s)
 
 
 def used_settings(s, folder_id: int) -> FolderSettings | None:
-    """The settings a folder uses, if any (see settings_id; none made)."""
-    parent, own = _uses(s)
-    f, seen = folder_id, set()
-    while f is not None and f not in seen:
-        if f in own:
-            return s.get(FolderSettings, own[f])
-        seen.add(f)
-        f = parent.get(f)
-    return None
+    """The settings a folder uses (see settings_id); none for an unknown folder."""
+    if not isinstance(folder_id, SettingsRef) and s.get(Folder, folder_id) is None:
+        return None
+    return s.get(FolderSettings, settings_id(s, folder_id))
 
 
 def primary_source(folder_id: int) -> str | None:
@@ -260,204 +258,168 @@ def settings_of(folder_id: int) -> int:
         return settings_id(s, folder_id)
 
 
-def _effective(s) -> dict[int, int | None]:
-    """The settings each folder uses (none: neither it nor those above it have some)."""
-    return _effective_of(*_uses(s))
-
-
-def _uses(s) -> tuple[dict[int, int | None], dict[int, int]]:
-    """(each folder's parent, the settings of those having their own)."""
-    parent = dict(s.execute(select(Folder.id, Folder.parent_id)).all())
-    own = dict(s.execute(select(FolderSettingsUse.folder_id, FolderSettingsUse.settings_id)).all())
-    return parent, own
-
-
-def _effective_of(parent: dict[int, int | None], own: dict[int, int]) -> dict[int, int | None]:
-    """The settings each folder uses, given its parent and the settings of those having their
-    own (see _effective)."""
-    out: dict[int, int | None] = {}
-    for f in parent:
-        seen, g = set(), f
-        while g is not None and g not in own and g not in seen:
-            seen.add(g)
-            g = parent.get(g)
-        out[f] = own.get(g) if g is not None else None
+def _users(s) -> dict[int, list[int]]:
+    """The folders using each settings."""
+    default = default_id(s)
+    out: dict[int, list[int]] = {}
+    for f, sid in s.execute(select(Folder.id, Folder.settings_id)):
+        out.setdefault(sid or default, []).append(f)
     return out
 
 
-def _resettle(s, before: dict[int, int | None]) -> int:
-    """After the settings of folders changed (``before``: those they used), file their
-    people's excerpts in the categories of the new ones (see categories.remap), their
-    starred papers in its star lists (see annotations.remap_lists); then drops
-    the settings no folder uses any more. Returns how many categories were added."""
+def sharing(folder_id: int) -> list[str]:
+    """The other folders using the same settings as a folder (their paths; a SettingsRef:
+    all those using them)."""
+    with session_scope() as s:
+        users = _users(s).get(settings_id(s, folder_id), [])
+        paths = _paths(s)
+    return sorted(paths[f] for f in users if f != folder_id or isinstance(folder_id, SettingsRef))
+
+
+@dataclass
+class NamedSettings:
+    id: int
+    name: str
+    default: bool
+    folders: list[str]  # (the paths of those using them)
+    filed: int  # (the excerpts and report texts in their categories)
+
+
+def named_settings() -> list[NamedSettings]:
+    """The settings of folders: the default ones, then the others by name."""
+    with session_scope() as s:
+        users, paths = _users(s), _paths(s)
+        filed = _filed(s)
+        out = [
+            NamedSettings(
+                x.id,
+                x.name,
+                x.is_default,
+                sorted(paths[f] for f in users.get(x.id, [])),
+                filed.get(x.id, 0),
+            )
+            for x in s.scalars(select(FolderSettings))
+        ]
+    return sorted(out, key=lambda x: (not x.default, x.name.lower(), x.id))
+
+
+def _filed(s) -> dict[int, int]:
+    """How many excerpts and report texts are in the categories of each settings."""
+    out: dict[int, int] = {}
+    for model in (Excerpt, SectionText):
+        q = (
+            select(Category.settings_id, func.count())
+            .join(model, model.category_id == Category.id)
+            .group_by(Category.settings_id)
+        )
+        for sid, n in s.execute(q):
+            out[sid] = out.get(sid, 0) + n
+    return out
+
+
+def _named(s, name: str, settings_id: int | None = None) -> str:
+    """A name for settings, trimmed. Refused (``ValueError``): blank, or that of others."""
+    name = name.strip()
+    if not name:
+        raise ValueError(_("A name is needed"))
+    taken = select(FolderSettings.id).where(
+        func.lower(FolderSettings.name) == name.lower(), FolderSettings.id != (settings_id or 0)
+    )
+    if s.scalar(taken) is not None:
+        raise ValueError(_("Settings of this name exist already"))
+    return name
+
+
+def create_settings(name: str, source_id: int | None = None) -> int:
+    """New settings: empty, or a copy of others (``source_id``: their citations, primary
+    source, categories and star lists). Refused (``ValueError``): see _named."""
     from . import annotations, categories
 
-    s.flush()
-    added = 0
-    for f, now in _effective(s).items():
-        if (was := before.get(f)) is not None and now is not None and was != now:
-            periods = list(s.scalars(select(Period.id).where(Period.folder_id == f)))
-            added += categories.remap(s, periods, was, now)
-            annotations.remap_lists(s, periods, was, now)
-    _drop_unused(s)
-    return added
+    with session_scope() as s:
+        new = FolderSettings(name=_named(s, name))
+        s.add(new)
+        s.flush()
+        if (source := s.get(FolderSettings, source_id or 0)) is not None:
+            new.citations = dict(source.citations or {}) or None
+            new.primary_source = source.primary_source
+            categories.copy_settings(s, source.id, new.id)
+            annotations.copy_lists(s, source.id, new.id)
+        return new.id
 
 
-def _drop_unused(s) -> None:
-    """Delete the settings no folder uses (and no excerpt is filed in)."""
-    used = set(s.scalars(select(FolderSettingsUse.settings_id)))
-    filed = set(
-        s.scalars(select(Category.settings_id).join(Excerpt, Excerpt.category_id == Category.id))
-    )
-    if unused := [i for i in s.scalars(select(FolderSettings.id)) if i not in used | filed]:
-        s.execute(delete(Category).where(Category.settings_id.in_(unused)))
-        s.execute(delete(FolderSettings).where(FolderSettings.id.in_(unused)))
+def rename_settings(settings_id: int, name: str) -> None:
+    """Refused (``ValueError``): see _named."""
+    with session_scope() as s:
+        if (x := s.get(FolderSettings, settings_id)) is not None:
+            x.name = _named(s, name, settings_id)
 
 
-def set_parent(folder_id: int, parent_id: int | None) -> int:
-    """Put a folder (with those within it) in another one (``None``: at the top level),
-    never within itself; one using its parent's settings then uses its new parent's (at the
-    top level: still those it used, as its own). Its people's excerpts follow (see
-    categories.remap); returns how many categories were added to the new settings for
-    them. Refused (``ValueError``) within itself."""
+def set_default_settings(settings_id: int) -> None:
+    """The settings used by the folders that chose none."""
+    with session_scope() as s:
+        if s.get(FolderSettings, settings_id) is None:
+            return
+        for x in s.scalars(select(FolderSettings).where(FolderSettings.is_default)):
+            x.is_default = False
+        s.flush()
+        s.get(FolderSettings, settings_id).is_default = True
+
+
+def delete_settings(settings_id: int) -> None:
+    """Delete settings, with their categories and star lists. Refused (``ValueError``): the
+    default ones, those a folder uses, those with excerpts or report texts in their
+    categories (lost otherwise)."""
+    with session_scope() as s:
+        x = s.get(FolderSettings, settings_id)
+        if x is None:
+            return
+        if x.is_default:
+            raise ValueError(_("The default settings cannot be deleted"))
+        if _users(s).get(x.id):
+            raise ValueError(_("Folders use these settings"))
+        if _filed(s).get(x.id):
+            raise ValueError(_("Excerpts or report texts are filed in their categories"))
+        s.delete(x)
+
+
+def use_settings(folder_id: int, chosen: int | None) -> int:
+    """The settings a folder uses (``chosen``; ``None``: the default ones): its people's
+    excerpts are filed in their categories (see categories.remap), their starred papers in
+    their star lists (see annotations.remap_lists). Returns how many categories were added
+    there for them."""
+    from . import annotations, categories
+
     with session_scope() as s:
         f = s.get(Folder, folder_id)
         if f is None:
             return 0
+        was = settings_id(s, folder_id)
+        f.settings_id = chosen if s.get(FolderSettings, chosen or 0) else None
+        s.flush()
+        now = settings_id(s, folder_id)
+        if was == now:
+            return 0
+        periods = list(s.scalars(select(Period.id).where(Period.folder_id == folder_id)))
+        annotations.remap_lists(s, periods, was, now)
+        return categories.remap(s, periods, was, now)
+
+
+# ---- The tree of folders ------------------------------------------------------------------
+
+
+def set_parent(folder_id: int, parent_id: int | None) -> None:
+    """Put a folder (with those within it) in another one (``None``: at the top level),
+    never within itself (refused: ``ValueError``); its settings stay those it uses."""
+    with session_scope() as s:
+        f = s.get(Folder, folder_id)
+        if f is None:
+            return
         p = s.get(Folder, parent_id) if parent_id else None
         while p is not None:
             if p.id == f.id:
                 raise ValueError(_("A folder cannot go within itself"))
             p = s.get(Folder, p.parent_id) if p.parent_id else None
-        before = _effective(s)
-        if parent_id is None and s.get(FolderSettingsUse, f.id) is None:
-            s.add(FolderSettingsUse(folder_id=f.id, settings_id=settings_id(s, f.id)))
         f.parent_id = parent_id or None
-        return _resettle(s, before)
-
-
-def use_own_settings(folder_id: int) -> None:
-    """A folder gets settings of its own: a copy of those it used (its people's excerpts
-    filed in the copies of their categories, their stars in those of the star lists)."""
-    from . import annotations, categories
-
-    with session_scope() as s:
-        before = _effective(s)
-        was = settings_id(s, folder_id)
-        new = _own_new(s, folder_id, dict(s.get(FolderSettings, was).citations or {}) or None)
-        s.get(FolderSettings, new).primary_source = s.get(FolderSettings, was).primary_source
-        categories.copy_settings(s, was, new)
-        annotations.copy_lists(s, was, new)
-        _resettle(s, before)
-
-
-def use_parent_settings(folder_id: int) -> int:
-    """A folder within another one uses its parent's settings (its own ones are dropped,
-    unless others use them): its people's excerpts are filed in their categories (see
-    categories.remap). Returns how many categories were added there for them."""
-    with session_scope() as s:
-        f = s.get(Folder, folder_id)
-        if f is None or f.parent_id is None:
-            return 0
-        before = _effective(s)
-        if (use := s.get(FolderSettingsUse, folder_id)) is not None:
-            s.delete(use)
-        return _resettle(s, before)
-
-
-def _above(parent: dict[int, int | None], folder_id: int) -> list[int]:
-    """The folders a folder is in, from its parent up."""
-    out, g = [], parent.get(folder_id)
-    while g is not None and g not in out and g != folder_id:
-        out.append(g)
-        g = parent.get(g)
-    return out
-
-
-_NEW = -1  # (the settings a copy would make, before they are)
-
-
-def _moved(parent, own, folder_id: int, target_id: int, *, copy: bool) -> dict[int, int]:
-    """The settings of the folders having their own, once those a folder uses are moved
-    (else, with ``copy``, copied) to another one (see move_settings, copy_settings_to).
-    Refused (``ValueError``): moved to a folder it is not in, copied to itself."""
-    if folder_id not in parent or target_id not in parent:
-        raise ValueError(_("Unknown folder"))
-    if copy:
-        if target_id == folder_id:
-            raise ValueError(_("A folder's settings cannot be copied to itself"))
-        return {**own, target_id: _NEW}
-    above = _above(parent, folder_id)
-    if target_id not in above:
-        raise ValueError(_("Settings move only to a folder it is in"))
-    out = {**own, target_id: _effective_of(parent, own)[folder_id]}
-    for f in [folder_id, *above[: above.index(target_id)]]:  # (they use the target's)
-        out.pop(f, None)
-    return out
-
-
-def affected(folder_id: int, target_id: int, *, copy: bool = False) -> list[str]:
-    """The folders whose settings change when those of a folder are moved (or copied) to
-    another one (their paths; see move_settings, copy_settings_to)."""
-    with session_scope() as s:
-        settings_id(s, folder_id)  # (made if none)
-        parent, own = _uses(s)
-        before = _effective_of(parent, own)
-        after = _effective_of(parent, _moved(parent, own, folder_id, target_id, copy=copy))
-        paths = _paths(s)
-    return sorted(paths[f] for f in parent if before.get(f) != after.get(f))
-
-
-def move_settings(folder_id: int, target_id: int) -> int:
-    """The settings a folder uses become those of a folder it is in (``target_id``, e.g. its
-    parent): the folder, and those between them, then use the target's (their own ones
-    dropped, unless others use them); so do the folders that used the target's (its previous
-    ones dropped, unless others use them). Everyone's excerpts follow (see categories.remap);
-    returns how many categories were added for them. Refused (``ValueError``): to a folder
-    it is not in."""
-    with session_scope() as s:
-        settings_id(s, folder_id)  # (made if none)
-        parent, own = _uses(s)
-        before = _effective_of(parent, own)
-        after = _moved(parent, own, folder_id, target_id, copy=False)
-        for f in set(own) | set(after):
-            use = s.get(FolderSettingsUse, f)
-            if f not in after:
-                s.delete(use)
-            elif use is None:
-                s.add(FolderSettingsUse(folder_id=f, settings_id=after[f]))
-            else:
-                use.settings_id = after[f]
-        return _resettle(s, before)
-
-
-def copy_settings_to(folder_id: int, target_id: int) -> int:
-    """Another folder (``target_id``) gets its own copy of the settings a folder uses (their
-    citations, star lists and categories); its people's excerpts, and those of the folders
-    using its settings, are filed in the copy (see categories.remap: the missing categories
-    added). Returns how many were added. Refused (``ValueError``): to itself."""
-    from . import annotations, categories
-
-    with session_scope() as s:
-        parent, own = _uses(s)
-        _moved(parent, own, folder_id, target_id, copy=True)  # (checked)
-        before = _effective_of(parent, own)
-        source = settings_id(s, folder_id)
-        citations = dict(s.get(FolderSettings, source).citations or {}) or None
-        new = _own_new(s, target_id, citations)
-        s.get(FolderSettings, new).primary_source = s.get(FolderSettings, source).primary_source
-        categories.copy_settings(s, source, new)
-        annotations.copy_lists(s, source, new)
-        return _resettle(s, before)
-
-
-def sharing(folder_id: int) -> list[str]:
-    """The other folders using the same settings as a folder (their paths)."""
-    with session_scope() as s:
-        effective = _effective(s)
-        mine = effective.get(folder_id) or settings_id(s, folder_id)
-        paths = _paths(s)
-    return sorted(paths[f] for f, sid in effective.items() if sid == mine and f != folder_id)
 
 
 @dataclass
@@ -468,8 +430,9 @@ class FolderNode:
     depth: int
     path: str
     hidden: bool
-    own: bool  # (its own settings; else its parent's)
-    shared_with: list[str] = field(default_factory=list)  # (others using its settings)
+    settings_id: int  # (those it uses)
+    settings: str  # (their name)
+    default_settings: bool  # (whether they are the default ones)
     children: list[FolderNode] = field(default_factory=list)
 
 
@@ -477,12 +440,9 @@ def tree() -> list[FolderNode]:
     """The folders, depth first (a folder, then those within it; most recent first)."""
     with session_scope() as s:
         rows = list(s.scalars(select(Folder)))
-        own = set(s.scalars(select(FolderSettingsUse.folder_id)))
-        effective = _effective(s)
+        default = default_id(s)
+        names = dict(s.execute(select(FolderSettings.id, FolderSettings.name)).all())
         paths = _paths(s)
-    users: dict[int | None, list[str]] = {}
-    for f, sid in effective.items():
-        users.setdefault(sid, []).append(paths[f])
     ids = {f.id for f in rows}
     kids: dict[int | None, list[Folder]] = {}
     for f in sorted(rows, key=_recent_first):
@@ -492,6 +452,7 @@ def tree() -> list[FolderNode]:
     def walk(parent: int | None, depth: int) -> list[FolderNode]:
         nodes = []
         for f in kids.get(parent, []):
+            sid = f.settings_id or default
             n = FolderNode(
                 f.id,
                 f.name,
@@ -499,8 +460,9 @@ def tree() -> list[FolderNode]:
                 depth,
                 paths[f.id],
                 f.hidden,
-                f.id in own,
-                sorted(p for p in users.get(effective[f.id], []) if p != paths[f.id]),
+                sid,
+                names.get(sid, ""),
+                sid == default,
             )
             out.append(n)
             n.children = walk(f.id, depth + 1)
@@ -588,8 +550,7 @@ def move_person(person_id: int, from_id: int, to_id: int) -> int:
             select(Period.id).where(Period.folder_id == to_id, Period.person_id == person_id)
         ):
             raise ValueError(_("Already in this folder"))
-        effective = _effective(s)
-        was, now = effective.get(from_id), effective.get(to_id)
+        was, now = settings_id(s, from_id), settings_id(s, to_id)
         if was != now and s.scalar(select(Excerpt.id).where(Excerpt.period_id == p.id).limit(1)):
             raise ValueError(
                 _("They have excerpts, and this folder's settings (its categories) differ")
@@ -599,7 +560,7 @@ def move_person(person_id: int, from_id: int, to_id: int) -> int:
             p.name = target.name
         p.folder_id = to_id
         s.flush()
-        if was is None or now is None or was == now:
+        if was == now:
             return 0
         annotations.remap_lists(s, [p.id], was, now)
         return categories.remap(s, [p.id], was, now)

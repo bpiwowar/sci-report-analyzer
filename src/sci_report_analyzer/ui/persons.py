@@ -13,12 +13,9 @@ from nicegui import ui
 from .. import (
     annotations,
     folders,
-    i18n,
-    llm,
     manual,
     persons,
     pubview,
-    reports,
     source_settings,
     urls,
 )
@@ -38,7 +35,7 @@ from ..sync import (
 from .categories_editor import categories_dialog
 from .dialogs import close_then, ok_handler, transient_dialog
 from .folder_notes import NOTES_TIP, notes_url
-from .folders_editor import ALL, delete_dialog, expand_to, folders_tree
+from .folders_editor import ALL, categories_added, delete_dialog, expand_to, folders_tree
 from .person import (
     candidate_details,
     deletion_dialog,
@@ -664,7 +661,7 @@ def _person_row(
         with ui.row().classes("items-center gap-1 no-wrap ml-auto"):
             if member.documents:
                 with (
-                    ui.link(target=f"{url}?tab=report")
+                    ui.link(target=url(tab="report"))
                     .classes("row items-center no-wrap text-grey-8 no-underline mr-1")
                     .mark(f"documents-{member.period_id}")
                 ):
@@ -773,193 +770,18 @@ def _tags_editor(member: folders.Member, options: list[str]) -> None:
 
 # ---- folders -------------------------------------------------------------------------------
 
-INFLUENCE_TIP = N_(
-    "In [[excerpts]] (and the copied excerpts), the excerpts flagged “rayonnement”; their "
-    "section where [[influence]] is in the report, else at the end of [[excerpts]]"
-)
-INFLUENCE_MODES = {
-    "copy": N_("Also in the Rayonnement section"),
-    "move": N_("Only in the Rayonnement section, by category"),
-    "mark": N_("Only in their categories, marked"),
-}
-
-
-def markers_section(folder_id: int) -> Callable[[], dict[str, reports.Marker]]:
-    """The tags of an excerpt's markers in the reports (blank: the default, in their
-    language), and whether the excerpts marked are first in their categories; returns them."""
-    from .viewer_side import MARKER_ICONS
-
-    current = reports.markers(folder_id)
-    fields = {}
-    with ui.row().classes("items-center gap-4"):
-        for key, m in current.items():
-            label, _tip, icon, colour = MARKER_ICONS[key]
-            with ui.row().classes("items-center gap-1 no-wrap"):
-                ui.icon(icon, size="xs", color=colour)
-                tag = (
-                    ui.input(_(label), value=m.tag)
-                    .props('dense prefix="#"')
-                    .classes("w-32")
-                    .tooltip(_("Its tag in the reports (e.g. turned into an icon when copied)"))
-                    .mark(f"folder-marker-tag-{key}")
-                )
-                first = (
-                    ui.checkbox(_("First"), value=m.first)
-                    .tooltip(
-                        _(
-                            "An excerpt marked moves first in its category (unmarked: "
-                            "after those marked)"
-                        )
-                    )
-                    .mark(f"folder-marker-first-{key}")
-                )
-                fields[key] = (tag, first)
-    return lambda: {
-        k: reports.Marker((t.value or "").strip("# "), bool(f.value))
-        for k, (t, f) in fields.items()
-    }
-
-
-def models_section(folder_id: int) -> Callable[[], tuple[str, str]]:
-    """The models the folder uses instead of the default ones (Settings → Local LLM): the LLM
-    and the embedding model (blank: the default; those of the servers proposed); returns
-    their values."""
-    st = llm.settings()
-    model, embed = llm.folder_models(folder_id)
-    ui.label(_("Models")).classes("text-base mt-2")
-    with ui.row().classes("w-full gap-2 no-wrap"):
-        inputs = [
-            ui.select(
-                [value] if value else [],
-                value=value or None,
-                label=label,
-                with_input=True,
-                new_value_mode="add-unique",
-                clearable=True,
-            )
-            .classes("grow")
-            .tooltip(tip)
-            .mark(mark)
-            for value, label, tip, mark in (
-                (
-                    model,
-                    _("LLM (default: {model})").format(model=st.model or _("none")),
-                    _("For the features using the local LLM"),
-                    "folder-llm-model",
-                ),
-                (
-                    embed,
-                    _("Embedding model (default: {model})").format(
-                        model=st.embed_model or _("none")
-                    ),
-                    _("E.g. to suggest an excerpt's category (trained again if changed)"),
-                    "folder-embed-model",
-                ),
-            )
-        ]
-
-    async def load() -> None:
-        for select, listing in (
-            (inputs[0], llm.list_models(st.url)),
-            (
-                inputs[1],
-                llm.list_embed_models(
-                    st.embed_api, st.embed_url if st.embed_api == "openai" else st.url
-                ),
-            ),
-        ):
-            try:
-                found = await listing
-            except Exception:
-                continue  # (the server is not running: typed)
-            value = select.value
-            select.set_options(sorted({*found, *([value] if value else [])}), value=value)
-
-    if st.enabled:
-        ui.timer(0.1, load, once=True)
-    return lambda: (inputs[0].value or "", inputs[1].value or "")
-
-
-def levels_section(folder_id: int) -> Callable[[], tuple[list[reports.Level], str | None]]:
-    """The levels an excerpt can have (e.g. local, national, international), in order: their
-    tags in the reports (blank: the default, in their language; a new one: added below,
-    removed with its button), and the default level of the excerpts without one; returns
-    them."""
-    rows = [{"key": lv.key, "tag": lv.tag} for lv in reports.levels(folder_id)]
-    state = {"default": reports.default_level(folder_id) or ""}
-    fields: dict[str, ui.select] = {}
-
-    def options() -> dict[str, str]:
-        return {
-            "": _("No level"),
-            **{r["key"] or r["tag"]: f"#{r['tag']}" for r in rows if (r["key"] or r["tag"])},
-        }
-
-    @ui.refreshable
-    def listing() -> None:
-        with ui.row().classes("items-center gap-2"):
-            ui.label(_("Levels")).classes("text-sm").tooltip(
-                _(
-                    "An excerpt's level (e.g. national; none: the default one), written as "
-                    "a #tag in the reports (e.g. turned into a text when copied)"
-                )
-            )
-            for i, r in enumerate(rows):
-                with ui.row().classes("items-center gap-0 no-wrap"):
-                    ui.input(value=r["tag"]).props('dense prefix="#"').classes("w-28").on(
-                        "blur", renamed
-                    ).bind_value(r, "tag").mark(f"folder-level-tag-{i}")
-                    ui.button(icon="close", on_click=lambda i=i: drop(i)).props(
-                        "flat dense round size=xs color=grey-7"
-                    ).tooltip(_("Remove this level")).mark(f"folder-level-remove-{i}")
-            ui.button(icon="add", on_click=add).props("flat dense round size=sm").tooltip(
-                _("Add a level")
-            ).mark("folder-level-add")
-            fields["default"] = (
-                ui.select(options(), label=_("Default level"))
-                .bind_value(state, "default")
-                .props("dense")
-                .classes("w-40")
-                .tooltip(_("That of the excerpts without one"))
-                .mark("folder-level-default")
-            )
-
-    def renamed() -> None:
-        """(the default's options: the tags as typed; a new level's, its tag)"""
-        shown, default = options(), fields["default"]
-        default.set_options(shown, value=default.value if default.value in shown else "")
-
-    def add() -> None:
-        rows.append({"key": "", "tag": ""})
-        listing.refresh()
-
-    def drop(i: int) -> None:
-        if rows[i]["key"] and state["default"] == rows[i]["key"]:
-            state["default"] = ""
-        del rows[i]
-        listing.refresh()
-
-    listing()
-
-    def values() -> tuple[list[reports.Level], str | None]:
-        kept = [r for r in rows if (r["tag"] or "").strip("# ") or r["key"]]
-        return (
-            [reports.Level(r["key"], (r["tag"] or "").strip("# ")) for r in kept],
-            state["default"] or None,
-        )
-
-    return values
-
-
 ARCHIVED_TIP = N_(
     "Greyed in the folders, its periods no longer offered when choosing a person's period"
 )
 
 
 def folder_dialog(f: folders.FolderView | None) -> None:
-    """A folder's own settings: its name, date, notes…; and (an existing one) those of its
-    reports, possibly shared with other folders (marked: an icon on their tab), in another tab:
-    their language, the papers numbered, the templates…"""
+    """A folder: its name, date, notes, the settings it uses (named, chosen among those of the
+    Parameters); and (an existing one) those settings, in another tab (marked shared if other
+    folders use them: changed for them too): the language of its reports, the papers
+    numbered, the templates…"""
+    from .folder_settings import settings_choice, settings_fields
+
     with transient_dialog(
         _("New folder") if f is None else _("Edit folder"),
         width="w-96" if f is None else "w-full max-w-4xl",
@@ -968,17 +790,17 @@ def folder_dialog(f: folders.FolderView | None) -> None:
             general_tab = ui.tab("general", _("Folder"), icon="folder").mark("folder-tab-general")
             if f is not None:
                 others = folders.sharing(f.id)
-                notes_tab = ui.tab(
-                    "notes", _("Reports"), icon="share" if others else "description"
-                ).mark("folder-tab-notes")
+                notes_tab = ui.tab("notes", _("Settings"), icon="share" if others else "tune").mark(
+                    "folder-tab-notes"
+                )
                 notes_tab.tooltip(
                     _("Shared with {folders}: changed for them too").format(
                         folders=", ".join(others)
                     )
                     if others
-                    else _("The settings of the reports (can be shared with other folders)")
+                    else _("The settings it uses (its reports, citations, star lists…)")
                 )
-        citations_save = None
+        state: dict = {"save": None}
         with ui.tab_panels(tabs, value=general_tab).classes("w-full"):
             with ui.tab_panel("general").classes("p-0 gap-2"):
                 name = (
@@ -1006,58 +828,20 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 hidden = ui.checkbox(_("Archived"), value=f.hidden if f else False).tooltip(
                     _(ARCHIVED_TIP)
                 )
-            influence = lang = primary = marker_fields = level_fields = model_fields = None
+                choice = settings_choice(
+                    f.settings_id if f else None, lambda: fields.refresh() if f else None
+                )
             if f is not None:
                 with ui.tab_panel("notes").classes("p-0 gap-2"):
-                    from .citations import folder_citations_section
 
-                    lang = (
-                        ui.select(
-                            {"": _("That of the interface"), **i18n.LANGUAGES},
-                            value=reports.language(f.id) or "",
-                            label=_("Language"),
-                        )
-                        .classes("w-64")
-                        .tooltip(_("Of what is generated: references, excerpts, summary…"))
-                        .mark("folder-language")
-                    )
-                    influence = (
-                        ui.select(
-                            {k: _(v) for k, v in INFLUENCE_MODES.items()},
-                            value=reports.influence_mode(f.id),
-                            label=_("Rayonnement excerpts"),
-                        )
-                        .classes("w-96")
-                        .tooltip(_(INFLUENCE_TIP))
-                        .mark("folder-influence-mode")
-                    )
-                    marker_fields = markers_section(f.id)
-                    level_fields = levels_section(f.id)
-                    default = source_settings.default_primary()
-                    primary = (
-                        ui.select(
-                            {
-                                None: _("Default ({source})").format(
-                                    source=ADAPTERS[default].label
-                                    if default in ADAPTERS
-                                    else _("none")
-                                ),
-                                source_settings.NO_PRIMARY: _("None"),
-                                **{
-                                    n: a.label
-                                    for n, a in ADAPTERS.items()
-                                    if a.linkable and a.provides_publications
-                                },
-                            },
-                            value=folders.primary_source(f.id),
-                            label=_("Primary source"),
-                        )
-                        .classes("w-full")
-                        .tooltip(_("Papers this source doesn't list for a person are not counted"))
-                        .mark("folder-primary")
-                    )
-                    citations_save = folder_citations_section(f.id)
-                    model_fields = models_section(f.id)
+                    @ui.refreshable
+                    def fields() -> None:
+                        """(those chosen: their values, shown again once others are)"""
+                        with ui.column().classes("w-full gap-2"):
+                            sid = choice.value or folders.default_settings()
+                            state["save"] = settings_fields(sid)
+
+                    fields()
 
         def save() -> bool | None:
             if not name.value.strip():
@@ -1069,21 +853,9 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 ui.notify(_("Invalid date (YYYY-MM-DD)"), type="warning")
                 tabs.value = "general"
                 return False
-            if citations_save is not None and citations_save() is False:
+            if state["save"] is not None and state["save"]() is False:
                 tabs.value = "notes"
                 return False
-            if influence is not None:
-                reports.save_influence_mode(f.id, influence.value)
-            if marker_fields is not None:
-                reports.save_markers(f.id, marker_fields())
-            if level_fields is not None:
-                reports.save_levels(f.id, *level_fields())
-            if lang is not None:
-                reports.save_language(f.id, lang.value or None)
-            if model_fields is not None:
-                llm.save_folder_models(f.id, *model_fields())
-            if primary is not None:
-                folders.set_primary_source(f.id, primary.value)
             fid = folders.save_folder(
                 f.id if f else None,
                 name.value.strip(),
@@ -1091,6 +863,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 hidden.value,
                 notes.value if edited["notes"] else ...,
             )
+            categories_added(folders.use_settings(fid, choice.value))
             _goto(fid)
 
         def delete() -> None:

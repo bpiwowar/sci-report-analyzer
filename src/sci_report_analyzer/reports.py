@@ -47,7 +47,7 @@ from lark.exceptions import LarkError
 from . import i18n
 from .authors import surname
 from .db.app_settings import get_setting, set_setting
-from .db.models import Folder, FolderSettings, Period
+from .db.models import Period
 from .db.session import session_scope
 from .i18n import _
 from .pubview import PubStat, hashtag, saved_summary, tagged
@@ -630,23 +630,22 @@ class Numbering:
 
 
 def _citations(folder_id: int | None) -> dict:
-    """How a folder's notes cite papers: its settings' (see folders.settings_id)."""
+    """How a folder's notes cite papers: its settings' (see folders.settings_id; a
+    folders.SettingsRef: those)."""
     from . import folders
 
     if not folder_id:
         return {}
     with session_scope() as s:
-        if s.get(Folder, folder_id) is None:
-            return {}
-        return dict(s.get(FolderSettings, folders.settings_id(s, folder_id)).citations or {})
+        c = folders.used_settings(s, folder_id)
+        return dict(c.citations or {}) if c is not None else {}
 
 
 def _save_citations(folder_id: int, **values) -> None:
     from . import folders
 
     with session_scope() as s:
-        if s.get(Folder, folder_id) is not None:
-            c = s.get(FolderSettings, folders.settings_id(s, folder_id))
+        if (c := folders.used_settings(s, folder_id)) is not None:
             c.citations = {**(c.citations or {}), **values}
 
 
