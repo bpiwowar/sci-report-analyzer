@@ -21,6 +21,7 @@ from .. import (
     pdftext,
     reflist,
     reports,
+    urls,
 )
 from ..i18n import N_, _, ngettext
 from ..sources.base import SourceError
@@ -590,8 +591,7 @@ class Side:
         if pub is None:
             ui.notify(_("No paper cited as @{key}").format(key=key), type="warning")
             return
-        period = f"/{self.period_id}" if self.period_id else ""
-        ui.navigate.to(f"/person/{self.person_id}{period}?pub={pub}", new_tab=True)
+        ui.navigate.to(urls.person_url(self.person_id, self.period_id, pub=pub), new_tab=True)
 
     def cite_dialog(self, editor: Callable[[], MarkdownEditor | None], mark: str) -> None:
         """Pick one of the person's papers (those of the PDF first): cited at the cursor."""

@@ -24,6 +24,7 @@ from sci_report_analyzer.db.models import Publication, SectionText
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.ui import copying, documents_page
 from sci_report_analyzer.ui.mdedit import MarkdownEditor, inline_quote, quote
+from sci_report_analyzer.urls import person_url
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
 
@@ -248,14 +249,14 @@ async def test_document_page(user: User, monkeypatch, fake_viewer):
         if opened:
             break
         await asyncio.sleep(0.02)
-    assert opened == [(f"/person/{pid}/{period}?pub={ids['b']}", True)]
+    assert opened == [(person_url(pid, period, pub=ids["b"]), True)]
     layout = user.client.layout
     clicked = [i for i, ls in layout._event_listeners.items() if ls.type == "vrCiteOpen"]
     [note] = user.find(marker="doc-note").elements
     for editor, key in ((-1, "anon2021deep"), (note.id, "anon2023sparse"), (note.id, "nokey")):
         for listener in clicked:
             layout._handle_event({"listener_id": listener, "args": {"id": editor, "key": key}})
-    assert opened[1:] == [(f"/person/{pid}/{period}?pub={ids['c']}", True)]  # (its editor's)
+    assert opened[1:] == [(person_url(pid, period, pub=ids["c"]), True)]  # (its editor's)
     await user.should_see("No paper cited as @nokey")
     # Shift-click on a citation in the PDF: cited in the notes last used, at the cursor.
     inserted = []

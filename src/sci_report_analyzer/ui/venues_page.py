@@ -8,7 +8,7 @@ from html import escape
 
 from nicegui import background_tasks, ui
 
-from .. import venue_match, venues
+from .. import urls, venue_match, venues
 from ..i18n import N_, _, ngettext
 from ..ranking import tracks
 from ..ranking.badge import (
@@ -1347,19 +1347,22 @@ def papers_dialog(row: venues.VenueRow, *, people: bool = False) -> None:
             ui.button(icon="close", on_click=dlg.close).props("flat round")
         if not papers:
             ui.label(_("No paper.")).classes("text-grey")
+        slugs = urls.Slugs.load()
         for pid, items in by_person.items():
             with ui.column().classes("w-full gap-0").mark(f"venue-person-{pid}"):
                 ui.link(
-                    f"{items[0].person} ({len(items)})", f"/person/{pid}?venue={row.id}"
+                    f"{items[0].person} ({len(items)})",
+                    urls.person_url(pid, slugs=slugs, venue=row.id),
                 ).classes("font-medium").tooltip(_("Their papers at this venue"))
                 if people:
                     continue
                 for p in items:
                     with ui.row().classes("gap-2 no-wrap items-baseline pl-4 text-sm"):
                         ui.label(str(p.year or "—")).classes("w-10 shrink-0 text-grey")
-                        ui.link(p.title or _("(untitled)"), f"/person/{pid}?pub={p.id}").classes(
-                            "text-grey-8" if p.hidden else ""
-                        ).mark(f"venue-paper-{p.id}")
+                        ui.link(
+                            p.title or _("(untitled)"),
+                            urls.person_url(pid, slugs=slugs, pub=p.id),
+                        ).classes("text-grey-8" if p.hidden else "").mark(f"venue-paper-{p.id}")
                         if p.hidden:
                             ui.label(_("hidden")).classes("text-xs text-grey")
 

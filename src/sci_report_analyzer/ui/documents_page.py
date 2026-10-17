@@ -12,7 +12,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 from nicegui import app, ui
 
-from .. import annotations, documents, pdfs, reports
+from .. import annotations, documents, pdfs, reports, urls
 from ..i18n import N_, Labels, _
 from .dialogs import actions, confirm, ok_handler, transient_dialog
 from .mdedit import MarkdownEditor, tool_group
@@ -213,7 +213,7 @@ class DocumentPage:
             _set_open(d.period_id, d.id)
         box = viewer_frame(
             d.name,
-            (d.person, f"/person/{d.person_id}/{d.period_id}"),
+            (d.person, urls.person_url(d.person_id, d.period_id)),
             (d.person_id, d.period_id, "report" if report else "publications"),
             f"/doc-file/{d.id}",
             int(file.stat().st_mtime) if file else 0,
@@ -233,7 +233,7 @@ class DocumentPage:
             },
             page=page,
             pane=pane,
-            closed=f"/person/{d.person_id}/{d.period_id}?tab=report" if report else None,
+            closed=urls.person_url(d.person_id, d.period_id, tab="report") if report else None,
             on_close=lambda: _set_open(d.period_id, None),
         )
         self.side.attach(box)

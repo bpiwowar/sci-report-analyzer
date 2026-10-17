@@ -10,7 +10,7 @@ from weakref import WeakSet
 from fastapi.responses import RedirectResponse
 from nicegui import app, ui
 
-from .. import folders, reports
+from .. import folders, reports, urls
 from ..i18n import N_, _
 from .dialogs import ok_handler, transient_dialog
 from .mdedit import MarkdownEditor
@@ -168,4 +168,4 @@ def register() -> None:
             with frame(_("Not found")):
                 ui.label(_("Not a person within a folder")).mark("notes-not-found")
             return None
-        return RedirectResponse(f"/person/{found[0]}/{period_id}?tab=report")
+        return RedirectResponse(urls.person_url(found[0], period_id, tab="report"))
