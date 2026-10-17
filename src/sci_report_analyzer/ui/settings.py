@@ -64,6 +64,7 @@ NAV = (
     (
         N_("Reports"),
         (
+            ("folders", N_("Folder settings")),
             ("contribution", N_("Contribution roles")),
             ("skeletons", N_("Report templates")),
             ("reports", N_("Citation templates")),
@@ -89,6 +90,7 @@ PANELS = {
     "detection": lambda: detection_tab(),
     "tracks": lambda: tracks_tab(),
     "tags": lambda: tags_tab(),
+    "folders": lambda: folder_settings_tab(),
     "contribution": lambda: contribution_tab(),
     "skeletons": lambda: skeletons_tab(),
     "reports": lambda: report_templates_tab(),
@@ -307,6 +309,16 @@ def contribution_tab() -> None:
         ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat")
         unsaved.cancel_button()
         ui.button(_("Save"), icon="save", on_click=save).mark("contribution-save")
+
+
+# ---- folder settings -----------------------------------------------------------------------
+
+
+def folder_settings_tab() -> None:
+    """The settings of folders, named (each folder uses one: see folder_settings)."""
+    from .folder_settings import settings_tab
+
+    settings_tab()
 
 
 # ---- report templates ----------------------------------------------------------------------

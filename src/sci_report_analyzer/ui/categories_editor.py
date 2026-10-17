@@ -16,16 +16,26 @@ from .theme import int_or_none
 
 
 def shared_note(folder_id: int) -> None:
-    """Says which other folders use the same settings as a folder (changed for them too)."""
+    """Says which other folders use the same settings as a folder (changed for them too; a
+    folders.SettingsRef: the folders using them)."""
     if others := folders.sharing(folder_id):
-        ui.label(
-            _("Shared with {folders}: changed for them too").format(folders=", ".join(others))
-        ).classes("text-sm text-primary").mark("settings-shared")
+        text = (
+            _("Used by {folders}: changed for them too")
+            if isinstance(folder_id, folders.SettingsRef)
+            else _("Shared with {folders}: changed for them too")
+        )
+        ui.label(text.format(folders=", ".join(others))).classes("text-sm text-primary").mark(
+            "settings-shared"
+        )
 
 
 def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None) -> None:
-    """Add, rename, order, nest (subcategories), date and delete the categories."""
-    name = next((f.name for f in folders.folders() if f.id == folder_id), "")
+    """Add, rename, order, nest (subcategories), date and delete the categories (of a
+    folder's settings; a folders.SettingsRef: of those)."""
+    if isinstance(folder_id, folders.SettingsRef):
+        name = next((x.name for x in folders.named_settings() if x.id == folder_id), "")
+    else:
+        name = next((f.name for f in folders.folders() if f.id == folder_id), "")
 
     def done() -> None:
         listing.refresh()

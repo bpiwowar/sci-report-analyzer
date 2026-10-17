@@ -131,7 +131,7 @@ def test_shared_primary_source_4a8c1f3e7d52(tmp_path):
             )
         c.execute("INSERT INTO folder_settings (id, citations) VALUES (10, NULL)")
         c.execute("INSERT INTO folder_settings_use (folder_id, settings_id) VALUES (5, 10)")
-    _upgrade(db, "head")
+    _upgrade(db, "4a8c1f3e7d52")
     with sqlite3.connect(db) as c:
         settings = dict(c.execute("SELECT id, primary_source FROM folder_settings"))
         uses = dict(c.execute("SELECT folder_id, settings_id FROM folder_settings_use"))
@@ -160,3 +160,69 @@ def test_shared_settings_c3e8a1f5d7b9(tmp_path):
     assert json.loads(rows[2]) == [{"type": "conference", "rank": "A"}]
     assert rows[3] is None
     assert {"decided_by", "decided_on"} <= cols
+
+
+def _downgrade(path, revision: str) -> None:
+    cfg = Config()
+    cfg.set_main_option("script_location", str(db_session.MIGRATIONS_DIR))
+    with create_engine(f"sqlite:///{path}").begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.downgrade(cfg, revision)
+
+
+def test_named_settings_e2a6c8f4b1d9(tmp_path):
+    """Each folder uses the settings it used (its own, else those above it); each set is
+    named after its top-most folder, the one used most the default (its folders: none
+    chosen); back, a folder using the same as its parent inherits them."""
+    db = tmp_path / "db.sqlite"
+    _upgrade(db, "b5d2e8f1a7c3")
+    with sqlite3.connect(db) as c:
+        for fid, name, parent in [
+            (1, "Hiring", None),
+            (2, "Session", 1),
+            (3, "Interviews", 2),
+            (4, "Prize", None),
+            (5, "Prize 2026", 4),
+            (6, "Loose", None),  # (no settings: then the default ones)
+        ]:
+            c.execute(
+                "INSERT INTO folder (id, name, parent_id, hidden) VALUES (?, ?, ?, 0)",
+                (fid, name, parent),
+            )
+        for sid in (10, 11, 12, 13):
+            c.execute("INSERT INTO folder_settings (id, citations) VALUES (?, NULL)", (sid,))
+        for fid, sid in [(1, 10), (3, 11), (4, 12), (5, 12)]:
+            c.execute(
+                "INSERT INTO folder_settings_use (folder_id, settings_id) VALUES (?, ?)",
+                (fid, sid),
+            )
+    _upgrade(db, "e2a6c8f4b1d9")
+    with sqlite3.connect(db) as c:
+        chosen = dict(c.execute("SELECT id, settings_id FROM folder"))
+        named = {
+            i: (n, d) for i, n, d in c.execute("SELECT id, name, is_default FROM folder_settings")
+        }
+        tables = {t for (t,) in c.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert chosen == {1: None, 2: None, 3: 11, 4: 12, 5: 12, 6: None}
+    assert named == {
+        10: ("Hiring", 1),
+        11: ("Hiring › Session › Interviews", 0),
+        12: ("Prize", 0),
+        13: ("Unused", 0),
+    }
+    assert "folder_settings_use" not in tables
+    _downgrade(db, "b5d2e8f1a7c3")
+    with sqlite3.connect(db) as c:
+        uses = dict(c.execute("SELECT folder_id, settings_id FROM folder_settings_use"))
+        columns = {r[1] for r in c.execute("PRAGMA table_info(folder)")}
+        settings = {r[1] for r in c.execute("PRAGMA table_info(folder_settings)")}
+    assert uses == {1: 10, 3: 11, 4: 12, 6: 10}
+    assert "settings_id" not in columns and "name" not in settings
+
+
+def test_named_settings_without_any_e2a6c8f4b1d9(tmp_path):
+    """No settings yet: default ones made."""
+    db = tmp_path / "db.sqlite"
+    _upgrade(db, "e2a6c8f4b1d9")
+    with sqlite3.connect(db) as c:
+        assert list(c.execute("SELECT name, is_default FROM folder_settings")) == [("Default", 1)]

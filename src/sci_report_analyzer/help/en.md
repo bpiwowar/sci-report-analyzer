@@ -215,8 +215,8 @@ click it to open the page.
 **Tags & notes** (a paper's details, "Tags & notes" tab): type a name to create a tag; it
 sticks to the paper. The **star lists** (★, e.g. "starred") are the folder's ordered lists of
 papers, set within each person's period in it: the ★ button puts a paper in the first one,
-the details' ★ chips in any. They are the folder's settings (its dialog's “Notes and
-citations” tab: their names, their numbers' format, whether their papers are to be cited,
+the details' ★ chips in any. They are the folder's settings (its dialog's “Settings” tab,
+or Settings → Folder settings: their names, their numbers' format, whether their papers are to be cited,
 their order). Rename and recolour tags with the 🏷 button or in Settings → Tags &
 categories. Each paper has a **note** (Markdown),
 plus a note within the selected period. The "tags" filter shows the papers having one of
@@ -256,7 +256,7 @@ without brackets: `@a, @b{.notes}`), `@key` its title, venue, year and category,
 star list writes it, `.index` the bare number as in `{**#.index**}`, `.title`, `.venue`,
 `.short-venue` the acronym, `.year`, `.tags`, `.notes`; a bracket without a value is dropped).
 Named templates (Settings → Citation templates, or the folder's own) are used as `.name`.
-The folder's settings (its dialog's “Notes and citations” tab) set its star lists: a paper
+The folder's settings (its dialog's “Settings” tab) set its star lists: a paper
 is numbered in the first one it is in (in its order, else by year). Each list, and the
 papers cited only (in no list: numbered apart, as first cited), has two formats: its
 **reference** (the number, e.g. `**#{index}**`, in the references and as `.number`) and its
@@ -423,19 +423,17 @@ selected are remembered. A click on a folder selects it (expanded): its actions 
 filter are in the bar above, staying on top; "All people (cleanup)" lists every person. Drag a folder onto another one to
 put it within it (onto its top or bottom: next to it), or onto "Drop here" for the top level.
 Each folder's ⋮ menu renames it, adds a folder within it, moves it ("Move to…") and chooses
-its settings. A folder uses the **settings** of the folder it is in, or its own ones (an icon in
-the tree): all of them, its categories, its star lists and the citations in its notes (the
-number formats, its templates, the starting notes). Choosing its own settings starts from a
-copy of its parent's; going back to its parent's drops its own (unless other folders use
-them), its people's excerpts going to the categories of the same names there (added if
-missing), as when a folder using its parent's settings is moved. **Move its settings to…**
-gives the settings a folder uses to a folder it is in (e.g. its parent, for all the folders
-within it to share them): the folder (and those between them) then uses the target's, as do
-the folders that used the target's previous settings (dropped, unless others use them).
-**Copy its settings to…** gives any other folder its own copy of them. Both name the folders
-whose settings change before doing it, the excerpts following as above. A folder moved to
-the top level keeps the settings it used; the categories and citations dialogs say when
-other folders use the same ones.
+its settings. The **folder settings** are named, in Settings → Folder settings: their
+categories, their star lists and the citations in the notes (the number formats, the
+templates, the starting notes), the language of the reports, the primary source… There they
+are created (empty, or a copy of others), renamed, edited, made the default, and deleted
+(once no folder uses them and no excerpt is filed in their categories). Each folder uses the
+settings chosen in its dialog or its menu (an icon in the tree when not the default ones),
+else the default ones; a folder made within another one starts with its choice, and a folder
+moved keeps its settings. Choosing other settings files its people's excerpts in the
+categories of the same names there (added if missing), their starred papers in the star lists
+of the same names. Settings used by several folders are changed for all of them: the
+categories and citations dialogs say which.
 
 **Co-author categories** (e.g. "Intl. collaborators"): click a co-author's name in a
 publication's details to put them in a category (or to say they are the person or one of

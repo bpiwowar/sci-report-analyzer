@@ -1,6 +1,6 @@
 from datetime import date
 
-from helpers import add_source, make_person, pub, toggle_star
+from helpers import add_source, make_person, own_settings, pub, toggle_star
 
 from sci_report_analyzer import annotations, folders
 
@@ -159,7 +159,8 @@ def test_primary_source_default_and_folder_override():
     # Shared: by the folders using the same settings (one within it), and their copies.
     sub = folders.save_folder(None, "Session", parent_id=fid)
     assert folders.primary_source(sub) == "dblp"
-    folders.use_own_settings(sub)
+    own_settings(sub, copy=True)
+    assert folders.primary_source(sub) == "dblp"
     folders.set_primary_source(sub, "hal")
     assert (folders.primary_source(fid), folders.primary_source(sub)) == ("dblp", "hal")
     # Not for someone without a profile there (nothing would count), nor a disabled source.

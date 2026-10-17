@@ -5,7 +5,7 @@ import asyncio
 import re
 
 import pytest
-from helpers import PDF, add_source, make_person, note_status, pub
+from helpers import PDF, add_source, make_person, note_status, own_settings, pub
 from nicegui import ui
 from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
@@ -689,6 +689,7 @@ def test_categories_and_markdown():
     categories.update_excerpt(taught)
     categories.update_excerpt(led)
     other = folders.save_folder(None, "Hiring 2027")
+    own_settings(other)
     assert categories.copy_tree(folder, other) == 3
     assert [n.path for n in categories.tree(other)][2] == "Research › Projects"
     # Deleted (with its subcategory) once its excerpts are moved elsewhere.
