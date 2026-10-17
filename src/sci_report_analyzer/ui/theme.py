@@ -401,6 +401,14 @@ def int_or_none(v) -> int | None:
         return None
 
 
+def float_or_none(v) -> float | None:
+    """An input's number (a number, or its text), else None (empty, or not a number)."""
+    try:
+        return float(v) if v not in (None, "") else None
+    except ValueError:
+        return None
+
+
 def fmt_dt(dt) -> str:
     return dt.strftime("%Y-%m-%d %H:%M") if dt else "—"
 

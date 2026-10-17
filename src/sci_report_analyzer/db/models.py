@@ -443,6 +443,9 @@ class Excerpt(Base):
     # folder (no precise date): either, not both; those of the group it leads.
     punctual: Mapped[bool] = mapped_column(default=False, server_default="0")
     in_period: Mapped[bool] = mapped_column(default=False, server_default="0")
+    # How many days a year it takes (its weight on the timeline; none: not said); the
+    # group's.
+    days: Mapped[float | None]
     # Merged with others: the excerpt leading the group (its category, years… are the
     # group's), else none.
     group_id: Mapped[int | None] = mapped_column(

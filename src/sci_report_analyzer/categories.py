@@ -9,6 +9,7 @@ import re
 from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from datetime import datetime
+from types import EllipsisType
 
 from sqlalchemy import func, select
 
@@ -23,7 +24,7 @@ from .db.models import (
     Tag,
 )
 from .db.session import session_scope
-from .i18n import _
+from .i18n import _, ngettext
 
 # The colours given to new categories, in turn (each category's can be changed); the first
 # one also tints the excerpts of a category without any.
@@ -738,6 +739,7 @@ class ExcerptView:
     url: str | None = None  # (a link; leading a group: the group's)
     punctual: bool = False  # (a one-off event: a moment, no duration)
     in_period: bool = False  # (sometime within the person's period: no precise date)
+    days: float | None = None  # (how many days a year it takes; none: not said)
 
     @property
     def tag_names(self) -> list[str]:
@@ -770,6 +772,26 @@ class ExcerptView:
     def words(self) -> set[str]:
         """The words of the item (and of the group it leads), to find similar ones."""
         return _words(" ".join([self.group_text or "", *(x.text for x in self.parts)]))
+
+
+# The most days a year an excerpt may take (a full year).
+MAX_DAYS = 366.0
+
+
+def clean_days(days: float | None) -> float | None:
+    """How many days a year an excerpt takes, as stored: none if not said (or not positive),
+    at most MAX_DAYS."""
+    if days is None or days != days or days <= 0:
+        return None
+    return min(float(days), MAX_DAYS)
+
+
+def days_label(days: float | None) -> str:
+    """E.g. “12 days/year”, “½ day/year” (nothing if not said)."""
+    if not days:
+        return ""
+    n = f"{days:g}" if days >= 1 or days * 2 != 1 else "½"
+    return ngettext("{n} day/year", "{n} days/year", max(1, round(days))).format(n=n)
 
 
 def _words(text: str) -> set[str]:
@@ -828,6 +850,7 @@ def add_excerpt(
     original: str | None = None,
     punctual: bool = False,
     in_period: bool = False,
+    days: float | None = None,
 ) -> int:
     """File a passage (its years, markers, tags and level: see update_excerpt; ``original``:
     its text as selected, when rewritten); one filed there already is kept."""
@@ -868,6 +891,7 @@ def add_excerpt(
             level=level or None,
             punctual=punctual,
             in_period=in_period and not punctual,
+            days=clean_days(days),
         )
         s.add(e)
         _set_tags(s, e, tags or [])
@@ -949,6 +973,7 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
                 url=e.url,
                 punctual=e.punctual,
                 in_period=e.in_period,
+                days=e.days,
             )
             for e, doc, title, colour in rows
         ]
@@ -1155,7 +1180,7 @@ def remove_excerpt(excerpt_id: int) -> None:
                 lead.influence, lead.salient, lead.caveat = e.influence, e.salient, e.caveat
                 lead.minor, lead.discarded, lead.level = e.minor, e.discarded, e.level
                 lead.in_timeline = e.in_timeline
-                lead.punctual, lead.in_period = e.punctual, e.in_period
+                lead.punctual, lead.in_period, lead.days = e.punctual, e.in_period, e.days
                 lead.group_text, lead.comment, lead.url = e.group_text, e.comment, e.url
                 lead.tags = list(e.tags)
                 for x in others[1:]:
@@ -1177,12 +1202,13 @@ def update_excerpt(
     level: str | None = None,
     punctual: bool | None = None,
     in_period: bool | None = None,
+    days: float | EllipsisType | None = ...,
 ) -> None:
     """Its text (unless None or blank), years, markers ("influence", "salient", "minor",
     "caveat"),
     tags (by name; None: unchanged) and level (its key, see reports.levels; none: the
     folder's default); whether it is a one-off event, or within the person's period (None:
-    unchanged; not both)."""
+    unchanged; not both); how many days a year it takes (see clean_days; ...: kept)."""
     with session_scope() as s:
         if e := s.get(Excerpt, excerpt_id):
             if text is not None and text.strip():
@@ -1195,6 +1221,8 @@ def update_excerpt(
                 e.punctual = punctual
             if in_period is not None:
                 e.in_period = in_period and not e.punctual
+            if days is not ...:
+                e.days = clean_days(days)
             if _rank(e, firsts) != before:  # (checked or unchecked: moved, see _place_by_rank)
                 s.flush()
                 _place_by_rank(s, e, firsts)
