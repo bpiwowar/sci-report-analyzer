@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-17 08:20+0200\n"
+"POT-Creation-Date: 2026-10-17 08:50+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -2829,6 +2829,10 @@ msgstr "Score minimal d'un appariement dans la liste des canaux prédateurs"
 msgid "Model"
 msgstr "Modèle"
 
+#, python-brace-format
+msgid "Model: {model}"
+msgstr "Modèle : {model}"
+
 msgid "Models"
 msgstr "Modèles"
 
@@ -3017,6 +3021,9 @@ msgstr "Aucun filtre de copie activé : voir Paramètres → Filtres de copie"
 
 msgid "No document"
 msgstr "Aucun document"
+
+msgid "No document: only their profiles and notes are read"
+msgstr "Aucun document : seuls ses profils et ses notes sont lus"
 
 msgid "No excerpt filed yet: nothing to learn from"
 msgstr "Aucun extrait classé : rien à apprendre"
@@ -3354,6 +3361,9 @@ msgstr "Rien à fusionner"
 msgid "Nothing to push: the group has all your decisions"
 msgstr "Rien à envoyer : le groupe a toutes vos décisions"
 
+msgid "Nothing to read"
+msgstr "Rien à lire"
+
 msgid "Number in this order"
 msgstr "Numéroter dans cet ordre"
 
@@ -3460,6 +3470,9 @@ msgstr "Ouvrir"
 
 msgid "Open in a new tab"
 msgstr "Ouvrir dans un nouvel onglet"
+
+msgid "Open it (its text is extracted there), then Refresh"
+msgstr "L'ouvrir (son texte y est extrait), puis Actualiser"
 
 msgid "Open its document (at its page)"
 msgstr "Ouvrir son document (à sa page)"
@@ -3636,6 +3649,10 @@ msgstr ""
 "Articles : {papers} article(s) avec un canal de publication, une source "
 "validée, un rang, un type, une année, une position d’auteur ou une note "
 "définis à la main"
+
+#, python-brace-format
+msgid "Part {i} of {n}"
+msgstr "Partie {i} sur {n}"
 
 msgid ""
 "Paste a list of publications (e.g. numbered, copied from a PDF): each "
@@ -3959,11 +3976,20 @@ msgstr "Extraits de rayonnement"
 msgid "Re-sync all"
 msgstr "Tout resynchroniser"
 
+msgid "Read"
+msgstr "Lire"
+
 msgid "Read in their documents"
 msgstr "Lire dans ses documents"
 
 msgid "Reading their documents (this may take a while)…"
 msgstr "Lecture de ses documents (cela peut prendre un moment)…"
+
+#, python-brace-format
+msgid "Reading their documents: part {i} of {n} (this may take a while)…"
+msgstr ""
+"Lecture de ses documents : partie {i} sur {n} (cela peut prendre un "
+"moment)…"
 
 msgid "Record removed from the venue: matched automatically"
 msgstr "Entrée retirée du canal : correspondance automatique"
@@ -3978,6 +4004,9 @@ msgstr "Référence"
 
 msgid "References"
 msgstr "Références"
+
+msgid "Refresh"
+msgstr "Actualiser"
 
 msgid "Reject"
 msgstr "Rejeter"
@@ -4702,6 +4731,15 @@ msgstr "Notes de départ"
 msgid "Status"
 msgstr "Statut"
 
+msgid "Stop"
+msgstr "Arrêter"
+
+msgid "Stop reading (the lines found so far are kept)"
+msgstr "Arrêter la lecture (les lignes trouvées jusque-là sont gardées)"
+
+msgid "Stopped: the lines found so far"
+msgstr "Arrêté : les lignes trouvées jusque-là"
+
 msgid "Store a PDF"
 msgstr "Stocker un PDF"
 
@@ -4873,6 +4911,15 @@ msgstr "Le PDF n'est pas encore affiché"
 msgid "The PDF window is closed"
 msgstr "La fenêtre du PDF est fermée"
 
+msgid ""
+"The answer is constrained to a JSON schema (Ollama's structured outputs):"
+" the lines, each with its kind, title, institution, dates, details and "
+"quote."
+msgstr ""
+"La réponse est contrainte par un schéma JSON (les sorties structurées "
+"d'Ollama) : les lignes, chacune avec son type, son intitulé, son "
+"établissement, ses dates, ses détails et sa citation."
+
 msgid "The career (CV)"
 msgstr "Le parcours (CV)"
 
@@ -4890,6 +4937,13 @@ msgstr "La couleur de ses extraits (leur teinte dans les PDF)"
 
 msgid "The conferences found in its texts (on saving)."
 msgstr "Les conférences trouvées dans ses textes (à l'enregistrement)."
+
+msgid ""
+"The documents to read (their passages about a career), with their "
+"profiles' affiliations and their notes:"
+msgstr ""
+"Les documents à lire (leurs passages sur un parcours), avec les "
+"affiliations de ses profils et ses notes :"
 
 msgid "The excerpts, as selected"
 msgstr "Les extraits, tels que sélectionnés"
@@ -5860,6 +5914,9 @@ msgstr "Devenir (poste, employeur…)"
 msgid "What is this venue for “{name}”?"
 msgstr "Qu'est ce canal pour « {name} » ?"
 
+msgid "What the model is sent"
+msgstr "Ce qui est envoyé au modèle"
+
 msgid ""
 "What this publication is (e.g. edited proceedings: not ranked as a paper "
 "of the venue); automatic: from the venue and the sources' document types"
@@ -6077,6 +6134,9 @@ msgstr "capturé par une règle de canal"
 
 msgid "captures no venue text"
 msgstr "ne capture aucun texte de canal"
+
+msgid "characters"
+msgstr "caractères"
 
 #, python-brace-format
 msgid "check on {site}"
@@ -6529,6 +6589,9 @@ msgstr "non classé (vérifié)"
 
 msgid "not ranked ✓"
 msgstr "non classé ✓"
+
+msgid "not read yet: open it once in the viewer"
+msgstr "pas encore lu : l'ouvrir une fois dans la visionneuse"
 
 #, python-brace-format
 msgid "not the person's ORCID ({orcid})"
@@ -7035,20 +7098,6 @@ msgid "{n} decision the group lacks"
 msgid_plural "{n} decisions the group lacks"
 msgstr[0] "{n} décision que le groupe n'a pas"
 msgstr[1] "{n} décisions que le groupe n'a pas"
-
-#, python-brace-format
-msgid ""
-"{n} document not read: open it once in the viewer (its text is extracted "
-"there)"
-msgid_plural ""
-"{n} documents not read: open them once in the viewer (their text is "
-"extracted there)"
-msgstr[0] ""
-"{n} document non lu : l'ouvrir une fois dans la visionneuse (son texte y "
-"est extrait)"
-msgstr[1] ""
-"{n} documents non lus : les ouvrir une fois dans la visionneuse (leur "
-"texte y est extrait)"
 
 #, python-brace-format
 msgid "{n} hidden by the filters"

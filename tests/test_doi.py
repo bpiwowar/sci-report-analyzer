@@ -119,9 +119,7 @@ def test_throttle_spaces_requests(monkeypatch):
 def test_springer_chapter_names_its_conference():
     # No "event": the conference is in the assertions, not the book's title.
     d = doi.parse(_fixture("crossref_chapter"), "crossref")
-    assert d["venue"] == (
-        "International Symposium on Sound Widget Studies (SWS)"
-    )
+    assert d["venue"] == ("International Symposium on Sound Widget Studies (SWS)")
     assert (d["venue_type"], d["doc_type"], d["venue_reliable"]) == (
         "conference",
         "proceedings-article",

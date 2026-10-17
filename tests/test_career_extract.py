@@ -107,21 +107,24 @@ def answering(monkeypatch):
     return sent
 
 
-def _person_with_document() -> tuple[int, int]:
+def _person_with_document() -> tuple[int, int, int]:
     pid = make_person("Jane Doe")
     period = folders.add_person(folders.save_folder(None, "Hiring 2026"), pid)
     doc = documents.add(period, "Application.pdf", PDF)
     documents.set_lines(doc, LINES)
-    documents.add(period, "Letters.pdf", PDF)  # (never opened: not read)
-    return pid, doc
+    letters = documents.add(period, "Letters.pdf", PDF)  # (never opened: not read)
+    return pid, doc, letters
 
 
 def test_extract(answering) -> None:
-    pid, _doc = _person_with_document()
+    pid, _doc, letters = _person_with_document()
+    assert [(d.name, d.read) for d in career_extract.person_documents(pid)] == [
+        ("Application", True),
+        ("Letters", False),
+    ]
     career.save(pid, career.Entry("position", "Post-doc", "2013", "2014", "Inria"))
     career.save(pid, career.Entry("position", "postdoc", "2013-01", "2014"))
-    found, unread = asyncio.run(career_extract.extract(pid))
-    assert unread == 1
+    found = asyncio.run(career_extract.extract(pid))
     assert "Jane Doe" in answering[0][0]["content"]
     assert "[Application, p. 2]" in answering[0][1]["content"]
     # (the postdoc known; the award not a line of a CV)
@@ -134,23 +137,72 @@ def test_extract(answering) -> None:
         (False, "Application, p. 2, Application, p. 3"),
     ]
     assert found[1].entry.elapsed  # (a diploma: the years since)
+    # Only the documents chosen: none (no passage of theirs sent).
+    answering.clear()
+    asyncio.run(career_extract.extract(pid, [letters]))
+    assert answering == []  # (nothing to read: no profile, no note, no document read)
 
 
 async def test_extract_dialog(user: User, answering) -> None:
-    pid, _doc = _person_with_document()
+    pid, doc, letters = _person_with_document()
     await user.open(f"/person/{pid}?tab=career")
     await user.should_not_see(marker="career-extract")  # (no LLM)
     llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3"))
     try:
         await user.open(f"/person/{pid}?tab=career")
         user.find(marker="career-extract").click()
+        # The documents chosen: that never opened, not (to open first).
+        await user.should_see(marker=f"career-extract-doc-{doc}")
+        assert user.find(marker=f"career-extract-doc-{doc}").elements.pop().value
+        unread = user.find(marker=f"career-extract-doc-{letters}").elements.pop()
+        assert not unread.value and "disable" in unread.props
+        await user.should_see(marker=f"career-extract-open-{letters}")
+        # What the model is sent: the instructions, the passages (of the documents ticked).
+        await user.should_see(marker="career-extract-sent-1-user")
+        sent = user.find(marker="career-extract-sent-1-user").elements.pop().text
+        assert "[Application, p. 2]" in sent
+        prompt = user.find(marker="career-extract-sent-1-system").elements.pop().text
+        assert "Jane Doe" in prompt
+        box = user.find(marker=f"career-extract-doc-{doc}").elements.pop()
+        box.value = False
+        await user.should_see("Nothing to read")
+        box.value = True
+        await user.should_see(marker="career-extract-sent-1-user")
+        user.find(marker="career-extract-read").click()
         await user.should_see(marker="career-extract-add")
-        await user.should_see(marker="career-extract-unread")
         await user.should_see("Quokka University")
         tick = user.find(marker="career-extract-tick-1").elements.pop()
         assert not tick.value  # (its words not in the documents: not ticked)
         user.find(marker="career-extract-add").click()
         await user.should_see("1 line added to the career")
         assert [e.title for e in career.entries(pid)] == ["Associate professor"]
+    finally:
+        llm.save_settings(llm.OllamaSettings())
+
+
+async def test_extract_stopped(user: User, monkeypatch) -> None:
+    """Reading stopped: the lines found so far (here, in the first part); the model named."""
+    pid, _doc, _letters = _person_with_document()
+    monkeypatch.setattr(career_extract, "PIECE", 100)  # (the two passages: two parts)
+    calls = []
+
+    async def chat_json(messages, schema, folder_id=None):
+        calls.append(messages)
+        if len(calls) > 1:
+            await asyncio.sleep(60)  # (the second part never answered)
+        return ANSWER
+
+    monkeypatch.setattr(llm, "chat_json", chat_json)
+    llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3"))
+    try:
+        await user.open(f"/person/{pid}?tab=career")
+        user.find(marker="career-extract").click()
+        await user.should_see("Model: qwen3")
+        user.find(marker="career-extract-read").click()
+        await user.should_see("part 2 of 2")
+        user.find(marker="career-extract-stop").click()
+        await user.should_see(marker="career-extract-stopped")
+        await user.should_see("Quokka University")
+        await user.should_see(marker="career-extract-add")
     finally:
         llm.save_settings(llm.OllamaSettings())

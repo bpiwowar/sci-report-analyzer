@@ -3,6 +3,7 @@ theses."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable
 from html import escape
@@ -308,16 +309,17 @@ def career_view(person_id: int) -> None:
 
 
 def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
-    """The lines of the CV the LLM reads in the person's documents (see career_extract): ticked
-    ones added, or one edited then added; each with the words it comes from."""
+    """The lines of the CV the LLM reads in the person's documents (see career_extract): the
+    documents chosen first (those not read yet, never opened in the viewer, to open); then
+    the ticked lines added, or one edited then added; each with the words it comes from."""
     with transient_dialog(_("Career read by the LLM"), width="w-full max-w-3xl") as (
         dlg,
         _card,
     ):
+        ui.label(_("Model: {model}").format(model=llm.model())).classes(
+            "text-xs text-grey -mt-2"
+        ).mark("career-extract-model")
         body = ui.column().classes("w-full gap-1").mark("career-extract-body")
-        with body, ui.row().classes("items-center gap-2"):
-            ui.spinner()
-            ui.label(_("Reading their documents (this may take a while)…")).classes("text-grey")
         footer = ui.row().classes("w-full items-center")
     ticks: dict[int, ui.checkbox] = {}
     found: list[career_extract.Suggestion] = []
@@ -338,29 +340,151 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
         dlg.close()
         _career_dialog(person_id, found[i].entry, on_change)
 
-    async def run() -> None:
+    boxes: dict[int, ui.checkbox] = {}
+
+    @ui.refreshable
+    def sent() -> None:
+        """The messages of each part (for the documents ticked), the constrained output's
+        schema (that of the answer) said."""
+        chosen = [i for i, b in boxes.items() if b.value]
+        parts = career_extract.requests(person_id, chosen)
+        if not parts:
+            ui.label(_("Nothing to read")).classes("text-sm text-grey")
+        for i, (_piece, chat) in enumerate(parts, 1):
+            ui.label(
+                _("Part {i} of {n}").format(i=i, n=len(parts))
+                + f" · {sum(len(m['content']) for m in chat)} "
+                + _("characters")
+            ).classes("text-xs text-grey-8 font-medium mt-1")
+            for m in chat:
+                ui.label(m["role"]).classes("text-xs text-grey")
+                ui.label(m["content"]).classes(
+                    "text-xs font-mono whitespace-pre-wrap bg-grey-2 rounded p-2 w-full "
+                    "max-h-64 overflow-auto"
+                ).mark(f"career-extract-sent-{i}-{m['role']}")
+        ui.label(
+            _(
+                "The answer is constrained to a JSON schema (Ollama's structured outputs): "
+                "the lines, each with its kind, title, institution, dates, details and quote."
+            )
+        ).classes("text-xs text-grey mt-1")
+
+    def choose() -> None:
+        """The documents to read: those read already ticked; the others, to open first."""
+        docs = career_extract.person_documents(person_id)
+        body.clear()
+        footer.clear()
+        boxes.clear()
+        with body:
+            ui.label(
+                _(
+                    "The documents to read (their passages about a career), with their "
+                    "profiles' affiliations and their notes:"
+                )
+            ).classes("text-sm text-grey-8")
+            if not docs:
+                ui.label(_("No document: only their profiles and notes are read")).classes(
+                    "text-sm text-grey"
+                ).mark("career-extract-no-document")
+            for d in docs:
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    boxes[d.id] = (
+                        ui.checkbox(d.name, value=d.read)
+                        .props("" if d.read else "disable")
+                        .mark(f"career-extract-doc-{d.id}")
+                    )
+                    if d.period:
+                        ui.label(d.period).classes("text-xs text-grey")
+                    if not d.read:
+                        ui.label(_("not read yet: open it once in the viewer")).classes(
+                            "text-xs text-warning"
+                        )
+                        ui.button(
+                            icon="open_in_new",
+                            on_click=lambda d=d: ui.navigate.to(page_url_of(d.id), new_tab=True),
+                        ).props("flat round dense size=sm").tooltip(
+                            _("Open it (its text is extracted there), then Refresh")
+                        ).mark(f"career-extract-open-{d.id}")
+            with (
+                ui.expansion(_("What the model is sent"), icon="visibility")
+                .classes("w-full")
+                .props("dense")
+                .mark("career-extract-prompt")
+            ):
+                sent()
+            for box in boxes.values():
+                box.on_value_change(sent.refresh)
+        with footer:
+            if any(not d.read for d in docs):
+                ui.button(_("Refresh"), icon="refresh", on_click=choose).props("flat").mark(
+                    "career-extract-refresh"
+                )
+            ui.space()
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            ui.button(
+                _("Read"),
+                icon="auto_awesome",
+                on_click=lambda: run([i for i, b in boxes.items() if b.value]),
+            ).mark("career-extract-read")
+
+    async def run(doc_ids: list[int]) -> None:
+        body.clear()
+        footer.clear()
+        got: list[career_extract.Suggestion] = []
+        with body, ui.row().classes("items-center gap-2 no-wrap"):
+            ui.spinner()
+            status = ui.label(_("Reading their documents (this may take a while)…")).classes(
+                "text-grey"
+            )
+
+        def progress(done: int, total: int) -> None:
+            status.set_text(
+                _("Reading their documents: part {i} of {n} (this may take a while)…").format(
+                    i=min(done + 1, total), n=total
+                )
+            )
+
+        task = background_tasks.create(
+            career_extract.extract(person_id, doc_ids, out=got, progress=progress),
+            name="career-extract",
+        )
+        stopped = False
+
+        def stop() -> None:
+            nonlocal stopped
+            stopped = True
+            task.cancel()
+
+        with footer:
+            ui.space()
+            ui.button(_("Stop"), icon="stop", on_click=stop).props("flat color=negative").tooltip(
+                _("Stop reading (the lines found so far are kept)")
+            ).mark("career-extract-stop")
+        dlg.on("hide", lambda: task.cancel() if not task.done() else None)
         try:
-            got, unread = await career_extract.extract(person_id)
+            await task
+        except asyncio.CancelledError:
+            if not stopped:  # (the dialog closed)
+                return
         except Exception as e:
             body.clear()
+            footer.clear()
             with body:
                 ui.label(_("Cannot read the career: {error}").format(error=e)).classes(
                     "text-negative"
                 )
+            with footer:
+                ui.button(_("Back"), icon="arrow_back", on_click=choose).props("flat")
             return
-        found.extend(got)
+        footer.clear()
+        found[:] = got
+        ticks.clear()
         body.clear()
         with body:
-            if unread:
-                ui.label(
-                    ngettext(
-                        "{n} document not read: open it once in the viewer (its text is "
-                        "extracted there)",
-                        "{n} documents not read: open them once in the viewer (their text is "
-                        "extracted there)",
-                        unread,
-                    ).format(n=unread)
-                ).classes("text-sm text-warning").mark("career-extract-unread")
+            if stopped:
+                ui.label(_("Stopped: the lines found so far")).classes("text-sm text-warning").mark(
+                    "career-extract-stopped"
+                )
             if not got:
                 ui.label(_("Nothing new found")).classes("text-grey").mark("career-extract-none")
             for i, sug in enumerate(got):
@@ -385,12 +509,15 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                         "flat round dense size=sm"
                     ).tooltip(_("Edit it, then add it")).mark(f"career-extract-edit-{i}")
         with footer:
+            ui.button(_("Back"), icon="arrow_back", on_click=choose).props("flat").mark(
+                "career-extract-back"
+            )
             ui.space()
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             if got:
                 ui.button(_("Add the ticked ones"), on_click=add_ticked).mark("career-extract-add")
 
-    ui.timer(0.05, run, once=True)
+    choose()
 
 
 def _career_dialog(person_id: int, entry: career.Entry | None, on_change) -> None:

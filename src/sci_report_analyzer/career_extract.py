@@ -13,12 +13,13 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import select
 
 from . import career, documents, llm
-from .db.models import Person, SourceLink
+from .db.models import Period, Person, SourceLink
 from .db.session import session_scope
 from .source_settings import active_links
 
@@ -121,9 +122,30 @@ def passages(name: str, lines: list[dict]) -> list[Passage]:
     return out
 
 
-def sources(person_id: int) -> tuple[str, list[Passage], list[str]]:
-    """The person's name, the passages to read (their profiles' affiliations, then their
-    documents'), and the documents not read yet (their text not extracted: never opened)."""
+@dataclass
+class Document:
+    id: int
+    name: str
+    period: str  # (the period it is in: its folder's)
+    read: bool  # (its text extracted: opened once in the viewer)
+
+
+def person_documents(person_id: int) -> list[Document]:
+    """The person's documents, those not read yet (never opened in the viewer) marked."""
+    with session_scope() as s:
+        periods = {
+            p.id: p.name for p in s.scalars(select(Period).where(Period.person_id == person_id))
+        }
+    return [
+        Document(d.id, d.name, periods.get(d.period_id, ""), documents.lines_of(d.id) is not None)
+        for docs in documents.of_person(person_id).values()
+        for d in docs
+    ]
+
+
+def sources(person_id: int, doc_ids: list[int] | None = None) -> tuple[str, list[Passage]]:
+    """The person's name and the passages to read: their profiles' affiliations, their
+    notes, then those of their documents (``doc_ids``; none: all of them) read already."""
     with session_scope() as s:
         person = s.get(Person, person_id)
         name, notes = person.name, person.notes
@@ -136,14 +158,10 @@ def sources(person_id: int) -> tuple[str, list[Passage], list[str]]:
     found = [Passage("profiles", "Affiliations: " + "; ".join(known))] if known else []
     if notes:
         found.append(Passage("notes", notes))
-    unread = []
-    for docs in documents.of_person(person_id).values():
-        for d in docs:
-            if (lines := documents.lines_of(d.id)) is None:
-                unread.append(d.name)
-            else:
-                found += passages(d.name, lines)
-    return name, found, unread
+    for d in person_documents(person_id):
+        if d.read and (doc_ids is None or d.id in doc_ids):
+            found += passages(d.name, documents.lines_of(d.id) or [])
+    return name, found
 
 
 def pieces(found: list[Passage]) -> list[list[Passage]]:
@@ -206,24 +224,47 @@ def _suggestions(answer: dict, piece: list[Passage]) -> list[Suggestion]:
     return out
 
 
-async def extract(person_id: int, folder_id: int | None = None) -> tuple[list[Suggestion], int]:
-    """The lines of a CV the LLM reads in the person's documents and profiles, without those
-    already in it (nor twice); and the documents not read (see sources). Raises if no LLM."""
-    name, found, unread = sources(person_id)
-    have = career.entries(person_id)
-    out: list[Suggestion] = []
-    for piece in pieces(found):
-        text = "\n\n".join(f"[{p.source}]\n{p.text}" for p in piece)
-        answer = await llm.chat_json(
+def requests(
+    person_id: int, doc_ids: list[int] | None = None
+) -> list[tuple[list[Passage], list[dict[str, str]]]]:
+    """What the LLM is sent (see extract): each piece of the passages, and its messages (the
+    instructions, then the passages)."""
+    name, found = sources(person_id, doc_ids)
+    return [
+        (
+            piece,
             [
                 {"role": "system", "content": PROMPT.format(name=name)},
-                {"role": "user", "content": text},
+                {"role": "user", "content": "\n\n".join(f"[{p.source}]\n{p.text}" for p in piece)},
             ],
-            SCHEMA,
-            folder_id,
         )
+        for piece in pieces(found)
+    ]
+
+
+async def extract(
+    person_id: int,
+    doc_ids: list[int] | None = None,
+    folder_id: int | None = None,
+    out: list[Suggestion] | None = None,
+    progress: Callable[[int, int], None] | None = None,
+) -> list[Suggestion]:
+    """The lines of a CV the LLM reads in the person's profiles and documents (``doc_ids``;
+    none: all those read), without those already in it (nor twice). Raises if no LLM.
+    ``out``: where they are added, piece after piece (those found so far, if stopped);
+    ``progress``: called with the pieces read and their number, before each one and at the
+    end."""
+    have = career.entries(person_id)
+    out = [] if out is None else out
+    split = requests(person_id, doc_ids)
+    for i, (piece, chat) in enumerate(split):
+        if progress:
+            progress(i, len(split))
+        answer = await llm.chat_json(chat, SCHEMA, folder_id)
         for sug in _suggestions(answer, piece):
             if not any(_same(sug.entry, e) for e in [*have, *(x.entry for x in out)]):
                 out.append(sug)
-    out.sort(key=lambda x: career._sort_key(x.entry), reverse=True)
-    return out, len(unread)
+        out.sort(key=lambda x: career._sort_key(x.entry), reverse=True)
+    if progress:
+        progress(len(split), len(split))
+    return out
