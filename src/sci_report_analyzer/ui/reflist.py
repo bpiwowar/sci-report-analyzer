@@ -21,7 +21,8 @@ NONE = 0  # the "no paper" choice of an item
 
 def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool = True) -> None:
     """The dialog, its list ``text`` given (e.g. selected in a PDF: its papers found at once);
-    ``show_tagged``: the panel shows the tagged papers afterwards (filtered by the tag)."""
+    ``show_tagged``: the tagged papers shown afterwards (the panel filtered by the tag; a
+    star list's: in the Starred tab)."""
     period = panel.period
     pid = period.id if period else None
     tags = {t.id: ("★ " if t.per_period else "") + t.name for t in panel.usable_tags()}
@@ -250,16 +251,17 @@ def tag_from_list(panel: PublicationsPanel, text: str = "", *, show_tagged: bool
         else:
             annotations.put_tag(chosen.id, list(numbers))
         dlg.close()
-        if show_tagged:
-            if chosen.per_period:
-                panel.tag_filter, panel.list_filter = [], [chosen.id]
-            else:
-                panel.tag_filter, panel.list_filter = [chosen.id], []
+        # The tagged papers shown: a tag's by filtering on it, a star list's in the Starred tab.
+        filtered = show_tagged and not chosen.per_period
+        if filtered:
+            panel.tag_filter = [chosen.id]
             panel.sels = []
             panel._save_state()
         await panel.reload()
+        if show_tagged and chosen.per_period and panel.show_starred is not None:
+            panel.show_starred()
         # The tagged papers the panel does not show (e.g. outside the period's years).
-        shown = {s.id for s in panel.base_rows()} if show_tagged else set(numbers)
+        shown = {s.id for s in panel.base_rows()} if filtered else set(numbers)
         rest = [s for s in panel.stats if s.id in numbers and s.id not in shown]
         with panel.dialogs:
             ui.notify(

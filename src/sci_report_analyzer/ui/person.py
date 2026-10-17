@@ -47,7 +47,7 @@ from ..sync import (
 from .dialogs import actions, close_then, ok_handler, transient_dialog
 from .documents_page import LINES_JS, ReportTabs, page_url_of
 from .folder_notes import NOTES_TIP
-from .panel import PublicationsPanel, period_label
+from .panel import PublicationsPanel, StarredView, period_label
 from .pdf_dock import PdfDock
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
 
@@ -99,6 +99,8 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
             folder = None
     if tab == "documents":  # (its former name)
         tab = "report"
+    if "lists" in request.query_params or "starred" in request.query_params:
+        tab = "starred"  # (earlier links: the panel filtered by star lists)
     # The profile's sub-tabs are named in the address (``tab=profile``: its first one).
     profile_tab = tab if tab in PROFILE_TABS else PROFILE_TABS[0]
     if tab in PROFILE_TABS:
@@ -126,6 +128,9 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
             with ui.tab_panel("publications"):
                 panel = PublicationsPanel(person_id, period, dict(request.query_params))
                 panel.build()
+                panel.show_starred = lambda: tabs.set_value("starred")
+            with ui.tab_panel("starred"):
+                StarredView(panel)
             with ui.tab_panel("profile"):
                 _person_actions(person)
                 with (
@@ -220,6 +225,7 @@ def _header(person: Person, tab: str, folder: tuple[int, str] | None = None) -> 
         with ui.tabs(value=tab).props("inline-label dense").classes("grow vr-tabs") as tabs:
             for name, label, icon in (
                 ("publications", _("Publications"), "article"),
+                ("starred", _("Starred papers"), "star"),
                 ("profile", _("Profile"), "manage_accounts"),
                 ("theses", _("Theses"), "school"),
                 ("report", _("Report"), "description"),
