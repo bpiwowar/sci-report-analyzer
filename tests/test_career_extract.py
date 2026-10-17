@@ -64,6 +64,9 @@ def test_pages_ranked_and_words() -> None:
     ]
     found = career_extract.passages("Dossier", lines)
     assert [p.source for p in found] == ["Dossier, p. 3", "Dossier, p. 2", "Dossier, p. 1"]
+    # (a word with capitals: only with its case)
+    cv = [_line(1, "CV"), _line(1, "x"), _line(2, "cv"), _line(2, "y")]
+    assert [p.source for p in career_extract.passages("Dossier", cv)] == ["Dossier, p. 1"]
     words = career_words.words()
     words["en"]["positions"] = ["promot*"]
     words["fr"] = {g: [] for g in career_words.GROUPS}

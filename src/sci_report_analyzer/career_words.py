@@ -1,8 +1,9 @@
 """The words finding the passages of a person's documents about their career (see
 career_extract), by language, editable (Settings → Local LLM): headings (a page with one is
 sent whole), positions and diplomas (a line with one and a year is sent). One word or phrase
-per line, compared without case nor accents; ``*``: any letters (e.g. ``recrut*``). Those of
-every language are used together (a document may mix them)."""
+per line, compared without accents, nor case unless it has capitals (``CV``: only in capitals);
+``*``: any letters (e.g. ``recrut*``). Those of every language are used together (a document
+may mix them)."""
 
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ DEFAULTS: dict[str, dict[str, list[str]]] = {
     "en": {
         "headings": [
             "curriculum vitae",
-            "cv",
+            "CV",
             "résumé",
             "career",
             "professional experience",
@@ -74,7 +75,7 @@ DEFAULTS: dict[str, dict[str, list[str]]] = {
     "fr": {
         "headings": [
             "curriculum vitae",
-            "cv",
+            "CV",
             "parcours",
             "parcours professionnel",
             "carrière",
@@ -130,10 +131,15 @@ DEFAULTS: dict[str, dict[str, list[str]]] = {
 }
 
 
+def normalize(text: str) -> str:
+    """(compared, see pattern: no accents, single spaces)"""
+    text = unicodedata.normalize("NFKD", text)
+    return " ".join("".join(c for c in text if not unicodedata.combining(c)).split())
+
+
 def fold(text: str) -> str:
     """(compared: lower case, no accents, single spaces)"""
-    text = unicodedata.normalize("NFKD", text.casefold())
-    return " ".join("".join(c for c in text if not unicodedata.combining(c)).split())
+    return normalize(text.casefold())
 
 
 def words() -> dict[str, dict[str, list[str]]]:
@@ -164,9 +170,10 @@ def save_words(values: dict[str, dict[str, list[str]]]) -> None:
 def _pattern(group: str, items: tuple[str, ...]) -> re.Pattern | None:
     alternatives = []
     for w in items:
-        parts = [re.escape(x).replace(r"\*", r"\w*") for x in fold(w).split()]
-        if parts:
-            alternatives.append(r"\s+".join(parts))
+        parts = [re.escape(x).replace(r"\*", r"\w*") for x in normalize(w).split()]
+        if parts:  # (with capitals: only with its case)
+            body = r"\s+".join(parts)
+            alternatives.append(body if any(c.isupper() for c in w) else f"(?i:{body})")
     if not alternatives:
         return None
     body = "|".join(sorted(alternatives, key=len, reverse=True))
@@ -176,6 +183,6 @@ def _pattern(group: str, items: tuple[str, ...]) -> re.Pattern | None:
 
 
 def pattern(group: str) -> re.Pattern | None:
-    """What finds a group's words (of every language) in a folded text (see fold)."""
+    """What finds a group's words (of every language) in a normalized text (see normalize)."""
     items = tuple(w for by_group in words().values() for w in by_group[group])
     return _pattern(group, items)

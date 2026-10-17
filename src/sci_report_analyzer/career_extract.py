@@ -171,7 +171,7 @@ def document_pages(name: str, lines: list[dict], doc_id: int | None = None) -> l
     )
     out = []
     for page, texts in sorted(_pages(lines).items()):
-        folded = [_fold(t) for t in texts]
+        folded = [career_words.normalize(t) for t in texts]
         whole = "\n".join(texts)
         if heading and any(
             heading.match(t) and (i < HEADING_LINES or len(t) <= HEADING_LENGTH)
