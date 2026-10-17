@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-17 11:16+0200\n"
+"POT-Creation-Date: 2026-10-17 14:23+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -205,9 +205,6 @@ msgstr ""
 "ceux par défaut ; les modifier les modifie pour chaque dossier qui les "
 "utilise."
 
-msgid "A folder's settings cannot be copied to itself"
-msgstr "Les réglages d'un dossier ne peuvent pas être copiés sur lui-même"
-
 msgid "A folder's template needs a name"
 msgstr "Un modèle de dossier doit avoir un nom"
 
@@ -267,14 +264,6 @@ msgstr ""
 
 msgid "A link (URL), written after the excerpt in the notes"
 msgstr "Un lien (URL), écrit après l'extrait dans les notes"
-
-msgid ""
-"A local LLM served by Ollama (https://ollama.com), for the features that "
-"use one (e.g. reading a person's career in their documents)."
-msgstr ""
-"Un LLM local servi par Ollama (https://ollama.com), pour les fonctions "
-"qui en utilisent un (p. ex. lire le parcours d'une personne dans ses "
-"documents)."
 
 msgid ""
 "A local LLM served by Ollama (https://ollama.com), or a server with an "
@@ -406,11 +395,6 @@ msgstr "Une synchronisation est déjà en cours"
 
 msgid "A sync is running and would be interrupted."
 msgstr "Une synchronisation est en cours et serait interrompue."
-
-msgid "A task can use another model (its own page, e.g. Reading a career)"
-msgstr ""
-"Une tâche peut utiliser un autre modèle (sa propre page, p. ex. Lecture "
-"d'un parcours)"
 
 msgid ""
 "A task can use another model (its own page: Reading a career, Rewriting "
@@ -664,9 +648,6 @@ msgstr "Ajouter la période"
 msgid "Add person"
 msgstr "Ajouter une personne"
 
-msgid "Add the categories of another folder"
-msgstr "Ajouter les catégories d'un autre dossier"
-
 msgid "Add the categories of other settings"
 msgstr "Ajouter les catégories d'autres réglages"
 
@@ -680,9 +661,6 @@ msgstr ""
 
 msgid "Add the ticked ones"
 msgstr "Ajouter celles cochées"
-
-msgid "Add to a category"
-msgstr "Ajouter à une catégorie"
 
 msgid "Add to a folder"
 msgstr "Ajouter à un dossier"
@@ -770,10 +748,6 @@ msgstr "Toutes les personnes (nettoyage)"
 
 msgid "All the pages"
 msgstr "Toutes les pages"
-
-#, python-brace-format
-msgid "All the papers, in “{name}” or not"
-msgstr "Tous les articles, dans « {name} » ou non"
 
 msgid "All years"
 msgstr "Toutes les années"
@@ -921,6 +895,16 @@ msgstr "Automatique (actuellement : {track})"
 msgid "Automatic ({kind})"
 msgstr "Automatique ({kind})"
 
+msgid "Automatic backups are off (by hand only): set an interval."
+msgstr ""
+"Sauvegardes automatiques désactivées (à la main seulement) : indiquez un "
+"intervalle."
+
+msgid "Automatic backups, when something changed; 0: by hand only"
+msgstr ""
+"Sauvegardes automatiques, si quelque chose a changé ; 0 : à la main "
+"seulement"
+
 msgid "Automatic matching"
 msgstr "Appariement automatique"
 
@@ -985,6 +969,42 @@ msgstr "Retour au DOI des sources"
 
 msgid "Back to the venue's rank"
 msgstr "Retour au rang du canal de publication"
+
+msgid "Back up now"
+msgstr "Sauvegarder maintenant"
+
+#, python-brace-format
+msgid "Back up the folders now (git repository: {path})"
+msgstr "Sauvegarder les dossiers maintenant (dépôt git : {path})"
+
+#, python-brace-format
+msgid "Backed up every {n} minutes, when something changed."
+msgstr "Sauvegardé toutes les {n} minutes, si quelque chose a changé."
+
+msgid "Backed up: nothing changed since the last backup"
+msgstr "Sauvegardé : rien n'a changé depuis la dernière sauvegarde"
+
+#, python-brace-format
+msgid "Backed up: {n} files changed (commit {sha})"
+msgstr "Sauvegardé : {n} fichiers modifiés (commit {sha})"
+
+msgid "Backing up…"
+msgstr "Sauvegarde en cours…"
+
+msgid "Backup"
+msgstr "Sauvegarde"
+
+#, python-brace-format
+msgid "Backup of {when}"
+msgstr "Sauvegarde du {when}"
+
+msgid "Backups are off: no directory set (Settings → Backup)"
+msgstr ""
+"Sauvegardes désactivées : aucun répertoire indiqué (Paramètres → "
+"Sauvegarde)"
+
+msgid "Backups are off: set a directory."
+msgstr "Sauvegardes désactivées : indiquez un répertoire."
 
 msgid "Before"
 msgstr "Avant"
@@ -1164,6 +1184,9 @@ msgstr "Choisissez au moins une décision"
 msgid "Choose files"
 msgstr "Choisir des fichiers"
 
+msgid "Choose its category first"
+msgstr "Choisissez d'abord sa catégorie"
+
 msgid "Choose the category to merge it into"
 msgstr "Choisissez la catégorie où la fusionner"
 
@@ -1286,17 +1309,6 @@ msgstr "Effacer les numéros"
 
 msgid "Clear the years"
 msgstr "Effacer les années"
-
-msgid ""
-"Click a folder to show it. Drag a folder onto another one to put it "
-"within it (onto its top or bottom: next to it). A folder uses the "
-"settings of the folder it is in (its categories, the citations in its "
-"notes: all of them), or its own ones: see its menu."
-msgstr ""
-"Cliquez sur un dossier pour l'afficher. Glissez un dossier sur un autre "
-"pour le mettre dedans (sur son haut ou son bas : à côté). Un dossier "
-"utilise les réglages du dossier où il est (ses catégories, les citations "
-"dans ses notes : tous), ou les siens : voir son menu."
 
 msgid ""
 "Click a folder to show it. Drag a folder onto another one to put it "
@@ -1443,9 +1455,6 @@ msgstr "Copier un nom :"
 msgid "Copy filters"
 msgstr "Filtres de copie"
 
-msgid "Copy its settings to…"
-msgstr "Copier ses réglages vers…"
-
 msgid "Copy my text"
 msgstr "Copier mon texte"
 
@@ -1461,10 +1470,6 @@ msgstr "Copier les extraits, en Markdown"
 
 msgid "Copy the note, its citations numbered and the papers cited listed"
 msgstr "Copier la note, ses citations numérotées et la liste des articles cités"
-
-#, python-brace-format
-msgid "Copy the settings of “{folder}”"
-msgstr "Copier les réglages de « {folder} »"
 
 msgid "Copy them (new settings)"
 msgstr "Les copier (nouveaux réglages)"
@@ -1511,6 +1516,9 @@ msgstr "Créer une catégorie nommée comme saisi ci-dessus"
 
 msgid "Create under"
 msgstr "Créer sous"
+
+msgid "Created if needed. Empty: no backup."
+msgstr "Créé si besoin. Vide : pas de sauvegarde."
 
 msgid "Current position (Profile → Career)"
 msgstr "Poste actuel (Profil → Parcours)"
@@ -1575,6 +1583,9 @@ msgstr "Des dates comme 2019, 2019-09 ou 2019-09-01"
 
 msgid "Dates as 2021, 2021-10 or 2021-10-01"
 msgstr "Dates sous la forme 2021, 2021-10 ou 2021-10-01"
+
+msgid "Days a year"
+msgstr "Jours par an"
 
 msgid "Declared by"
 msgstr "Déclaré par"
@@ -1724,6 +1735,9 @@ msgstr "Diplôme (p. ex. doctorat en informatique, HDR)"
 
 msgid "Diplomas (a line with a year)"
 msgstr "Diplômes (une ligne avec une année)"
+
+msgid "Directory of the repository (full path)"
+msgstr "Répertoire du dépôt (chemin complet)"
 
 msgid "Discard"
 msgstr "Abandonner"
@@ -2020,6 +2034,25 @@ msgstr "Rapport d'évaluation"
 msgid "Event"
 msgstr "Événement"
 
+msgid "Every (minutes)"
+msgstr "Toutes les (minutes)"
+
+msgid ""
+"Every folder and the people in it, in a git repository: their notes (as "
+"typed and as generated), excerpts, categories, documents and PDFs, each "
+"person in a directory of their own, a commit at each backup (the history "
+"kept). A folder renamed or moved, a person renamed or moved: their "
+"directory is moved at once. Back up by hand with the button in the "
+"header, or every so often."
+msgstr ""
+"Chaque dossier et les personnes qu'il contient, dans un dépôt git : leurs"
+" notes (telles que saisies et telles que générées), extraits, catégories,"
+" documents et PDF, chaque personne dans son propre répertoire, un commit "
+"à chaque sauvegarde (l'historique conservé). Un dossier renommé ou "
+"déplacé, une personne renommée ou déplacée : son répertoire est déplacé "
+"aussitôt. Sauvegardez à la main avec le bouton de l'en-tête, ou "
+"régulièrement."
+
 msgid ""
 "Every person, with the folders they are in: select people to delete them "
 "or to put them in a folder. Pick a folder in the tree to work with it."
@@ -2126,8 +2159,10 @@ msgstr "Récupération de la notice du DOI…"
 msgid "Fetching the candidate's papers…"
 msgstr "Récupération des articles du candidat…"
 
-msgid "File this wording and these years (the text selected kept)"
-msgstr "Classer cette formulation et ces années (le texte sélectionné conservé)"
+msgid "File this wording, these years, days and flags (the text selected kept)"
+msgstr ""
+"Classer cette formulation, ces années, jours et marqueurs (le texte "
+"sélectionné conservé)"
 
 #, python-brace-format
 msgid "Find a category of {folder} (Enter: the first one)"
@@ -2227,9 +2262,6 @@ msgstr "Source"
 
 msgid "From (year)"
 msgstr "De (année)"
-
-msgid "From a template"
-msgstr "D'un modèle"
 
 msgid "From an open-access copy found by Unpaywall (by its DOI)"
 msgstr "Depuis une copie en accès ouvert trouvée par Unpaywall (par son DOI)"
@@ -2413,6 +2445,14 @@ msgstr ""
 " .number : sa référence ; vide : la référence)"
 
 msgid ""
+"How many days a year it takes (e.g. 10 for a committee, 180 for half a "
+"job): the thicker and darker its bar on the timeline. Empty: not said."
+msgstr ""
+"Combien de jours par an cela prend (p. ex. 10 pour un comité, 180 pour un"
+" mi-temps) : plus sa barre est épaisse et foncée sur la frise. Vide : non"
+" précisé."
+
+msgid ""
 "How the excerpts are written in the reports: their markers and levels (as"
 " #tags), and where those flagged “rayonnement” go."
 msgstr ""
@@ -2495,9 +2535,6 @@ msgid "In the notes and the copy, they follow the text in a comment (%% … %%)"
 msgstr ""
 "Dans les notes et la copie, ils suivent le texte dans un commentaire (%% "
 "… %%)"
-
-msgid "In the order of the list"
-msgstr "Dans l'ordre de la liste"
 
 msgid "In the references"
 msgstr "Dans les références"
@@ -2642,6 +2679,9 @@ msgstr ""
 "Ses catégories, listes étoilées, la façon dont ses notes citent les "
 "articles…"
 
+msgid "Its category (filed on Save)"
+msgstr "Sa catégorie (classé à l'enregistrement)"
+
 #, python-format
 msgid ""
 "Its commentary (Markdown): in the notes, a comment after it (%% … %%, not"
@@ -2684,12 +2724,9 @@ msgstr ""
 "Ses titres et blocs, sans ce qui est écrit (à modifier dans les réglages "
 "du dossier) :"
 
-msgid ""
-"Its headings and blocks, what is written left out (to edit in the "
-"settings):"
-msgstr ""
-"Ses titres et ses blocs, sans ce qui est écrit (à modifier dans les "
-"paramètres) :"
+#, python-brace-format
+msgid "Its history: git -C “{path}” log --stat"
+msgstr "Son historique : git -C « {path} » log --stat"
 
 msgid ""
 "Its id in the reports: [[excerpts#id]] lists its excerpts (and those "
@@ -2742,12 +2779,6 @@ msgstr "Son numéro dans la liste de l’étiquette (Alt-clic pour le changer)"
 
 msgid "Its number in the tag's list (click to change it)"
 msgstr "Son numéro dans la liste de l’étiquette (cliquez pour le changer)"
-
-msgid "Its own settings"
-msgstr "Ses propres réglages"
-
-msgid "Its own settings: a copy of its parent's"
-msgstr "Ses propres réglages : une copie de ceux de son parent"
 
 msgid "Its papers are to discuss: each cited in the notes"
 msgstr "Ses articles sont à discuter : chacun cité dans les notes"
@@ -2931,6 +2962,10 @@ msgstr ""
 "article"
 
 #, python-brace-format
+msgid "Last backup: {when}"
+msgstr "Dernière sauvegarde : {when}"
+
+#, python-brace-format
 msgid "Last pull: {when} (commit {sha})"
 msgstr "Dernière récupération : {when} (commit {sha})"
 
@@ -3041,9 +3076,6 @@ msgstr "Listés comme similaires"
 
 msgid "Local LLM"
 msgstr "LLM local"
-
-msgid "Local LLM (Ollama)"
-msgstr "LLM local (Ollama)"
 
 msgid "Look up on…"
 msgstr "Rechercher sur…"
@@ -3294,10 +3326,6 @@ msgid "Model"
 msgstr "Modèle"
 
 #, python-brace-format
-msgid "Model (blank: the default one, {model})"
-msgstr "Modèle (vide : celui par défaut, {model})"
-
-#, python-brace-format
 msgid "Model: {model} (local: nothing leaves this machine or the local network)"
 msgstr ""
 "Modèle : {model} (local : rien ne sort de cette machine ni du réseau "
@@ -3312,18 +3340,11 @@ msgstr "Modèles (IA locale)"
 msgid "Move"
 msgstr "Déplacer"
 
-msgid "Move its settings to…"
-msgstr "Déplacer ses réglages vers…"
-
 msgid "Move the PDFs to the left"
 msgstr "Déplacer les PDF à gauche"
 
 msgid "Move the PDFs to the right"
 msgstr "Déplacer les PDF à droite"
-
-#, python-brace-format
-msgid "Move the settings of “{folder}”"
-msgstr "Déplacer les réglages de « {folder} »"
 
 msgid "Move them to"
 msgstr "Les déplacer vers"
@@ -3343,6 +3364,9 @@ msgstr "Déplacer « {folder} » vers"
 
 msgid "Move, then delete"
 msgstr "Déplacer, puis supprimer"
+
+msgid "Moved"
+msgstr "Déplacé"
 
 #, python-brace-format
 msgid "Moved to {category}"
@@ -3414,6 +3438,9 @@ msgstr "{track} nat."
 msgid "Neutral wording (local AI)"
 msgstr "Formulation neutre (IA locale)"
 
+msgid "Never backed up."
+msgstr "Jamais sauvegardé."
+
 msgid "Never propose this pair again"
 msgstr "Ne plus jamais proposer cette paire"
 
@@ -3434,6 +3461,9 @@ msgstr "Nouvelle catégorie…"
 
 msgid "New co-author category"
 msgstr "Nouvelle catégorie de co-auteurs"
+
+msgid "New excerpt"
+msgstr "Nouvel extrait"
 
 msgid "New folder"
 msgstr "Nouveau dossier"
@@ -3491,6 +3521,9 @@ msgstr ""
 "Aucun profil candidat trouvé : ajoutez ses profils par URL dans l'onglet "
 "Sources."
 
+msgid "No category chosen yet: pick one in its Category tab"
+msgstr "Aucune catégorie choisie : choisissez-en une dans l'onglet Catégorie"
+
 #, python-brace-format
 msgid "No category with the id “{key}”"
 msgstr "Aucune catégorie n'a l'identifiant « {key} »"
@@ -3542,9 +3575,6 @@ msgstr ""
 
 msgid "No folder yet"
 msgstr "Aucun dossier pour l'instant"
-
-msgid "No folder's settings change"
-msgstr "Les réglages d'aucun dossier ne changent"
 
 msgid "No heading nor block to keep in a template"
 msgstr "Aucun titre ni bloc à garder dans un modèle"
@@ -3673,9 +3703,6 @@ msgstr "Pas de lecture par l'IA locale : le LLM local est désactivé"
 msgid "No record"
 msgstr "Aucun enregistrement"
 
-msgid "No report template (Settings → Report templates)"
-msgstr "Aucun modèle de rapport (Paramètres → Modèles de rapport)"
-
 msgid "No report template (the folder's settings)"
 msgstr "Aucun modèle de rapport (les réglages du dossier)"
 
@@ -3739,9 +3766,6 @@ msgid ""
 msgstr ""
 "Aucune thèse : validez un profil theses.fr dans l'onglet Sources, ou "
 "ajoutez un doctorant à la main."
-
-msgid "No thesis: validate a theses.fr profile in the Sources tab."
-msgstr "Aucune thèse : validez un profil theses.fr dans l'onglet Sources."
 
 msgid "No title"
 msgstr "Sans titre"
@@ -3907,10 +3931,6 @@ msgstr ""
 #, python-brace-format
 msgid "Not saved: {error}"
 msgstr "Non enregistré : {error}"
-
-#, python-brace-format
-msgid "Not shown: {why}"
-msgstr "Non affichés : {why}"
 
 msgid "Not the same"
 msgstr "Différents"
@@ -4123,10 +4143,6 @@ msgstr ""
 " casse sauf s'il a des majuscules (CV : seulement en majuscules) ; * pour"
 " n'importe quelles lettres (par ex. recrut*). Les mots de toutes les "
 "langues sont utilisés ensemble."
-
-#, python-brace-format
-msgid "Only the papers in “{name}” (within the period)"
-msgstr "Seulement les articles de « {name} » (dans la période)"
 
 msgid "Only this text, its excerpts not listed"
 msgstr "Ce texte seul, sans lister ses extraits"
@@ -5018,10 +5034,6 @@ msgstr "Saillant"
 msgid "Same paper as… (merge into this one)"
 msgstr "Même article que… (le fusionner dans celui-ci)"
 
-#, python-brace-format
-msgid "Same settings as: {folders}"
-msgstr "Mêmes réglages que : {folders}"
-
 msgid "Save"
 msgstr "Enregistrer"
 
@@ -5222,20 +5234,6 @@ msgstr ""
 "Ctrl+C). Maj+glisser ajoute une autre zone (leurs textes, dans l'ordre). "
 "Échap pour sortir."
 
-msgid ""
-"Select an area of a page (A, or Alt+drag): draw a rectangle on the page, "
-"the text inside it becomes the selection, to quote (Q), add as an excerpt"
-" (E), find its paper (F), tag the papers of a list (L), read a career (V)"
-" or copy (⌘C / Ctrl+C). Shift+drag adds another area (their texts, in "
-"order). Escape to leave."
-msgstr ""
-"Sélectionner une zone d'une page (A, ou Alt+glisser) : tracez un "
-"rectangle sur la page, le texte qu'il contient devient la sélection : "
-"pour la citer (Q), l'ajouter comme extrait (E), trouver son article (F), "
-"étiqueter les articles d'une liste (L), lire une carrière (V) ou la "
-"copier (⌘C / Ctrl+C). Maj+glisser ajoute une autre zone (leurs textes, "
-"dans l'ordre). Échap pour quitter."
-
 msgid "Select an excerpt (its entry, or on its PDF) or a passage of a PDF first"
 msgstr ""
 "Sélectionnez d'abord un extrait (son entrée, ou sur son PDF) ou un "
@@ -5312,9 +5310,6 @@ msgstr "Paramètres"
 
 msgid "Settings file (.json)"
 msgstr "Fichier de paramètres (.json)"
-
-msgid "Settings move only to a folder it is in"
-msgstr "Les réglages ne se déplacent que vers un dossier où il est"
 
 msgid "Settings of this name exist already"
 msgstr "Des réglages de ce nom existent déjà"
@@ -5424,9 +5419,6 @@ msgid "Show all the pages, to tick others (else only those ticked)"
 msgstr ""
 "Montrer toutes les pages, pour en cocher d'autres (sinon seulement celles"
 " cochées)"
-
-msgid "Show all years"
-msgstr "Afficher toutes les années"
 
 msgid "Show how the text was cleaned and matched"
 msgstr "Montrer comment le texte a été nettoyé et rapproché"
@@ -5588,9 +5580,6 @@ msgid "Started {n} sync"
 msgid_plural "Started {n} syncs"
 msgstr[0] "{n} synchronisation lancée"
 msgstr[1] "{n} synchronisations lancées"
-
-msgid "Starting notes"
-msgstr "Notes de départ"
 
 msgid "Status"
 msgstr "Statut"
@@ -5857,14 +5846,6 @@ msgstr ""
 "donne (OpenAlex, HAL, Google Scholar…), chacune une fois avec ses sources"
 
 msgid ""
-"The answer is constrained to this JSON schema (Ollama's structured "
-"outputs): as the career's lines, a position or a diploma and its thesis."
-msgstr ""
-"La réponse est contrainte par ce schéma JSON (sorties structurées "
-"d'Ollama) : comme les lignes du parcours, un poste ou un diplôme et sa "
-"thèse."
-
-msgid ""
 "The answer is constrained to this JSON schema (the LLM's structured "
 "outputs): as the career's lines, a position or a diploma and its thesis."
 msgstr ""
@@ -5873,6 +5854,10 @@ msgstr ""
 
 msgid "The answer's format"
 msgstr "Le format de la réponse"
+
+#, python-brace-format
+msgid "The backup failed: {error}"
+msgstr "La sauvegarde a échoué : {error}"
 
 msgid "The career (CV)"
 msgstr "Le parcours (CV)"
@@ -5932,31 +5917,6 @@ msgstr ""
 msgid "The first rule that matches:"
 msgstr "La première règle qui s'applique :"
 
-msgid ""
-"The folder gets its own copy of these settings (its categories, the "
-"citations in its notes); its people's excerpts, and those of the folders "
-"using its settings, go to the categories of the same names there (added "
-"if missing)."
-msgstr ""
-"Le dossier reçoit sa propre copie de ces réglages (ses catégories, les "
-"citations dans ses notes) ; les extraits de ses personnes, et ceux des "
-"dossiers utilisant ses réglages, vont dans les catégories de mêmes noms "
-"(ajoutées si elles manquent)."
-
-#, python-brace-format
-msgid ""
-"The folder then uses these settings (its categories, the citations in its"
-" notes), as do the folders that used its own, and “{folder}” (with those "
-"between them) uses them from it. Settings no folder uses any more are "
-"dropped; excerpts go to the categories of the same names (added if "
-"missing)."
-msgstr ""
-"Le dossier utilise alors ces réglages (ses catégories, les citations dans"
-" ses notes), comme les dossiers qui utilisaient les siens, et « {folder} "
-"» (avec ceux entre les deux) les utilise depuis lui. Les réglages "
-"qu'aucun dossier n'utilise plus sont supprimés ; les extraits vont dans "
-"les catégories de mêmes noms (ajoutées si elles manquent)."
-
 #, python-brace-format
 msgid "The folder within it goes up a level."
 msgid_plural "The {n} folders within it go up a level."
@@ -5988,6 +5948,10 @@ msgstr "La langue des mots de la règle (toutes : une règle générale)"
 
 msgid "The language whose words the rule removes (any: a general rule)"
 msgstr "La langue dont la règle retire des mots (toutes : une règle générale)"
+
+#, python-brace-format
+msgid "The last backup failed: {error}"
+msgstr "La dernière sauvegarde a échoué : {error}"
 
 msgid "The last category chosen (Enter, nothing typed)"
 msgstr "La dernière catégorie choisie (Entrée, sans rien taper)"
@@ -6264,13 +6228,6 @@ msgstr "L'emplacement de la sélection est inconnu"
 msgid "The settings it uses (its reports, citations, star lists…)"
 msgstr "Les réglages qu'il utilise (ses rapports, citations, listes étoilées…)"
 
-msgid "The settings of the reports (can be shared with other folders)"
-msgstr "Les paramètres des rapports (partageables avec d’autres dossiers)"
-
-#, python-brace-format
-msgid "The settings of these folders change: {folders}"
-msgstr "Les réglages de ces dossiers changent : {folders}"
-
 msgid "The side panel is back in the PDF window: this one can be closed"
 msgstr ""
 "Le panneau latéral est revenu dans la fenêtre du PDF : celle-ci peut être"
@@ -6301,9 +6258,6 @@ msgstr ""
 "Les textes des sources portant ce nom lui appartiennent ; ajoutez des "
 "variantes ou des règles au canal pour reconnaître d'autres textes."
 
-msgid "The starting notes copied from a report template (Settings)"
-msgstr "Les notes de départ copiées d'un modèle de rapport (Paramètres)"
-
 msgid "The summary of the period’s publications (as set in the Summary)"
 msgstr "Le résumé des publications de la période (réglé comme dans le Résumé)"
 
@@ -6314,16 +6268,6 @@ msgstr ""
 "Les modèles dont un rapport peut partir (leurs blocs nomment les "
 "catégories), et la langue de ce qui est généré."
 
-msgid ""
-"The text a person's notes start with, while empty (e.g. headings and the "
-"blocks [[publications]]: the summary of their publications, [[excerpts]]:"
-" their excerpts by category, [[cv]]: their career)"
-msgstr ""
-"Le texte par lequel commencent les notes d'une personne, tant qu'elles "
-"sont vides (p. ex. des titres et les blocs [[publications]] : le résumé "
-"de ses publications, [[excerpts]] : ses extraits par catégorie, [[cv]] : "
-"son parcours)"
-
 msgid "The text of the group (edit it with its pencil)"
 msgstr "Le texte du groupe (modifiez-le avec son crayon)"
 
@@ -6332,27 +6276,6 @@ msgstr "Le texte de cette section (Markdown, p. ex. un résumé de ses élément
 
 msgid "The text of this section (click to edit it)"
 msgstr "Le texte de cette section (cliquez pour le modifier)"
-
-#, python-format
-msgid ""
-"The texts a report can start from: its headings, the blocks "
-"`[[publications]]` (the summary of the publications), `[[excerpts]]` (the"
-" excerpts by category; `[[excerpts#id]]`: those of the category of that "
-"id, then left out of the others), `[[cv]]` (the person's career), "
-"`[[references]]` (the papers cited), and guidance as comments `%% … %%` "
-"(left out when shown or copied). A folder's starting notes are copied "
-"from one (its settings: Reports), and a report from one (its toolbar), "
-"which also makes one from a report: its headings and blocks."
-msgstr ""
-"Les textes dont un rapport peut partir : ses titres, les blocs "
-"`[[publications]]` (le résumé des publications), `[[excerpts]]` (les "
-"extraits par catégorie ; `[[excerpts#id]]` : ceux de la catégorie de cet "
-"identifiant, alors omis des autres), `[[cv]]` (le parcours de la "
-"personne), `[[references]]` (les articles cités), et des consignes en "
-"commentaires `%% … %%` (omis à l'affichage et à la copie). Les notes de "
-"départ d'un dossier sont copiées de l'un d'eux (ses paramètres : "
-"Rapports), et un rapport aussi (sa barre d'outils), qui en fait également"
-" un à partir d'un rapport : ses titres et ses blocs."
 
 #, python-format
 msgid ""
@@ -6740,9 +6663,6 @@ msgstr "{token} inattendu en colonne {column}"
 msgid "Unhide"
 msgstr "Réafficher"
 
-msgid "Unknown folder"
-msgstr "Dossier inconnu"
-
 msgid "Unknown person"
 msgstr "Personne inconnue"
 
@@ -6793,31 +6713,11 @@ msgstr "Utiliser"
 msgid "Use it"
 msgstr "L’utiliser"
 
-msgid "Use its parent's settings"
-msgstr "Utiliser les réglages de son parent"
-
-msgid "Use settings of its own (a copy)"
-msgstr "Utiliser ses propres réglages (une copie)"
-
 msgid "Use the conferences found in its texts"
 msgstr "Utiliser les conférences trouvées dans ses textes"
 
 msgid "Use the local LLM"
 msgstr "Utiliser le LLM local"
-
-msgid "Use the parent's"
-msgstr "Utiliser ceux du parent"
-
-msgid ""
-"Use the settings of the folder it is in? Its own ones (categories, "
-"citations in the notes) are dropped, unless other folders use them; its "
-"people's excerpts go to the categories of the same names there (added if "
-"missing)."
-msgstr ""
-"Utiliser les réglages du dossier où il est ? Les siens (catégories, "
-"citations dans les notes) sont supprimés, sauf si d'autres dossiers les "
-"utilisent ; les extraits de ses personnes vont dans les catégories de "
-"mêmes noms (ajoutées si elles manquent)."
 
 msgid "Use the venues' short names (acronyms) when they have one"
 msgstr ""
@@ -6846,8 +6746,8 @@ msgstr ""
 msgid "Use this venue"
 msgstr "Utiliser ce canal"
 
-msgid "Use this wording and these years"
-msgstr "Utiliser cette formulation et ces années"
+msgid "Use this wording, these years, days and flags"
+msgstr "Utiliser cette formulation, ces années, jours et marqueurs"
 
 #, python-brace-format
 msgid "Use {path}?"
@@ -7008,21 +6908,12 @@ msgstr ""
 "notice, un texte de recherche, un nom court, des règles ou des ISSN ; "
 "{variants} variante(s) définie(s) à la main"
 
-msgid "View and annotate the PDF"
-msgstr "Voir et annoter le PDF"
-
 msgid ""
 "View and annotate the stored PDF (beside the page; ⌘/Ctrl-click: a new "
 "tab)"
 msgstr ""
 "Voir et annoter le PDF enregistré (à côté de la page ; ⌘/Ctrl-clic : un "
 "nouvel onglet)"
-
-msgid "View the PDF (annotated)"
-msgstr "Voir le PDF (annoté)"
-
-msgid "View the PDF, with its notes (a new window)"
-msgstr "Voir le PDF, avec ses notes (nouvelle fenêtre)"
 
 msgid "View the stored PDF, annotated (beside the page; ⌘/Ctrl-click: a new tab)"
 msgstr ""
@@ -7455,6 +7346,9 @@ msgstr "git n'a pas répondu à temps"
 msgid "git is not installed"
 msgstr "git n'est pas installé"
 
+msgid "git is not installed: backups cannot be made"
+msgstr "git n'est pas installé : impossible de sauvegarder"
+
 msgid "given by the sources"
 msgstr "donnée par les sources"
 
@@ -7525,6 +7419,9 @@ msgstr "dans « {list} »"
 #, python-brace-format
 msgid "in “{venue}”"
 msgstr "dans « {venue} »"
+
+msgid "influence"
+msgstr "rayonnement"
 
 msgid "international"
 msgstr "international"
@@ -8379,6 +8276,12 @@ msgstr[0] "{n} conflit : choisissez la valeur à conserver"
 msgstr[1] "{n} conflits : choisissez la valeur à conserver"
 
 #, python-brace-format
+msgid "{n} day/year"
+msgid_plural "{n} days/year"
+msgstr[0] "{n} jour/an"
+msgstr[1] "{n} jours/an"
+
+#, python-brace-format
 msgid "{n} decision of yours the group lacks: push it after"
 msgid_plural "{n} decisions of yours the group lacks: push them after"
 msgstr[0] "{n} décision à vous que le groupe n'a pas : envoyez-la ensuite"
@@ -8972,3 +8875,4 @@ msgstr "✓ C'est {name}"
 #, python-brace-format
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
+

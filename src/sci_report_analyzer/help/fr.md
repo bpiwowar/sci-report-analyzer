@@ -384,10 +384,12 @@ chacune avec un identifiant facultatif (`#id`, pour les rapports : voir plus bas
 n'est supprimée qu'une fois ceux-ci déplacés vers une autre, choisie à ce moment-là. Dans le PDF d'un document (un rapport,
 un dossier de candidature… pas celui d'un article), sélectionnez un passage (ou cliquez sur un surlignage), puis « ajouter à une
 catégorie » (en-tête, ou touche E ; sur un extrait déjà classé, cliqué ou son texte
-sélectionné : le modifie) : cliquez sur une catégorie, ou tapez pour la trouver (la dernière choisie est proposée, marquée et affichée :
+sélectionné : le modifie) : la fenêtre d'un extrait, ouverte sur son onglet Catégorie : cliquez sur une catégorie, ou tapez pour la trouver (la dernière choisie est proposée, marquée et affichée :
 Entrée la prend ; en tapant, Entrée : la première trouvée ;
-un nouveau nom la crée, la boîte de dialogue restant ouverte), avec les années concernées (celles trouvées
-dans le passage, par exemple « 2026-32 » : 2026–2032, et retirées de son texte quand elles le commencent
+un nouveau nom la crée, la boîte de dialogue restant ouverte) : elle est seulement choisie (surlignée, nommée sous le titre), et
+seul Enregistrer classe l'extrait (fermée : rien n'est classé) ; avec les années concernées (celles trouvées
+dans le passage, par exemple « 2026-32 » : 2026–2032 ; « 2024- », « (2024-) » ou « 2024 – aujourd'hui » : depuis 2024, sa fin
+laissée ouverte ; et retirées de son texte quand elles le commencent
 suivies de deux-points ou le terminent après eux ; son calendrier barré les efface, le texte redevenant celui
 sélectionné) et, le cas échéant, ses marqueurs : saillant (un point fort), rayonnement, mineur (de moindre poids) ou
 bémol (une réserve) ; lorsqu'il pourrait déjà s'agir d'un extrait
@@ -466,7 +468,7 @@ CV en barre le long de sa durée, au mois près quand ses dates le donnent (un p
 s'estompant), son nom au-dessus ; les **doctorants** qu'elle a encadrés, chacun en barre du début de la thèse à sa
 soutenance (en cours : jusqu'à aujourd'hui), le nom du doctorant au-dessus ; les **jurys de thèse** dont elle a fait partie (chacun un point à la soutenance, au mois près si on le connaît, sinon au milieu de son année, le nom du doctorant au-dessus, coloré selon son rôle : rapporteur, examinateur, président, comme le dit la légende ; au survol, son rôle, son titre, le doctorant et la date ; cliqué, dans les détails, avec un bouton vers l'onglet Thèses ; les thèses masquées laissées de côté) ; les barres qui se chevauchent l'une
 au-dessus de l'autre. Ses **extraits** dans le dossier, une ligne par catégorie principale (de la couleur de leur
-catégorie) : le début de leur texte au-dessus d'une fine barre le long de leurs années (une seule : celle-là ; depuis une année, sans fin : jusqu'à aujourd'hui, en s'estompant, comme un poste actuel ; un **événement ponctuel**, un interrupteur de sa fenêtre : un point au milieu de son année, sans jamais se prolonger ; **dans la période**, son autre interrupteur, pour un extrait sans date précise : le long de la période de la personne dans le dossier, ou de ses propres années s'il en a, en pointillé et plus clair, dit « dans la période (2020–2024) » dans les détails ; allumer l'un éteint l'autre ; sans années à lui, placé le long de la période, sauf si elle n'en a pas non plus, ce qui est signalé, listé parmi les extraits sans années ; la légende montre les deux aspects) ; ses
+catégorie) : le début de leur texte au-dessus d'une fine barre le long de leurs années (une seule : celle-là ; depuis une année, sans fin : jusqu'à aujourd'hui, en s'estompant, comme un poste actuel ; un **événement ponctuel**, un interrupteur de sa fenêtre : un point au milieu de son année, sans jamais se prolonger ; **dans la période**, son autre interrupteur, pour un extrait sans date précise : le long de la période de la personne dans le dossier, ou de ses propres années s'il en a, en pointillé et plus clair, dit « dans la période (2020–2024) » dans les détails ; allumer l'un éteint l'autre ; sans années à lui, placé le long de la période, sauf si elle n'en a pas non plus, ce qui est signalé, listé parmi les extraits sans années ; la légende montre les deux aspects ; ses **jours par an**, un nombre dans sa fenêtre (par exemple 10 pour un comité, 180 pour un mi-temps) : plus sa barre est épaisse et marquée, sur une échelle logarithmique jusqu'à environ une demi-année, indiqués dans son infobulle et ses détails) ; ses
 **articles** : une petite barre par année, aussi haute que leur nombre, empilée aux couleurs de leurs rangs (au survol : leur nombre par rang, comme dans l'onglet Publications, par exemple « 9 articles en 2022 — 3 Q1, 2 Q2, 1 CORE A*, 3 non classés », et leurs titres ; cliquée : listés en dessous, chacun avec son rang, sa revue ou conférence et ses premiers auteurs, un PDF stocké s'ouvrant à côté de la page, sinon ses liens affichés). Au survol, une barre
 dit tout d'elle. Cliqué, ce qu'il est s'affiche sous la chronologie : une ligne de la carrière ou un doctorant, avec
 **Modifier** (sa fenêtre : la chronologie redessinée) et un bouton vers son onglet ; un extrait, ou une année (ses
@@ -553,8 +555,9 @@ réfléchit (« Par défaut » : non ; « Réfléchit » ; « Ne réflé
 - **Lecture d'un parcours** : dans l'onglet Parcours d'une personne, « Lire dans ses documents », le LLM lit les
   pages de ses documents qui portent sur un parcours (trouvées par les mots réglés là, dans chaque langue) et
   suggère des lignes de son CV.
-- **Réécriture des extraits** : un nouvel extrait est reformulé (court, impersonnel, sans ses dates) et ses années
-  lues en lui et autour, proposé dans sa fenêtre, où son texte se modifie aussi tout de suite (la sélection gardée
+- **Réécriture des extraits** : un nouvel extrait est reformulé (court, impersonnel, sans ses dates), ses années
+  lues en lui et autour, s'il montre du rayonnement, est un événement ponctuel ou a lieu dans la période
+  (sans date donnée), et ses jours par an estimés, proposé dans sa fenêtre (« L’utiliser » les règle tous), où son texte se modifie aussi tout de suite (la sélection gardée
   comme son original). « Aucun (pas de réécriture) » : seulement ses années, trouvées autour.
   Son bouton « Changer de LLM » fait la même réécriture avec d'autres modèles, l'un après l'autre, leurs
   formulations côte à côte avec leur durée (le premier passage d'un modèle compte son chargement) ; « Garder »
@@ -574,3 +577,11 @@ Données et cache indique où) : une par jour au démarrage (les 7 dernières s
 son schéma (`pre-migration-…` ; une sauvegarde marquée `.pending` provient d'une mise à niveau qui a échoué, et est
 toujours conservée). Pour en restaurer une, quittez l'application et copiez-la par-dessus le fichier de la base de données (en supprimant les
 fichiers `-wal` et `-shm` situés à côté).
+
+Une **sauvegarde git** (Paramètres → Sauvegarde : le chemin complet de son répertoire, `git-backup` à côté de la
+base par défaut, vide : désactivée ; toutes les 30 minutes par défaut, si quelque chose a changé, 0 : à la main
+seulement) garde tout ce qu'il faut pour reconstruire chaque dossier : chaque personne dans son propre
+répertoire (ses notes telles que saisies et telles que générées, ses extraits et catégories, en JSON et
+Markdown, ses documents et les PDF de ses articles), avec un commit à chaque fois (l'historique conservé :
+`git log --stat` dedans). Un dossier ou une personne renommé ou déplacé : son répertoire est déplacé dans git
+aussitôt. Le bouton de l'en-tête sauvegarde tout de suite (grisé quand c'est désactivé, en disant pourquoi).

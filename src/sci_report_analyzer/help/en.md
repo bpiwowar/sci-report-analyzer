@@ -391,7 +391,8 @@ category’ (header, or the E key; on an excerpt filed already, clicked or its t
 edits it): the dialog of an excerpt, opened on its Category tab: click a category, or type to find it (the one chosen last proposed, marked and scrolled to: Enter picks it; typed, Enter:
 the first match; a new name creates it, the dialog staying open): it is only chosen (highlighted, named under the title), and
 only Save files the excerpt (closed: nothing filed); with the years it is about (those found
-in the passage, e.g. “2026-32”: 2026–2032, and taken out of its text when leading it with a
+in the passage, e.g. “2026-32”: 2026–2032; “2024-”, “(2024-)” or “2024 – present”: since
+2024, its end left open; and taken out of its text when leading it with a
 colon or ending it after one; its crossed-out calendar clears them, the text as selected
 again) and its markers if need be: salient (“saillant”, a strong point), influence
 (“rayonnement”), minor (“mineur”, of lesser weight) or caveat (“bémol”, a reservation); when it might be an excerpt
@@ -465,7 +466,7 @@ its name above it; the **PhD students** they supervised, each a bar from the the
 to its defence (in progress: up to now), the student's name above it; the **thesis juries** they were on (each a dot at the defence, to the month if known, else the middle of its year, the student's name above it, coloured by their role: reviewer (rapporteur), examiner, president, as the legend says; hovered, its role, title, student and date; clicked, in the details, with a button to the Theses tab; hidden theses left out); overlapping bars one
 above the other. Their **excerpts** in the folder, a row for each main category (in their
 category's colour): the beginning of their text above a thin bar along their years (a single
-year: that one; since a year, without an end: up to now, fading, as a current position; a **one-off event**, a switch of its dialog: a dot in the middle of its year, never continuing; **within the period**, its other switch, for an excerpt without a precise date: along the person's period in the folder, or its own years if it has some, dotted and lighter, said “within the period (2020–2024)” in the details; one switch on turns the other off; without years of its own, placed along the period, unless the period has none either, said so, listed without years; the legend shows both looks); their **papers**: a small bar a year, as high as their number, stacked by the colours of their ranks (hovered: their number by rank, as in the Publications tab, e.g. “9 papers in 2022 — 3 Q1, 2 Q2, 1 CORE A*, 3 unranked”, and their titles; clicked: listed below, each with its rank, venue and first authors, a stored PDF opened beside the page, else its links shown). Hovered, a bar tells all about it. Clicked, what it is is shown below the
+year: that one; since a year, without an end: up to now, fading, as a current position; a **one-off event**, a switch of its dialog: a dot in the middle of its year, never continuing; **within the period**, its other switch, for an excerpt without a precise date: along the person's period in the folder, or its own years if it has some, dotted and lighter, said “within the period (2020–2024)” in the details; one switch on turns the other off; without years of its own, placed along the period, unless the period has none either, said so, listed without years; the legend shows both looks; its **days a year**, a number in its dialog (e.g. 10 for a committee, 180 for half a job): the thicker and stronger its bar, on a logarithmic scale up to about half a year, said in its tooltip and details); their **papers**: a small bar a year, as high as their number, stacked by the colours of their ranks (hovered: their number by rank, as in the Publications tab, e.g. “9 papers in 2022 — 3 Q1, 2 Q2, 1 CORE A*, 3 unranked”, and their titles; clicked: listed below, each with its rank, venue and first authors, a stored PDF opened beside the page, else its links shown). Hovered, a bar tells all about it. Clicked, what it is is shown below the
 timeline: a line of the career or a PhD student, with **Edit** (its dialog: the timeline
 drawn again) and a button to its tab; an excerpt, or a year (its excerpts), where an excerpt
 clicked opens its PDF beside the page, at it (selected there), the timeline still shown; its
@@ -590,3 +591,11 @@ Data & cache shows where): one a day at startup (the last 7 kept), and one befor
 its schema (`pre-migration-…`; one marked `.pending` is from an upgrade that failed, and is
 always kept). To restore one, quit the app and copy it over the database file (removing the
 `-wal` and `-shm` files next to it).
+
+A **git backup** (Settings → Backup: the full path of its directory, `git-backup` next to the
+database by default, empty: off; every 30 minutes by default, when something changed, 0: by
+hand only) keeps everything needed to rebuild each folder: each person in a directory of
+their own (their notes as typed and as generated, excerpts and categories, in JSON and
+Markdown, their documents and the PDFs of their papers), committed each time (the history
+kept: `git log --stat` in it). A folder or a person renamed or moved: their directory is moved
+in git at once. The header's button backs up now (dimmed when off, saying why).
