@@ -228,7 +228,7 @@ class DocumentPage:
             page=page,
             pane=pane,
             embed=embed,
-            rename=lambda title: rename_dialog(d.id, title.text, title.set_text),
+            rename=lambda title: rename_dialog(d.id, title.text, lambda n: self.renamed(title, n)),
         )
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
@@ -270,6 +270,14 @@ class DocumentPage:
         ui.on("vr-doc-paper", self.clicked)
         ui.on("vr-doc-excerpt", lambda e: self.side.select_excerpt((e.args or {}).get("id")))
         ui.timer(0.05, self._load, once=True)
+
+    def renamed(self, title: ui.label, name: str) -> None:
+        """Its title above the PDF; beside a person's page, its tab in the strip too."""
+        title.set_text(name)
+        key = json.dumps(f"d{self.d.id}")
+        ui.run_javascript(
+            f"vrPane.dock()?.emit('vr-dock-renamed', {{key: {key}, name: {json.dumps(name)}}})"
+        )
 
     async def _load(self) -> None:
         await self.side.load()

@@ -339,7 +339,8 @@ for the person (and in the address) until closed. Each has the viewer's header (
 in a window of its own) and its side panel, hidden: meanwhile, the page's notes and excerpts
 are its own, Q quoting into the notes (the Report tab), E filing the selection (the Excerpts
 tab), an excerpt clicked on its pages selected in the Excerpts tab, and an excerpt clicked
-there shown on its page.
+there shown on its page. A document renamed from its title (double-click) is renamed in the
+strip too.
 
 **Documents** (person's Report tab, “Documents” menu): PDFs of the person within a folder or
 a period (an application, a CV…), uploaded there and read in the same viewer (annotations,

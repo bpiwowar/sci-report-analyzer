@@ -82,6 +82,8 @@ class PdfDock:
             )
         ui.on("vr-dock-open", lambda e: self.open(str(e.args.get("key")), e.args.get("page")))
         ui.on("vr-dock-width", lambda e: self._width(int(e.args)))
+        # (a document renamed from its title above its PDF: its tab too)
+        ui.on("vr-dock-renamed", lambda e: self._renamed(str(e.args["key"]), str(e.args["name"])))
         self._update(changed=False)
 
     def set_documents(self, docs: list[documents.DocView]) -> None:
@@ -264,12 +266,14 @@ class PdfDock:
 
     def rename(self, key: str) -> None:
         """A document's (its tab double-clicked: the two clicks undone)."""
+        rename_dialog(
+            int(key[1:]), self.labels.get(key, (key, key))[0], lambda n: self._renamed(key, n)
+        )
 
-        def renamed(name: str) -> None:
+    def _renamed(self, key: str, name: str) -> None:
+        if key in self.labels:
             self.labels[key] = (name, name)
             self._strip()
-
-        rename_dialog(int(key[1:]), self.labels.get(key, (key, key))[0], renamed)
 
     def _width(self, width: int) -> None:
         width = max(WIDTH_MIN, width)

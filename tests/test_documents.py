@@ -2453,6 +2453,34 @@ async def test_quote_and_excerpt_from_the_pdf_beside(user: User, monkeypatch, fa
     assert "vr-excerpt-on" in row.classes
 
 
+async def test_document_renamed_beside_the_page(user: User, fake_viewer):
+    """A document renamed from its title above its PDF, beside the person's page: its tab in
+    the strip renamed at once."""
+    pid, period, _ = _person()
+    doc = documents.add(period, "Application.pdf", PDF)
+    sent: list[str] = []
+    run_javascript = ui.run_javascript
+
+    def recorded(code, *args, **kwargs):
+        sent.append(code)
+        return run_javascript(code, *args, **kwargs)
+
+    await user.open(f"/doc/{doc}?embed=1")
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(ui, "run_javascript", recorded)
+        user.find(marker="pdf-title").trigger("dblclick")
+        await user.should_see(marker="document-name")
+        user.find(marker="document-name").clear().type("Letter.pdf")
+        user.find(marker="document-rename-ok").click()
+        await user.should_see("Letter.pdf")
+    assert any("vr-dock-renamed" in c and f'"d{doc}"' in c and "Letter.pdf" in c for c in sent)
+    # The page beside: its tab renamed (as sent by the frame, through vrDock).
+    await user.open(f"/person/{pid}?pdfs=d{doc}")
+    await user.should_see(marker=f"dock-tab-d{doc}")
+    _page_event(user, "vrDockRenamed", {"key": f"d{doc}", "name": "Cover letter.pdf"})
+    await user.should_see("Cover letter.pdf")
+
+
 async def test_quote_into_a_report_tab_not_built(user: User, monkeypatch, fake_viewer):
     """Q in the PDF beside the page, its Report tab not built yet: built, then quoted into
     its notes (inserted once its editor is there in the browser: see vrEditor)."""
