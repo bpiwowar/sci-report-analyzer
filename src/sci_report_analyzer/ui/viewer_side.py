@@ -1125,26 +1125,33 @@ def category_suggestions(folder_id: int, text: str, pick: Callable[[int], None])
     a button to learn again. Without an embedding model: greyed, saying so."""
     names = {n.id: n.path for n in categories.tree(folder_id)}
     on = bool(llm.embed_model(folder_id))
-    with ui.row().classes("w-full items-center gap-1 no-wrap").mark("category-suggestions"):
-        ui.icon("auto_awesome", size="xs", color="purple" if on else "grey-5").tooltip(
-            _("Suggested from the excerpts filed (their embeddings)")
-        )
-        if not on:
-            ui.label(
-                _("Suggestions: turn on the local LLM, choose an embedding model (Settings)")
-            ).classes("text-xs text-grey-5 grow").mark("category-suggestions-off")
-            ui.button(_("Train"), icon="model_training").props(
-                "flat dense size=sm no-caps disable"
-            ).mark("classifier-train")
-            return
-        chips = ui.row().classes("gap-1 grow items-center min-w-0")
-        info = ui.label().classes("text-xs text-grey shrink-0").mark("classifier-trained")
-        train_button = (
-            ui.button(_("Train"), icon="model_training")
-            .props("flat dense size=sm no-caps color=purple")
-            .tooltip(_("Learn again from the excerpts filed in the folder's categories"))
-            .mark("classifier-train")
-        )
+    with ui.column().classes("w-full gap-0").mark("category-suggestions"):
+        # A header (what they come from, when learnt, to learn again), then the suggestions
+        # one per line: the category itself stressed, its parents dimmed, its similarity
+        with ui.row().classes("w-full items-center gap-1 no-wrap"):
+            ui.icon("auto_awesome", size="xs", color="purple" if on else "grey-5").tooltip(
+                _("Suggested from the excerpts filed (their embeddings)")
+            )
+            if not on:
+                ui.label(
+                    _("Suggestions: turn on the local LLM, choose an embedding model (Settings)")
+                ).classes("text-xs text-grey-5 grow").mark("category-suggestions-off")
+                ui.button(_("Train"), icon="model_training").props(
+                    "flat dense size=sm no-caps disable"
+                ).mark("classifier-train")
+                return
+            info = (
+                ui.label()
+                .classes("text-xs text-grey grow min-w-0 ellipsis")
+                .mark("classifier-trained")
+            )
+            train_button = (
+                ui.button(_("Train"), icon="model_training")
+                .props("flat dense size=sm no-caps color=purple")
+                .tooltip(_("Learn again from the excerpts filed in the folder's categories"))
+                .mark("classifier-train")
+            )
+        chips = ui.column().classes("w-full gap-0 pl-4")
 
     def show_trained() -> None:
         t = classifier.trained(folder_id)
@@ -1172,12 +1179,21 @@ def category_suggestions(folder_id: int, text: str, pick: Callable[[int], None])
             elif not found:
                 ui.label(_("No suggestion (train first)")).classes("text-xs text-grey")
             for cat, score in found:
-                if cat in names:
-                    ui.chip(names[cat], on_click=lambda cat=cat: pick(cat)).props(
-                        "dense clickable outline color=purple"
-                    ).tooltip(_("Similarity: {score:.0%}").format(score=score)).mark(
-                        f"category-suggested-{cat}"
-                    )
+                if cat not in names:
+                    continue
+                *up, leaf = names[cat].split(" › ")
+                with (
+                    ui.item(on_click=lambda cat=cat: pick(cat))
+                    .props("dense")
+                    .classes("w-full rounded-borders px-2 py-0 min-h-0 items-center gap-2")
+                    .tooltip(_("Similarity: {score:.0%}").format(score=score))
+                    .mark(f"category-suggested-{cat}")
+                ):
+                    with ui.element("div").classes("grow min-w-0 ellipsis text-sm"):
+                        if up:
+                            ui.label(" › ".join(up) + " › ").classes("inline text-grey-7")
+                        ui.label(leaf).classes("inline text-purple text-weight-medium")
+                    ui.label(f"{score:.0%}").classes("text-xs text-grey shrink-0")
 
     async def train() -> None:
         train_button.props("loading")
