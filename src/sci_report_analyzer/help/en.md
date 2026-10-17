@@ -439,19 +439,25 @@ categories (added if missing).
 The 📝 button of a person's line (also next to the folder's name on their page) opens their
 **notes in the folder** (their Report tab; their excerpts by category: the Excerpts tab), as
 next to their PDFs: to write them without opening any document (e.g. when they have none).
-An excerpt's dialog names its category under its title. Their **Timeline** tab draws
-what is dated about them along a vertical axis of years, the most recent at the top (every
-year a tick, so that the gaps show; their period in the folder shaded), an arrow from the
-axis to each item. On the left, their **career** (Profile tab): a line of their CV as a bar
-along its years (a current position: up to now), and beyond it the **theses they
-supervised**, each a bar from its start to its defence (in progress: up to now), overlapping
-ones side by side; on the right, their **excerpts** in the folder (in their category's
-colour) and their **papers** (a small mark each, their titles hovered). Each kind is shown or hidden with its
-switch; one they have none of is said so. An excerpt is at its first year (a paper's
-excerpt without years: at the paper's year); clicked, it is shown in the Excerpts tab (where
-its years are edited), its PDF icon opening its PDF beside the page; a line of the career
-clicked shows the Profile tab, a thesis the Theses tab. The excerpts without years, and the
-lines of the career without dates, are listed apart, below.
+An excerpt's dialog names its category under its title. Their **Timeline** tab draws what is
+dated about them along a horizontal axis of years, the oldest on the left (every year a
+column, so that the gaps show; this year marked; their period in the folder shaded), a row
+for each kind. Their **career** (Profile tab): a line of their CV as a bar along its years
+(a current position: up to now, fading), its name above it; the **PhD students** they
+supervised, each a bar from the thesis's start to its defence (in progress: up to now), the
+student's name above it; overlapping bars one above the other. Their **excerpts** in the
+folder (in their category's colour): a dot in their year, a thin bar along their years when
+they have several; their **papers**: a small bar a year, as high as their number (their
+titles hovered). Hovered, a bar tells all about it; a line of the career clicked shows the
+Profile tab, a thesis the Theses tab. A year's dots, an excerpt's bar or a year clicked
+shows its excerpts below the timeline; there an excerpt clicked is shown in the Excerpts tab
+(where its years are edited), its PDF icon opening its PDF beside the page. A paper's
+excerpt without years is at the paper's year. The timeline starts with the earliest of their
+career, theses and excerpts (their papers at most three years before; the earlier ones
+counted below); with many years, only every fifth is named when narrow, and the timeline
+scrolls sideways when very long. Each kind is shown or hidden with its switch; one they have
+none of is said so. The excerpts without years, and the lines of the career without dates,
+are listed apart, below.
 
 Folders can be **within other folders**: the Reports page shows them as a **tree**, each
 folder expanded showing the folders within it then its people, one line each (their period,
