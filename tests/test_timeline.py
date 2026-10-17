@@ -124,6 +124,7 @@ async def test_timeline_tab_ranges(user: User) -> None:
     # A row for each main category (named after it).
     await user.should_see("Research", marker=f"timeline-row-main-{cats['Research']}")
     await user.should_see("Teaching", marker=f"timeline-row-main-{cats['Teaching']}")
+    await user.should_see(marker="timeline-papers-ranked")  # (drawn again, once ranked)
     chart = user.find(marker="timeline-chart").elements.pop()
     user.find(marker=f"timeline-span-{project}").click()
     await user.should_see("An excerpt, 2019–2022", marker="timeline-details")
@@ -527,3 +528,47 @@ async def test_timeline_juries(user: User) -> None:
     other_period = folders.add_person(fid, other)
     await user.open(f"/person/{other}/{other_period}?tab=timeline")
     await user.should_see(marker="timeline-none-juries")
+
+
+async def test_timeline_papers_by_rank(user: User, fake_viewer) -> None:
+    """A year's papers: by rank (hovered, stacked); clicked, listed below (the chart kept),
+    a stored PDF opened beside the page."""
+    from helpers import set_level
+
+    from sci_report_analyzer import pdfs
+
+    pid = make_person("Ann Example")
+    papers = [
+        pub("a", "On made-up things", 2022, "Journal of Made-up Studies"),
+        pub("b", "On other made-up things", 2022, "Journal of Made-up Studies"),
+        pub("c", "A small idea", 2022, "Imaginary Workshop"),
+    ]
+    add_source(pid, "dblp", "x/1", papers)
+    set_level("Journal of Made-up Studies", "journal", "Q1")
+    fid = folders.save_folder(None, "Hiring committee")
+    period = folders.add_person(fid, pid, 2020, 2024)
+    with session_scope() as s:
+        ids = dict(s.execute(select(Publication.title, Publication.id)).all())
+    pdfs.save(ids["On made-up things"], PDF, None)
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see(marker="timeline-papers-ranked")
+    cell = user.find(marker="timeline-papers-2022").elements.pop()
+    assert (
+        len(next(c for c in cell.descendants() if "vr-tl-hist" in c.classes).default_slot.children)
+        == 2
+    )
+    chart = user.find(marker="timeline-chart").elements.pop()
+    user.find(marker="timeline-papers-2022").click()
+    # (an unranked workshop: its kind, as in the Publications tab)
+    await user.should_see(
+        "3 papers in 2022 — 2 Q1, 1 Intl. workshop", marker="timeline-papers-details"
+    )
+    assert "picked" in cell.classes and user.find(marker="timeline-chart").elements.pop() is chart
+    await user.should_see(marker=f"timeline-paper-{ids['A small idea']}")
+    # Stored: its PDF beside the page; else its links.
+    user.find(marker=f"timeline-paper-{ids['On made-up things']}").click()
+    await user.should_see(marker=f"dock-frame-p{ids['On made-up things']}")
+    tab = user.find(marker="tab-timeline").elements.pop()
+    assert tab.parent_slot.parent.value == "timeline"
+    user.find(marker="timeline-papers-close").click()
+    await user.should_not_see(marker="timeline-papers-details")

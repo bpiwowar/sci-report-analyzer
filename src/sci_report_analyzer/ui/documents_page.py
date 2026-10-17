@@ -576,7 +576,15 @@ class ReportTabs:
             with ui.row().classes("items-center"):
                 self._choice(which)
             self.editor = None  # (gone with the tab's content)
-            timeline_view(self.person_id, p, self._select, self._show, self._edit, self.show_tab)
+            timeline_view(
+                self.person_id,
+                p,
+                self._select,
+                self._show,
+                self._edit,
+                self.show_tab,
+                lambda pub_id: self.dock.open(f"p{pub_id}"),
+            )
             return
         side = (_notes if which == "report" else _excerpts)(self.person_id, p.id)
         self.sides[which] = side

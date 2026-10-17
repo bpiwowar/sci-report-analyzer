@@ -18,11 +18,12 @@ from itertools import pairwise
 
 from nicegui import ui
 
-from .. import career, categories, persons, reports
+from .. import career, categories, persons, pubview, reports
 from .. import timeline as tl
 from ..db.models import Period
 from ..i18n import _, ngettext
 from ..sources.thesesfr import ROLE_LABELS
+from .theme import rank_chip
 from .viewer_side import MARKER_ICONS
 
 # The colours of the kinds of items (an excerpt: its category's).
@@ -95,7 +96,12 @@ body.body--dark .vr-tl { --tl-bg:var(--q-dark); --tl-line:rgba(160,170,180,.2);
 .vr-tl-papers { z-index:2; height:2.3rem; display:flex; flex-direction:column;
   align-items:center; justify-content:flex-end; padding-top:.2rem; }
 .vr-tl-papers .n { font-size:.6rem; line-height:.75rem; color:#8c959f; }
-.vr-tl-hist { width:min(65%, 14px); border-radius:2px 2px 0 0; background:#8c959f; }
+.vr-tl-papers { cursor:pointer; border-radius:3px; }
+.vr-tl-papers:hover .vr-tl-hist, .vr-tl-papers.picked .vr-tl-hist {
+  box-shadow:0 0 0 2px rgba(140,149,159,.45); }
+.vr-tl-hist { width:min(65%, 14px); border-radius:2px 2px 0 0; background:#8c959f;
+  display:flex; flex-direction:column-reverse; overflow:hidden; }
+.vr-tl-hist > div { width:100%; }
 .vr-tl-details { display:grid; gap:.5rem; grid-template-columns:repeat(auto-fill,
   minmax(17rem, 1fr)); }
 @container (max-width: 640px) {
@@ -110,6 +116,7 @@ ui.add_css(_CSS, shared=True)
 ui.add_head_html(
     """<script>
 window.vrTimelineScroll = (id, keep) => {
+  if (!keep) window.vrTlAt = null;  // (another timeline's: not this one's)
   const go = () => {
     const w = getHtmlElement(id);
     if (!w) return;
@@ -169,6 +176,7 @@ class _Acts:
     select: Callable[[int], None]
     on_timeline: Callable[[categories.ExcerptView, bool], None]
     within: tuple[int | None, int | None] = (None, None)  # (the years of the person's period)
+    paper: Callable[[int], None] | None = None  # (a paper's PDF beside the page)
 
 
 def _spanned(d: categories.Dated, this_year: int) -> _Span:
@@ -213,14 +221,16 @@ def timeline_view(
     show: Callable[[categories.ExcerptView], None],
     edit: Callable[[categories.ExcerptView, Callable[[], None]], Awaitable[None] | None],
     show_tab: Callable[[str], None],
+    paper: Callable[[int], None] | None = None,
 ) -> None:
     """The timeline of a person, their excerpts those in the folder of ``period``: an
     excerpt (or a year's) clicked, shown in the details below, where clicked its PDF is
     opened beside the page at it (``show``), edited with its pencil (``edit``: its dialog,
     given what draws the timeline again once saved), seen in the Excerpts tab (``select``);
     a line of their career or a PhD student clicked, in the details too, edited there (or
-    seen in its tab: ``show_tab``). Drawn again once one is edited (what is shown, the zoom
-    kept)."""
+    seen in its tab: ``show_tab``); a year's papers, by rank once known (hovered; clicked,
+    listed below, a stored PDF opened beside the page: ``paper``). Drawn again once one is
+    edited (what is shown, the zoom kept)."""
     state: dict = {
         "shown": {
             "career": True,
@@ -235,11 +245,12 @@ def timeline_view(
         # (the excerpts shown: those with one of these markers, and of one of these levels;
         # none: whatever)
         "filters": {"markers": set(), "levels": set()},
+        "ranked": None,  # (their papers by year, ranked: see pubview.load_stats; once loaded)
     }
 
     @ui.refreshable
     def view() -> None:
-        _view(person_id, period, select, show, edit, show_tab, state, view.refresh)
+        _view(person_id, period, select, show, edit, show_tab, paper, state, view.refresh)
 
     view()
 
@@ -251,6 +262,7 @@ def _view(
     show: Callable[[categories.ExcerptView], None],
     edit: Callable[[categories.ExcerptView, Callable[[], None]], Awaitable[None] | None],
     show_tab: Callable[[str], None],
+    paper: Callable[[int], None] | None,
     state: dict,
     rebuild: Callable[[], None],
 ) -> None:
@@ -298,7 +310,20 @@ def _view(
         select,
         on_timeline,
         (period.start_year, period.end_year),
+        paper,
     )
+
+    async def rank() -> None:
+        """Their papers' ranks (as in the Publications tab), then the chart drawn again."""
+        stats = await pubview.load_stats(person_id)
+        ranked: dict[int, list[pubview.PubStat]] = {}
+        for r in stats:
+            if r.year and not (r.hidden or r.missing):
+                ranked.setdefault(r.year, []).append(r)
+        state["ranked"] = ranked
+        if not chart_box.is_deleted:
+            chart.refresh()
+            below.refresh()
 
     def on() -> dict[str, bool]:
         return {k: bool(v and counts[k]) for k, v in shown.items()}
@@ -335,6 +360,7 @@ def _view(
             [t for t in juries if t.year] if on_["juries"] else [],
             kept()[0] if on_["excerpts"] else [],
             papers if on_["papers"] else {},
+            state["ranked"],
             nodes,
             period,
             picked,
@@ -351,6 +377,10 @@ def _view(
         """The details of what is picked, and what is listed apart."""
         on_ = on()
         _line_details(person_id, spans, directed, juries, picked, pick, show_tab, rebuild)
+        if on_["papers"] and (year := picked.get("papers")):
+            _papers_details(
+                year, papers.get(year, []), (state["ranked"] or {}).get(year), pick, acts
+            )
         if on_["excerpts"]:
             spans_, undated_, left_out_ = kept()
             _details(spans_, picked, paths, pick, acts)
@@ -411,8 +441,11 @@ def _view(
                     _("The width of the years (left: the whole timeline fitting the width)")
                 ).mark("timeline-zoom")
                 ui.icon("zoom_in", color="grey", size="xs")
-        chart()
+        with ui.column().classes("w-full gap-0") as chart_box:
+            chart()
         below()
+    if state["ranked"] is None and counts["papers"]:
+        ui.timer(0.05, rank, once=True)
 
 
 def _passes(e: categories.ExcerptView, filters: dict, default: str | None) -> bool:
@@ -553,6 +586,7 @@ def _chart(
     juries: list[tl.Jury],
     excerpts: list[_Span],
     papers: dict[int, list[str]],
+    ranked: dict[int, list[pubview.PubStat]] | None,
     nodes: list[categories.Node],
     period: Period,
     picked: dict[str, int],
@@ -681,7 +715,9 @@ def _chart(
                 else:
                     top = max(map(len, papers.values()))
                     for year, titles in papers.items():
-                        _papers(year, titles, top, row, col)
+                        items["papers", year] = _papers(
+                            year, titles, (ranked or {}).get(year), top, row, col, picked, pick
+                        )
                 row += k
     if earlier:
         ui.label(
@@ -938,29 +974,131 @@ def _excerpt(
     return item
 
 
-def _papers(year: int, titles: list[str], top: int, row: int, col: Callable[[int], int]) -> None:
+def _by_rank(ranked: list[pubview.PubStat]) -> list[tuple[pubview.Category, int]]:
+    """A year's papers by the category of their rank (as in the Publications tab: see
+    pubview.category_list), best first, each with its number."""
+    counts: dict[str, int] = {}
+    for r in ranked:
+        counts[r.category.key] = counts.get(r.category.key, 0) + 1
+    return [(c, counts[c.key]) for c in pubview.category_list(ranked)]
+
+
+def _rank_line(ranked: list[pubview.PubStat]) -> str:
+    """E.g. “3 Q1, 2 Q2, 1 CORE A*, 3 unranked”."""
+    return ", ".join(pubview._summary_category(c, None, n) for c, n in _by_rank(ranked))
+
+
+def _papers(
+    year: int,
+    titles: list[str],
+    ranked: list[pubview.PubStat] | None,
+    top: int,
+    row: int,
+    col: Callable[[int], int],
+    picked: dict[str, int],
+    pick: Callable[..., None],
+) -> ui.element:
     """Their papers of a year: a bar as high as their number (``top``: the most of a
-    year's), their titles hovered."""
+    year's), stacked by rank once known (``ranked``, their colours); hovered, their number
+    by rank and their titles; clicked, listed below."""
     with (
         ui.element("div")
-        .classes("vr-tl-papers")
+        .classes("vr-tl-papers" + (" picked" if picked.get("papers") == year else ""))
         .style(f"grid-column:{col(year)};grid-row:{row}")
-        .mark(f"timeline-papers-{year}")
+        .on("click", lambda: pick("papers", year))
+        .mark(f"timeline-papers-{year}", *(["timeline-papers-ranked"] if ranked else [])) as item
     ):
         ui.label(str(len(titles))).classes("n")
-        ui.element("div").classes("vr-tl-hist").style(
-            f"height:{max(3, round(len(titles) / top * 100)) * 0.014:.3f}rem"
-        )
+        with (
+            ui.element("div")
+            .classes("vr-tl-hist")
+            .style(f"height:{max(3, round(len(titles) / top * 100)) * 0.014:.3f}rem")
+        ):
+            total = len(ranked or [])
+            for cat, n in _by_rank(ranked or []):  # (the best at the bottom)
+                ui.element("div").style(f"height:{n / total * 100:.2f}%;background:{cat.colour}")
         with ui.tooltip().classes("max-w-sm"):
             ui.label(
                 ngettext("{n} paper in {year}", "{n} papers in {year}", len(titles)).format(
                     n=len(titles), year=year
                 )
+                + (f" — {_rank_line(ranked)}" if ranked else "")
             ).classes("font-medium")
             for title in titles[:20]:
                 ui.label(title).classes("text-xs")
             if len(titles) > 20:
                 ui.label(_("and {n} more").format(n=len(titles) - 20)).classes("text-xs")
+            ui.label(_("Click: listed below")).classes("italic")
+    return item
+
+
+def _papers_details(
+    year: int,
+    titles: list[str],
+    ranked: list[pubview.PubStat] | None,
+    pick: Callable[..., None],
+    acts: _Acts,
+) -> None:
+    """A year's papers (picked), as in the Publications tab, briefly: title, venue, rank,
+    authors; clicked, its PDF beside the page if stored, else more about it (its links)."""
+    with ui.column().classes("w-full gap-2 mt-2").mark("timeline-papers-details"):
+        with ui.row().classes("items-center gap-2 w-full"):
+            ui.icon("article", color="grey-8")
+            ui.label(
+                ngettext("{n} paper in {year}", "{n} papers in {year}", len(titles)).format(
+                    n=len(titles), year=year
+                )
+                + (f" — {_rank_line(ranked)}" if ranked else "")
+            ).classes("font-medium")
+            ui.space()
+            ui.button(icon="close", on_click=lambda: pick()).props(
+                "flat dense round size=sm"
+            ).tooltip(_("Close")).mark("timeline-papers-close")
+        if ranked is None:
+            with ui.row().classes("items-center gap-2"):
+                ui.spinner(size="sm")
+                ui.label(_("Their ranks, being computed…")).classes("text-sm text-grey")
+            for title in titles:
+                ui.label(title).classes("text-sm")
+            return
+        order = {c.key: i for i, (c, _n) in enumerate(_by_rank(ranked))}
+        with ui.element("div").classes("vr-tl-details w-full"):
+            for r in sorted(ranked, key=lambda r: (order[r.category.key], r.title or "")):
+                _paper_item(r, acts)
+
+
+def _paper_item(r: pubview.PubStat, acts: _Acts) -> None:
+    """A paper: its title, rank, venue and first authors; clicked, its PDF beside the page
+    (stored), else its links shown."""
+    authors = ", ".join(r.authors[:3]) + (", …" if len(r.authors) > 3 else "")
+    stored = r.pdf is not None and acts.paper is not None
+    with (
+        ui.column()
+        .classes("w-full gap-0 cursor-pointer rounded")
+        .style("border-left:3px solid #8c959f;padding:.15rem .5rem")
+        .mark(f"timeline-paper-{r.id}") as box
+    ):
+        with ui.row().classes("items-center gap-2 no-wrap"):
+            rank_chip(r.badge, r.track, r.kind)
+            ui.label(r.venue or "").classes("text-xs text-grey-8 ellipsis min-w-0")
+            if stored:
+                ui.icon("picture_as_pdf", size="xs", color="red-8")
+        ui.label(r.title or _("(untitled)")).classes("text-sm line-clamp-2")
+        ui.label(authors).classes("text-xs text-grey ellipsis")
+        more = ui.row().classes("items-center gap-2")
+        more.visible = False
+        with more:
+            if r.doi:
+                ui.link("DOI", f"https://doi.org/{r.doi}", new_tab=True).classes("text-xs")
+            if r.url:
+                ui.link(_("Link"), r.url, new_tab=True).classes("text-xs")
+            ui.label(_("No PDF stored")).classes("text-xs text-grey")
+    if stored:
+        box.on("click", lambda: acts.paper(r.id)).tooltip(_("Click: its PDF beside the page"))
+    else:
+        box.on("click", lambda: more.set_visibility(not more.visible)).tooltip(
+            _("Click: its links (no PDF stored)")
+        )
 
 
 def _line_details(
@@ -1042,7 +1180,7 @@ def _details(
     acts: _Acts,
 ) -> None:
     """The excerpts picked on the timeline: those of a year (along it, or in it), or one."""
-    if not excerpts or picked.keys() & {"career", "thesis", "jury"}:
+    if not excerpts or picked.keys() & {"career", "thesis", "jury", "papers"}:
         return
     with ui.column().classes("w-full gap-2 mt-2").mark("timeline-details"):
         if not picked:
