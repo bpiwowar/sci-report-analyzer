@@ -5,6 +5,7 @@ import asyncio
 import re
 
 import httpx
+import numpy as np
 import pytest
 import respx
 from helpers import PDF, make_person
@@ -99,7 +100,8 @@ def test_train_and_suggest(embeddings) -> None:
     assert classifier.trained(folder) is None
     assert asyncio.run(classifier.suggest(folder, "ranking")) == []  # (not trained)
     t = asyncio.run(classifier.train(folder))
-    assert (t.count, t.categories, t.model) == (5, 3, "nomic-embed-text")
+    assert (t.count, t.categories, t.prototypes, t.model) == (5, 3, 3, "nomic-embed-text")
+    assert t.top3 == 0.8  # (the lone award, hidden, not to be found)
     assert classifier.trained(folder).count == 5
     found = asyncio.run(classifier.suggest(folder, "A search engine"))
     assert found[0][0] == cats["Research"] and len(found) == 3
@@ -112,6 +114,65 @@ def test_train_and_suggest(embeddings) -> None:
     # Another model in the folder: to train again.
     llm.save_folder_models(folder, "", "bge-m3")
     assert asyncio.run(classifier.suggest(folder, "A search engine")) == []
+
+
+def _blobs(rng, centre, n, noise=0.05):
+    return classifier._unit(centre + noise * rng.standard_normal((n, len(centre))))
+
+
+def test_clusters() -> None:
+    """A category of two far groups: a cluster each (none smaller than allowed, at most as
+    many as allowed); a small one, or without threshold: its mean."""
+    rng = np.random.default_rng(0)
+    e = np.eye(8)
+    x = np.vstack([_blobs(rng, e[0], 6), _blobs(rng, e[1], 6)])
+    found = classifier.clusters(x, 0.9, 5, 10)
+    assert sorted(sorted(c.tolist()) for c in found) == [list(range(6)), list(range(6, 12))]
+    assert len(classifier.clusters(x, 0.9, 5, 1)) == 1  # (at most one)
+    assert len(classifier.clusters(x, 0.9, 7, 10)) == 1  # (clusters of 7 at least)
+    assert len(classifier.clusters(x, None, 5, 10)) == 1
+    # A lone excerpt far from the others: dissolved in them
+    x = np.vstack([_blobs(rng, e[0], 10), e[2:3]])
+    assert [len(c) for c in classifier.clusters(x, 0.9, 5, 10)] == [11]
+
+
+def test_fit_chooses_clusters() -> None:
+    """A category made of two groups, another between them: a single mean each confuses
+    them, two prototypes for the first do not (chosen by leave-one-out); otherwise one."""
+    rng = np.random.default_rng(1)
+    e = np.eye(8)
+    x = np.vstack(
+        [
+            _blobs(rng, e[0], 6),
+            _blobs(rng, e[1], 6),
+            _blobs(rng, (e[0] + e[1]) / np.sqrt(2) + 0.3 * e[2], 6),
+        ]
+    )
+    labels = np.array([1] * 12 + [2] * 6)
+    best = classifier.fit(x, labels, 5, 10)
+    assert best.threshold is not None and best.top1 == 1.0
+    assert [len(best.prototypes[c]) for c in (1, 2)] == [2, 1]
+    assert classifier._fit(x, labels, None, 5, 10).top1 < 1.0
+    # Every category one group: a single mean each
+    x = np.vstack([_blobs(rng, e[0], 10), _blobs(rng, e[1], 10)])
+    best = classifier.fit(x, np.array([1] * 10 + [2] * 10), 5, 10)
+    assert best.threshold is None and best.top1 == 1.0
+
+
+def test_trained_before_clusters(embeddings) -> None:
+    """Trained before the clusters (a mean per category): still suggesting."""
+    from sci_report_analyzer.db.models import ExcerptClassifier
+    from sci_report_analyzer.db.session import session_scope
+
+    folder, _period, cats = _folder()
+    asyncio.run(classifier.train(folder))
+    with session_scope() as s:
+        row = s.get(ExcerptClassifier, folders.settings_id(s, folder))
+        row.centroids = {c: p[0] for c, p in row.centroids["prototypes"].items()}
+    t = classifier.trained(folder)
+    assert (t.categories, t.prototypes, t.top1) == (3, 3, None)
+    found = asyncio.run(classifier.suggest(folder, "A search engine"))
+    assert found[0][0] == cats["Research"]
 
 
 def test_train_without_excerpt(embeddings) -> None:
@@ -136,6 +197,7 @@ async def test_suggestions_in_the_picker(user: User, fake_viewer, embeddings):
     user.find(marker="classifier-train").click()
     await user.should_see("Learnt from 5 excerpts")
     await user.should_see("Trained on")
+    await user.should_see(marker="classifier-accuracy")
     await user.should_see(marker=f"category-suggested-{cats['Research']}")
     user.find(marker=f"category-suggested-{cats['Research']}").click()
     await user.should_see("Added to Research")
@@ -154,3 +216,21 @@ async def test_suggestions_greyed_without_model(user: User, fake_viewer):
     user.find(marker="pdf-excerpt").click()
     await user.should_see(marker="category-suggestions-off")
     assert "disable" in user.find(marker="classifier-train").elements.pop().props
+
+
+async def test_cluster_settings(user: User, monkeypatch) -> None:
+    """Settings → Local LLM: the clusters' bounds (saved, the rest kept)."""
+    monkeypatch.delenv(llm.EMBED_MODEL_ENV, raising=False)
+    llm.save_settings(llm.OllamaSettings(enabled=True, embed_model="bge-m3"))
+    try:
+        await user.open("/settings?tab=llm")
+        await user.should_see(marker="llm-cluster-max")
+        assert user.find(marker="llm-cluster-min").elements.pop().value == 5
+        user.find(marker="llm-cluster-max").elements.pop().value = 4
+        user.find(marker="llm-cluster-min").elements.pop().value = 3
+        user.find(marker="llm-save").click()
+        await user.should_see("Saved")
+        st = llm.settings()
+        assert (st.cluster_max, st.cluster_min, st.embed_model) == (4, 3, "bge-m3")
+    finally:
+        llm.save_settings(llm.OllamaSettings())

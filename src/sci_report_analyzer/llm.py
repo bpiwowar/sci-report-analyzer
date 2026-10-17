@@ -113,6 +113,10 @@ class OllamaSettings:
     # The OpenAI-compatible server (its base URL, e.g. http://localhost:8080/v1).
     embed_url: str = ""
     embed_model: str = ""  # (the default one)
+    # The suggested categories (see classifier.py): a category's excerpts grouped in at most
+    # cluster_max clusters, each of at least cluster_min excerpts.
+    cluster_min: int = 5
+    cluster_max: int = 10
     tasks: dict[str, str] = field(default_factory=dict)  # (a task's model, see TASKS)
     # Whether a reasoning model thinks before answering (slower; Ollama's "think"); a task's
     # own choice (see thinks).
@@ -154,6 +158,7 @@ def settings() -> OllamaSettings:
     st.model = "" if is_cloud(st.model) else st.model
     if st.embed_api == "ollama" and is_cloud(st.embed_model):
         st.embed_model = ""
+    st.cluster_min, st.cluster_max = max(1, int(st.cluster_min)), max(1, int(st.cluster_max))
     return st
 
 

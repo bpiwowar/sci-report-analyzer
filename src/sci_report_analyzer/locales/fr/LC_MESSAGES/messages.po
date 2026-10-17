@@ -7877,3 +7877,32 @@ msgstr "Sélectionnez d'abord le texte (ou une zone qui le couvre) dans le PDF"
 msgid "1. Selection"
 msgstr "1. Sélection"
 
+
+msgid "Suggested categories"
+msgstr "Catégories suggérées"
+
+msgid ""
+"A category's excerpts grouped in clusters of close ones (the suggestions from"
+" the closest): how many at most, how small at least (a single one if it does "
+"as well)."
+msgstr ""
+"Les extraits d'une catégorie regroupés en groupes d'extraits proches (les "
+"suggestions venant du plus proche) : combien au plus, de quelle taille au "
+"moins (un seul s'il fait aussi bien)."
+
+msgid "Clusters per category, at most"
+msgstr "Groupes par catégorie, au plus"
+
+msgid "Excerpts per cluster, at least"
+msgstr "Extraits par groupe, au moins"
+
+msgid "{top1:.0%} right"
+msgstr "{top1:.0%} justes"
+
+msgid ""
+"Each excerpt hidden then suggested: its category first {top1:.0%}, among the "
+"first three {top3:.0%} ({prototypes} clusters for {categories} categories)"
+msgstr ""
+"Chaque extrait caché puis suggéré : sa catégorie en premier {top1:.0%}, parmi"
+" les trois premières {top3:.0%} ({prototypes} groupes pour {categories} "
+"catégories)"

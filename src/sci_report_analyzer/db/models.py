@@ -883,5 +883,6 @@ class ExcerptClassifier(Base):
     model: Mapped[str]  # (the embedding model)
     trained_at: Mapped[datetime] = mapped_column(default=utcnow)
     count: Mapped[int]  # (the excerpts it learnt from)
-    # {category id: the mean of its excerpts' embeddings, normalised}
+    # {"prototypes": {category id: its clusters' means, normalised}, "threshold", "top1",
+    # "top3"} (see classifier.train; before: {category id: the mean of its excerpts})
     centroids: Mapped[dict[str, Any]]

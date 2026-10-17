@@ -1174,6 +1174,9 @@ def category_suggestions(folder_id: int, text: str, pick: Callable[[int], None])
                 .classes("text-xs text-grey grow min-w-0 ellipsis")
                 .mark("classifier-trained")
             )
+            accuracy = ui.label().classes("text-xs text-grey shrink-0").mark("classifier-accuracy")
+            with accuracy:
+                accuracy_tip = ui.tooltip()
             train_button = (
                 ui.button(_("Train"), icon="model_training")
                 .props("flat dense size=sm no-caps color=purple")
@@ -1191,6 +1194,16 @@ def category_suggestions(folder_id: int, text: str, pick: Callable[[int], None])
             if t
             else _("Never trained")
         )
+        accuracy.set_visibility(bool(t and t.top1 is not None))
+        if t and t.top1 is not None:
+            accuracy.set_text(_("{top1:.0%} right").format(top1=t.top1))
+            accuracy_tip.set_text(
+                _(
+                    "Each excerpt hidden then suggested: its category first {top1:.0%}, among "
+                    "the first three {top3:.0%} ({prototypes} clusters for {categories} "
+                    "categories)"
+                ).format(top1=t.top1, top3=t.top3, prototypes=t.prototypes, categories=t.categories)
+            )
 
     async def load() -> None:
         try:

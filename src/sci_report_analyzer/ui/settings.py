@@ -1512,6 +1512,25 @@ def llm_tab() -> None:
     embed_api.on_value_change(lambda: load_embed())
     ui.timer(0.1, load_embed, once=True)
 
+    ui.label(_("Suggested categories")).classes("text-md mt-2")
+    ui.label(
+        _(
+            "A category's excerpts grouped in clusters of close ones (the suggestions from the "
+            "closest): how many at most, how small at least (a single one if it does as well)."
+        )
+    ).classes("text-sm text-grey-8 max-w-[48rem]")
+    with ui.row().classes("items-center gap-4"):
+        cluster_max = (
+            ui.number(_("Clusters per category, at most"), value=st.cluster_max, min=1, step=1)
+            .classes("w-56")
+            .mark("llm-cluster-max")
+        )
+        cluster_min = (
+            ui.number(_("Excerpts per cluster, at least"), value=st.cluster_min, min=1, step=1)
+            .classes("w-56")
+            .mark("llm-cluster-min")
+        )
+
     def values() -> llm.OllamaSettings:
         return llm.OllamaSettings(
             enabled=bool(enabled.value),
@@ -1523,6 +1542,8 @@ def llm_tab() -> None:
             embed_api=embed_api.value or "ollama",
             embed_url=(embed_url.value or "").strip(),
             embed_model=(embed_model.value or "").strip(),
+            cluster_min=max(1, int(cluster_min.value or 1)),
+            cluster_max=max(1, int(cluster_max.value or 1)),
         )
 
     def save() -> bool | None:
