@@ -461,8 +461,8 @@ def settings_tab() -> None:
         )
         + " "
         + _(
-            "The report templates (the texts a report starts from) are with their categories, "
-            "in each settings' “Categories & report”."
+            "The report templates (the texts a report starts from) are "
+            "in each settings' “Report” section."
         )
     ).classes("text-sm text-grey").mark("folder-settings-help")
 
