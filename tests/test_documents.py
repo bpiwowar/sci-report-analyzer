@@ -6,7 +6,7 @@ import re
 
 import pytest
 from helpers import PDF, add_source, make_person, note_status, own_settings, pub
-from nicegui import ui
+from nicegui import Client, ui
 from nicegui.elements.upload_files import SmallFileUpload
 from nicegui.testing import User
 from sqlalchemy import select
@@ -2538,6 +2538,104 @@ async def test_quote_and_excerpt_from_the_pdf_beside(user: User, monkeypatch, fa
     _page_event(user, "vrDocExcerpt", {"id": e.id})  # (its tint clicked in the PDF)
     row = user.find(marker=f"excerpt-part-{e.id}").elements.pop()
     assert "vr-excerpt-on" in row.classes
+
+
+async def test_find_tag_and_bookmark_from_the_pdf_beside(user: User, fake_viewer):
+    """F, L and B in the PDF shown beside the person's page (its side column hidden): done
+    on the page (the paper found and linked there, the list's papers to tag, the place
+    bookmarked), as Q and E."""
+    from pathlib import Path
+
+    from sci_report_analyzer.ui import pdf_dock
+
+    dock_js = (Path(pdf_dock.__file__).parent / "static" / "dock.js").read_text()
+    for name in ("vr-pdf-find", "vr-pdf-tag-list", "vr-pdf-bookmark"):
+        assert f"'{name}'" in dock_js  # (taken from the frame: see vrDock.takes)
+    pid, period, ids = _person()
+    doc = documents.add(period, "Application.pdf", PDF)
+    documents.set_lines(doc, LINES)
+    selection = {
+        "text": "[9] J. Doe. Neural retrieval models for long documents. ECIR 2022.",
+        "p": 3,
+        "rects": [[72, 400, 300, 410]],
+    }
+    user.javascript_rules[re.compile(r"vrPdf\.selection\(\)")] = lambda _: selection
+    user.javascript_rules[re.compile(r"vrPdf\.location\(\)")] = lambda _: {
+        "p": 2,
+        "y": 640.0,
+        "text": "Publications",
+    }
+    await user.open(f"/person/{pid}?pdfs=d{doc}&pdf=d{doc}")
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    _page_event(user, "vrPdfBookmark", None)  # (B)
+    await user.should_see("Bookmarked: Publications")
+    assert documents.bookmarks("doc", doc) == [{"name": "Publications", "p": 2, "y": 640.0}]
+    _page_event(user, "vrPdfFind", None)  # (F: in the Report tab, shown)
+    await user.should_see(marker=f"find-link-{ids['b']}")
+    user.find(marker=f"find-link-{ids['b']}").click()
+    await user.should_see("Linked")
+    [link] = documents.links_of(doc)
+    assert link["pub"] == ids["b"] and link["p"] == 3
+    _page_event(user, "vrPdfTagList", None)  # (L)
+    await user.should_see(marker="reflist-text")
+    assert user.find(marker="reflist-text").elements.pop().value == selection["text"]
+
+
+async def test_document_renamed_beside_the_page(user: User, fake_viewer):
+    """A document renamed from its title above its PDF, beside the person's page: its tab in
+    the strip renamed at once."""
+    pid, period, _ = _person()
+    doc = documents.add(period, "Application.pdf", PDF)
+    sent: list[str] = []
+    run_javascript = ui.run_javascript
+
+    def recorded(code, *args, **kwargs):
+        sent.append(code)
+        return run_javascript(code, *args, **kwargs)
+
+    await user.open(f"/doc/{doc}?embed=1")
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(ui, "run_javascript", recorded)
+        user.find(marker="pdf-title").trigger("dblclick")
+        await user.should_see(marker="document-name")
+        user.find(marker="document-name").clear().type("Letter.pdf")
+        user.find(marker="document-rename-ok").click()
+        await user.should_see("Letter.pdf")
+    assert any("vr-dock-renamed" in c and f'"d{doc}"' in c and "Letter.pdf" in c for c in sent)
+    # The page beside: its tab renamed (as sent by the frame, through vrDock).
+    await user.open(f"/person/{pid}?pdfs=d{doc}")
+    await user.should_see(marker=f"dock-tab-d{doc}")
+    _page_event(user, "vrDockRenamed", {"key": f"d{doc}", "name": "Cover letter.pdf"})
+    await user.should_see("Cover letter.pdf")
+
+
+async def test_quote_into_a_report_tab_not_built(user: User, monkeypatch, fake_viewer):
+    """Q in the PDF beside the page, its Report tab not built yet: built, then quoted into
+    its notes (inserted once its editor is there in the browser: see vrEditor)."""
+    pid, period, _ = _person()
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "Led the Quokka project", "p": 2, "rects": []}
+    user.javascript_rules[re.compile(r"vrPdf\.quoted\(\)")] = lambda _: selection
+    sent: list[str] = []
+    run_javascript = Client.run_javascript
+
+    def recorded(self, code, *args, **kwargs):
+        if "Quokka" in code:
+            sent.append(code)
+        return run_javascript(self, code, *args, **kwargs)
+
+    monkeypatch.setattr(Client, "run_javascript", recorded)
+    await user.open(f"/person/{pid}?pdfs=d{doc}&pdf=d{doc}")
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    await user.should_not_see(marker="folder-note")  # (the Report tab: not built)
+    _page_event(user, "vrPdfQuote", None)
+    await user.should_see(marker="folder-note")
+    for _i in range(50):
+        if sent:
+            break
+        await asyncio.sleep(0.02)
+    [code] = sent
+    assert code.startswith("vrEditor(")  # (not dropped: the editor awaited in the browser)
 
 
 async def test_papers_beside_the_notes_with_their_pdfs(user: User, fake_viewer):

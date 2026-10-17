@@ -249,16 +249,8 @@ class Side:
             self.box.style(remove="min-width:40rem")
 
     async def add_bookmark(self, kind: str, key: int) -> None:
-        loc = await ui.run_javascript("vrPdf.location()")
-        if not loc:
-            ui.notify(_("The PDF is not shown yet"), type="warning")
-            return
-        name = " ".join((loc.get("text") or "").split())[:80]
-        documents.add_bookmark(kind, key, name, int(loc["p"]), loc.get("y"))
-        if self.bookmarks:
+        if await bookmark_here(kind, key) and self.bookmarks:
             self.bookmarks()
-        where = name or _("page {page}").format(page=loc["p"])
-        ui.notify(_("Bookmarked: {name}").format(name=where))
 
     async def add_excerpt(self) -> None:
         """File the selected text in one of the folder's categories; already filed (the
@@ -859,6 +851,20 @@ def short_title(s: PubStat | None, width: int = 40) -> str:
         return f"{names[-1]} {s.year}" if len(s.authors) < 2 else f"{names[-1]} et al. {s.year}"
     title = " ".join((s.title or _("(untitled)")).split())
     return title if len(title) <= width else title[: width - 1] + "…"
+
+
+async def bookmark_here(kind: str, key: int) -> bool:
+    """Bookmark the place read in the PDF (``kind``, ``key``: see documents.add_bookmark),
+    named after the selected text if any: whether done."""
+    loc = await ui.run_javascript("vrPdf.location()")
+    if not loc:
+        ui.notify(_("The PDF is not shown yet"), type="warning")
+        return False
+    name = " ".join((loc.get("text") or "").split())[:80]
+    documents.add_bookmark(kind, key, name, int(loc["p"]), loc.get("y"))
+    where = name or _("page {page}").format(page=loc["p"])
+    ui.notify(_("Bookmarked: {name}").format(name=where))
+    return True
 
 
 def bookmarks_section(kind: str, key: int) -> Callable[[], None]:

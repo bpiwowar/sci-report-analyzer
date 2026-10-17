@@ -5,7 +5,6 @@ papers it mentions found and linked)."""
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -22,7 +21,7 @@ from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
 from .theme import DEFAULT_COLOUR, bare_page
 from .timeline import timeline_view
-from .viewer_side import Side, bookmarks_section, categories_section
+from .viewer_side import Side, bookmark_here, bookmarks_section, categories_section
 
 if TYPE_CHECKING:
     from .pdf_dock import PdfDock
@@ -230,7 +229,7 @@ class DocumentPage:
             page=page,
             pane=pane,
             embed=embed,
-            rename=lambda title: rename_dialog(d.id, title.text, title.set_text),
+            rename=lambda title: rename_dialog(d.id, title.text, lambda n: self.renamed(title, n)),
         )
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
@@ -272,6 +271,14 @@ class DocumentPage:
         ui.on("vr-doc-paper", self.clicked)
         ui.on("vr-doc-excerpt", lambda e: self.side.select_excerpt((e.args or {}).get("id")))
         ui.timer(0.05, self._load, once=True)
+
+    def renamed(self, title: ui.label, name: str) -> None:
+        """Its title above the PDF; beside a person's page, its tab in the strip too."""
+        title.set_text(name)
+        key = json.dumps(f"d{self.d.id}")
+        ui.run_javascript(
+            f"vrPane.dock()?.emit('vr-dock-renamed', {{key: {key}, name: {json.dumps(name)}}})"
+        )
 
     async def _load(self) -> None:
         await self.side.load()
@@ -500,6 +507,7 @@ class ReportTabs:
     beside the page: see pdf_dock); their excerpts there, by category; and by year. Each
     filled once shown (the timeline: each time, the excerpts edited meanwhile). The PDF
     shown beside the page is theirs: quoted into the notes (Q), its passages filed (E), its
+    selection's paper found (F), its list's papers tagged (L), its place bookmarked (B), its
     excerpts clicked selected (its side column hidden: see vrDock)."""
 
     def __init__(
@@ -529,6 +537,9 @@ class ReportTabs:
         ui.on("vr-pdf-quote", lambda: self._quote(inline=False))
         ui.on("vr-pdf-quote-inline", lambda: self._quote(inline=True))
         ui.on("vr-pdf-excerpt", self._excerpt)
+        ui.on("vr-pdf-find", self._find)
+        ui.on("vr-pdf-tag-list", self._tag_list)
+        ui.on("vr-pdf-bookmark", self._bookmark)
         ui.on("vr-doc-excerpt", lambda e: self._select((e.args or {}).get("id")))
 
     def fill(self, which: str) -> None:
@@ -606,10 +617,7 @@ class ReportTabs:
             side.dock(source)
 
     async def _quote(self, *, inline: bool) -> None:
-        built = "report" in self.sides
-        if (side := self._side("report")) is not None:
-            if not built:  # (its editor there first)
-                await asyncio.sleep(0.3)
+        if (side := self._side("report")) is not None:  # (built now: quoted once its editor is)
             await side.quote(inline=inline)
 
     async def _excerpt(self) -> None:
@@ -625,6 +633,37 @@ class ReportTabs:
         """The PDF of an excerpt beside the page, at its page."""
         key = f"d{e.document_id}" if e.document_id else f"p{e.publication_id}"
         self.dock.open(key, e.page)
+
+    async def _find(self) -> None:
+        """The paper of the selection (shown in the Report tab; a document's: to link it
+        there too)."""
+        built = "report" in self.sides
+        if self.dock.source is not None and (side := self._side("report")) is not None:
+            if not built:  # (its papers, to match: loaded first)
+                await side.load()
+            side.link = self._link if self.dock.source[0] == "doc" else None
+            await side.find_selection()
+
+    def _link(self, pub_id: int, page: int, rects: list, text: str) -> None:
+        """The selection in the document shown linked to a paper (see DocumentPage.link):
+        its papers found there again."""
+        if not rects or self.dock.source is None:
+            ui.notify(_("The selection's place is unknown"), type="warning")
+            return
+        documents.add_link(self.dock.source[1], pub_id, page, rects, text)
+        ui.run_javascript("vrDock.win()?.emitEvent('vr-doc-text')")
+        ui.notify(_("Linked"))
+
+    async def _tag_list(self) -> None:
+        built = "report" in self.sides
+        if self.dock.source is not None and (side := self._side("report")) is not None:
+            if not built:  # (its papers, to match: loaded first)
+                await side.load()
+            await side.tag_selection()
+
+    async def _bookmark(self) -> None:
+        if (source := self.dock.source) is not None:
+            await bookmark_here(*source)
 
 
 def _documents(p, open_doc, on_change=None) -> None:

@@ -221,6 +221,20 @@ window.vrSync = {
     new MutationObserver(() => follow(e)).observe(p, {childList: true, subtree: true});
   },
 };
+// The CodeMirror view of an editor (its element's id), once there: e.g. an editor just built,
+// not yet in the page (its element awaited, then the view it makes).
+window.vrEditor = (id) => new Promise((resolve) => {
+  const found = () => {
+    const c = getElement(id);
+    if (!c) return false;
+    if (c.editor) resolve(c.editor); else c.editorPromise.then(resolve);
+    return true;
+  };
+  if (found()) return;
+  const o = new MutationObserver(() => { if (found()) o.disconnect(); });
+  o.observe(document.body, {childList: true, subtree: true});
+  setTimeout(() => o.disconnect(), 30000);  // (never there: e.g. deleted at once)
+});
 </script>""",
     shared=True,
 )
@@ -490,9 +504,10 @@ class MarkdownEditor:
     # ---- Editing at the cursor (in the browser) ----
 
     def _js(self, body: str) -> None:
+        """``body`` run on the editor's view ``v`` (the editor just built: once it is made in
+        the browser, see vrEditor)."""
         self.editor.client.run_javascript(
-            f"(() => {{ const v = getElement({self.editor.id})?.editor; if (!v) return; "
-            f"{body}; v.focus(); }})()"
+            f"vrEditor({self.editor.id}).then((v) => {{ {body}; v.focus(); }})"
         )
 
     def insert(self, text: str) -> None:
