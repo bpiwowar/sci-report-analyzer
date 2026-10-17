@@ -568,7 +568,7 @@ class ReportTabs:
         if which == "timeline":
             with ui.row().classes("items-center"):
                 self._choice(which)
-            timeline_view(p.id, p.folder.id, self._select, self._open)
+            timeline_view(self.person_id, p, self._select, self._open, self.show_tab)
             return
         side = (_notes if which == "report" else _excerpts)(self.person_id, p.id)
         self.sides[which] = side

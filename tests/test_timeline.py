@@ -1,12 +1,16 @@
 """A person's timeline: their excerpts in a folder placed by their years (categories.timeline),
-and its tab on the person's page."""
+their career, supervised theses and papers (timeline), and its tab on the person's page."""
+
+from dataclasses import replace
+from datetime import date
 
 import pytest
-from helpers import add_source, make_person, pub
+from helpers import add_source, make_person, pub, thesis
 from nicegui.testing import User
 from sqlalchemy import select
 
-from sci_report_analyzer import categories, folders
+from sci_report_analyzer import career, categories, folders, timeline
+from sci_report_analyzer.career import Entry
 from sci_report_analyzer.db.models import Publication
 from sci_report_analyzer.db.session import session_scope
 
@@ -77,7 +81,70 @@ async def test_timeline_tab_without_excerpts(user: User) -> None:
     pid, period, _cats, _paper = _seed()
     await user.open(f"/person/{pid}/{period}?tab=timeline")
     await user.should_see(marker="timeline-empty")
+    # Nor career, nor theses: said so (the paper of 2018 still on it).
+    await user.should_see(marker="timeline-none-career")
+    await user.should_see(marker="timeline-none-theses")
+    await user.should_see("1 paper", marker="timeline-papers-2018")
     # Not within a folder: said so.
     other = make_person("Bob Sample")
     await user.open(f"/person/{other}?tab=timeline")
     await user.should_see(marker="documents-no-period")
+
+
+def test_career_spans() -> None:
+    pid = make_person("Cy Placeholder")
+    for e in (
+        Entry("diploma", "PhD", "2010", "2013-09-30"),
+        Entry("position", "Postdoc", "2013", "2015"),
+        Entry("position", "Lecturer", "2015-09"),  # (current: until this year)
+        Entry("position", "Visiting", "2018", "2018"),  # (overlapping: beside it)
+        Entry("position", "Consultant"),  # (no date)
+    ):
+        career.save(pid, e)
+    spans, undated = timeline.career_spans(pid, today=date(2026, 5, 1))
+    assert [(s.entry.title, s.first, s.last, s.lane) for s in spans] == [
+        ("Lecturer", 2015, 2026, 0),
+        ("Visiting", 2018, 2018, 1),
+        ("Postdoc", 2013, 2015, 1),  # (2015: the Lecturer's too)
+        ("PhD", 2010, 2013, 0),  # (2013: the Postdoc's, in the other lane)
+    ]
+    assert [e.title for e in undated] == ["Consultant"]
+
+
+def test_supervised_and_papers() -> None:
+    pid = make_person("Dee Placeholder")
+    done = replace(
+        thesis("t1", "director", "On things"),
+        start_date="2017-10-01",
+        defence_date="2020-12-01",
+        status="soutenue",
+    )
+    running = replace(
+        thesis("t2", "director", "On more"), student="B Student", start_date="2023-10-01"
+    )
+    jury = replace(thesis("t3", "rapporteur", "Elsewhere"), defence_date="2021-01-01")
+    add_source(pid, "thesesfr", "1", theses=[done, running, jury])
+    got = [(t.year, t.student, t.years, t.in_progress) for t in timeline.supervised(pid)]
+    assert got == [(2023, "B Student", "2023", True), (2020, "A Student", "2017–2020", False)]
+    add_source(pid, "dblp", "x/2", [pub("a", "Alpha", 2019), pub("b", "Beta", 2019)])
+    assert timeline.papers_by_year(pid) == {2019: ["Alpha", "Beta"]}
+
+
+async def test_timeline_tab_career_and_theses(user: User) -> None:
+    pid, period, cats, _paper = _seed()
+    lead = career.save(pid, Entry("position", "Lecturer", "2015"))
+    career.save(pid, Entry("position", "Mentor"))  # (no date: listed apart)
+    done = replace(thesis("t1", "director", "On things"), defence_date="2016-06-01")
+    add_source(pid, "thesesfr", "1", theses=[done])
+    categories.add_excerpt(cats["Research"], period, "Led a project.", 1, [], start=2021)
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see("Lecturer", marker=f"timeline-career-{lead}")
+    await user.should_see("On things", marker="timeline-2016")
+    await user.should_see(marker="timeline-career-undated")
+    # Every year a tick, even without anything (the gaps seen); the folder's period shaded.
+    await user.should_see(marker="timeline-tick-2017")
+    await user.should_see(marker="timeline-period")
+    # A kind hidden: off the timeline.
+    user.find(marker="timeline-show-career").click()
+    await user.should_not_see(marker=f"timeline-career-{lead}")
+    await user.should_see("Led a project.", marker="timeline-2021")
