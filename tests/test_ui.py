@@ -3296,3 +3296,23 @@ async def test_move_a_person_to_another_folder(user: User) -> None:
     user.find("move-ok").click()
     await user.should_see(marker=f"move-{a}")
     assert [f.id for f in folders.folders() if f.members] == [a]
+
+
+async def test_a_person_with_excerpts_is_not_moved_to_other_settings(user: User) -> None:
+    from sci_report_analyzer import categories, folders
+
+    pid = make_person("Ann Smith")
+    a = folders.save_folder(None, "Committee A")
+    b = folders.save_folder(None, "Committee B")
+    research = categories.add(a, "Research")
+    categories.add(b, "Activities")
+    period = folders.add_person(a, pid, 2020, 2024)
+    categories.add_excerpt(research, period, "A grant.", 1, [])
+    await user.open(f"/?folder={a}")
+    user.find(f"move-{pid}").click()
+    await user.should_see(marker="move-target")
+    user.find("move-target").elements.pop().value = b
+    user.find("move-ok").click()
+    await user.should_see("They have excerpts")
+    assert not next(f for f in folders.folders() if f.id == b).members
+    assert [n.path for n in categories.tree(b)] == ["Activities"]

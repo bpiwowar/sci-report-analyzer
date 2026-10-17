@@ -564,10 +564,11 @@ def remove_person(folder_id: int, person_id: int, *, keep: bool = False) -> None
 
 def move_person(person_id: int, from_id: int, to_id: int) -> int:
     """Move a person from a folder to another, with their period in it (its years, tags,
-    notes, documents, starred papers and report): their excerpts are filed in the
-    categories of the other folder's settings (see categories.remap), their stars in its
-    star lists. Refused (``ValueError``) if they are in it already. Returns how many
-    categories were added for them."""
+    notes, documents, starred papers and report): their stars go to the star lists of the
+    other folder's settings, their sections' texts to its categories (see categories.remap).
+    Refused (``ValueError``) if they are in it already, or if they have excerpts and its
+    settings differ (they could be misfiled there). Returns how many categories were added
+    for them."""
     from . import annotations, categories
 
     with session_scope() as s:
@@ -582,6 +583,10 @@ def move_person(person_id: int, from_id: int, to_id: int) -> int:
             raise ValueError(_("Already in this folder"))
         effective = _effective(s)
         was, now = effective.get(from_id), effective.get(to_id)
+        if was != now and s.scalar(select(Excerpt.id).where(Excerpt.period_id == p.id).limit(1)):
+            raise ValueError(
+                _("They have excerpts, and this folder's settings (its categories) differ")
+            )
         target = s.get(Folder, to_id)
         if p.name == p.folder.name:  # (named after the folder)
             p.name = target.name

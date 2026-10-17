@@ -193,9 +193,17 @@ def test_moving_a_person_to_another_folder():
     categories.add(b, "Activities")
     period = folders.add_person(a, ann, 2020, 2024)
     folders.set_tags(period, ["shortlisted"])
-    categories.add_excerpt(categories.tree(a)[0].id, period, "A grant.", 1, [])
+    research = categories.tree(a)[0].id
+    excerpt = categories.add_excerpt(research, period, "A grant.", 1, [])
     toggle_star(period, paper)
-    # Moved with their period (years, tags, stars), their excerpts filed in B's categories.
+    # Not with excerpts, B's settings differing (they could be misfiled there).
+    with pytest.raises(ValueError):
+        folders.move_person(ann, a, b)
+    assert [m.person_id for f in folders.folders() if f.id == a for m in f.members] == [ann]
+    # Moved with their period (years, tags, stars), their sections' texts filed in B's
+    # categories.
+    categories.remove_excerpt(excerpt)
+    categories.set_section_text(period, research, "Some research.")
     assert folders.move_person(ann, a, b) == 1
     [fa] = [f for f in folders.folders() if f.id == a]
     [fb] = [f for f in folders.folders() if f.id == b]
@@ -208,7 +216,11 @@ def test_moving_a_person_to_another_folder():
         ["shortlisted"],
         1,
     )
-    assert _cats(b) == ["Activities", "Research"] and _filed(period) == [("Research", "A grant.")]
+    assert _cats(b) == ["Activities", "Research"]
+    names = {n.id: n.path for n in categories.tree(b)}
+    assert {names[c]: x for c, x in categories.section_texts(period).items()} == {
+        "Research": "Some research."
+    }
     # Not into a folder they are in already.
     folders.add_person(a, ann)
     with pytest.raises(ValueError):

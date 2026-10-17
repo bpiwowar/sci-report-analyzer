@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-17 09:51+0200\n"
+"POT-Creation-Date: 2026-10-17 11:13+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -28,6 +28,7 @@ msgstr " — règle {rules}"
 msgid " — same cleaned text"
 msgstr " — même texte nettoyé"
 
+#, python-brace-format
 msgid "([link]({url}))"
 msgstr "([lien]({url}))"
 
@@ -92,6 +93,9 @@ msgstr "1- Titre. Auteurs. Canal, 2023. Lien : https://hal.science/…"
 
 msgid "1. Pages"
 msgstr "1. Pages"
+
+msgid "1. Selection"
+msgstr "1. Sélection"
 
 msgid "1. Which venue is the primary one?"
 msgstr "1. Quel est le canal principal ?"
@@ -168,6 +172,15 @@ msgstr "Une session prédéfinie, modifiée par rapport à sa valeur par défaut
 
 msgid "A category cannot go within itself"
 msgstr "Une catégorie ne peut pas aller dans elle-même"
+
+msgid ""
+"A category's excerpts grouped in clusters of close ones (the suggestions "
+"from the closest): how many at most, how small at least (a single one if "
+"it does as well)."
+msgstr ""
+"Les extraits d'une catégorie regroupés en groupes d'extraits proches (les"
+" suggestions venant du plus proche) : combien au plus, de quelle taille "
+"au moins (un seul s'il fait aussi bien)."
 
 msgid "A colour is a hex code, e.g. #2196f3"
 msgstr "Une couleur est un code hexadécimal, p. ex. #2196f3"
@@ -1210,6 +1223,9 @@ msgstr "Clic : détails · Maj-clic : citer dans les notes"
 msgid "Close"
 msgstr "Fermer"
 
+msgid "Clusters per category, at most"
+msgstr "Groupes par catégorie, au plus"
+
 msgid "Co-author categories"
 msgstr "Catégories de co-auteurs"
 
@@ -1228,12 +1244,6 @@ msgstr "Replier toutes les catégories"
 
 msgid "Colour"
 msgstr "Couleur"
-
-msgid "Commentary"
-msgstr "Commentaire"
-
-msgid "Commentary on the merged excerpts"
-msgstr "Commentaire sur les extraits fusionnés"
 
 msgid "Conference"
 msgstr "Conférence"
@@ -1654,6 +1664,16 @@ msgstr "P. ex. nomic-embed-text, bge-m3 (ollama pull <modèle>)"
 msgid "E.g. to suggest an excerpt's category (trained again if changed)"
 msgstr "P. ex. pour suggérer la catégorie d'un extrait (à réentraîner s'il change)"
 
+#, python-brace-format
+msgid ""
+"Each excerpt hidden then suggested: its category first {top1:.0%}, among "
+"the first three {top3:.0%} ({prototypes} clusters for {categories} "
+"categories)"
+msgstr ""
+"Chaque extrait caché puis suggéré : sa catégorie en premier {top1:.0%}, "
+"parmi les trois premières {top3:.0%} ({prototypes} groupes pour "
+"{categories} catégories)"
+
 msgid ""
 "Each named: it is used as `.name` in the folder's notes, instead of the "
 "general template of that name (Settings → Citation templates)."
@@ -1668,9 +1688,6 @@ msgstr ""
 
 msgid "Edit"
 msgstr "Édition"
-
-msgid "Edit (text, years, influence, tags…)"
-msgstr "Modifier (texte, années, rayonnement, étiquettes…)"
 
 msgid "Edit (text, years, markers, tags…; category; notes)"
 msgstr "Modifier (texte, années, marqueurs, étiquettes… ; catégorie ; notes)"
@@ -1841,16 +1858,8 @@ msgstr ""
 "glisser pour les ordonner et les imbriquer. Sa couleur teinte ses "
 "extraits."
 
-msgid ""
-"Excerpts of the people's documents (a passage selected in a PDF) are "
-"filed in them; in this order in the reports. Drag to order and nest them."
-" Years (optional): those a category is about. Its colour tints its "
-"excerpts."
-msgstr ""
-"Les extraits des documents des personnes (un passage sélectionné dans un "
-"PDF) y sont classés, dans cet ordre dans les rapports. Faites-les glisser"
-" pour les ordonner et les imbriquer. Années (facultatif) : celles que "
-"concerne une catégorie. Sa couleur teinte ses extraits."
+msgid "Excerpts per cluster, at least"
+msgstr "Extraits par groupe, au moins"
 
 msgid "Excerpts were filed there meanwhile"
 msgstr "Des extraits y ont été classés entre-temps"
@@ -1927,10 +1936,6 @@ msgstr "En premier"
 #, python-brace-format
 msgid "First, {names} are merged into “{name}”."
 msgstr "D'abord, {names} sont fusionnés dans « {name} »."
-
-#, python-brace-format
-msgid "Flagged “influence” in {category} (copied here too)"
-msgstr "Marqué « rayonnement » dans {category} (copié ici aussi)"
 
 msgid "Folder"
 msgstr "Dossier"
@@ -2227,14 +2232,6 @@ msgid "In folders"
 msgstr "Dans les dossiers"
 
 #, python-format
-msgid ""
-"In the notes and the copy, a comment after the excerpt (%% … %%): kept "
-"for reference, not shown. Empty: none."
-msgstr ""
-"Dans les notes et la copie, un commentaire après l'extrait (%% … %%) : "
-"gardé pour référence, non affiché. Vide : aucun."
-
-#, python-format
 msgid "In the notes and the copy, they follow the text in a comment (%% … %%)"
 msgstr ""
 "Dans les notes et la copie, ils suivent le texte dans un commentaire (%% "
@@ -2251,6 +2248,7 @@ msgstr ""
 "Dans leur ordre sur le graphique (p. ex. de la réalisation du travail à "
 "son encadrement)."
 
+#, python-brace-format
 msgid "In {category}: pick another one to move it there (and save)"
 msgstr ""
 "Dans {category} : choisissez-en une autre pour l'y déplacer (et "
@@ -2367,6 +2365,7 @@ msgstr ""
 msgid "Its commentary (click to edit it)"
 msgstr "Son commentaire (cliquer pour le modifier)"
 
+#, python-format
 msgid ""
 "Its commentary: in the notes and the copy, a comment after the excerpt "
 "(%% … %%), kept for reference, not shown. Empty: none."
@@ -2735,13 +2734,6 @@ msgstr "En faire un canal conjoint"
 msgid "Make it primary"
 msgstr "En faire le principal"
 
-msgid ""
-"Make it the “rayonnement” category: the excerpts flagged “influence” in "
-"the other categories are listed in it too"
-msgstr ""
-"En faire la catégorie « rayonnement » : les extraits marqués « "
-"rayonnement » des autres catégories y sont aussi listés"
-
 msgid "Manage tags (names, colours)"
 msgstr "Gérer les étiquettes (noms, couleurs)"
 
@@ -2883,6 +2875,7 @@ msgstr[1] "Fusionner {n} canaux dans celui-ci"
 msgid "Merge “{first}” with “{second}”?"
 msgstr "Fusionner « {first} » avec « {second} » ?"
 
+#, python-brace-format
 msgid ""
 "Merge “{name}” into another category: its excerpts, its sections' texts "
 "and its subcategories go there, after its own; then “{name}” is deleted."
@@ -2984,9 +2977,6 @@ msgstr "Déplacer les réglages de « {folder} »"
 
 msgid "Move them to"
 msgstr "Les déplacer vers"
-
-msgid "Move to a category"
-msgstr "Déplacer vers une catégorie"
 
 msgid "Move to another category"
 msgstr "Déplacer vers une autre catégorie"
@@ -4184,6 +4174,13 @@ msgstr "Lire dans ses documents"
 msgid "Read now:"
 msgstr "Lu en ce moment :"
 
+msgid ""
+"Read the career in the selected text (or the areas) with the LLM, at once"
+" (V)"
+msgstr ""
+"Lire la carrière dans le texte sélectionné (ou les zones) avec le LLM, "
+"tout de suite (V)"
+
 msgid "Reading a career"
 msgstr "Lecture d'un parcours"
 
@@ -4609,6 +4606,20 @@ msgstr ""
 "Voir l'article cité au curseur, dans une nouvelle fenêtre (ou ⌘/Ctrl-clic"
 " sur sa citation)"
 
+msgid ""
+"Select an area of a page (A, or Alt+drag): draw a rectangle on the page, "
+"the text inside it becomes the selection, to quote (Q), add as an excerpt"
+" (E), find its paper (F), tag the papers of a list (L), read a career (V)"
+" or copy (⌘C / Ctrl+C). Shift+drag adds another area (their texts, in "
+"order). Escape to leave."
+msgstr ""
+"Sélectionner une zone d'une page (A, ou Alt+glisser) : tracez un "
+"rectangle sur la page, le texte qu'il contient devient la sélection : "
+"pour la citer (Q), l'ajouter comme extrait (E), trouver son article (F), "
+"étiqueter les articles d'une liste (L), lire une carrière (V) ou la "
+"copier (⌘C / Ctrl+C). Maj+glisser ajoute une autre zone (leurs textes, "
+"dans l'ordre). Échap pour quitter."
+
 msgid "Select people and a folder"
 msgstr "Sélectionnez des personnes et un dossier"
 
@@ -4620,6 +4631,9 @@ msgstr "Sélectionnez d'abord la liste (ou une zone qui la couvre) dans le PDF"
 
 msgid "Select the reference (or its title) in the PDF first"
 msgstr "Sélectionnez d'abord la référence (ou son titre) dans le PDF"
+
+msgid "Select the text (or an area over it) in the PDF first"
+msgstr "Sélectionnez d'abord le texte (ou une zone qui le couvre) dans le PDF"
 
 msgid "Select the text to file (or an area with text, or click a highlight) first"
 msgstr ""
@@ -4956,6 +4970,9 @@ msgstr "Alias de doctorant ajouté"
 
 msgid "Students"
 msgstr "Étudiants"
+
+msgid "Suggested categories"
+msgstr "Catégories suggérées"
 
 msgid "Suggested from the excerpts filed (their embeddings)"
 msgstr "Suggérées d'après les extraits classés (leurs embeddings)"
@@ -5620,11 +5637,6 @@ msgstr "La source {source} est désactivée (Paramètres → Sources)"
 msgid "The {track} track of “{main}”"
 msgstr "La session {track} de « {main} »"
 
-msgid "The “rayonnement” category: it also lists the influence excerpts"
-msgstr ""
-"La catégorie « rayonnement » : elle liste aussi les extraits de "
-"rayonnement"
-
 msgid "The ★ button's"
 msgstr "Celle du bouton ★"
 
@@ -5711,6 +5723,9 @@ msgstr ""
 "Ils forment un seul élément (dans l'ordre de leurs PDF), avec la "
 "catégorie, les années, le rayonnement et le texte du second (son crayon "
 "modifie le texte du groupe)."
+
+msgid "They have excerpts, and this folder's settings (its categories) differ"
+msgstr "Cette personne a des extraits, et les réglages de ce dossier (ses catégories) diffèrent"
 
 msgid "Thinks"
 msgstr "Réfléchit"
@@ -7702,6 +7717,10 @@ msgstr ""
 "téléchargés dans le répertoire de données."
 
 #, python-brace-format
+msgid "{top1:.0%} right"
+msgstr "{top1:.0%} justes"
+
+#, python-brace-format
 msgid "{track} track: {why}"
 msgstr "Session {track} : {why}"
 
@@ -7918,59 +7937,3 @@ msgstr "✓ C'est {name}"
 msgid "✗ Not {name}"
 msgstr "✗ Pas {name}"
 
-msgid ""
-"Select an area of a page (A, or Alt+drag): draw a rectangle on the page, "
-"the text inside it becomes the selection, to quote (Q), add as an excerpt"
-" (E), find its paper (F), tag the papers of a list (L), read a career (V)"
-" or copy (⌘C / Ctrl+C). Shift+drag adds another area (their texts, in "
-"order). Escape to leave."
-msgstr ""
-"Sélectionner une zone d'une page (A, ou Alt+glisser) : tracez un "
-"rectangle sur la page, le texte qu'il contient devient la sélection : "
-"pour la citer (Q), l'ajouter comme extrait (E), trouver son article (F), "
-"étiqueter les articles d'une liste (L), lire une carrière (V) ou la "
-"copier (⌘C / Ctrl+C). Maj+glisser ajoute une autre zone (leurs textes, "
-"dans l'ordre). Échap pour quitter."
-
-msgid ""
-"Read the career in the selected text (or the areas) with the LLM, at once"
-" (V)"
-msgstr ""
-"Lire la carrière dans le texte sélectionné (ou les zones) avec le LLM, "
-"tout de suite (V)"
-
-msgid "Select the text (or an area over it) in the PDF first"
-msgstr "Sélectionnez d'abord le texte (ou une zone qui le couvre) dans le PDF"
-
-msgid "1. Selection"
-msgstr "1. Sélection"
-
-
-msgid "Suggested categories"
-msgstr "Catégories suggérées"
-
-msgid ""
-"A category's excerpts grouped in clusters of close ones (the suggestions from"
-" the closest): how many at most, how small at least (a single one if it does "
-"as well)."
-msgstr ""
-"Les extraits d'une catégorie regroupés en groupes d'extraits proches (les "
-"suggestions venant du plus proche) : combien au plus, de quelle taille au "
-"moins (un seul s'il fait aussi bien)."
-
-msgid "Clusters per category, at most"
-msgstr "Groupes par catégorie, au plus"
-
-msgid "Excerpts per cluster, at least"
-msgstr "Extraits par groupe, au moins"
-
-msgid "{top1:.0%} right"
-msgstr "{top1:.0%} justes"
-
-msgid ""
-"Each excerpt hidden then suggested: its category first {top1:.0%}, among the "
-"first three {top3:.0%} ({prototypes} clusters for {categories} categories)"
-msgstr ""
-"Chaque extrait caché puis suggéré : sa catégorie en premier {top1:.0%}, parmi"
-" les trois premières {top3:.0%} ({prototypes} groupes pour {categories} "
-"catégories)"
