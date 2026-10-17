@@ -332,7 +332,8 @@ def _page_chips(found: list[career_extract.Passage], mark: str) -> None:
 
 
 _SENT = "text-xs font-mono whitespace-pre-wrap bg-grey-2 rounded p-2 w-full overflow-auto"
-# Draws a page of a PDF in a canvas, small (with PDF.js, as the viewer; one at a time).
+# Draws a page of a PDF in a canvas, small (with PDF.js, as the viewer; one at a time; the
+# canvas waited for, up to 5 s).
 _THUMBS_JS = """
 window.sraThumb = window.sraThumb || (() => {
   const docs = {};
@@ -343,10 +344,11 @@ window.sraThumb = window.sraThumb || (() => {
         lib = await import('/pdfjs/build/pdf.mjs');
         lib.GlobalWorkerOptions.workerSrc = '/pdfjs/build/pdf.worker.mjs';
       }
-      await new Promise(requestAnimationFrame);
-      const canvas = document.getElementById(id);
+      let canvas;  // (a dialog's content: shown after its transition)
+      for (let i = 0; i < 100 && !(canvas = document.getElementById(id)); i++)
+        await new Promise(resolve => setTimeout(resolve, 50));
       if (!canvas) return;
-      docs[url] = docs[url] || lib.getDocument(url).promise;
+      docs[url] = docs[url] || lib.getDocument({url}).promise;
       const p = await (await docs[url]).getPage(page);
       const width = (canvas.clientWidth || 184) * devicePixelRatio;
       const scale = width / p.getViewport({scale: 1}).width;
