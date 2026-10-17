@@ -123,14 +123,20 @@ async def test_timeline_tab_ranges(user: User) -> None:
     # A row for each main category (named after it).
     await user.should_see("Research", marker=f"timeline-row-main-{cats['Research']}")
     await user.should_see("Teaching", marker=f"timeline-row-main-{cats['Teaching']}")
+    chart = user.find(marker="timeline-chart").elements.pop()
     user.find(marker=f"timeline-span-{project}").click()
     await user.should_see("An excerpt, 2019–2022", marker="timeline-details")
     await user.should_see("Led a project.", marker="timeline-details")
+    # Picked: marked on the chart, the chart kept as it is (its scroll too).
+    span = user.find(marker=f"timeline-span-{project}").elements.pop()
+    assert "picked" in span.classes
+    assert user.find(marker="timeline-chart").elements.pop() is chart
     # A year clicked: its excerpts, those along it too.
     user.find(marker="timeline-tick-2020").click()
     await user.should_see("2 excerpts in 2020", marker="timeline-details")
     await user.should_see("Taught a course.", marker="timeline-details")
     await user.should_see("Led a project.", marker="timeline-details")
+    assert "picked" not in span.classes and not chart.is_deleted
     # Closed: the hint again.
     user.find(marker="timeline-details-close").click()
     await user.should_see(marker="timeline-details-hint")

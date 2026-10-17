@@ -94,13 +94,19 @@ body.body--dark .vr-tl { --tl-bg:var(--q-dark); --tl-line:rgba(160,170,180,.2);
 """
 ui.add_css(_CSS, shared=True)
 # A timeline wider than the page: scrolled (once laid out) to the period in the folder, whole
-# if it fits (else its start), or else to this year.
+# if it fits (else its start), or else to this year; drawn again (``keep``): where it was (its
+# middle at the same place along it, vrTlAt).
 ui.add_head_html(
     """<script>
-window.vrTimelineScroll = (id) => {
+window.vrTimelineScroll = (id, keep) => {
   const go = () => {
     const w = getHtmlElement(id);
     if (!w) return;
+    w.onscroll = () => { window.vrTlAt = (w.scrollLeft + w.clientWidth / 2) / w.scrollWidth; };
+    if (keep && window.vrTlAt != null) {
+      w.scrollLeft = window.vrTlAt * w.scrollWidth - w.clientWidth / 2;
+      return;
+    }
     const b = w.querySelector('.vr-tl-band');
     const label = w.querySelector('.vr-tl-head')?.offsetWidth || 0;
     if (!b) { w.scrollLeft = w.scrollWidth; return; }
@@ -109,8 +115,7 @@ window.vrTimelineScroll = (id) => {
       ? b.offsetLeft + b.offsetWidth - w.clientWidth + 32
       : b.offsetLeft - label - 16;
   };
-  setTimeout(go, 300);
-  setTimeout(go, 900);
+  for (const t of keep ? [0, 100, 300] : [300, 900]) setTimeout(go, t);
 };
 </script>""",
     shared=True,
@@ -167,6 +172,7 @@ def timeline_view(
         "shown": {"career": True, "excerpts": True, "theses": True, "papers": True},
         "picked": {},  # ("year", "excerpt", "career" or "thesis": shown in the details)
         "zoom": ZOOM_START,  # (see ZOOM)
+        "drawn": False,  # (the chart drawn already: drawn again, scrolled where it was)
     }
 
     @ui.refreshable
@@ -202,11 +208,17 @@ def _view(
         "papers": sum(map(len, papers.values())),
     }
 
+    # (the items of the chart, by kind and id: marked once picked, the chart kept as it is)
+    items: dict[tuple[str, int], ui.element] = {}
+
     def pick(kind: str | None = None, value: int = 0) -> None:
         picked.clear()
         if kind:
             picked[kind] = value
-        drawn.refresh()
+        for key, item in items.items():
+            if not item.is_deleted:
+                item.classes(**{"add" if picked.get(key[0]) == key[1] else "remove": "picked"})
+        below.refresh()
 
     def on_timeline(e: categories.ExcerptView, value: bool) -> None:
         categories.set_in_timeline(e.id, value)
@@ -216,40 +228,53 @@ def _view(
 
     acts = _Acts(show, lambda e: edit(e, rebuild), select, on_timeline)
 
+    def on() -> dict[str, bool]:
+        return {k: bool(v and counts[k]) for k, v in shown.items()}
+
     @ui.refreshable
-    def drawn() -> None:
-        on = {k: v and counts[k] for k, v in shown.items()}
+    def chart() -> None:
+        on_ = on()
+        items.clear()
         _chart(
-            spans if on["career"] else [],
-            [t for t in directed if t.year] if on["theses"] else [],
-            excerpts if on["excerpts"] else [],
-            papers if on["papers"] else {},
+            spans if on_["career"] else [],
+            [t for t in directed if t.year] if on_["theses"] else [],
+            excerpts if on_["excerpts"] else [],
+            papers if on_["papers"] else {},
             nodes,
             period,
             picked,
             pick,
             ZOOM[state["zoom"]],
+            items,
+            state["drawn"],
         )
+        state["drawn"] = True
+
+    @ui.refreshable
+    def below() -> None:
+        """The details of what is picked, and what is listed apart."""
+        on_ = on()
         _line_details(person_id, spans, directed, picked, pick, show_tab, rebuild)
-        if on["excerpts"]:
+        if on_["excerpts"]:
             _details(excerpts, picked, paths, pick, acts)
             if undated:
                 _undated_excerpts(undated, paths, acts)
             if left_out:
                 _left_out(left_out, paths, acts)
-        if on["career"] and no_date:
+        if on_["career"] and no_date:
             _undated_career(no_date, show_tab)
 
     def toggle(kind: str, value: bool) -> None:
         shown[kind] = value
-        drawn.refresh()
+        chart.refresh()
+        below.refresh()
 
     def zoom(by: int) -> None:
         state["zoom"] = max(0, min(len(ZOOM) - 1, state["zoom"] + by))
         narrower.set_enabled(state["zoom"] > 0)
         wider.set_enabled(state["zoom"] < len(ZOOM) - 1)
         if by:
-            drawn.refresh()
+            chart.refresh()
 
     with ui.column().classes("w-full gap-2").mark("timeline"):
         ui.label(
@@ -281,7 +306,8 @@ def _view(
                     .mark("timeline-zoom-in")
                 )
             zoom(0)
-        drawn()
+        chart()
+        below()
 
 
 def _legend(
@@ -348,10 +374,13 @@ def _chart(
     picked: dict[str, int],
     pick: Callable[..., None],
     zoom: float,
+    items: dict[tuple[str, int], ui.element],
+    keep: bool,
 ) -> None:
     """The years, from the earliest of the items (papers not much earlier than the rest) to
     this year at least; a row for each kind (the excerpts: for each main category); a year
-    ``width`` rem wide (none: the years fitting the width)."""
+    ``width`` rem wide (none: the years fitting the width); ``items``: given its items (by kind
+    and id); ``keep``: drawn again, scrolled where it was."""
     this_year = date.today().year
     core = [y for sp in [*spans, *directed, *excerpts] for y in (sp.first, sp.last)]
     if not core and not papers:
@@ -400,7 +429,7 @@ def _chart(
                 f";grid-template-columns:var(--label) repeat({n}, {year})"
                 ";width:max-content;min-width:100%"
             )
-            ui.run_javascript(f"vrTimelineScroll({wrap.id})")
+            ui.run_javascript(f"vrTimelineScroll({wrap.id}, {str(keep).lower()})")
         with (
             ui.element("div")
             .classes(f"vr-tl {_names(n, zoom)}")
@@ -450,13 +479,13 @@ def _chart(
                     ui.label(name)
                 if kind == "career":
                     for sp, end in _cells(spans, hi):
-                        _career(sp, row, col, end, picked, pick)
+                        items["career", sp.entry.id] = _career(sp, row, col, end, picked, pick)
                 elif kind == "theses":
                     for t, end in _cells(directed, hi):
-                        _thesis(t, row, col, end, picked, pick)
+                        items["thesis", t.id] = _thesis(t, row, col, end, picked, pick)
                 elif kind == "excerpts":
                     for x, end in _cells(xs, hi):
-                        _excerpt(x, row, col, end, picked, pick)
+                        items["excerpt", x.d.excerpt.id] = _excerpt(x, row, col, end, picked, pick)
                 else:
                     top = max(map(len, papers.values()))
                     for year, titles in papers.items():
@@ -564,7 +593,7 @@ def _career(
     end: int,
     picked: dict[str, int],
     pick: Callable[..., None],
-) -> None:
+) -> ui.element:
     """A line of the career, along its years (clicked: in the details)."""
     e = sp.entry
     colour = KIND_COLOUR["diploma" if e.kind == "diploma" else "position"]
@@ -588,6 +617,7 @@ def _career(
         if e.details:
             ui.label(e.details)
         ui.label(_("Click: its details, to edit it")).classes("italic")
+    return item
 
 
 def _thesis(
@@ -597,7 +627,7 @@ def _thesis(
     end: int,
     picked: dict[str, int],
     pick: Callable[..., None],
-) -> None:
+) -> ui.element:
     """A thesis they supervised, from its start to its defence (in progress: to now;
     clicked: in the details)."""
     text = t.student or t.title
@@ -621,6 +651,7 @@ def _thesis(
         )
         ui.label(t.title).classes("text-sm font-medium")
         ui.label(_("Click: its details, to edit it")).classes("italic")
+    return item
 
 
 def _excerpt(
@@ -630,7 +661,7 @@ def _excerpt(
     end: int,
     picked: dict[str, int],
     pick: Callable[..., None],
-) -> None:
+) -> ui.element:
     """An excerpt: the beginning of its text above a thin bar along its years (a single
     one: that year; at its paper's: hollow), clicked shown below."""
     e = x.d.excerpt
@@ -647,6 +678,7 @@ def _excerpt(
             _("the paper's year ({year})").format(year=x.first) if x.d.paper_year else e.years
         ).classes("font-medium")
         ui.label(e.quoted).classes("line-clamp-4")
+    return item
 
 
 def _papers(year: int, titles: list[str], top: int, row: int, col: Callable[[int], int]) -> None:
