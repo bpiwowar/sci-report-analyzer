@@ -75,7 +75,7 @@ NAV = (
     (
         N_("AI"),
         (
-            ("llm", N_("Local LLM (Ollama)")),
+            ("llm", N_("Local LLM")),
             ("career", N_("Reading a career")),
             ("rewrite", N_("Rewriting the excerpts")),
         ),
@@ -1392,11 +1392,17 @@ def llm_tab() -> None:
     confidential_note()
     ui.label(
         _(
-            "A local LLM served by Ollama (https://ollama.com), for the features that use one "
-            "(e.g. reading a person's career in their documents)."
+            "A local LLM served by Ollama (https://ollama.com), or a server with an "
+            "OpenAI-compatible API (llama.cpp, vLLM, LM Studio…), for the features that use "
+            "one (e.g. reading a person's career in their documents)."
         )
     ).classes("text-sm text-grey-8 max-w-[48rem]")
     enabled = ui.switch(_("Use the local LLM"), value=st.enabled).mark("llm-enabled")
+    chat_api = (
+        ui.toggle({k: _(v) for k, v in llm.CHAT_APIS.items()}, value=st.chat_api)
+        .props("dense no-caps")
+        .mark("llm-chat-api")
+    )
     url = (
         ui.input(_("Ollama server URL"), value=st.url, placeholder=llm.DEFAULT_URL)
         .classes("w-[32rem]")
@@ -1411,9 +1417,35 @@ def llm_tab() -> None:
             "ollama.com: to turn them off in Ollama itself too, start it with {env}=1."
         ).format(env=llm.NO_CLOUD_ENV)
     ).classes("text-xs text-grey max-w-[48rem]")
+    with ui.column().classes("gap-1").bind_visibility_from(chat_api, "value", value="openai"):
+        chat_url = (
+            ui.input(
+                _("Server URL (with /v1)"),
+                value=st.chat_url,
+                placeholder="http://localhost:8080/v1",
+            )
+            .classes("w-[32rem]")
+            .mark("llm-chat-url")
+        )
+    api_key = (
+        ui.input(_("API key (if the server needs one)"), value=st.api_key, password=True)
+        .props("autocomplete=off")
+        .classes("w-[32rem]")
+        .tooltip(_("Sent to the OpenAI-compatible servers (the LLM's and the embeddings')"))
+        .mark("llm-api-key")
+    )
+    ui.label(_("(or set the {env} environment variable)").format(env=llm.API_KEY_ENV)).classes(
+        "text-xs text-grey"
+    )
     with ui.row().classes("items-center gap-2"):
         model = (
-            ui.select([st.model] if st.model else [], value=st.model or None, label=_("Model"))
+            ui.select(
+                [st.model] if st.model else [],
+                value=st.model or None,
+                label=_("Model"),
+                with_input=True,
+                new_value_mode="add-unique",
+            )
             .classes("w-[32rem]")
             .mark("llm-model")
         )
@@ -1441,17 +1473,30 @@ def llm_tab() -> None:
     )
 
     async def load(notify: bool = False) -> None:
+        openai = chat_api.value == "openai"
         try:
-            models = await llm.list_models(url.value or llm.DEFAULT_URL)
+            models = await llm.list_chat_models(
+                chat_api.value,
+                (chat_url.value if openai else url.value) or llm.DEFAULT_URL,
+                api_key.value or "",
+            )
         except Exception as e:
-            message = _("Cannot reach Ollama: {error}").format(error=e)
+            message = (
+                _("Cannot reach the server: {error}")
+                if openai
+                else _("Cannot reach Ollama: {error}")
+            ).format(error=e)
             status.set_text(message)
             status.classes(replace="text-xs text-negative")
             if notify:
                 ui.notify(message, type="negative")
             return
         model.set_options(models, value=model.value if model.value in models else None)
-        if models:
+        if openai:
+            message = ngettext(
+                "{n} model on the server", "{n} models on the server", len(models)
+            ).format(n=len(models))
+        elif models:
             message = ngettext(
                 "Ollama is running: {n} model", "Ollama is running: {n} models", len(models)
             ).format(n=len(models))
@@ -1463,6 +1508,7 @@ def llm_tab() -> None:
             ui.notify(message, type="positive" if models else "warning")
 
     refresh.on_click(lambda: load(notify=True))
+    chat_api.on_value_change(lambda: load())
     ui.timer(0.1, load, once=True)
 
     ui.label(_("Embeddings")).classes("text-lg mt-4")
@@ -1517,6 +1563,7 @@ def llm_tab() -> None:
             models = await llm.list_embed_models(
                 embed_api.value,
                 (embed_url.value if openai else url.value) or llm.DEFAULT_URL,
+                api_key.value or "",
             )
         except Exception as e:
             message = _("Cannot reach the server: {error}").format(error=e)
@@ -1570,11 +1617,14 @@ def llm_tab() -> None:
             cluster_min=max(1, int(cluster_min.value or 1)),
             cluster_max=max(1, int(cluster_max.value or 1)),
             rewrite_model=llm.stored_settings().rewrite_model,  # (on its own page)
+            chat_api=chat_api.value or "ollama",
+            chat_url=(chat_url.value or "").strip(),
+            api_key=(api_key.value or "").strip(),
         )
 
     def save() -> bool | None:
         st = values()
-        servers = [st.url] + ([st.embed_url] if st.embed_api == "openai" else [])
+        servers = [st.url, llm.chat_server(st), llm.embed_server(st)]
         if far := [u for u in servers if not llm.is_local_url(u)]:
             ui.notify(
                 _("Not a local server (this machine or the local network): {url}").format(
@@ -1654,7 +1704,7 @@ def task_model_section(
 
     async def load() -> None:
         try:
-            models = await llm.list_models(st.url)
+            models = await llm.list_chat_models(st.chat_api, llm.chat_server(st))
         except Exception:
             return  # (the server not running: the model as saved)
         model.set_options(options(models), value=model.value)

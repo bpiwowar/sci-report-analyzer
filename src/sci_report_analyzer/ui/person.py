@@ -871,7 +871,7 @@ def _extract_dialog(
             ):
                 ui.label(
                     _(
-                        "The answer is constrained to this JSON schema (Ollama's structured "
+                        "The answer is constrained to this JSON schema (the LLM's structured "
                         "outputs): as the career's lines, a position or a diploma and its thesis."
                     )
                 ).classes("text-xs text-grey")
