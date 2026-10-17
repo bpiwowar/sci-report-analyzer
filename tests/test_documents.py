@@ -827,6 +827,7 @@ async def test_excerpt_tags_in_the_viewer(user: User, fake_viewer):
     assert "To discuss" in tags.options
     tags.value = ["To discuss", "Quokka"]
     user.find(marker=f"pick-category-{research}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Research")
     [e] = categories.excerpts(period)
     assert e.tag_names == ["Quokka", "To discuss"]
@@ -1426,6 +1427,7 @@ async def test_excerpt_from_an_area(user: User, monkeypatch, fake_viewer):
     user.find(marker="pdf-excerpt").click()
     await user.should_see(marker=f"pick-category-{figures}")
     user.find(marker=f"pick-category-{figures}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Figures")
     [e] = categories.excerpts(period)
     assert (e.text, e.page, e.rects) == (
@@ -1497,21 +1499,81 @@ async def test_last_category_proposed(user: User, fake_viewer):
     user.find(marker="pdf-excerpt").click()
     await user.should_see(marker="category-last")
     user.find(marker="category-search").trigger("keydown.enter")
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Impact")
     # Another category chosen: proposed next.
     selection = {**selection, "text": "Ten papers at SIGIR."}
     user.find(marker="pdf-excerpt").click()
     await user.should_see(marker=f"pick-category-{research}")
     user.find(marker=f"pick-category-{research}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Research")
     selection = {**selection, "text": "Two at ECIR."}
     user.find(marker="pdf-excerpt").click()
     await user.should_see(marker="category-last")
     user.find(marker="category-search").trigger("keydown.enter")
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Research")
     assert sorted(x.category_id for x in categories.excerpts(period)) == sorted(
         [impact, impact, research, research]
     )
+
+
+async def test_new_excerpt_filed_on_save(user: User, fake_viewer):
+    """A new excerpt's dialog (that of an excerpt, its tabs): opened on its category, none
+    chosen yet (said); a category clicked only chosen (highlighted, under the title, its text
+    shown again), nothing filed; Save files it there (its notes too); closed instead, or
+    saved with no category (said, kept open): nothing filed."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    impact = categories.add(folder, "Impact")
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "Led the Quokka project", "p": 1, "rects": []}
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see("New excerpt")
+    await user.should_see(marker="excerpt-category-none")
+    [dlg] = user.find(ui.dialog).elements
+    [tab_panels] = [x for x in dlg.descendants() if isinstance(x, ui.tab_panels)]
+    assert tab_panels.value == "move"
+    user.find(marker="excerpt-edit-save").click()  # (no category: said, kept open)
+    await user.should_see("Choose its category first")
+    await user.should_see(marker="excerpt-edit-save")
+    await user.should_not_see(marker="category-selected")
+    user.find(marker=f"pick-category-{impact}").click()
+    await user.should_see(marker="category-selected")
+    await user.should_not_see(marker="excerpt-category-none")
+    await user.should_see(marker="excerpt-edit-save")
+    assert tab_panels.value == "text"
+    assert categories.excerpts(period) == []
+    user.find(marker=f"pick-category-{research}").click()  # (another one: it instead)
+    [check] = [x for x in user.find(marker="category-selected").elements if x.visible]
+    [row] = user.find(marker=f"pick-category-{research}").elements
+    assert check in row.descendants() and "bg-blue-3" in row.classes
+    user.find(marker="excerpt-comment-input").elements.pop().value = "Its *own* note."
+    user.find(marker="excerpt-edit-save").click()
+    await user.should_see("Added to Research")
+    await user.should_not_see(marker="excerpt-edit-save")
+    [e] = categories.excerpts(period)
+    assert (e.category_id, e.text, e.comment) == (
+        research,
+        "Led the Quokka project",
+        "Its *own* note.",
+    )
+    # Closed (not saved): nothing filed.
+    selection = {**selection, "text": "Chaired the Wombat workshop"}
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker=f"pick-category-{impact}")
+    user.find(marker=f"pick-category-{impact}").click()
+    for dlg in user.find(ui.dialog).elements:
+        dlg.close()
+    await user.should_not_see(marker="excerpt-edit-save")
+    assert [x.id for x in categories.excerpts(period)] == [e.id]
 
 
 async def test_excerpts_in_the_viewer(user: User, fake_viewer):
@@ -1535,6 +1597,7 @@ async def test_excerpts_in_the_viewer(user: User, fake_viewer):
     user.find(marker="excerpt-start").elements.pop().value = 2020  # (its properties)
     user.find(marker="excerpt-influence").click()
     user.find(marker=f"pick-category-{research}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Research")
     [e] = categories.excerpts(period)
     assert e.category_id == research and e.page == 1 and e.document_id == doc
@@ -1553,6 +1616,7 @@ async def test_excerpts_in_the_viewer(user: User, fake_viewer):
     assert [n.name for n in categories.tree(folder)] == ["Research", "Impact"]
     await user.should_see(marker=f"pick-category-{impact}")
     user.find(marker=f"pick-category-{impact}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Impact")
     assert categories.last_category(period) == impact
     # Edited (text, years), then moved with the picker.
@@ -1662,6 +1726,7 @@ async def test_excerpt_years_from_its_text(user: User, fake_viewer):
     assert (start.value, end.value) == (None, None)
     assert text.value == "2026-32: Led the Quokka project"
     user.find(marker=f"pick-category-{research}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Research")
     [e] = categories.excerpts(period)
     assert (e.text, e.start_year, e.end_year) == ("2026-32: Led the Quokka project", None, None)
@@ -1673,6 +1738,7 @@ async def test_excerpt_years_from_its_text(user: User, fake_viewer):
     assert field.value == "Led the Wombat network."
     field.value = "Led the Wombat network (12 labs)."  # (edited at once: filed so)
     user.find(marker=f"pick-category-{research}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Research")
     [e2] = [x for x in categories.excerpts(period) if x.id != e.id]
     assert (e2.text, e2.start_year, e2.end_year) == (
@@ -2348,7 +2414,9 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
 
     async def rewrite(text, before, after):
         asked.append((text, before, after))
-        return excerpt_rewrite.Rewrite(text="Membre du conseil de l'école X", start=2019)
+        return excerpt_rewrite.Rewrite(
+            text="Membre du conseil de l'école X", start=2019, influence=True, days=12
+        )
 
     monkeypatch.setattr(llm, "rewrite_model", lambda: "gemma3:4b")
     monkeypatch.setattr(excerpt_rewrite, "rewrite", rewrite)
@@ -2358,9 +2426,16 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
     assert user.find(marker="excerpt-rewrite-text").elements.pop().value == (
         "Membre du conseil de l'école X"
     )
+    await user.should_see(marker="excerpt-rewrite-years")  # (what it predicts, said)
+    facts = user.find(marker="excerpt-rewrite-years").elements.pop().text
+    assert "2019" in facts and "Influence" in facts and "12 days/year" in facts
+    user.find(marker="excerpt-in-period").elements.pop().value = True
     user.find(marker="excerpt-rewrite-use").click()
     assert user.find(marker="excerpt-end").elements.pop().value is None  # (ongoing)
+    assert user.find(marker="excerpt-days").elements.pop().value == 12
+    assert user.find(marker="excerpt-in-period").elements.pop().value is False
     user.find(marker=f"pick-category-{service}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Service")
     [e] = categories.excerpts(period)
     assert (e.text, e.original, e.start_year, e.end_year) == (
@@ -2368,6 +2443,13 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
         "membre du conseil de l'école X",
         2019,
         None,
+    )
+    assert (e.influence, e.salient, e.punctual, e.in_period, e.days) == (
+        True,
+        False,
+        False,
+        False,
+        12.0,
     )
 
 
@@ -2408,7 +2490,9 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
         asked.append((name, text, before))
         if name == "broken":
             return excerpt_rewrite.Trial(name, None, 0.5, "out of memory")
-        r = excerpt_rewrite.Rewrite(text=f"Membre du conseil de l'école X ({name})", start=2018)
+        r = excerpt_rewrite.Rewrite(
+            text=f"Membre du conseil de l'école X ({name})", start=2018, in_period=True, days=0.5
+        )
         return excerpt_rewrite.Trial(name, r, 1.25)
 
     async def models(api, url, api_key=None):
@@ -2438,6 +2522,8 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
         assert [a[0] for a in asked] == ["gemma3:4b", "broken"]
         assert asked[0][1:] == (selection["text"], "Entre 2019 et 2021, j'ai été ")
         await user.should_not_see(marker="change-llm-keep-1")
+        facts = user.find(marker="change-llm-facts-0").elements.pop().text
+        assert "2018" in facts and "Within the period" in facts and "½ day/year" in facts
         user.find(marker="change-llm-default").elements.pop().value = True
         user.find(marker="change-llm-keep-0").click()
         await user.should_not_see(marker="change-llm-models")
@@ -2445,14 +2531,19 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
             "Membre du conseil de l'école X (gemma3:4b)"
         )
         assert user.find(marker="excerpt-start").elements.pop().value == 2018
+        assert user.find(marker="excerpt-in-period").elements.pop().value is True
+        assert user.find(marker="excerpt-days").elements.pop().value == 0.5
         assert llm.stored_settings().rewrite_model == "gemma3:4b"
         user.find(marker=f"pick-category-{service}").click()
+        user.find(marker="excerpt-edit-save").click()
         await user.should_see("Added to Service")
         [e] = categories.excerpts(period)
-        assert (e.text, e.original, e.start_year) == (
+        assert (e.text, e.original, e.start_year, e.in_period, e.days) == (
             "Membre du conseil de l'école X (gemma3:4b)",
             "membre du conseil de l'école X",
             2018,
+            True,
+            0.5,
         )
     finally:
         llm.save_settings(llm.OllamaSettings())
@@ -2551,6 +2642,7 @@ async def test_quote_and_excerpt_from_the_pdf_beside(user: User, monkeypatch, fa
     _page_event(user, "vrPdfExcerpt", None)  # (E)
     await user.should_see(marker=f"pick-category-{research}")
     user.find(marker=f"pick-category-{research}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Research")
     [e] = categories.excerpts(period)
     assert e.document_id == doc and e.page == 2

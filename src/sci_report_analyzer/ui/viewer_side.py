@@ -6,6 +6,7 @@ from __future__ import annotations
 import inspect
 import json
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from weakref import WeakSet
 
@@ -111,7 +112,7 @@ class Side:
         # The excerpt selected (clicked: its tint on the PDF, or its entry), and the entries of
         # the categories' tab (by excerpt: highlighted when selected).
         self.excerpt: int | None = None
-        self.last_category: int | None = None  # (chosen last in category_picker, here)
+        self.last_category: int | None = None  # (chosen last in excerpt_dialog, here)
         # (an excerpt's edit dialog, once the categories' tab is there: see _ExcerptsSection)
         self.edit_excerpt: Callable[[categories.ExcerptView], None] | None = None
         # (an excerpt not shown in the categories' tab, collapsed or searched: shown)
@@ -277,11 +278,9 @@ class Side:
         dated, rewriting = categories.detect_years(sel["text"]), bool(llm.rewrite_model())
         llm_on = llm.settings().enabled  # (other models tried: see change_llm_dialog)
         before, after = await self._around(rects) if llm_on or not dated else ("", "")
-        category_picker(
-            self,
+        new = NewExcerpt(
             sel["text"],
             lambda cat_id, text, **props: self.file_excerpt(cat_id, text, page, rects, **props),
-            properties=True,
             around=None if dated else categories.context_years("", before, after),
             suggest=(lambda: excerpt_rewrite.rewrite(sel["text"], before, after))
             if rewriting
@@ -293,6 +292,7 @@ class Side:
                 lead, sel["text"], page, rects, ref_only=ref_only
             ),
         )
+        excerpt_dialog(self, None, new=new)
 
     async def _around(self, rects: list) -> tuple[str, str]:
         """The text around a selection in the PDF (see documents.selection_context): in the
@@ -328,10 +328,10 @@ class Side:
 
     def file_excerpt(
         self, category_id: int, text: str, page: int | None, rects: list, **props
-    ) -> None:
-        """``props``: its years, influence flag and tags (see categories.add_excerpt)."""
+    ) -> int:
+        """``props``: its years, markers, tags… (see categories.add_excerpt); returns its id."""
         kind, key = self.source
-        categories.add_excerpt(
+        excerpt_id = categories.add_excerpt(
             category_id,
             self.period_id,
             text,
@@ -343,6 +343,7 @@ class Side:
         )
         self.unhighlight(page, rects)
         self.refresh_excerpts()
+        return excerpt_id
 
     def unhighlight(self, page: int | None, rects: list) -> None:
         """The highlights of PDF.js under an excerpt just filed: removed (its tint instead)."""
@@ -1056,7 +1057,9 @@ def excerpt_properties(
     (not both: one on, the other off), markers (see MARKER_ICONS), level (one of the
     folder's, see reports.levels; none: its default) and tags (those of papers and excerpts,
     or new ones typed); returns their values (the keywords of categories.add_excerpt /
-    update_excerpt; its ``set_years``, a function setting the years)."""
+    update_excerpt; its ``set_years``, ``set_days``, ``set_timing`` (one-off, within the
+    period) and ``set_marker`` (none: ""), functions setting them, e.g. from a rewrite: see
+    apply_rewrite)."""
 
     def clear() -> None:
         start_in.set_value(None)
@@ -1138,8 +1141,53 @@ def excerpt_properties(
         start_in.set_value(start)
         end_in.set_value(end)
 
+    def set_days(days: float | None) -> None:
+        days_in.set_value(categories.clean_days(days))
+
+    def set_timing(punctual: bool, in_period: bool) -> None:
+        punctual_in.set_value(punctual)
+        in_period_in.set_value(in_period and not punctual)
+
+    def set_marker(marker: str) -> None:
+        marker_in.value = marker if marker in MARKER_ICONS else ""
+        marker_in.show()
+
     values.set_years = set_years  # type: ignore[attr-defined]
+    values.set_days = set_days  # type: ignore[attr-defined]
+    values.set_timing = set_timing  # type: ignore[attr-defined]
+    values.set_marker = set_marker  # type: ignore[attr-defined]
+    values.marker = lambda: marker_in.value  # type: ignore[attr-defined]
     return values
+
+
+def apply_rewrite(props: Callable[[], dict], r: excerpt_rewrite.Rewrite) -> None:
+    """A rewrite's predictions set in an excerpt's fields (``props``: see excerpt_properties):
+    its years and days a year if it has them, whether a one-off event or within the period,
+    the influence marker if it shows it (else cleared, if it was the one: another kept)."""
+    if r.start or r.end:
+        props.set_years(r.start, r.end)  # type: ignore[attr-defined]
+    if r.days is not None:
+        props.set_days(r.days)  # type: ignore[attr-defined]
+    props.set_timing(r.punctual, r.in_period)  # type: ignore[attr-defined]
+    if r.influence:
+        props.set_marker("influence")  # type: ignore[attr-defined]
+    elif props.marker() == "influence":  # type: ignore[attr-defined]
+        props.set_marker("")  # type: ignore[attr-defined]
+
+
+def rewrite_facts(r: excerpt_rewrite.Rewrite) -> str:
+    """What a rewrite predicts besides its wording, e.g. “2019–2021 · Influence · One-off
+    event · 3 days/year” (nothing predicted: "")."""
+    facts = [categories.years_label(r.start, r.end)] if r.start or r.end else []
+    if r.influence:
+        facts.append(_(MARKER_ICONS["influence"][0]))
+    if r.punctual:
+        facts.append(_("One-off event"))
+    elif r.in_period:
+        facts.append(_("Within the period"))
+    if r.days:
+        facts.append(categories.days_label(r.days))
+    return " · ".join(facts)
 
 
 class MarkerBadges(ui.row):
@@ -1410,173 +1458,96 @@ def category_suggestions(folder_id: int, text: str, pick: Callable[[int], None])
     ui.timer(0.05, load, once=True)
 
 
-def category_picker(
+@dataclass
+class NewExcerpt:
+    """A passage selected, to file as a new excerpt (see excerpt_dialog, Side.add_excerpt):
+    ``file`` files it (called with its category, its text and properties as the keywords of
+    categories.add_excerpt; returns its id); ``around``: its years when its text has none
+    (found around it: see categories.context_years); ``suggest``: its neutral wording, years,
+    days a year and flags (see excerpt_rewrite; none: no model rewriting, said); ``rewriter``:
+    its rewrite by a given model, to try others (see change_llm_dialog; none: the local LLM
+    off, said there); ``merge``: merge it with an excerpt instead (called with it, and whether
+    only its place is cited), the similar ones shown with a warning."""
+
+    text: str
+    file: Callable[..., int]
+    around: tuple[int, int] | None = None
+    suggest: Callable[[], Awaitable[excerpt_rewrite.Rewrite | None]] | None = None
+    rewriter: Callable[[str], Awaitable[excerpt_rewrite.Trial]] | None = None
+    merge: Callable[[categories.ExcerptView, bool], None] | None = None
+
+
+def _rewording(
     side: Side,
-    text: str,
-    chosen: Callable[..., None],
-    *,
-    title: str = N_("Add to a category"),
-    done: str = N_("Added to {category}"),
-    current: int | None = None,
-    properties: bool = False,
-    merge: Callable[[categories.ExcerptView, bool], None] | None = None,
-    around: tuple[int, int] | None = None,
-    suggest: Callable[[], Awaitable[excerpt_rewrite.Rewrite | None]] | None = None,
-    rewriter: Callable[[str], Awaitable[excerpt_rewrite.Trial]] | None = None,
-) -> None:
-    """Choose the category of an excerpt (``chosen`` is called with it): click it, or type to
-    find it (Enter: the first one), or name a new one. ``title``, ``done`` (its
-    ``{category}`` named): marked with ``N_``, translated here. ``current``: its category, shown;
-    ``properties``: also its years (those found in the text, then taken out of it if leading
-    or ending it: see categories.split_years; cleared, the text as it was), influence flag
-    and tags (passed to ``chosen`` as keywords, with ``text``, so taken out or not);
-    ``merge``: or merge it with an excerpt (called with it, and whether only its place is
-    cited), the similar ones shown with a warning; ``around``: its years when its text has
-    none (found around it: see categories.context_years); ``suggest``: a neutral wording of
-    it and its years (see excerpt_rewrite), asked for once the dialog is open and proposed
-    there, edited, then used (its text filed, the text selected kept as its original) or not;
-    ``rewriter``: its rewrite by a given model, to try others (see change_llm_dialog; none:
-    the local LLM off, said there). The category chosen last (here, else that
-    of the excerpt filed last) is proposed: marked, scrolled to, and Enter picks it (nothing
-    typed)."""
-    folder_id = side.folder[0]
-    tree = categories.tree(folder_id)
-    last = side.last_category
-    if last is None and side.period_id is not None:
-        last = categories.last_category(side.period_id)
-    if last == current or all(n.id != last for n in tree):
-        last = None
-    with side.host.dialogs, transient_dialog(_(title), width="w-full max-w-xl") as (dlg, _card):
-        years, filed = categories.split_years(text) if properties else (None, text)
-        years = years or around
-        selected = filed  # (its text, its years out: changed, it is kept as its original)
-        if properties:  # (to edit at once)
+    new: NewExcerpt,
+    use: Callable[[str, excerpt_rewrite.Rewrite], None],
+) -> Callable[[], None]:
+    """A new excerpt's rewording by the local AI (``new.suggest``), asked for at once and
+    proposed (its wording, to edit, and what it predicts: see rewrite_facts), then used
+    (``use`` is called with its wording and it) or not; no model rewriting: said, with where
+    to choose one; and “Change LLM” (see change_llm_dialog). Returns a function hiding the
+    proposal (once used)."""
+    hint: ui.row | None = None
+    if new.suggest is not None:
+        suggest = new.suggest
+        hint = ui.row().classes("w-full items-center no-wrap gap-2").mark("excerpt-rewrite")
+        with hint:
+            ui.spinner(size="sm")
+            ui.label(_("The local AI rewrites the excerpt…")).classes("text-xs text-grey")
 
-            def typed(e) -> None:
-                nonlocal filed
-                filed = e.value or ""
-
-            quote = (
-                ui.textarea(_("Text"), value=filed, on_change=typed)
-                .props("dense outlined autogrow")
-                .classes("w-full text-sm")
-                .mark("excerpt-text")
-            )
-        else:
-            quote = ui.label().classes("text-sm text-grey").mark("excerpt-text")
-
-        def show(t: str) -> None:
-            nonlocal filed
-            filed = t
-            if properties:
-                quote.value = t
+        async def proposed() -> None:
+            r = await suggest()
+            if hint is None or hint.is_deleted:
                 return
-            short = t if len(t) <= 300 else t[:299] + "…"
-            quote.set_text(f"“{' '.join(short.split())}”")
-
-        show(filed)
-        if merge is not None and side.period_id is not None:
-            similar_excerpts(side, text, lambda lead, ref_only: (merge(lead, ref_only), close(dlg)))
-        rewritten = False
-
-        def cleared() -> None:
-            nonlocal rewritten
-            rewritten = False
-            show(text)
-
-        props = (
-            excerpt_properties(*(years or (None, None)), cleared=cleared, folder_id=folder_id)
-            if properties
-            else dict
-        )
-
-        def use(wording: str, r: excerpt_rewrite.Rewrite) -> None:
-            nonlocal rewritten
-            if wording := " ".join(wording.split()):
-                show(wording)
-                rewritten = True
-            if r.start or r.end:
-                props.set_years(r.start, r.end)  # type: ignore[attr-defined]
-            if hint is not None:
-                hint.set_visibility(False)
-
-        hint: ui.row | None = None
-        if properties and suggest is not None:
-            hint = ui.row().classes("w-full items-center no-wrap gap-2").mark("excerpt-rewrite")
-            with hint:
-                ui.spinner(size="sm")
-                ui.label(_("The local AI rewrites the excerpt…")).classes("text-xs text-grey")
-
-            async def proposed() -> None:
-                r = await suggest()
-                if hint is None or hint.is_deleted:
-                    return
-                hint.clear()
-                if r is None:  # (said, not hidden)
-                    with hint:
-                        ui.icon("auto_awesome", size="xs", color="grey-5")
-                        ui.label(_("No rewording: the local AI gave no valid answer")).classes(
-                            "text-xs text-grey"
-                        ).mark("excerpt-rewrite-failed")
-                    return
+            hint.clear()
+            if r is None:  # (said, not hidden)
                 with hint:
-                    ui.icon("auto_awesome", size="xs", color="primary")
-                    wording = (
-                        ui.input(_("Neutral wording (local AI)"), value=r.text)
-                        .props("dense outlined")
-                        .classes("grow")
-                        .mark("excerpt-rewrite-text")
-                    )
-                    if r.start or r.end:
-                        ui.label(categories.years_label(r.start, r.end)).classes(
-                            "text-xs text-grey"
-                        ).mark("excerpt-rewrite-years")
-                    ui.button(_("Use it"), on_click=lambda: use(wording.value or "", r)).props(
-                        "flat dense no-caps"
-                    ).tooltip(_("File this wording and these years (the text selected kept)")).mark(
-                        "excerpt-rewrite-use"
-                    )
+                    ui.icon("auto_awesome", size="xs", color="grey-5")
+                    ui.label(_("No rewording: the local AI gave no valid answer")).classes(
+                        "text-xs text-grey"
+                    ).mark("excerpt-rewrite-failed")
+                return
+            with hint:
+                ui.icon("auto_awesome", size="xs", color="primary")
+                wording = (
+                    ui.input(_("Neutral wording (local AI)"), value=r.text)
+                    .props("dense outlined")
+                    .classes("grow")
+                    .mark("excerpt-rewrite-text")
+                )
+                if facts := rewrite_facts(r):
+                    ui.label(facts).classes("text-xs text-grey").mark("excerpt-rewrite-years")
+                ui.button(_("Use it"), on_click=lambda: use(wording.value or "", r)).props(
+                    "flat dense no-caps"
+                ).tooltip(
+                    _("File this wording, these years, days and flags (the text selected kept)")
+                ).mark("excerpt-rewrite-use")
 
-            background_tasks.create(proposed(), name="excerpt-rewrite")
-        elif properties:  # (no rewriting: said, with where to turn it on)
-            with ui.row().classes("w-full items-center no-wrap gap-1").mark("excerpt-rewrite-off"):
-                ui.icon("auto_awesome", size="xs", color="grey-5")
-                ui.label(
-                    _("No rewording by the local AI: the local LLM is off")
-                    if not llm.settings().enabled
-                    else _("No rewording by the local AI: no model chosen")
-                ).classes("text-xs text-grey-6")
-                ui.link(_("Settings"), "/settings?tab=rewrite", new_tab=True).classes(
-                    "text-xs"
-                ).mark("excerpt-rewrite-settings")
-        if properties:
-            ui.button(
-                _("Change LLM"),
-                icon="compare_arrows",
-                on_click=lambda: change_llm_dialog(side, text, rewriter, lambda r: use(r.text, r)),
-            ).props("flat dense no-caps size=sm").tooltip(
-                _("Rewrite the excerpt with other models, compare them and keep the best")
-            ).mark("excerpt-change-llm")
-
-        def edited() -> bool:
-            """Its text typed in (not only its years taken out, or put back)."""
-            return " ".join(filed.split()) not in (selected, " ".join(text.split()))
-
-        def pick(cat_id: int) -> None:
-            side.last_category = cat_id
-            chosen(
-                cat_id,
-                **({"text": " ".join(filed.split()) or selected} if properties else {}),
-                **({"original": text} if rewritten or edited() else {}),
-                **props(),
+        background_tasks.create(proposed(), name="excerpt-rewrite")
+    else:  # (no rewriting: said, with where to turn it on)
+        with ui.row().classes("w-full items-center no-wrap gap-1").mark("excerpt-rewrite-off"):
+            ui.icon("auto_awesome", size="xs", color="grey-5")
+            ui.label(
+                _("No rewording by the local AI: the local LLM is off")
+                if not llm.settings().enabled
+                else _("No rewording by the local AI: no model chosen")
+            ).classes("text-xs text-grey-6")
+            ui.link(_("Settings"), "/settings?tab=rewrite", new_tab=True).classes("text-xs").mark(
+                "excerpt-rewrite-settings"
             )
-            name = next((n.path for n in categories.tree(folder_id) if n.id == cat_id), "")
-            ui.notify(_(done).format(category=name))
-            close(dlg)
+    ui.button(
+        _("Change LLM"),
+        icon="compare_arrows",
+        on_click=lambda: change_llm_dialog(side, new.text, new.rewriter, lambda r: use(r.text, r)),
+    ).props("flat dense no-caps size=sm").tooltip(
+        _("Rewrite the excerpt with other models, compare them and keep the best")
+    ).mark("excerpt-change-llm")
 
-        with category_list(side, filed, pick, current=current, last=last):
-            ui.space()
-            ui.button(_("Close"), on_click=dlg.close).props("flat").mark("category-close")
+    def hide() -> None:
+        if hint is not None and not hint.is_deleted:
+            hint.set_visibility(False)
+
+    return hide
 
 
 def change_llm_dialog(
@@ -1702,13 +1673,13 @@ def change_llm_dialog(
                         ).classes("text-xs text-negative").mark(f"change-llm-failed-{i}")
                         continue
                     ui.label(t.rewrite.text).classes("text-sm").mark(f"change-llm-text-{i}")
-                    if t.rewrite.start or t.rewrite.end:
-                        ui.label(categories.years_label(t.rewrite.start, t.rewrite.end)).classes(
-                            "text-xs text-grey"
-                        )
+                    if facts := rewrite_facts(t.rewrite):
+                        ui.label(facts).classes("text-xs text-grey").mark(f"change-llm-facts-{i}")
                     ui.button(_("Keep it"), on_click=lambda t=t: chosen(t)).props(
                         "flat dense no-caps"
-                    ).tooltip(_("Use this wording and these years")).mark(f"change-llm-keep-{i}")
+                    ).tooltip(_("Use this wording, these years, days and flags")).mark(
+                        f"change-llm-keep-{i}"
+                    )
             status.set_text(_("Done: keep the best one"))
         finally:
             if not run.is_deleted:
@@ -1724,11 +1695,13 @@ def category_list(
     *,
     current: int | None = None,
     last: int | None = None,
+    selecting: bool = False,
 ) -> ui.row:
     """The folder's categories to pick one (``pick`` is called with it, but ``current``):
     click it, or type to find it (Enter: ``last``, nothing typed, else the first one), or name
-    a new one; those suggested for ``text`` first. Returns the row of its buttons (to add
-    others)."""
+    a new one; those suggested for ``text`` first; ``selecting``: the one picked stays
+    highlighted (chosen, not filed yet: see excerpt_dialog). Returns the row of its buttons
+    (to add others)."""
     folder_id, folder_name = side.folder
     search = (
         ui.input(
@@ -1748,13 +1721,27 @@ def category_list(
         nodes = categories.tree(folder_id)
         return [n for n in nodes if q in n.path.lower()] if q else nodes
 
+    picked: dict[str, int | None] = {"id": None}
+    rows: dict[int, tuple[ui.row, ui.icon]] = {}  # (those listed: the one picked marked)
+
     def chosen(cat_id: int) -> None:
-        if cat_id != current:
-            pick(cat_id)
+        if cat_id == current:
+            return
+        if selecting:  # (at once, not refreshed: the dialog may be saved right after)
+            picked["id"] = cat_id
+            for n_id, (row, check) in rows.items():
+                on = n_id == cat_id
+                row.classes(
+                    add="bg-blue-3 text-weight-medium" if on else "",
+                    remove="" if on else "bg-blue-3 text-weight-medium",
+                )
+                check.set_visibility(on)
+        pick(cat_id)
 
     @ui.refreshable
     def listing() -> None:
         nodes = matching()
+        rows.clear()
         if not nodes:
             ui.label(
                 _("No category yet: type a name, then Enter (or ‘create’)")
@@ -1768,14 +1755,27 @@ def category_list(
                 ui.row()
                 .classes("w-full items-center no-wrap gap-1 cursor-pointer hover:bg-grey-2")
                 .style(f"padding-left:{1.2 * indent}rem")
-                .classes("vr-last-category bg-blue-1" if n.id == last else "")
+                .classes("vr-last-category" if n.id == last else "")
+                .classes(
+                    "bg-blue-3 text-weight-medium"
+                    if n.id == picked["id"]
+                    else "bg-blue-1"
+                    if n.id == last
+                    else ""
+                )
                 .on("click", lambda n=n: chosen(n.id))
                 .mark(f"pick-category-{n.id}")
-            ):
+            ) as row:
                 ui.icon("label" if n.depth else "folder_special", size="xs", color="primary")
                 ui.label(n.path if q else n.name).classes(
                     "grow" + (" text-grey" if n.id == current else "")
                 )
+                check = ui.icon("check_circle", size="xs", color="primary").mark(
+                    "category-selected"
+                )
+                check.tooltip(_("Its category (filed on Save)"))
+                check.set_visibility(n.id == picked["id"])
+                rows[n.id] = (row, check)
                 if n.id == last:
                     ui.icon("history", size="xs", color="primary").tooltip(
                         _("The last category chosen (Enter, nothing typed)")
@@ -1793,7 +1793,7 @@ def category_list(
             create()
 
     def create() -> None:
-        """A new category (the list stays: click it to file the excerpt)."""
+        """A new category (the list stays: click it to choose it)."""
         name = (search.value or "").strip()
         if not name:
             return
@@ -2417,97 +2417,173 @@ def _originals(e: categories.ExcerptView, text: ui.textarea) -> None:
                 ).mark(f"excerpt-original-open-{x.id}")
 
 
-def _category_line(side: Side, e: categories.ExcerptView) -> None:
-    """Under the title of an excerpt's dialog: its category (its path, in its colour)."""
-    nodes = categories.tree(side.folder[0]) if side.folder else []
-    path = next((n.path for n in nodes if n.id == e.category_id), None)
-    if path is None:
-        return
+def _category_line(nodes: list[categories.Node], cat_id: int | None, colour: str = "") -> None:
+    """Under the title of an excerpt's dialog: its category (its path, in its colour; a new
+    excerpt's: the one chosen, or none yet, said)."""
+    node = next((n for n in nodes if n.id == cat_id), None)
     with ui.row().classes("items-center gap-1 no-wrap -mt-3").mark("excerpt-category"):
-        ui.icon("circle", size="0.7rem").style(f"color: {e.colour}")
-        ui.label(path).classes("text-sm text-grey-8")
+        if node is None:
+            ui.icon("help_outline", size="xs", color="grey-6")
+            ui.label(_("No category chosen yet: pick one in its Category tab")).classes(
+                "text-sm text-grey-6"
+            ).mark("excerpt-category-none")
+            return
+        ui.icon("circle", size="0.7rem").style(f"color: {colour or node.colour}")
+        ui.label(node.path).classes("text-sm text-grey-8")
 
 
 def excerpt_dialog(
     side: Side,
-    e: categories.ExcerptView,
+    e: categories.ExcerptView | None,
     tab: str = "text",
     then: Callable[[], None] | None = None,
+    *,
+    new: NewExcerpt | None = None,
 ) -> None:
-    """A dialog on an excerpt (that of its group), in tabs: its text (that of a group),
-    years, markers, level and tags, the passages as selected shown; its category (one
-    picked: all saved, then moved there); its commentary (Markdown) and link. ``then``: once
-    saved (e.g. the timeline drawn again; the side's excerpts are)."""
+    """A dialog on an excerpt (that of its group), or on a new one (``new``; ``e`` none), in
+    tabs: its text (that of a group), years, markers, level and tags, the passages as
+    selected shown (new: its years found in its text, then taken out of it if leading or
+    ending it, see categories.split_years, cleared: the text as it was; else those around
+    it; its rewording by the local AI, see _rewording); its category (one picked: all saved,
+    then moved there; new: only chosen, highlighted, then its text shown again; or merged
+    with a similar excerpt instead); its commentary (Markdown) and link. New: it opens on its
+    category (the one chosen last proposed, see category_list), and only Save files it (its
+    text as selected kept as its original if rewritten or edited; Cancel: nothing filed).
+    ``then``: once saved (e.g. the timeline drawn again; the side's excerpts are)."""
+    folder_id = side.folder[0] if side.folder else None
+
+    def names() -> dict[int, str]:
+        """(as they are: one may have been created in the dialog)"""
+        return {n.id: n.path for n in categories.tree(folder_id)} if folder_id is not None else {}
+
+    chosen: dict[str, int | None] = {"category": e.category_id if e is not None else None}
+    last, selected, rewritten = None, "", False
+    if new is not None:
+        years, selected = categories.split_years(new.text)
+        years = years or new.around
+        last = side.last_category
+        if last is None and side.period_id is not None:
+            last = categories.last_category(side.period_id)
+        if last not in names():
+            last = None
+        tab = "move"
+        title = _("New excerpt")
+    else:
+        title = _("Merged excerpts") if e.members else _("Excerpt")
     with (
         side.host.dialogs,
-        transient_dialog(
-            _("Merged excerpts") if e.members else _("Excerpt"), width="w-[40rem] max-w-full"
-        ) as (dialog, _card),
+        transient_dialog(title, width="w-[40rem] max-w-full") as (dialog, _card),
     ):
-        _category_line(side, e)
+        line = ui.column().classes("w-full gap-0")
+
+        def category_line() -> None:
+            """(at once, not refreshed: the dialog may be saved right after)"""
+            line.clear()
+            nodes = categories.tree(folder_id) if folder_id is not None else []
+            with line:
+                _category_line(nodes, chosen["category"], e.colour if e is not None else "")
+
+        category_line()
         with ui.tabs().props("dense align=left no-caps").classes("w-full") as tabs:
             tab_text = ui.tab("text", _("Excerpt"), icon="format_quote").mark("excerpt-tab-text")
             ui.tab("move", _("Category"), icon="drive_file_move").mark("excerpt-tab-move")
             ui.tab("notes", _("Notes"), icon="comment").mark("excerpt-tab-notes")
         with ui.tab_panels(tabs, value=tab).classes("w-full"):
             with ui.tab_panel(tab_text).classes("p-1 gap-2"):
-                text = (
-                    ui.textarea(_("Text of the group") if e.members else _("Text"), value=e.quoted)
-                    .props("outlined autogrow")
-                    .classes("w-full")
-                    .mark("excerpt-edit-text")
-                )
-                if e.members:
-                    ui.label(
-                        _(
-                            "Its quotes, joined; edited, it is the text of the group (its "
-                            "excerpts: their places only). Blank: its quotes again."
+                if new is None:
+                    text = (
+                        ui.textarea(
+                            _("Text of the group") if e.members else _("Text"), value=e.quoted
                         )
-                    ).classes("text-xs text-grey")
-                _originals(e, text)
-                props = excerpt_properties(
-                    e.start_year,
-                    e.end_year,
-                    e.influence,
-                    e.tag_names,
-                    salient=e.salient,
-                    minor=e.minor,
-                    caveat=e.caveat,
-                    folder_id=side.folder[0] if side.folder else None,
-                    level=e.level,
-                    punctual=e.punctual,
-                    in_period=e.in_period,
-                    days=e.days,
-                )
+                        .props("outlined autogrow")
+                        .classes("w-full")
+                        .mark("excerpt-edit-text")
+                    )
+                    if e.members:
+                        ui.label(
+                            _(
+                                "Its quotes, joined; edited, it is the text of the group (its "
+                                "excerpts: their places only). Blank: its quotes again."
+                            )
+                        ).classes("text-xs text-grey")
+                    _originals(e, text)
+                    props = excerpt_properties(
+                        e.start_year,
+                        e.end_year,
+                        e.influence,
+                        e.tag_names,
+                        salient=e.salient,
+                        minor=e.minor,
+                        caveat=e.caveat,
+                        folder_id=folder_id,
+                        level=e.level,
+                        punctual=e.punctual,
+                        in_period=e.in_period,
+                        days=e.days,
+                    )
+                else:
+                    text = (
+                        ui.textarea(_("Text"), value=selected)
+                        .props("outlined autogrow")
+                        .classes("w-full")
+                        .mark("excerpt-text")
+                    )
+
+                    def use(wording: str, r: excerpt_rewrite.Rewrite) -> None:
+                        nonlocal rewritten
+                        if wording := " ".join(wording.split()):
+                            text.set_value(wording)
+                            rewritten = True
+                        apply_rewrite(props, r)
+                        hide()
+
+                    hide = _rewording(side, new, use)
+
+                    def cleared() -> None:
+                        nonlocal rewritten
+                        rewritten = False
+                        text.set_value(new.text)
+
+                    props = excerpt_properties(
+                        *(years or (None, None)), cleared=cleared, folder_id=folder_id
+                    )
             with ui.tab_panel("move").classes("p-1 gap-2"):
-                path = next(
-                    (n.path for n in categories.tree(side.folder[0]) if n.id == e.category_id),
-                    "",
-                )
-                ui.label(
-                    _("In {category}: pick another one to move it there (and save)").format(
-                        category=path
-                    )
-                ).classes("text-sm text-grey")
+                if new is None:
+                    ui.label(
+                        _("In {category}: pick another one to move it there (and save)").format(
+                            category=names().get(e.category_id, "")
+                        )
+                    ).classes("text-sm text-grey")
 
-                def moved(cat_id: int) -> None:
-                    save(done=False)
-                    categories.move_excerpt(e.id, cat_id)
-                    side.last_category = cat_id
-                    name = next(
-                        (n.path for n in categories.tree(side.folder[0]) if n.id == cat_id),
-                        "",
-                    )
-                    ui.notify(_("Moved to {category}").format(category=name))
-                    close(dialog)
-                    side.refresh_excerpts()
-                    if then is not None:
-                        then()
+                    def moved(cat_id: int) -> None:
+                        save(done=False)
+                        categories.move_excerpt(e.id, cat_id)
+                        side.last_category = cat_id
+                        ui.notify(_("Moved to {category}").format(category=names().get(cat_id, "")))
+                        close(dialog)
+                        side.refresh_excerpts()
+                        if then is not None:
+                            then()
 
-                category_list(side, e.quoted, moved, current=e.category_id)
+                    category_list(side, e.quoted, moved, current=e.category_id)
+                else:
+                    if new.merge is not None and side.period_id is not None:
+                        merge = new.merge
+                        similar_excerpts(
+                            side,
+                            new.text,
+                            lambda lead, ref_only: (merge(lead, ref_only), close(dialog)),
+                        )
+
+                    def picked(cat_id: int) -> None:
+                        chosen["category"] = cat_id
+                        category_line()
+                        tabs.set_value("text")
+
+                    category_list(side, new.text, picked, last=last, selecting=True)
             with ui.tab_panel("notes").classes("p-1 gap-2"):
                 editor = MarkdownEditor(
-                    e.comment or "",
+                    (e.comment if e is not None else None) or "",
                     render=lambda t: (
                         reports.render(t, reports.folder_context(side.stats, side.period_id)).text
                     ),
@@ -2524,7 +2600,11 @@ def excerpt_dialog(
                 ).classes("text-xs text-grey")
                 with ui.row().classes("w-full items-center no-wrap gap-1"):
                     url = (
-                        ui.input(_("Link"), value=e.url or "", placeholder="https://…")
+                        ui.input(
+                            _("Link"),
+                            value=(e.url if e is not None else None) or "",
+                            placeholder="https://…",
+                        )
                         .props("dense outlined clearable")
                         .classes("grow")
                         .tooltip(_("A link (URL), written after the excerpt in the notes"))
@@ -2541,7 +2621,9 @@ def excerpt_dialog(
                         _("Open the link")
                     ).mark("excerpt-url-open")
 
-        def save(done: bool = True) -> None:
+        def save(done: bool = True) -> bool | None:
+            if new is not None:
+                return file_new()
             if e.members:
                 joined = " […] ".join(x.text for x in e.parts if not x.ref_only)
                 edited = " ".join((text.value or "").split())
@@ -2552,6 +2634,33 @@ def excerpt_dialog(
             side.refresh_excerpts()
             if done and then is not None:
                 then()
+            return None
+
+        def file_new() -> bool | None:
+            """Filed in the category chosen (none: said, the dialog kept open on it)."""
+            assert new is not None
+            cat_id = chosen["category"]
+            if cat_id is None:
+                ui.notify(_("Choose its category first"), type="warning")
+                tabs.set_value("move")
+                return False
+            typed = " ".join((text.value or "").split())
+            edited = typed not in (" ".join(selected.split()), " ".join(new.text.split()))
+            excerpt_id = new.file(
+                cat_id,
+                text=typed or selected,
+                **({"original": new.text} if rewritten or edited else {}),
+                **props(),
+            )
+            if (editor.value or "").strip() or (url.value or "").strip():
+                categories.set_comment(excerpt_id, editor.value)
+                categories.set_url(excerpt_id, url.value)
+                side.refresh_excerpts()
+            side.last_category = cat_id
+            ui.notify(_("Added to {category}").format(category=names().get(cat_id, "")))
+            if then is not None:
+                then()
+            return None
 
         actions(dialog, _("Save"), save, mark="excerpt-edit-save")
     if tab == "notes":

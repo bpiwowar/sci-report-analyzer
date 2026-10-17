@@ -94,6 +94,17 @@ def test_rewrite(model) -> None:
     prompt = sent["messages"][0]["content"]
     assert "Entre 2019 et 2021, j'ai été" in prompt and "Line 0" not in prompt
     assert "Line A" in prompt and "Line C" in prompt
+    assert all(f'"{k}"' in prompt for k in ("influence", "punctual", "in_period", "days"))
+    assert set(excerpt_rewrite.SCHEMA["required"]) == {
+        "text",
+        "start_year",
+        "end_year",
+        "ongoing",
+        "influence",
+        "punctual",
+        "in_period",
+        "days",
+    }
 
 
 @pytest.mark.parametrize(
@@ -117,6 +128,61 @@ def test_rewrite(model) -> None:
             Rewrite(text="Reviewer"),
         ),
         ({"text": "", "start_year": None, "end_year": None, "ongoing": False}, None),
+        (  # (its influence, timing and days predicted)
+            {
+                "text": "Keynote at the Z conference",
+                "start_year": 2022,
+                "end_year": 2022,
+                "ongoing": False,
+                "influence": True,
+                "punctual": True,
+                "in_period": False,
+                "days": 2,
+            },
+            Rewrite(
+                text="Keynote at the Z conference",
+                start=2022,
+                end=2022,
+                influence=True,
+                punctual=True,
+                days=2.0,
+            ),
+        ),
+        (  # (not both one-off and within the period: one-off; days at most a year)
+            {
+                "text": "Reviewer",
+                "start_year": None,
+                "end_year": None,
+                "ongoing": False,
+                "punctual": True,
+                "in_period": True,
+                "days": 1000,
+            },
+            Rewrite(text="Reviewer", punctual=True, days=366.0),
+        ),
+        (  # (invalid predictions: as if not given, the rest kept)
+            {
+                "text": "Reviewer",
+                "start_year": 2021,
+                "end_year": None,
+                "ongoing": False,
+                "influence": "maybe",
+                "punctual": None,
+                "in_period": True,
+                "days": "a lot",
+            },
+            Rewrite(text="Reviewer", start=2021, in_period=True),
+        ),
+        (
+            {
+                "text": "Reviewer",
+                "start_year": None,
+                "end_year": None,
+                "ongoing": False,
+                "days": -3,
+            },
+            Rewrite(text="Reviewer"),
+        ),
         ({"start_year": 2019}, None),
         ({"text": "Reviewer", "start_year": "soon", "end_year": None, "ongoing": False}, None),
     ],

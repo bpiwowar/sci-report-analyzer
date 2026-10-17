@@ -388,8 +388,9 @@ them, each with an optional id (`#id`, for the reports: see below); one with exc
 is deleted once they are moved to another one, chosen then. In a document's PDF (a report,
 an application… not a paper's), select a passage (or click a highlight), then ‘add to a
 category’ (header, or the E key; on an excerpt filed already, clicked or its text selected:
-edits it): click a category, or type to find it (the one chosen last proposed, marked and scrolled to: Enter picks it; typed, Enter:
-the first match; a new name creates it, the dialog staying open), with the years it is about (those found
+edits it): the dialog of an excerpt, opened on its Category tab: click a category, or type to find it (the one chosen last proposed, marked and scrolled to: Enter picks it; typed, Enter:
+the first match; a new name creates it, the dialog staying open): it is only chosen (highlighted, named under the title), and
+only Save files the excerpt (closed: nothing filed); with the years it is about (those found
 in the passage, e.g. “2026-32”: 2026–2032, and taken out of its text when leading it with a
 colon or ending it after one; its crossed-out calendar clears them, the text as selected
 again) and its markers if need be: salient (“saillant”, a strong point), influence
@@ -567,7 +568,9 @@ brings them back):
   the pages of their documents about a career (found by the words set there, in each
   language) and suggests lines of their CV.
 - **Rewriting the excerpts**: a new excerpt is reworded (short, impersonal, without its
-  dates) and its years read in it and around it, proposed in its dialog, where its text can
+  dates), its years read in it and around it, whether it shows influence (“rayonnement”), is
+  a one-off event or sometime within the period (no date given), and its days a year
+  estimated, proposed in its dialog (“Use it” sets them all), where its text can
   also be edited at once (the selection kept as its original). “None (no rewriting)”: only
   its years, found around it.
   Its “Change LLM” button runs the same rewriting through other models, one after the

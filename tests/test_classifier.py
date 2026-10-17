@@ -200,6 +200,7 @@ async def test_suggestions_in_the_picker(user: User, fake_viewer, embeddings):
     await user.should_see(marker="classifier-accuracy")
     await user.should_see(marker=f"category-suggested-{cats['Research']}")
     user.find(marker=f"category-suggested-{cats['Research']}").click()
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see("Added to Research")
     filed = [e for e in categories.excerpts(period) if e.quoted.startswith("Our ranking")]
     assert [e.category_id for e in filed] == [cats["Research"]]
