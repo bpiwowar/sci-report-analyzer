@@ -247,15 +247,35 @@ class Side:
             return
         sel["text"] = pdftext.clean_pdf_text(sel["text"], one_paragraph=True)
         page, rects = sel.get("p"), sel.get("rects") or []
+        around = None if categories.detect_years(sel["text"]) else await self._years_around(rects)
         category_picker(
             self,
             sel["text"],
             lambda cat_id, text, **props: self.file_excerpt(cat_id, text, page, rects, **props),
             properties=True,
+            around=around,
             merge=lambda lead, ref_only: self.merge_excerpt(
                 lead, sel["text"], page, rects, ref_only=ref_only
             ),
         )
+
+    async def _years_around(self, rects: list) -> tuple[int, int] | None:
+        """The years around a selection in the PDF (see categories.context_years): in the
+        document's lines, else in those of its pages, extracted."""
+        kind, key = self.source
+        lines = documents.lines_of(key) if kind == "doc" else None
+        if lines is None and rects:
+            from .documents_page import LINES_JS
+
+            pages = sorted({int(r[4]) for r in (rects[0], rects[-1]) if len(r) > 4})
+            try:
+                lines = await ui.run_javascript(
+                    LINES_JS + f"sraLines(vrPdf.app().pdfDocument, {json.dumps(pages)})"
+                )
+            except TimeoutError:
+                lines = None
+        before, after = documents.selection_context(lines or [], rects)
+        return categories.context_years("", before, after)
 
     def _filed(self, text: str) -> categories.ExcerptView | None:
         """The excerpt (its group's lead) of this PDF with that text (none: the one selected,
@@ -1199,6 +1219,7 @@ def category_picker(
     current: int | None = None,
     properties: bool = False,
     merge: Callable[[categories.ExcerptView, bool], None] | None = None,
+    around: tuple[int, int] | None = None,
 ) -> None:
     """Choose the category of an excerpt (``chosen`` is called with it): click it, or type to
     find it (Enter: the first one), or name a new one. ``title``, ``done`` (its
@@ -1207,7 +1228,8 @@ def category_picker(
     or ending it: see categories.split_years; cleared, the text as it was), influence flag
     and tags (passed to ``chosen`` as keywords, with ``text``, so taken out or not);
     ``merge``: or merge it with an excerpt (called with it, and whether only its place is
-    cited), the similar ones shown with a warning. The category chosen last (here, else that
+    cited), the similar ones shown with a warning; ``around``: its years when its text has
+    none (found around it: see categories.context_years). The category chosen last (here, else that
     of the excerpt filed last) is proposed: marked, scrolled to, and Enter picks it (nothing
     typed)."""
     folder_id, folder_name = side.folder
@@ -1219,6 +1241,7 @@ def category_picker(
         last = None
     with side.host.dialogs, transient_dialog(_(title), width="w-full max-w-xl") as (dlg, _card):
         years, filed = categories.split_years(text) if properties else (None, text)
+        years = years or around
         quote = ui.label().classes("text-sm text-grey").mark("excerpt-text")
 
         def show(t: str) -> None:
