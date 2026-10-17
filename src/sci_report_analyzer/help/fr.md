@@ -356,7 +356,7 @@ la visionneuse (son ↗ l'ouvre dans une fenêtre à part) et son panneau latér
 extraits de la page sont les siens, Q citant dans les notes (l'onglet Rapport), E classant la sélection (l'onglet
 Extraits), F trouvant l'article de la sélection et L marquant les articles d'une liste (depuis l'onglet Rapport), B
 ajoutant un signet à l'endroit lu, un extrait cliqué sur ses pages sélectionné dans l'onglet Extraits, et un extrait
-cliqué là montré sur sa page. Un document renommé depuis son titre (double-clic) l'est aussi dans le bandeau.
+cliqué là montré sur sa page (E, alors, sur la page elle-même : cet extrait modifié). Un document renommé depuis son titre (double-clic) l'est aussi dans le bandeau.
 Dans un dossier, le bandeau est toujours là, quel que soit l'onglet : son + y ajoute un document (PDF) de la
 personne, comme des fichiers PDF déposés dessus.
 

@@ -2097,6 +2097,31 @@ async def test_excerpt_selected(user: User, monkeypatch, fake_viewer):
     assert scripts[-1].startswith(f"vrDoc.select({first});")
 
 
+async def test_excerpt_edited_by_e_on_the_page(user: User, fake_viewer):
+    """E on the person's page (not in the PDF): the excerpt selected (its entry clicked)
+    edited; none selected, nor a PDF shown: said so."""
+    from sci_report_analyzer import categories
+
+    pid, period, _ids = _person()
+    doc = documents.add(period, "Application.pdf", PDF)
+    research = categories.add(folders.folder_of_period(period)[0], "Research")
+    x = categories.add_excerpt(
+        research, period, "Our ranking model.", 1, [[72, 700, 300, 710]], document_id=doc
+    )
+    user.javascript_rules[re.compile(r"vrPdf\.excerpted\(\)")] = lambda _: None  # (no text)
+    await user.open(f"/person/{pid}/{period}?tab=excerpts")
+    await user.should_see(marker=f"excerpt-part-{x}")
+    _page_event(user, "vrPageExcerpt", None)
+    await user.should_see("Select an excerpt")
+    # Its PDF beside the page, its entry clicked: selected.
+    await user.open(f"/person/{pid}/{period}?tab=excerpts&pdfs=d{doc}&pdf=d{doc}")
+    await user.should_see(marker=f"excerpt-part-{x}")
+    user.find(content="Our ranking model.").click()
+    _page_event(user, "vrPageExcerpt", None)
+    await user.should_see(marker="excerpt-edit-text")
+    assert user.find(marker="excerpt-edit-text").elements.pop().value == "Our ranking model."
+
+
 def test_excerpt_discarded():
     """An excerpt discarded: left out of the generated text (its section too, without any
     other), struck through in the section's excerpts for reference; put back."""

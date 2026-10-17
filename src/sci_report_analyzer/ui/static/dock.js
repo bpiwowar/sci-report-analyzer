@@ -77,3 +77,12 @@ document.addEventListener('mousedown', (ev) => {
   document.addEventListener('mousemove', move);
   document.addEventListener('mouseup', up);
 });
+
+// E on the page itself (not typing; the PDF's own keys go through its frame): the excerpt
+// selected (its entry clicked) edited, or the PDF's selection filed (see ReportTabs).
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'e' || !vrKeys.plain(ev) || vrKeys.typing(ev.target)) return;
+  if (document.querySelector('.q-dialog')) return;  // (a dialog open: not for the page)
+  ev.preventDefault();
+  emitEvent('vr-page-excerpt');
+});

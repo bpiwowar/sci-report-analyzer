@@ -537,6 +537,7 @@ class ReportTabs:
         ui.on("vr-pdf-quote", lambda: self._quote(inline=False))
         ui.on("vr-pdf-quote-inline", lambda: self._quote(inline=True))
         ui.on("vr-pdf-excerpt", self._excerpt)
+        ui.on("vr-page-excerpt", self._page_excerpt)
         ui.on("vr-pdf-find", self._find)
         ui.on("vr-pdf-tag-list", self._tag_list)
         ui.on("vr-pdf-bookmark", self._bookmark)
@@ -627,6 +628,31 @@ class ReportTabs:
         doc = self.dock.source is not None and self.dock.source[0] == "doc"
         if doc and (side := self._side("excerpts")) is not None:
             await side.add_excerpt()
+
+    async def _page_excerpt(self) -> None:
+        """E on the page: the text selected in the PDF filed (or its excerpt edited); else the
+        excerpt selected (its entry clicked, in the Excerpts tab) edited."""
+        side = self.sides.get("excerpts")
+        sel = await ui.run_javascript("vrPdf.excerpted()") if self.dock.source else None
+        if not (sel and (sel.get("text") or "").strip()) and side and side.excerpt is not None:
+            lead = next(
+                (
+                    e
+                    for e in categories.excerpts(side.period_id, grouped=True)
+                    if side.excerpt in (e.id, *(m.id for m in e.members))
+                ),
+                None,
+            )
+            if lead is not None and side.edit_excerpt is not None:
+                side.edit_excerpt(lead)
+                return
+        if self.dock.source is None:
+            ui.notify(
+                _("Select an excerpt (its entry, or on its PDF) or a passage of a PDF first"),
+                type="warning",
+            )
+            return
+        await self._excerpt()
 
     def _select(self, excerpt_id: int | None) -> None:
         if (side := self._side("excerpts")) is not None:
