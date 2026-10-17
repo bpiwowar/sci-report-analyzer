@@ -10,7 +10,7 @@ et des rapports, pour préparer une évaluation.
 1. **Ajoutez une personne** (nom, affiliation et ORCID facultatifs, les sources à interroger ;
    dans un dossier, sa période et ses étiquettes). Les sources sont interrogées et les profils
    possibles listés dans la fenêtre : cochez les bons (les plus probables le sont) pour les
-   valider tout de suite. Les autres restent *candidats* dans l'onglet **Profil**, sous **Sources** (ses
+   valider tout de suite. Dans un dossier, ses **documents** dans ce dossier viennent ensuite (des PDF déposés ou choisis, chacun listé, renommé ou retiré ; ou on passe), avant sa page. Chaque dossier de l'arbre a son propre bouton (une personne avec un +) pour y **ajouter des personnes** : celles déjà connues, cherchées au fil de la frappe (par nom ou affiliation ; celles qui y sont déjà sont signalées), avec la période et les étiquettes données ; ou une nouvelle personne (la fenêtre ci-dessus). Les autres restent *candidats* dans l'onglet **Profil**, sous **Sources** (ses
    sous-onglets : **Parcours**, **Périodes** et **Sources** ; on modifie, purge ou supprime
    la personne au-dessus).
    Son **parcours** (son CV) s'y construit aussi : postes et diplômes, datés (une année,

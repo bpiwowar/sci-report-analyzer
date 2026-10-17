@@ -10,7 +10,11 @@ and reports, to prepare an evaluation.
 1. **Add a person** (name, optional affiliation and ORCID, the sources to search; in a
    folder, their period and tags in it). The sources are searched and the possible profiles
    are listed in the dialog: tick the right ones (the likely ones are) to validate them right
-   away. The others stay *candidates* in the **Profile** tab, under **Sources** (its sub-tabs:
+   away. In a folder, their **documents** there come next (PDFs dropped or chosen,
+   each listed, renamed or removed; or skipped), before their page. Each folder of the tree
+   has its own button (a person with a +) to **add people** to it: those already known,
+   searched as you type (by name or affiliation; those in it already said so), with the
+   period and tags given; or a new person (the dialog above). The others stay *candidates* in the **Profile** tab, under **Sources** (its sub-tabs:
    **Career**, **Periods** and **Sources**; the person is edited, purged or deleted above them).
    Their **career** (their CV) is built there too: positions and diplomas, dated (a year,
    `2019-09` or `2019-09-01`), a diploma with its thesis; the position without an end is the
