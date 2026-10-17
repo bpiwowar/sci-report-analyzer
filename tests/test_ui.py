@@ -1026,6 +1026,42 @@ async def test_settings_search(user: User) -> None:
     assert tags_header.visible
 
 
+async def test_settings_search_narrows_and_reads_dialogs(user: User) -> None:
+    """A screen without headers narrowed to its items with a match (a field kept with its
+    help); the content of a dialog (some settings' editor) searched as what opens it, what
+    matched said next to it."""
+    from sci_report_analyzer import categories, folders
+
+    await user.open("/settings?tab=keys")
+    inputs = {e.props.get("label") or "": e for e in user.find(kind=ui.input).elements}
+    s2 = next(e for label, e in inputs.items() if label.startswith("Semantic Scholar"))
+    openalex = next(e for label, e in inputs.items() if label.startswith("OpenAlex"))
+    user.find(marker="settings-search").type("semantic scholar")
+    await user.should_see(marker="settings-search-count-keys", content="1")
+    assert s2.visible and not openalex.visible
+    user.find(marker="settings-search").clear().type("S2_API_KEY")  # (its help)
+    await user.should_see(marker="settings-search-count-keys", content="1")
+    assert s2.visible and not openalex.visible
+    user.find(marker="settings-search").clear()
+    await user.should_not_see(marker="settings-search-count-keys")
+    assert openalex.visible
+    # In a dialog: the settings holding a category of that name.
+    fid = folders.save_folder(None, "Committee")
+    categories.add(fid, "Outreach")
+    other = folders.create_settings("Other grid")
+    default = folders.default_settings()
+    await user.open("/settings?tab=folders")
+    user.find(marker="settings-search").type("outreach")
+    await user.should_see(marker="settings-search-count-folders", content="1")
+    await user.should_see(marker="settings-search-dialog", content="Outreach")
+    await user.should_see(marker=f"named-settings-{default}")
+    await user.should_not_see(marker=f"named-settings-{other}")
+    await user.should_not_see(marker="settings-new")
+    user.find(marker="settings-search").clear()
+    await user.should_not_see(marker="settings-search-dialog")
+    await user.should_see(marker=f"named-settings-{other}")
+
+
 async def test_categories_copied_from_other_settings(user: User) -> None:
     """ "Copy those of": the other settings with categories (not folders), theirs added."""
     from sci_report_analyzer import categories, folders

@@ -17,6 +17,7 @@ from ..sources import ADAPTERS
 from .categories_editor import HELP as CATEGORIES_HELP
 from .categories_editor import categories_editor
 from .dialogs import actions, confirm, transient_dialog
+from .settings_search import searched
 
 TAB = "folders"  # (their tab in the Parameters)
 URL = f"/settings?tab={TAB}"
@@ -538,11 +539,14 @@ def settings_tab() -> None:
                         if x.folders
                         else _("Used by no folder")
                     ).classes("text-sm text-grey").mark(f"named-settings-folders-{x.id}")
-                button(
-                    "edit",
-                    _("Edit them"),
-                    f"settings-edit-{x.id}",
-                    lambda x=x: settings_dialog(x.id, listing.refresh),
+                searched(
+                    button(
+                        "edit",
+                        _("Edit them"),
+                        f"settings-edit-{x.id}",
+                        lambda x=x: settings_dialog(x.id, listing.refresh),
+                    ),
+                    lambda x=x: settings_fields(x.id),
                 )
                 button(
                     "category",
