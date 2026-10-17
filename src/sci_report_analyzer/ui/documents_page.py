@@ -1,15 +1,17 @@
 """Documents of a person within a period / folder (their application, a CV…): the person's
-Report tab (with their notes and excerpts in the folder; the documents open there), and a
-document's page (read and annotated with PDF.js, the person's papers it mentions found and
-linked)."""
+Report and Excerpts tabs (their notes and excerpts in the folder; the documents in a menu,
+opened beside the page), and a document's page (read and annotated with PDF.js, the person's
+papers it mentions found and linked)."""
 
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import Any
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from fastapi import HTTPException, Request
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 from nicegui import app, ui
 
 from .. import annotations, documents, pdfs, reports, urls
@@ -20,6 +22,9 @@ from .pdf_viewer import file_response, gone, install_or_notify, viewer_frame
 from .tags import note_editor
 from .theme import DEFAULT_COLOUR, bare_page
 from .viewer_side import Side, bookmarks_section, categories_section
+
+if TYPE_CHECKING:
+    from .pdf_dock import PdfDock
 
 # A PDF's lines of text (PDF.js: each with its page, text, rectangle and runs), as the server
 # keeps them (see documents.set_lines), of all its pages or some; and a document's, extracted
@@ -111,29 +116,9 @@ KINDS = Labels(
 )
 
 
-def page_url_of(doc_id: int) -> str:
-    return f"/doc/{doc_id}"
-
-
-def _open_key(period_id: int) -> str:
-    # AppSetting: the document left open in the person's Report tab (within the period)
-    return f"ui.report.doc.{period_id}"
-
-
-def open_document(period_id: int | None) -> int | None:
-    """The document left open in the person's Report tab within ``period_id``, if any
-    (opened from there, not closed back to it)."""
-    if not period_id:
-        return None
-    doc_id = annotations.ui_state(_open_key(period_id))
-    d = documents.info(doc_id) if isinstance(doc_id, int) else None
-    if d is None or d.period_id != period_id or documents.file_of(d.id) is None:
-        return None
-    return d.id
-
-
-def _set_open(period_id: int, doc_id: int | None) -> None:
-    annotations.save_ui_state(_open_key(period_id), doc_id)
+def page_url_of(doc_id: int, *, embed: bool = False) -> str:
+    """A document's page; ``embed``: beside the person's page (see pdf_dock)."""
+    return f"/doc/{doc_id}" + ("?embed=1" if embed else "")
 
 
 def register() -> None:
@@ -163,17 +148,28 @@ def register() -> None:
 
     @ui.page("/doc/{doc_id}")
     def doc_page(
-        doc_id: int, page: int | None = None, pane: str | None = None, report: bool = False
-    ) -> None:
+        doc_id: int,
+        page: int | None = None,
+        pane: str | None = None,
+        report: bool = False,
+        embed: bool = False,
+    ) -> RedirectResponse | None:
+        """``report``: (formerly) opened from the person's Report tab: there, beside it."""
         d = documents.info(doc_id)
-        bare_page(d.name if d else _("Document"))
+        if report and d is not None and not pane:
+            key = f"d{d.id}"
+            return RedirectResponse(
+                urls.person_url(d.person_id, d.period_id, tab="report", pdfs=key, pdf=key)
+            )
+        bare_page(d.name if d else _("Document"), menu=not embed)
         if d is None or documents.file_of(doc_id) is None:
             ui.label(_("No such document")).classes("p-4")
-            return
+            return None
         if not pdfs.has_viewer():
             _install()
-            return
-        DocumentPage(d, page, pane, report)
+            return None
+        DocumentPage(d, page, pane, embed)
+        return None
 
 
 def _install() -> None:
@@ -200,22 +196,20 @@ class DocumentPage:
         d: documents.DocInfo,
         page: int | None = None,
         pane: str | None = None,
-        report: bool = False,
+        embed: bool = False,
     ) -> None:
-        """``pane``: only the side column, in its own window; ``report``: opened from the
-        person's Report tab, closed back to it (see viewer_frame)."""
+        """``pane``: only the side column, in its own window; ``embed``: beside the person's
+        page (see viewer_frame)."""
         self.d = d
         self.mentions: list[documents.Mention] = []
         file = documents.file_of(d.id)
         self.side = Side(d.person_id, d.period_id, ("doc", d.id))
         self.side.on_render.append(self.update)
         self.side.link = self.link
-        if report and not pane:  # (left open there: back to it from the Report tab)
-            _set_open(d.period_id, d.id)
         box = viewer_frame(
             d.name,
             (d.person, urls.person_url(d.person_id, d.period_id)),
-            (d.person_id, d.period_id, "report" if report else "publications"),
+            (d.person_id, d.period_id, "publications"),
             f"/doc-file/{d.id}",
             int(file.stat().st_mtime) if file else 0,
             self.side,
@@ -234,8 +228,7 @@ class DocumentPage:
             },
             page=page,
             pane=pane,
-            closed=urls.person_url(d.person_id, d.period_id, tab="report") if report else None,
-            on_close=lambda: _set_open(d.period_id, None),
+            embed=embed,
         )
         self.side.attach(box)
         with self.side.section("categories", "category", _("Excerpts, by category")):
@@ -280,7 +273,7 @@ class DocumentPage:
 
     async def _load(self) -> None:
         await self.side.load()
-        self.side.refresh_excerpts()
+        self.side.refresh_excerpts(others=False)
         self.note.refresh_preview()
 
     def _note_again(self) -> None:
@@ -477,49 +470,138 @@ class DocumentPage:
         ui.notify(_("Linked"))
 
 
-# ---- The Report tab of a person -------------------------------------------------------------
+# ---- The Report and Excerpts tabs of a person ------------------------------------------------
+
+# (the boxes ``vr-fit`` as high as the room left in the window, the page not scrolled, above the
+# strip of the PDFs beside it: at least 24rem)
+_FIT_JS = """
+window.vrFit = () => {
+  const strip = document.querySelector('.vr-dock-strip');
+  const below = 36 + (strip ? Math.max(0, innerHeight - strip.getBoundingClientRect().top) : 0);
+  for (const e of document.querySelectorAll('.vr-fit')) {
+    if (!e.offsetParent) continue;
+    const top = e.getBoundingClientRect().top + scrollY;
+    e.style.height = Math.max(384, innerHeight - top - below) + 'px';
+  }
+};
+if (!window.vrFitOn) {
+  window.vrFitOn = true;
+  addEventListener('resize', () => window.vrFit());
+}
+window.vrFit();
+"""
 
 
-def report_view(person_id: int, period_id: int | None = None) -> None:
-    """The person's report within a folder (or a period; chosen when several, ``period_id``
-    first): its documents (added here; opened in their page, closed back here) and the notes
-    and excerpts in the folder."""
-    periods = sorted(
-        annotations.periods(person_id, include_hidden_folders=True),
-        key=lambda p: p.folder_id is None,
-    )
-    if not periods:
-        ui.label(
-            _("Put the person in a folder, or add a period (Profile tab), to write a report.")
-        ).classes("text-grey").mark("documents-no-period")
-        return
-    full = ui.column().classes("w-full gap-2")
+class ReportTabs:
+    """A person's Report and Excerpts tabs, within a folder (or a period; chosen when several,
+    ``period_id`` first): their notes there, with its documents (added here, opened beside the
+    page: see pdf_dock); their excerpts there, by category. Each filled once shown. The PDF
+    shown beside the page is theirs: quoted into the notes (Q), its passages filed (E), its
+    excerpts clicked selected (its side column hidden: see vrDock)."""
 
-    def open_doc(d: documents.DocView) -> None:  # (its page, closed back here)
-        ui.navigate.to(f"{page_url_of(d.id)}?report=1")
+    def __init__(
+        self,
+        person_id: int,
+        period_id: int | None,
+        dock: PdfDock,
+        boxes: dict[str, ui.column],
+        show_tab: Callable[[str], None],
+    ) -> None:
+        """``boxes``: where the tabs go ("report", "excerpts")."""
+        self.person_id = person_id
+        self.dock = dock
+        self.show_tab = show_tab
+        self.periods = sorted(
+            annotations.periods(person_id, include_hidden_folders=True),
+            key=lambda p: p.folder_id is None,
+        )
+        self.period = next(
+            (p for p in self.periods if p.id == period_id),
+            self.periods[0] if self.periods else None,
+        )
+        self.boxes = boxes
+        self.sides: dict[str, Side] = {}
+        dock.on_shown.append(self._shown)
+        ui.on("vr-pdf-quote", lambda: self._quote(inline=False))
+        ui.on("vr-pdf-quote-inline", lambda: self._quote(inline=True))
+        ui.on("vr-pdf-excerpt", self._excerpt)
+        ui.on("vr-doc-excerpt", lambda e: self._select((e.args or {}).get("id")))
 
-    def show(p) -> None:
-        full.clear()
-        with full:
-            # (on the row of the notes' tabs: the folder and its documents; the folder is named
-            # above, chosen here when several)
-            bar = _notes(person_id, p.id).bar if p.folder else ui.row().classes("items-center")
-            with bar:
-                if len(periods) > 1:
-                    ui.select(
-                        {q.id: q.name for q in periods},
-                        value=p.id,
-                        on_change=lambda e: show(next(q for q in periods if q.id == e.value)),
-                    ).props("dense options-dense borderless").classes("w-64").mark("report-period")
-                if p.folder and p.folder.hidden:
-                    ui.badge(_("archived"), color="grey")
-                _documents(p, open_doc)
-            if p.folder is None:
-                ui.label(_("Notes and excerpts: only within a folder.")).classes(
-                    "text-sm text-grey"
-                )
+    def fill(self, which: str) -> None:
+        """The tab ``which``, unless filled already."""
+        box = self.boxes[which]
+        if box.default_slot.children:
+            return
+        with box:
+            self._build(which)
+        ui.timer(0.05, lambda: ui.run_javascript(_FIT_JS), once=True)  # (once laid out)
 
-    show(next((p for p in periods if p.id == period_id), periods[0]))
+    def _build(self, which: str) -> None:
+        p = self.period
+        if p is None:
+            ui.label(
+                _("Put the person in a folder, or add a period (Profile tab), to write a report.")
+            ).classes("text-grey").mark("documents-no-period")
+            return
+        if p.folder is None:
+            with ui.row().classes("items-center"):
+                self._choice(which)
+            ui.label(_("Notes and excerpts: only within a folder.")).classes("text-sm text-grey")
+            return
+        side = (_notes if which == "report" else _excerpts)(self.person_id, p.id)
+        self.sides[which] = side
+        side.dock(self.dock.source)
+        with side.bar:  # (on the row of its tabs: the folder and its documents)
+            self._choice(which)
+
+    def _choice(self, which: str) -> None:
+        """The period, chosen when several (the folder is named above); the documents."""
+        p = self.period
+        if len(self.periods) > 1:
+            ui.select(
+                {q.id: q.name for q in self.periods},
+                value=p.id,
+                on_change=lambda e: self.choose(e.value),
+            ).props("dense options-dense borderless").classes("w-64").mark(f"{which}-period")
+        if p.folder and p.folder.hidden:
+            ui.badge(_("archived"), color="grey")
+        if which == "report":
+            _documents(p, lambda d: self.dock.open(f"d{d.id}"))
+
+    def choose(self, period_id: int) -> None:
+        """Another period: the tabs filled again."""
+        self.period = next((p for p in self.periods if p.id == period_id), self.period)
+        self.sides.clear()
+        for which, box in self.boxes.items():
+            if box.default_slot.children:
+                box.clear()
+                self.fill(which)
+
+    def _side(self, which: str) -> Side | None:
+        """That of the tab ``which``, shown (filled first)."""
+        self.show_tab(which)
+        self.fill(which)
+        return self.sides.get(which)
+
+    def _shown(self, source: tuple[str, int] | None) -> None:
+        for side in self.sides.values():
+            side.dock(source)
+
+    async def _quote(self, *, inline: bool) -> None:
+        built = "report" in self.sides
+        if (side := self._side("report")) is not None:
+            if not built:  # (its editor there first)
+                await asyncio.sleep(0.3)
+            await side.quote(inline=inline)
+
+    async def _excerpt(self) -> None:
+        doc = self.dock.source is not None and self.dock.source[0] == "doc"
+        if doc and (side := self._side("excerpts")) is not None:
+            await side.add_excerpt()
+
+    def _select(self, excerpt_id: int | None) -> None:
+        if (side := self._side("excerpts")) is not None:
+            side.select_excerpt(excerpt_id)
 
 
 def _documents(p, open_doc) -> None:
@@ -627,34 +709,36 @@ def _doc_item(d: documents.DocView, refresh, open_doc) -> None:
             )
 
 
-def _notes(person_id: int, period_id: int) -> Side:
-    """The person's notes in the folder and their excerpts by category (as next to their
-    PDFs)."""
+def _side_box(person_id: int, period_id: int, mark: str) -> Side:
+    """A side of the person's page (as next to their PDFs; of the PDF shown beside it, see
+    Side.dock), as high as the room left in the window."""
     side = Side(person_id, period_id, ("notes", 0))
-    box = ui.column().classes("w-full gap-2").style("height:24rem").mark("notes-side")
-    # (as high as the room left in the window, the page not scrolled: at least 24rem)
-    fit = f"""
-    window.vrFitNotes = () => {{
-      const e = document.getElementById('c{box.id}');
-      if (!e || !e.offsetParent) return;
-      const top = e.getBoundingClientRect().top + scrollY;
-      e.style.height = Math.max(384, innerHeight - top - 36) + 'px';
-    }};
-    if (!window.vrFitNotesOn) {{
-      window.vrFitNotesOn = true;
-      addEventListener('resize', () => window.vrFitNotes());
-    }}
-    window.vrFitNotes();
-    """
-    ui.timer(0.05, lambda: ui.run_javascript(fit), once=True)  # (once connected, laid out)
-    side.attach(box)
-    side.folder_notes()
-    with side.section("categories", "category", _("Excerpts, by category")):
-        side.categories = categories_section(side)
+    side.docked = True
+    side.attach(ui.column().classes("w-full gap-2 vr-fit").style("height:24rem").mark(mark))
+    return side
+
+
+def _loaded(side: Side) -> Side:
+    side.tab_bar.set_visibility(False)  # (one tab)
 
     async def load() -> None:
         await side.load()
-        side.refresh_excerpts()
+        side.refresh_excerpts(others=False)
 
     ui.timer(0.05, load, once=True)
     return side
+
+
+def _notes(person_id: int, period_id: int) -> Side:
+    """The person's notes in the folder."""
+    side = _side_box(person_id, period_id, "notes-side")
+    side.folder_notes()
+    return _loaded(side)
+
+
+def _excerpts(person_id: int, period_id: int) -> Side:
+    """The person's excerpts in the folder, by category."""
+    side = _side_box(person_id, period_id, "excerpts-side")
+    with side.section("categories", "category", _("Excerpts, by category")):
+        side.categories = categories_section(side)
+    return _loaded(side)

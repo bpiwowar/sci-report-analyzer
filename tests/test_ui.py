@@ -978,8 +978,8 @@ async def test_folder_notes_without_a_document(user: User) -> None:
     await note_status(user, "folder-note")
     assert folders.notes_of(period) == "Strong **candidate**"
     await user.should_not_see(marker="note-quote")  # (no PDF to quote from)
-    # Their excerpts, by category.
-    user.find(marker="side-tab-categories").click()
+    # Their excerpts, by category: in the Excerpts tab.
+    user.find(marker="tab-excerpts").click()
     await user.should_see("Led a project.")
     # From the person's page, and their Report tab (no document).
     await user.open(f"/person/{pid}/{period}")
@@ -1005,7 +1005,7 @@ async def test_section_text_of_a_category(user: User) -> None:
     categories.add_excerpt(research, period, "Led a project.", 1, [])
     folders.set_notes(period, "# Report\n\n[]{.excerpts}\n")
     await user.open(f"/notes/{period}")
-    user.find(marker="side-tab-categories").click()
+    user.find(marker="tab-excerpts").click()
     await user.should_see("Led a project.")
     await user.should_not_see(marker=f"section-text-{research}")
     user.find(marker=f"section-text-edit-{research}").click()

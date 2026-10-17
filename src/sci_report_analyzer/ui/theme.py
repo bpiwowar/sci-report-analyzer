@@ -171,11 +171,14 @@ def frame(title: str) -> Iterator[None]:
         yield
 
 
-def bare_page(title: str) -> None:
+def bare_page(title: str, *, menu: bool = True) -> None:
     """A page without the frame (e.g. a PDF window): its title, no padding, and the menu
-    bar, compact (``BAR_HEIGHT`` high; there from the start: while the PDF is fetched…)."""
+    bar, compact (``BAR_HEIGHT`` high; there from the start: while the PDF is fetched…;
+    without ``menu``: none, e.g. within another page)."""
     ui.page_title(f"{title} · {APP_NAME}")
     ui.query(".nicegui-content").classes("p-0 gap-0")
+    if not menu:
+        return
     with (
         ui.row()
         .classes("w-full items-center justify-between no-wrap shrink-0 px-3 bg-primary text-white")

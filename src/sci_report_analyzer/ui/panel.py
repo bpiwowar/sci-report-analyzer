@@ -39,7 +39,7 @@ from ..ranking.kinds import KIND_SHORT
 from ..sources import ADAPTERS
 from .dialogs import actions, ok_handler, transient_dialog
 from .pdf_viewer import changed, download_dialog, pdf_button, watch
-from .pub_details import open_details, source_badge
+from .pub_details import open_details, source_links
 from .reflist import tag_from_list
 from .tags import save_number, tag_chip, tag_order_dialog, tags_dialog
 from .theme import (
@@ -1505,25 +1505,7 @@ class PublicationsPanel:
                     span(f'<span class="text-sm">{", ".join(names)}</span>')
                 # 4. quick links and badges
                 with ui.row().classes("items-center gap-1"):
-                    if s.publisher_url:
-                        with ui.link(target=s.publisher_url, new_tab=True).mark(
-                            f"publisher-{s.id}"
-                        ):
-                            ui.icon("launch", size="xs", color="primary").tooltip(
-                                _("Publisher's page: {url}").format(url=s.publisher_url)
-                            )
-                    shown: set[str] = set()
-                    for m in s.members:
-                        source_badge(m)
-                        # Its PDF right after the source's badge (each PDF once).
-                        if m.pdf_url and m.pdf_url not in shown:
-                            shown.add(m.pdf_url)
-                            with ui.link(target=m.pdf_url, new_tab=True).mark(f"pdf-{m.id}"):
-                                ui.icon("picture_as_pdf", size="xs", color="red-7").tooltip(
-                                    _("PDF from {source}: {url}").format(
-                                        source=m.source, url=m.pdf_url
-                                    )
-                                )
+                    source_links(s)
                     if s.track:
                         track_chip(s.track, f"pub-track-{s.id}")
                     pid = period.id if period else None

@@ -303,8 +303,10 @@ ligne si coché, par ex. les étiquettes des marqueurs des extraits (par défaut
 de texte, le surlignage, les emojis (🌍 ⭐ 📣) et les symboles (★ ✦ ◆ ➤) ; il retire les
 exposants, les tailles de police et le texte barré.
 
-**PDF** : l'icône PDF à côté d'un titre ouvre le PDF stocké de l'article dans une nouvelle fenêtre (rouge ;
-✎ une fois annoté). Une icône grise signifie qu'un lien en accès ouvert (ou un DOI) est connu : cliquez dessus pour
+**PDF** : l'icône de fichier PDF à côté d'un titre (avec un crayon une fois annoté ; les icônes PDF rouges simples
+après le badge d'une source sont le PDF de cette source, en ligne) ouvre le PDF stocké de l'article à côté de la page
+de la personne (⌘/Ctrl-clic : dans une nouvelle fenêtre). Une icône grise signifie qu'un lien en accès ouvert (ou un
+DOI) est connu : cliquez dessus pour
 télécharger le PDF (après confirmation, sauf si elle est désactivée) et l'ouvrir. La visionneuse (PDF.js,
 installée une seule fois) dispose d'outils de surlignage, de texte, de dessin et d'image ; les annotations sont enregistrées dans le
 PDF stocké (toutes les quelques secondes, avec Enregistrer ou ⌘S/Ctrl+S) ; le menu de la visionneuse (») enregistre,
@@ -328,10 +330,22 @@ Données et cache affiche l'espace utilisé et supprime les fichiers des article
 article qui disparaît des sources emporte avec lui son PDF téléchargé ; un PDF téléversé ou annoté
 conserve l'article.
 
-**Documents** (onglet Documents de la personne) : PDF concernant la personne au sein d'un dossier ou d'une période (un
-dossier de candidature, un CV…), téléversés là et lus dans la même visionneuse (annotations, signets, une
-note). Un document ouvert depuis l'onglet Rapport y reste ouvert : de retour dans cet onglet, il est de nouveau
-affiché, jusqu'à sa fermeture (✕). Les articles de la personne mentionnés dans un document sont retrouvés (par le titre, quelques coquilles
+**PDF à côté de la page d'une personne** : quel que soit l'onglet (les publications, le rapport, les extraits…), les
+PDF s'ouvrent à sa droite : les documents de la personne (onglet Rapport, menu « Documents ») et ses articles (leur
+icône PDF, dans la liste ou à côté des notes ; un lien vers un PDF, par exemple celui d'une citation dans les notes, ou
+un extrait d'un autre PDF), par exemple les extraits avec un document, ou le rapport avec un article. Une bande en bas
+les liste : cliquez sur l'un pour l'afficher, sur celui affiché (ou ») pour les réduire (la page seule ; « réaffiche
+le dernier), ✕ pour en fermer un (de la vue seulement : rien n'est supprimé). Faites glisser leur bord gauche pour les
+redimensionner. Ils restent ouverts pour la personne (et dans l'adresse) jusqu'à leur fermeture. Chacun a l'en-tête de
+la visionneuse (son ↗ l'ouvre dans une fenêtre à part) et son panneau latéral, masqué : pendant ce temps, les notes et
+extraits de la page sont les siens, Q citant dans les notes (l'onglet Rapport), E classant la sélection (l'onglet
+Extraits), un extrait cliqué sur ses pages sélectionné dans l'onglet Extraits, et un extrait cliqué là montré sur sa
+page.
+
+**Documents** (onglet Rapport de la personne, menu « Documents ») : PDF concernant la personne au sein d'un dossier ou
+d'une période (un dossier de candidature, un CV…), téléversés là et lus dans la même visionneuse (annotations, signets,
+une note), à côté de la page (ou dans un nouvel onglet, depuis leur ⋮). Les articles de la personne mentionnés dans un
+document sont retrouvés (par le titre, quelques coquilles
 tolérées, ou par DOI / identifiant HAL) et deviennent des liens (un léger soulignement pointillé ; rouge lorsque le PDF de
 l'article est stocké). Les références
 numérotées (« [11] », « 11. », « [C3] ») font aussi pointer leurs citations (« [11] », « [3, 11] », « [3-5] »)
@@ -345,7 +359,8 @@ les auteurs, le canal ou l'année). La note du document cite les articles de la 
 (`[@key]`, le bouton ❝ pour en choisir un, ceux du document en premier) ; son aperçu et sa copie
 les numérotent (« [1] », dans l'ordre de première citation), la copie se terminant par les références.
 
-**Catégories** (page du dossier : le bouton des catégories ; ou l'onglet des catégories de la visionneuse) :
+**Catégories** (page du dossier : le bouton des catégories ; l'onglet Extraits de la personne ; ou l'onglet des
+catégories de la visionneuse) :
 l'arborescence ordonnée des catégories d'un dossier (par exemple une grille d'évaluation), que l'on fait glisser pour les ordonner et les imbriquer,
 chacune avec un identifiant facultatif (`#id`, pour les rapports : voir plus bas) ; une catégorie contenant des extraits (directement ou en dessous, de n'importe quelle personne du dossier)
 n'est supprimée qu'une fois ceux-ci déplacés vers une autre, choisie à ce moment-là. Dans le PDF d'un document (un rapport,
@@ -423,9 +438,10 @@ textes de rapport).
 La **déplacer** vers un autre dossier (le bouton dossier avec une flèche, aux mêmes endroits)
 emporte cette période, avec toutes ses données ; ses extraits sont classés dans les catégories
 de l'autre dossier (ajoutées s'il le faut).
-Le bouton 📝 de la ligne d'une personne (aussi à côté du nom du dossier sur sa page, et dans son onglet Documents)
-ouvre ses **notes et extraits dans le dossier** sur une page à part, comme à côté de ses PDF : pour les écrire, ou
-voir ses extraits par catégorie, sans ouvrir de document (par exemple quand elle n'en a aucun).
+Le bouton 📝 de la ligne d'une personne (aussi à côté du nom du dossier sur sa page) ouvre ses **notes dans le
+dossier** (son onglet Rapport ; ses extraits par catégorie : l'onglet Extraits), comme à côté de ses PDF : pour les
+écrire sans ouvrir de document (par exemple quand elle n'en a aucun). La fenêtre d'un extrait nomme sa catégorie sous
+son titre.
 
 Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre**, chaque dossier
 déplié montrant les dossiers qu'il contient puis ses personnes, une ligne chacune (sa période, ses étoiles, ses

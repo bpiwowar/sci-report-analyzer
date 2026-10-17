@@ -22,7 +22,7 @@ from sci_report_analyzer import (
 )
 from sci_report_analyzer.db.models import Publication, SectionText
 from sci_report_analyzer.db.session import session_scope
-from sci_report_analyzer.ui import copying, documents_page
+from sci_report_analyzer.ui import copying
 from sci_report_analyzer.ui.mdedit import MarkdownEditor, inline_quote, quote
 from sci_report_analyzer.urls import person_url
 
@@ -180,20 +180,34 @@ async def test_document_page(user: User, monkeypatch, fake_viewer):
     doc = documents.add(period, "Application.pdf", PDF)
     await user.open(f"/doc/{doc}")
     await user.should_see(marker="pdf-frame")
-    await user.should_not_see(marker="document-close")
-    # Opened from the person's Report tab: closed back to it.
+    await user.should_see(marker="tab-report")  # (its person's header: back to their tabs)
+    # Opened from the person's Report tab: beside it (the notes still there), listed below.
     await user.open(f"/person/{pid}?tab=report")
     user.find(marker=f"documents-{period}").click()
     user.find(marker=f"document-open-{doc}").click()
-    await user.should_see(marker="document-close")
-    # (its person's header there: back to their tabs)
-    await user.should_see(marker="tab-report")
-    # Left open there: the Report tab goes back to it, until it is closed.
-    assert documents_page.open_document(period) == doc
-    user.find(marker="document-close").click()
-    await user.should_see(marker="notes-side")
+    await user.should_see(marker=f"dock-frame-d{doc}")
     await user.should_see(marker="folder-note")
-    assert documents_page.open_document(period) is None
+    # Left open: there again, whatever the tab; minimized, still listed; closed, gone from the
+    # view only.
+    await user.open(f"/person/{pid}")
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    user.find(marker="dock-minimize").click()
+    await user.should_not_see(marker=f"dock-frame-d{doc}")
+    user.find(marker=f"dock-show-d{doc}").click()
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    user.find(marker=f"dock-close-d{doc}").click()
+    await user.should_not_see(marker=f"dock-tab-d{doc}")
+    assert documents.info(doc) is not None
+    await user.open(f"/person/{pid}")
+    await user.should_not_see(marker=f"dock-tab-d{doc}")
+    # Its former address from the Report tab: there, beside it.
+    await user.open(f"/doc/{doc}?report=1")
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    # Embedded beside the page: neither the menu bar nor the person's header.
+    await user.open(f"/doc/{doc}?embed=1")
+    await user.should_see(marker="pdf-own-window")
+    await user.should_not_see(marker="tab-report")
+    await user.should_not_see(marker="menu-bar")
     await user.open(f"/doc/{doc}")
     await user.should_see("Looking for the papers…")  # (until the viewer sent the text)
     documents.set_lines(doc, LINES)
@@ -2323,3 +2337,113 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
         2019,
         None,
     )
+
+
+async def test_pdfs_beside_the_person_page(user: User, fake_viewer):
+    """The PDFs open beside a person's page (from the address, else as left): one shown, the
+    others listed below; shown, minimized, restored, closed (from the view only)."""
+    pid, period, ids = _person()
+    a = ids["a"]
+    pdfs.save(a, PDF, None)
+    doc = documents.add(period, "Application.pdf", PDF)
+    folder = folders.folders()[0].id
+    other = documents.add(folders.add_person(folder, make_person("John Roe")), "CV.pdf", PDF)
+    keys = f"d{doc},p{a},d{other},x1,d999"  # (another person's, unknown ones: left out)
+    await user.open(f"/person/{pid}?pdfs={keys}&pdf=p{a}")
+    await user.should_see(marker=f"dock-frame-p{a}")
+    src = user.find(marker=f"dock-frame-p{a}").elements.pop().props["src"]
+    assert src.startswith(f"/pdf/{a}?") and "embed=1" in src
+    await user.should_see(marker=f"dock-tab-d{doc}")
+    await user.should_not_see(marker=f"dock-frame-d{doc}")  # (not loaded until shown)
+    await user.should_not_see(marker=f"dock-tab-d{other}")
+    user.find(marker=f"dock-show-d{doc}").click()
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    await user.should_not_see(marker=f"dock-frame-p{a}")
+    state = {"open": [f"d{doc}", f"p{a}"], "shown": f"d{doc}"}
+    assert annotations.ui_state(f"ui.dock.{pid}") == state
+    # A link to a PDF clicked on the page (see vrDock): there, not opened twice.
+    _page_event(user, "vrDockOpen", {"key": f"d{doc}", "page": 2})
+    assert len(user.find(marker=f"dock-frame-d{doc}").elements) == 1
+    # Its tab clicked again, or the double arrow: minimized; back with the other one.
+    user.find(marker=f"dock-show-d{doc}").click()
+    await user.should_not_see(marker=f"dock-frame-d{doc}")
+    user.find(marker="dock-restore").click()
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    user.find(marker="dock-minimize").click()
+    await user.should_not_see(marker=f"dock-frame-d{doc}")
+    # As left, without the address saying otherwise.
+    await user.open(f"/person/{pid}")
+    await user.should_see(marker=f"dock-tab-p{a}")
+    await user.should_not_see(marker=f"dock-frame-p{a}")
+    user.find(marker=f"dock-close-p{a}").click()
+    user.find(marker=f"dock-close-d{doc}").click()
+    await user.should_not_see(marker=f"dock-tab-d{doc}")
+    assert pdfs.file_of(a) is not None and documents.info(doc) is not None
+    # Embedded, a paper's viewer: without the menu bar nor the person's header.
+    await user.open(f"/pdf/{a}?embed=1")
+    await user.should_see(marker="pdf-own-window")
+    await user.should_not_see(marker="menu-bar")
+    await user.should_not_see(marker="pdf-full-screen")
+
+
+async def test_quote_and_excerpt_from_the_pdf_beside(user: User, monkeypatch, fake_viewer):
+    """The document shown beside the person's page: quoted into their notes (Q there: the
+    Report tab), its passages filed (E: the Excerpts tab), its excerpts clicked selected."""
+    from sci_report_analyzer import categories
+
+    pid, period, _ = _person()
+    research = categories.add(folders.folders()[0].id, "Research")
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "Led the Quokka\nproject", "p": 2, "rects": []}
+    user.javascript_rules[re.compile(r"vrPdf\.(quoted|excerpted)\(\)")] = lambda _: selection
+    inserted: list[str] = []
+    monkeypatch.setattr(MarkdownEditor, "insert_block", lambda self, text: inserted.append(text))
+    await user.open(f"/person/{pid}?pdfs=d{doc}")  # (minimized)
+    await user.should_see(marker=f"dock-tab-d{doc}")
+    user.find(marker="tab-report").click()
+    await user.should_see(marker="folder-note")
+    await user.should_not_see(marker="note-quote")  # (no PDF shown)
+    user.find(marker=f"dock-show-d{doc}").click()
+    await user.should_see(marker="note-quote")
+    _page_event(user, "vrPdfQuote", None)  # (Q in the PDF, its side column hidden)
+    for _i in range(50):
+        if inserted:
+            break
+        await asyncio.sleep(0.02)
+    assert inserted == [f"> Led the Quokka project ([Application, p. 2](/doc/{doc}?page=2))"]
+    _page_event(user, "vrPdfExcerpt", None)  # (E)
+    await user.should_see(marker=f"pick-category-{research}")
+    user.find(marker=f"pick-category-{research}").click()
+    await user.should_see("Added to Research")
+    [e] = categories.excerpts(period)
+    assert e.document_id == doc and e.page == 2
+    await user.should_see(marker=f"excerpt-part-{e.id}")
+    # Its dialog: its category under the title.
+    user.find(marker=f"excerpt-edit-{e.id}").click()
+    await user.should_see(marker="excerpt-category")
+    user.find(marker="excerpt-edit-save").click()
+    await user.should_not_see(marker="excerpt-category")
+    _page_event(user, "vrDocExcerpt", {"id": e.id})  # (its tint clicked in the PDF)
+    row = user.find(marker=f"excerpt-part-{e.id}").elements.pop()
+    assert "vr-excerpt-on" in row.classes
+
+
+async def test_papers_beside_the_notes_with_their_pdfs(user: User, fake_viewer):
+    """The papers beside the notes (Report tab): each with its stored PDF (a PDF file's icon,
+    opened beside the page), then its sources' badges with their PDFs, as in the panel."""
+    pid, period, ids = _person()
+    a = ids["a"]
+    pdfs.save(a, PDF, None)
+    await user.open(f"/person/{pid}?tab=report")
+    await user.should_see(marker="folder-note-mode")
+    user.find(marker="folder-note-mode").elements.pop().value = "side"
+    user.find(marker="folder-papers-search").type("deep ranking")
+    await user.should_see(marker=f"folder-papers-stored-pdf-{a}")
+    link = user.find(marker=f"folder-papers-stored-pdf-{a}").elements.pop()
+    assert link.props["href"] == f"/pdf/{a}?period={period}"
+    icons = [e for e in link.descendants() if isinstance(e, ui.icon)]
+    assert icons and icons[0].props["name"].endswith("/pdf.svg")
+    row = link
+    while not any(m.startswith("folder-papers-row-") for m in row._markers):
+        row = row.parent_slot.parent
+    assert any(m.startswith("source-") for e in row.descendants() for m in e._markers)

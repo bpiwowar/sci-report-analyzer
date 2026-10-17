@@ -57,7 +57,7 @@ STATIC = Path(__file__).parent / "static"
 STATIC_URL = "/vr-static"
 
 
-def _scripts(config: dict, *names: str) -> None:
+def scripts(config: dict, *names: str) -> None:
     """``config`` (window.vrConfig), then the static scripts ``names`` (their version: of
     their files, so that a new one is not cached)."""
     tags = [f"<script>window.vrConfig = {json.dumps(config)};</script>"]
@@ -142,15 +142,17 @@ def register() -> None:
         period: int | None = None,
         page: int | None = None,
         pane: str | None = None,
+        embed: bool = False,
     ) -> None:
+        """``embed``: beside the person's page (see pdf_dock)."""
         found = _title(pub_id)
-        bare_page(found[0] if found else "PDF")
+        bare_page(found[0] if found else "PDF", menu=not embed)
         if found is None:
             ui.label(_("No such paper")).classes("p-4")
             return
         title, person_id = found
         if not pdfs.has_viewer() or pdfs.file_of(pub_id) is None:
-            _prepare(pub_id, title, fetch, period)
+            _prepare(pub_id, title, fetch, period, embed)
             return
         from .viewer_side import Side, bookmarks_section
 
@@ -166,6 +168,7 @@ def register() -> None:
             ("pub", pub_id),
             page=page,
             pane=pane,
+            embed=embed,
         )
         side.attach(box)
         with side.section("notes", "sell", _("Tags and notes"), fill=True):
@@ -206,8 +209,7 @@ def viewer_frame(
     script: str = "",
     page: int | None = None,
     pane: str | None = None,
-    closed: str | None = None,
-    on_close: Callable[[], None] | None = None,
+    embed: bool = False,
 ) -> ui.column:
     """The page of a stored PDF, under the menu bar (see theme.bare_page) and the header of
     its ``person``'s page (id, period, tab; both hidden in full screen): a header (its
@@ -215,15 +217,18 @@ def viewer_frame(
     finding the paper of a selection…, full screen), PDF.js (opened at ``page``, else where
     it was last read; saving and downloading in its menu), and the side column (returned).
     With ``pane`` (the token of a PDF window): only the side column, in its own window, kept
-    in sync with that one. ``closed`` (a URL): opened from there (the person’s Report tab),
-    closed back to it in place of going ``home`` (after ``on_close``)."""
+    in sync with that one. ``embed``: beside the person's page (see pdf_dock), without its
+    header, the side column hidden at first: meanwhile, that page's notes and excerpts are
+    its own (quotes, excerpts: see vrDock)."""
     if pane and PANE_TOKEN.fullmatch(pane):
         return _pane_frame(title, home, side, bookmarked, pane)
     _fill_window()
-    from .person import page_header
+    side.embedded = embed
+    if not embed:
+        from .person import page_header
 
-    with ui.element("div").classes("w-full px-3 shrink-0 vr-person-header"):
-        page_header(*person)
+        with ui.element("div").classes("w-full px-3 shrink-0 vr-person-header"):
+            page_header(*person)
     texts = {
         "saving": _("Saving…"),
         "saved": _("Saved at {time}"),
@@ -237,8 +242,9 @@ def viewer_frame(
         "sideMin": SIDE_MIN,
         "frameCss": css,
         "fontsCss": f"/_nicegui/{nicegui.__version__}/static/fonts.css",
+        "embedded": embed,
     }
-    _scripts(config, "pdf_viewer.js")
+    scripts(config, "pdf_viewer.js")
     if script:
         ui.add_head_html(script)
     with (
@@ -246,17 +252,7 @@ def viewer_frame(
         .classes("w-full items-center no-wrap gap-2 px-3 bg-primary text-white shrink-0")
         .style(f"height:{HEADER_HEIGHT}px")
     ):
-        if closed:
-
-            def close() -> None:
-                if on_close:
-                    on_close()
-                ui.navigate.to(closed)
-
-            ui.button(icon="close", on_click=close).props("flat dense round color=white").tooltip(
-                _("Close")
-            ).mark("document-close")
-        else:
+        if not embed:
             ui.link(home[0], home[1]).classes("text-white font-bold no-underline ellipsis max-w-48")
         ui.label(title).classes("ellipsis grow min-w-0 font-medium")
         ui.label("").classes("text-sm opacity-80").props("id=vr-pdf-status").mark("pdf-status")
@@ -286,25 +282,35 @@ def viewer_frame(
                 _in_menu(ui.button(icon="download"), tip, tip).props(
                     "flat dense round color=white"
                 ).tooltip(tip)
-        ui.button(icon="open_in_new").props("flat dense round color=white").on(
-            "click", js_handler="() => vrPane.toggle()"
-        ).tooltip(
-            _(
-                "Show the side panel (notes, excerpts, bookmarks…) in another window, e.g. on "
-                "another screen; again: back here"
-            )
-        ).mark("pdf-pane")
+        if embed:  # (the same page, on its own)
+            ui.button(icon="launch").props("flat dense round color=white").on(
+                "click",
+                js_handler="() => { const u = new URL(location.href); "
+                "u.searchParams.delete('embed'); u.searchParams.delete('page'); "
+                "window.open(u.href, '_blank'); }",
+            ).tooltip(_("Open it in a window of its own")).mark("pdf-own-window")
+        else:
+            ui.button(icon="open_in_new").props("flat dense round color=white").on(
+                "click", js_handler="() => vrPane.toggle()"
+            ).tooltip(
+                _(
+                    "Show the side panel (notes, excerpts, bookmarks…) in another window, e.g. "
+                    "on another screen; again: back here"
+                )
+            ).mark("pdf-pane")
 
         def toggle_side() -> None:
             if side.detached:  # (in another window: back here)
                 ui.run_javascript("vrPane.toggle()")
             else:
                 box.set_visibility(not box.visible)
+                splitter.set_visibility(box.visible)
 
         ui.button(icon="view_sidebar", on_click=toggle_side).props(
             "flat dense round color=white"
         ).tooltip(_("Side panel (notes, bookmarks, papers)")).mark("pdf-toggle-notes")
-        full_screen_button()
+        if not embed:
+            full_screen_button()
     src = f"/pdfjs/web/viewer.html?file={file_url}%3Fv%3D{version}"
     # (at a page asked for, else where it was last read)
     src += f"#page={page}" if page else documents.place_hash(documents.last_place(*bookmarked))
@@ -330,6 +336,9 @@ def viewer_frame(
             "vr-pdf-side-width",
             lambda e: annotations.save_ui_state(SIDE_WIDTH, max(SIDE_MIN, int(e.args))),
         )
+    if embed:  # (the person's page beside it, in its place)
+        box.set_visibility(False)
+        splitter.set_visibility(False)
 
     async def detached(e) -> None:  # (the side panel in another window, or back)
         side.detached = bool(e.args)
@@ -452,7 +461,7 @@ def _here(side: Side, event: str, act: Callable[[], Any]) -> Callable[[], Awaita
     the side panel is in another window."""
 
     async def run() -> None:
-        if side.detached:
+        if side.detached or (side.embedded and not side.box.visible):  # (see vrPane.emit)
             ui.run_javascript(f"vrPane.emit({json.dumps(event)})")
         elif inspect.isawaitable(done := act()):
             await done
@@ -471,7 +480,7 @@ def _pane_frame(
         "closed": _("The PDF window is closed"),
         "back": _("The side panel is back in the PDF window: this one can be closed"),
     }
-    _scripts({"token": token, "texts": texts}, "pane.js")
+    scripts({"token": token, "texts": texts}, "pane.js")
     _fill_window()
     with (
         ui.row()
@@ -563,7 +572,7 @@ async def install_or_notify(label: ui.label) -> None:
         await pdfs.install_viewer()
 
 
-def _prepare(pub_id: int, title: str, fetch: bool, period: int | None) -> None:
+def _prepare(pub_id: int, title: str, fetch: bool, period: int | None, embed: bool = False) -> None:
     """The viewer page before it can show the PDF: download PDF.js, and the paper's PDF when
     asked to (``fetch``)."""
     with ui.column().classes("p-6 gap-3 w-full max-w-3xl mx-auto") as box:
@@ -576,9 +585,11 @@ def _prepare(pub_id: int, title: str, fetch: bool, period: int | None) -> None:
                 ui.button(
                     _("Download it"),
                     icon="download",
-                    on_click=lambda: ui.navigate.to(page_url(pub_id, period, fetch=True)),
+                    on_click=lambda: ui.navigate.to(
+                        page_url(pub_id, period, fetch=True, embed=embed)
+                    ),
                 ).props("flat").mark("pdf-fetch")
-            _upload(pub_id, period)
+            _upload(pub_id, period, embed)
             return
         with status:
             ui.spinner(size="sm")
@@ -595,9 +606,9 @@ def _prepare(pub_id: int, title: str, fetch: bool, period: int | None) -> None:
                     "text-negative"
                 ).mark("pdf-error")
             with box:
-                _upload(pub_id, period)
+                _upload(pub_id, period, embed)
             return
-        ui.navigate.to(page_url(pub_id, period))
+        ui.navigate.to(page_url(pub_id, period, embed=embed))
 
     ui.timer(0.1, prepare, once=True)
 
@@ -613,7 +624,7 @@ async def _get(pub_id: int, label: ui.label) -> None:
             changed(found[1])
 
 
-def _upload(pub_id: int, period: int | None) -> None:
+def _upload(pub_id: int, period: int | None, embed: bool = False) -> None:
     async def done(e) -> None:
         try:
             pdfs.save(pub_id, await e.file.read(), None)
@@ -622,7 +633,7 @@ def _upload(pub_id: int, period: int | None) -> None:
             return
         if found := _title(pub_id):
             changed(found[1])
-        ui.navigate.to(page_url(pub_id, period))
+        ui.navigate.to(page_url(pub_id, period, embed=embed))
 
     ui.label(_("Or upload it (a PDF file):")).classes("text-sm text-grey")
     ui.upload(on_upload=done, auto_upload=True).props('accept=".pdf,application/pdf"').mark(
@@ -634,12 +645,17 @@ def _upload(pub_id: int, period: int | None) -> None:
 
 
 def page_url(
-    pub_id: int, period: int | None = None, *, fetch: bool = False, page: int | None = None
+    pub_id: int,
+    period: int | None = None,
+    *,
+    fetch: bool = False,
+    page: int | None = None,
+    embed: bool = False,
 ) -> str:
-    """The viewer page of a paper (with the tags and notes of ``period``), at ``page``."""
-    params = {
-        k: v for k, v in (("fetch", 1 if fetch else None), ("period", period), ("page", page)) if v
-    }
+    """The viewer page of a paper (with the tags and notes of ``period``), at ``page``;
+    ``embed``: beside the person's page (see pdf_dock)."""
+    pairs = (("fetch", fetch), ("period", period), ("page", page), ("embed", embed))
+    params = {k: int(v) for k, v in pairs if v}
     return f"/pdf/{pub_id}" + (f"?{urlencode(params)}" if params else "")
 
 
@@ -647,16 +663,26 @@ def can_download(s: PubStat) -> bool:
     return bool(s.pdf_urls or s.doi or s.doi_manual)
 
 
+def pdf_icon(edited: bool = False, size: str = "xs") -> ui.icon:
+    """The icon of a stored PDF (a PDF file; ``edited``: with a pencil, annotated), told apart
+    from the links to the sources' PDFs."""
+    name = "pdf-annotated.svg" if edited else "pdf.svg"
+    return ui.icon(f"img:{STATIC_URL}/{name}", size=size)
+
+
+STORED_TIP = N_("View and annotate the stored PDF (beside the page; ⌘/Ctrl-click: a new tab)")
+EDITED_TIP = N_("View the stored PDF, annotated (beside the page; ⌘/Ctrl-click: a new tab)")
+
+
 def pdf_button(panel: PublicationsPanel, s: PubStat) -> None:
-    """Next to a paper's title: its stored PDF (opened in a new window), else a button to
-    download it (after confirmation) and open it."""
+    """Next to a paper's title: its stored PDF (opened beside the person's page, see
+    pdf_dock; elsewhere in a new window), else a button to download it (after confirmation)
+    and open it."""
     period = panel.period_id
     if s.pdf:
         edited = s.pdf == "edited"
         with ui.link(target=page_url(s.id, period), new_tab=True).mark(f"view-pdf-{s.id}"):
-            ui.icon(
-                "edit_document" if edited else "picture_as_pdf", size="xs", color="red-8"
-            ).tooltip(_("View the PDF (annotated)") if edited else _("View and annotate the PDF"))
+            pdf_icon(edited).tooltip(_(EDITED_TIP) if edited else _(STORED_TIP))
     elif can_download(s):
         icon = (
             ui.icon("picture_as_pdf", size="xs", color="grey-6")

@@ -299,8 +299,10 @@ levels' #local, #national, #international as “(national)”… after the line'
 highlights, emojis (🌍 ⭐ 📣) and symbols (★ ✦ ◆ ➤); it drops superscripts, font sizes and
 strikethroughs.
 
-**PDFs**: the PDF icon next to a title opens the paper's stored PDF in a new window (red;
-✎ once annotated). A grey icon means an open-access link (or a DOI) is known: click it to
+**PDFs**: the PDF file icon next to a title (with a pencil once annotated; the plain red PDF
+icons after a source's badge are that source's PDF, online) opens the paper's stored PDF
+beside the person's page (⌘/Ctrl-click: in a new window). A grey icon means an open-access
+link (or a DOI) is known: click it to
 download the PDF (after confirmation, unless turned off) and open it. The viewer (PDF.js,
 installed once) has highlight, text, drawing and image tools; annotations are saved into the
 stored PDF (every few seconds, with Save or ⌘S/Ctrl+S); the viewer's menu (») saves,
@@ -326,10 +328,23 @@ Data & cache shows the space used and cleans up the files of papers no longer in
 paper that leaves the sources takes its downloaded PDF with it; an uploaded or annotated one
 keeps the paper.
 
-**Documents** (person's Documents tab): PDFs of the person within a folder or a period (an
-application, a CV…), uploaded there and read in the same viewer (annotations, bookmarks, a
-note). One opened from the Report tab stays open there: back to that tab, it is shown again,
-until closed (✕). The person's papers mentioned in a document are found (by title, a few typos
+**PDFs beside a person's page**: whatever the tab (the publications, the report, the
+excerpts…), PDFs open on the right of it: the person's documents (Report tab, “Documents”
+menu) and papers (their PDF icon, in the list or beside the notes; a link to a PDF, e.g. a
+quote's in the notes, or an excerpt of another PDF), e.g. the excerpts with a document, or the
+report with a paper. A strip at the bottom lists them: click one to show it, click the one
+shown (or ») to minimize them (the page alone; « shows the last one again), ✕ to close one
+(from the view only: nothing is deleted). Drag their left edge to resize them. They stay open
+for the person (and in the address) until closed. Each has the viewer's header (its ↗ opens it
+in a window of its own) and its side panel, hidden: meanwhile, the page's notes and excerpts
+are its own, Q quoting into the notes (the Report tab), E filing the selection (the Excerpts
+tab), an excerpt clicked on its pages selected in the Excerpts tab, and an excerpt clicked
+there shown on its page.
+
+**Documents** (person's Report tab, “Documents” menu): PDFs of the person within a folder or
+a period (an application, a CV…), uploaded there and read in the same viewer (annotations,
+bookmarks, a note), beside the page (or in a new tab, from their ⋮). The person's papers
+mentioned in a document are found (by title, a few typos
 allowed, or DOI / HAL id) and become links (a light dotted underline; red when the paper's
 PDF is stored). Numbered
 references (“[11]”, “11.”, “[C3]”) make their citations (“[11]”, “[3, 11]”, “[3-5]”) point
@@ -343,7 +358,8 @@ authors, venue or year). The document's note cites the person's papers as report
 (`[@key]`, the ❝ button to pick one, those of the document first); its preview and copy
 number them (“[1]”, as first cited), the copy ending with the references.
 
-**Categories** (folder page: the category button; or the viewer's categories tab): a
+**Categories** (folder page: the category button; the person's Excerpts tab; or the viewer's
+categories tab): a
 folder's ordered tree of categories (e.g. an evaluation grid), dragged to order and nest
 them, each with an optional id (`#id`, for the reports: see below); one with excerpts (there or below, of anyone in the folder)
 is deleted once they are moved to another one, chosen then. In a document's PDF (a report,
@@ -412,10 +428,10 @@ tab) either keeps that period, with its data, as one of their own periods, or de
 **Moving** them to another folder (the folder-with-an-arrow button, same places) takes
 that period with them, with all its data; their excerpts are filed in the other folder's
 categories (added if missing).
-The 📝 button of a person's line (also next to the folder's name on their page, and in their
-Documents tab) opens their **notes and excerpts in the folder** on a page of their own, as
-next to their PDFs: to write them, or see their excerpts by category, without opening any
-document (e.g. when they have none).
+The 📝 button of a person's line (also next to the folder's name on their page) opens their
+**notes in the folder** (their Report tab; their excerpts by category: the Excerpts tab), as
+next to their PDFs: to write them without opening any document (e.g. when they have none).
+An excerpt's dialog names its category under its title.
 
 Folders can be **within other folders**: the Reports page shows them as a **tree**, each
 folder expanded showing the folders within it then its people, one line each (their period,
