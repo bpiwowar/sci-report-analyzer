@@ -104,7 +104,10 @@ def on_chart_click(chart: ui.echart, handler: Callable[[str, int, dict[str, bool
 # when asked (body.vr-charts-on).
 ui.add_css(
     ".vr-charts-toggle{display:none}body.vr-docked .vr-charts-toggle{display:inline-flex}"
-    "body.vr-docked:not(.vr-charts-on) .vr-charts{display:none}",
+    "body.vr-docked:not(.vr-charts-on) .vr-charts{display:none}"
+    # (and then one per line)
+    "body.vr-docked .vr-charts-row{flex-direction:column}"
+    "body.vr-docked .vr-charts-row>*{width:100%}",
     shared=True,
 )
 
@@ -503,7 +506,7 @@ class PublicationsPanel:
             )
             with ui.column().classes("w-full vr-charts"):
                 self._years(matching("year"), cats, sels)
-                with ui.row().classes("w-full gap-4 no-wrap"):
+                with ui.row().classes("w-full gap-4 no-wrap vr-charts-row"):
                     self._coauthors(matching("coauthors"), sels)
                     self._contributions(matching("contribution", "phd", "authorcat"), sels)
             self._list(conditioned)
@@ -1084,7 +1087,7 @@ class PublicationsPanel:
                     lambda e, c=c: self.pick(Sel("category", c.label, key=c.key), e),
                     ["shiftKey", "altKey"],
                 )
-        with ui.row().classes("w-full gap-3 select-none"):
+        with ui.row().classes("w-full gap-x-3 gap-y-0 select-none leading-snug"):
             items = [(c.key, c.label, c.colour, stripes(c), counts[c.key]) for c in present]
             if predatory:
                 items.append(("predatory", _("⚠ predatory"), PREDATORY_COLOUR, "", predatory))
@@ -1094,8 +1097,9 @@ class PublicationsPanel:
                 el = span(
                     f'<span class="{dim_cls}"><i'
                     f' style="display:inline-block;width:10px;height:10px;background:{colour};'
-                    f'margin-right:4px{striped}"></i>{escape(label)} {pct(n)} <b>({n})</b></span>'
-                ).classes("cursor-pointer text-sm")
+                    f'margin-right:4px;border-radius:2px{striped}"></i>{escape(label)} <b>{n}</b>'
+                    f' <span style="opacity:.6">{pct(n)}</span></span>'
+                ).classes("cursor-pointer text-sm whitespace-nowrap")
                 el.on(
                     "click",
                     lambda e, k=key, lab=label: self.pick(Sel("category", lab, key=k), e),
