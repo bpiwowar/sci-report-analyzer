@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from . import contribution, i18n, pdfs, venue_match
+from . import contribution, i18n, pdfs, theses, venue_match
 from .authors import fold_name, same_author
 from .db.app_settings import get_setting, set_setting
 from .db.models import (
@@ -59,7 +59,6 @@ from .ranking.kinds import (
 from .ranking.normalize import is_non_venue, normalize
 from .ranking.service import is_ranked, service
 from .ranking.tracks import FINDINGS_ID, MAIN
-from .source_settings import active_links
 from .sources import ADAPTERS, PRIORITY
 from .sources.base import to_year
 from .venues import auto_short_name, link_venues, venue_badge
@@ -654,19 +653,12 @@ class PeopleIndex:
         aliases = person.student_aliases or {}
         rejects = person.name_rejects or {}
         students: dict[str, StudentNames] = {}
-        rows = session.scalars(
-            select(Thesis)
-            .join(SourceLink)
-            .where(
-                SourceLink.person_id == person.id,
-                active_links(),
-                Thesis.role == "director",
-            )
-        )
+        rows = session.scalars(theses.of_person(person.id).where(Thesis.role == "director"))
         for t in rows:
+            end = theses.span(t).end
             for name in (t.student or "").split(", "):
                 if name and name not in students:
-                    when = (t.defence_date or "")[:4] or _("in progress")
+                    when = (end or "")[:4] or _("in progress")
                     names = [name, *aliases.get(name, [])]
                     students[name] = StudentNames(
                         name,
@@ -674,7 +666,7 @@ class PeopleIndex:
                         names,
                         {fold_name(n) for n in rejects.get(name, [])},
                         _("PhD student {name} ({when})").format(name=name, when=when),
-                        to_year(t.defence_date),
+                        to_year(end),
                     )
         owner = [person.name, *(person.aliases or [])]
         names = {c.id: c.name for c in session.scalars(select(AuthorCategory))}

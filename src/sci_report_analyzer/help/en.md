@@ -492,6 +492,13 @@ theses in progress only, so for a defended one it is the start seen while in pro
 estimated (3 years before the defence, marked ≈). They follow the panel's period:
 supervision overlapping it, juries with the defence within it.
 
+**PhD students** can be edited by hand (Theses tab): the dates of one from theses.fr (set
+over its own, kept when theses.fr is fetched again; marked ✎), and a student added by hand
+(name, title, supervisors, dates). Removing one added by hand deletes it; one from theses.fr
+is hidden instead: still listed (struck, with a comment on why), it can be restored, and is
+counted nowhere (author lists, the "with PhD student" filter, contribution roles), even once
+theses.fr is fetched again.
+
 **Settings** are grouped (Sources, Venues, Annotations, Reports, AI, Data) in a list on the
 left; the search box above it finds a setting by its words. A page with unsaved changes is
 listed below them, with its Save / Cancel.

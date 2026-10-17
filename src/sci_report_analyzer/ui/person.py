@@ -2157,16 +2157,18 @@ class ThesesView:
         self.panel = panel
         self.show_all = False
         self.shown: tuple | None = None
-        self.rows = persons.theses(person_id)
-        if not self.rows:
-            ui.label(_("No thesis: validate a theses.fr profile in the Sources tab.")).classes(
-                "text-grey"
-            )
-            return
-        student_aliases_view(person_id, self.rows)
+        self.aliases = ui.column().classes("w-full")
         self.container = ui.column().classes("w-full gap-2").mark("theses")
-        self.render()
+        self.reload()
         panel.on_render.append(self.refresh)
+
+    def reload(self) -> None:
+        """Read the theses again (one edited, added, removed), and render them."""
+        self.rows = persons.theses(self.person_id, hidden=True)
+        self.aliases.clear()
+        with self.aliases:
+            student_aliases_view(self.person_id, [t for t in self.rows if not t.hidden])
+        self.render()
 
     def refresh(self) -> None:
         """Re-render when the period changed."""
@@ -2184,8 +2186,27 @@ class ThesesView:
             if self.show_all or not bounded
             else [t for t in self.rows if theses.in_period(t, lo, hi)]
         )
+        total = sum(not t.hidden for t in self.rows)
         self.container.clear()
+
+        def add_button() -> None:
+            ui.button(
+                _("Add a PhD student"),
+                icon="person_add",
+                on_click=lambda: _student_dialog(self.person_id, None, self.reload),
+            ).props("flat dense no-caps").mark("thesis-add")
+
         with self.container:
+            if not bounded or not self.rows:
+                add_button()
+            if not self.rows:
+                ui.label(
+                    _(
+                        "No thesis: validate a theses.fr profile in the Sources tab, or add a "
+                        "PhD student by hand."
+                    )
+                ).classes("text-grey")
+                return
             if bounded:
                 period = next((p for p in self.panel.periods if p.id == self.panel.period_id), None)
                 rng = f"{lo or '…'}–{hi or '…'}"
@@ -2202,11 +2223,11 @@ class ThesesView:
                 with ui.row().classes("items-center gap-4"):
                     ui.label(
                         _("{n} of {total} theses in {where}").format(
-                            n=len(rows), total=len(self.rows), where=where
+                            n=sum(not t.hidden for t in rows), total=total, where=where
                         )
                         if not self.show_all
                         else _("All {total} theses (period: {where})").format(
-                            total=len(self.rows), where=where
+                            total=total, where=where
                         )
                     ).classes("text-grey").mark("theses-period")
 
@@ -2220,19 +2241,28 @@ class ThesesView:
                             "juries: the defence within it)"
                         )
                     ).mark("theses-all")
+                    add_button()
             outcomes = persons.student_outcomes(self.person_id)
             for role in ["director", "rapporteur", "examiner", "president", "author", "other"]:
                 items = [t for t in rows if t.role == role]
                 if items:
-                    _theses_table(role, items, self.person_id, outcomes)
+                    _theses_table(role, items, self.person_id, outcomes, self.reload)
 
 
-def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict) -> None:
+def _theses_table(
+    role: str,
+    items: list[Thesis],
+    person_id: int,
+    outcomes: dict,
+    on_change: Callable[[], None],
+) -> None:
     spans = {t.id: theses.span(t) for t in items}
     items.sort(key=lambda t: spans[t.id].end or spans[t.id].start or "9999", reverse=True)
-    with ui.expansion(f"{ROLE_LABELS[role]} ({len(items)})", value=role != "author").classes(
-        "w-full"
-    ):
+    hidden = sum(t.hidden for t in items)
+    label = f"{ROLE_LABELS[role]} ({len(items) - hidden})"
+    if hidden:
+        label += " · " + ngettext("{n} hidden", "{n} hidden", hidden).format(n=hidden)
+    with ui.expansion(label, value=role != "author").classes("w-full"):
         columns = [
             {"name": "start", "label": _("Start"), "field": "start", "sortable": True},
             {"name": "end", "label": _("End"), "field": "end", "sortable": True},
@@ -2244,14 +2274,15 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
         ]
         supervised = role == "director"
         if supervised:
-            columns.append(
+            columns += [
                 {
                     "name": "outcome",
                     "label": _("After the PhD"),
                     "field": "outcome",
                     "align": "left",
-                }
-            )
+                },
+                {"name": "edit", "label": "", "field": "id"},
+            ]
         table = (
             ui.table(
                 columns=columns,
@@ -2271,10 +2302,14 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
                         if t.status == "enCours"
                         else t.status,
                         "url": t.url,
+                        "hidden": t.hidden,
                         **(
                             {
                                 "outcome": outcomes.get(t.student or "", ""),
                                 "links": theses.search_links(t.student or ""),
+                                "added": t.added,
+                                "comment": t.comment or "",
+                                "edited": _edited_dates(t),
                             }
                             if supervised
                             else {}
@@ -2286,6 +2321,7 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
             )
             .classes("w-full")
             .props("dense flat wrap-cells")
+            .props(""":table-row-class-fn="r => r.hidden ? 'text-grey-6' : ''" """)
             .mark(f"theses-{role}")
         )
         estimated = escape(
@@ -2302,12 +2338,17 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
                 <q-tooltip>{estimated}</q-tooltip>
               </span>
               <span v-else>{{{{ props.value }}}}</span>
+              <q-icon v-if="props.row.edited" name="edit" size="xs" class="q-ml-xs">
+                <q-tooltip>{{{{ props.row.edited }}}}</q-tooltip>
+              </q-icon>
             </q-td>""",
         )
         table.add_slot(
             "body-cell-title",
             """
-            <q-td :props="props"><a :href="props.row.url" target="_blank">{{ props.value }}</a>
+            <q-td :props="props" :class="props.row.hidden ? 'text-strike' : ''">
+              <a v-if="props.row.url" :href="props.row.url" target="_blank">{{ props.value }}</a>
+              <span v-else>{{ props.value }}</span>
             </q-td>""",
         )
         if supervised:
@@ -2353,6 +2394,218 @@ def _theses_table(role: str, items: list[Thesis], person_id: int, outcomes: dict
                 ui.notify(_("Note saved"))
 
             table.on("outcome", save_outcome)
+            _student_slots(table, person_id, {t.id: t for t in items}, on_change)
+
+
+def _edited_dates(t: Thesis) -> str:
+    """The dates set by hand over theses.fr's, said (empty: none)."""
+    if not (t.start_override or t.end_override):
+        return ""
+    return _("Set by hand (theses.fr: {start} – {end})").format(
+        start=t.start_date or "?", end=t.defence_date or "…"
+    )
+
+
+def _student_slots(
+    table: ui.table, person_id: int, by_id: dict[int, Thesis], on_change: Callable[[], None]
+) -> None:
+    """Supervised theses: the student (struck once hidden, with why: click to edit), and
+    buttons to edit, remove (hide one from theses.fr), restore."""
+    table.add_slot(
+        "body-cell-student",
+        """
+        <q-td :props="props">
+          <span :class="props.row.hidden ? 'text-strike' : ''">{{ props.value }}</span>
+          <q-badge v-if="props.row.added" outline color="primary" class="q-ml-xs"
+                   label="__ADDED__" />
+          <q-badge v-if="props.row.hidden" outline color="grey" class="q-ml-xs"
+                   label="__HIDDEN__" />
+          <div v-if="props.row.hidden" class="cursor-pointer text-italic">
+            {{ props.row.comment || __ADD_COMMENT__ }}
+            <q-popup-edit v-model="props.row.comment" buttons v-slot="scope"
+                @save="v => $parent.$emit('comment', {id: props.row.id, comment: v})">
+              <q-input v-model="scope.value" type="textarea" autogrow dense autofocus
+                       label="__COMMENT_LABEL__" />
+            </q-popup-edit>
+          </div>
+        </q-td>""".replace("__ADDED__", escape(_("added by hand"), quote=True))
+        .replace("__HIDDEN__", escape(_("hidden"), quote=True))
+        .replace("__ADD_COMMENT__", json.dumps(_("why hidden? (add a comment)")))
+        .replace("__COMMENT_LABEL__", escape(_("Why it is hidden"), quote=True)),
+    )
+    table.add_slot(
+        "body-cell-edit",
+        """
+        <q-td :props="props" class="text-no-wrap">
+          <q-btn icon="edit" flat dense round size="sm"
+                 @click="$parent.$emit('edit', props.row.id)">
+            <q-tooltip>__EDIT__</q-tooltip>
+          </q-btn>
+          <q-btn v-if="props.row.hidden" icon="restore" flat dense round size="sm"
+                 @click="$parent.$emit('restore', props.row.id)">
+            <q-tooltip>__RESTORE__</q-tooltip>
+          </q-btn>
+          <q-btn v-else icon="delete" flat dense round size="sm"
+                 @click="$parent.$emit('remove', props.row.id)">
+            <q-tooltip>__REMOVE__</q-tooltip>
+          </q-btn>
+        </q-td>""".replace("__EDIT__", escape(_("Edit")))
+        .replace("__RESTORE__", escape(_("Restore: shown and counted again")))
+        .replace("__REMOVE__", escape(_("Remove this PhD student"))),
+    )
+
+    def edit(e) -> None:
+        _student_dialog(person_id, by_id[e.args], on_change)
+
+    def remove(e) -> None:
+        _remove_student_dialog(by_id[e.args], on_change)
+
+    def restore(e) -> None:
+        theses.restore(e.args)
+        ui.notify(_("PhD student restored"))
+        on_change()
+
+    def save_comment(e) -> None:
+        theses.set_comment(e.args["id"], e.args["comment"])
+        for r in table.rows:
+            if r["id"] == e.args["id"]:
+                r["comment"] = e.args["comment"].strip()
+        ui.notify(_("Comment saved"))
+
+    table.on("edit", edit)
+    table.on("remove", remove)
+    table.on("restore", restore)
+    table.on("comment", save_comment)
+
+
+def _student_dialog(person_id: int, t: Thesis | None, on_change: Callable[[], None]) -> None:
+    """A PhD student to add by hand (``t`` None) or edit: all of one added by hand, the
+    dates of one from theses.fr (set over its own, kept on its updates)."""
+    added = t is None or t.added
+    sp = theses.span(t) if t is not None else None
+    with transient_dialog(
+        _("Add a PhD student") if t is None else _("Edit the PhD student"),
+        width="w-full max-w-lg",
+    ) as (dlg, _card):
+        fields: dict[str, ui.input] = {}
+        if added:
+            fields["student"] = (
+                ui.input(_("PhD student"), value=t.student if t else "")
+                .classes("w-full")
+                .mark("student-name")
+            )
+            fields["title"] = (
+                ui.input(_("Title"), value=(t.title or "") if t else "")
+                .classes("w-full")
+                .mark("student-title")
+            )
+            fields["supervisors"] = (
+                ui.input(
+                    _("Supervisors (comma-separated)"),
+                    value=", ".join(t.supervisors or []) if t else "",
+                )
+                .classes("w-full")
+                .mark("student-supervisors")
+            )
+            fields["institution"] = (
+                ui.input(_("Institution"), value=(t.institution or "") if t else "")
+                .classes("w-full")
+                .mark("student-institution")
+            )
+        else:
+            ui.label(t.student or "").classes("font-medium")
+            ui.label(t.title or "").classes("text-grey")
+        with ui.row().classes("w-full gap-2 no-wrap"):
+            start = (
+                ui.input(
+                    _("Start"),
+                    value=(t.start_override or t.start_date or "") if t else "",
+                    placeholder="2021, 2021-10-01",
+                )
+                .classes("grow")
+                .mark("student-start")
+            )
+            end = (
+                ui.input(
+                    _("End (defence)"),
+                    value=(t.end_override or t.defence_date or "") if t else "",
+                    placeholder="2024-12-12",
+                )
+                .classes("grow")
+                .mark("student-end")
+                .tooltip(_("Empty while in progress"))
+            )
+        if not added:
+            ui.label(
+                _("theses.fr: {start} – {end} (empty: back to these)").format(
+                    start=t.start_date or (f"≈ {sp.start}" if sp and sp.start else "?"),
+                    end=t.defence_date or "…",
+                )
+            ).classes("text-grey text-sm")
+
+        def save() -> bool | None:
+            if added and not (fields["student"].value or "").strip():
+                ui.notify(_("A name is needed"), type="warning")
+                return False
+            if not (career.valid_date(start.value) and career.valid_date(end.value)):
+                ui.notify(_("Dates as 2021, 2021-10 or 2021-10-01"), type="warning")
+                return False
+            if added:
+                theses.save_student(
+                    person_id,
+                    theses.Student(
+                        fields["student"].value,
+                        fields["title"].value,
+                        start.value,
+                        end.value,
+                        fields["supervisors"].value.split(","),
+                        fields["institution"].value,
+                    ),
+                    t.id if t else None,
+                )
+            else:
+                theses.set_dates(t.id, start.value, end.value)
+            ui.notify(_("PhD student saved"))
+            on_change()
+
+        actions(dlg, _("Save"), save, mark="student-save")
+
+
+def _remove_student_dialog(t: Thesis, on_change: Callable[[], None]) -> None:
+    """Delete a PhD student added by hand; hide one from theses.fr (with why)."""
+    with transient_dialog(_("Remove {name}").format(name=t.student), width="max-w-lg") as (
+        dlg,
+        _card,
+    ):
+        comment = None
+        if t.added:
+            ui.label(_("This PhD student, added by hand, will be deleted."))
+        else:
+            ui.label(
+                _(
+                    "From theses.fr: hidden rather than deleted (still listed, greyed, to "
+                    "restore), and counted nowhere, even once theses.fr is fetched again."
+                )
+            )
+            comment = (
+                ui.textarea(_("Why it is hidden (optional)"))
+                .props("autogrow")
+                .classes("w-full")
+                .mark("student-comment")
+            )
+
+        def remove() -> None:
+            deleted = theses.remove(t.id, comment.value if comment else None)
+            ui.notify(_("PhD student deleted") if deleted else _("PhD student hidden"))
+            on_change()
+
+        actions(
+            dlg,
+            _("Delete") if t.added else _("Hide"),
+            remove,
+            danger=t.added,
+            mark="student-remove",
+        )
 
 
 __all__ = ["register"]

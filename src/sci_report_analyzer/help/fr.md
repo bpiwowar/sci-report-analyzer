@@ -498,6 +498,12 @@ thèses en cours, donc pour une thèse soutenue, c'est le début observé lorsqu
 estimation (3 ans avant la soutenance, marquée ≈). Elles suivent la période du panneau :
 encadrements qui la chevauchent, jurys dont la soutenance tombe dans la période.
 
+Les **doctorants** se modifient à la main (onglet Thèses) : les dates d'un doctorant de theses.fr (posées sur les
+siennes, gardées quand theses.fr est relu ; marquées ✎), et un doctorant ajouté à la main (nom, titre, encadrants,
+dates). Retirer un doctorant ajouté à la main le supprime ; un doctorant de theses.fr est masqué à la place :
+toujours listé (barré, avec un commentaire disant pourquoi), il peut être rétabli, et n'est compté nulle part (listes
+d'auteurs, filtre « avec doctorant », rôles de contribution), même quand theses.fr est relu.
+
 Les **paramètres** sont groupés (Sources, Canaux, Annotations, Rapports, IA, Données) dans une liste à gauche ;
 le champ de recherche au-dessus trouve un réglage par ses mots. Une page aux modifications non enregistrées est
 listée en dessous, avec ses Enregistrer / Annuler.
