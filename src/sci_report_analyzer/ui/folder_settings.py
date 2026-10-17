@@ -108,13 +108,8 @@ def models_section(folder_id: int) -> Callable[[], tuple[str, str]]:
 
     async def load() -> None:
         for select, listing in (
-            (inputs[0], llm.list_models(st.url)),
-            (
-                inputs[1],
-                llm.list_embed_models(
-                    st.embed_api, st.embed_url if st.embed_api == "openai" else st.url
-                ),
-            ),
+            (inputs[0], llm.list_chat_models(st.chat_api, llm.chat_server(st))),
+            (inputs[1], llm.list_embed_models(st.embed_api, llm.embed_server(st))),
         ):
             try:
                 found = await listing

@@ -182,3 +182,27 @@ def test_edited_instructions() -> None:
         assert m["content"].startswith("You rewrite a passage") and "Led X" in m["content"]
     finally:
         excerpt_rewrite.save_prompt("")
+
+
+def test_trial(model) -> None:
+    """A passage rewritten by a given model (to compare them): timed, its error said."""
+    answer = {"text": "Reviewer", "start_year": 2020, "end_year": None, "ongoing": True}
+    with respx.mock:
+        route = respx.post(CHAT).mock(return_value=_answer(answer))
+        t = asyncio.run(excerpt_rewrite.trial("I review", "", "", "qwen3:8b"))
+        assert json.loads(route.calls[0].request.content)["model"] == "qwen3:8b"
+        assert (t.model, t.rewrite, t.error) == (
+            "qwen3:8b",
+            Rewrite(text="Reviewer", start=2020),
+            "",
+        )
+        assert t.seconds >= 0
+        route.mock(return_value=_answer("not json"))
+        t = asyncio.run(excerpt_rewrite.trial("I review", "", "", "qwen3:8b"))
+        assert t.rewrite is None and t.error
+        route.mock(return_value=_answer({"text": ""}))
+        t = asyncio.run(excerpt_rewrite.trial("I review", "", "", "qwen3:8b"))
+        assert t.rewrite is None and t.error == ""  # (an answer, not valid)
+        route.mock(return_value=httpx.Response(200, json={"error": "out of memory"}))
+        t = asyncio.run(excerpt_rewrite.trial("I review", "", "", "gemma3:4b"))
+        assert (t.rewrite, t.error) == (None, "out of memory")

@@ -1,6 +1,8 @@
-"""Local LLM (Ollama) settings, for the features that use one; and the embeddings of texts
-(e.g. to classify the excerpts), from Ollama (``/api/embed``) or an OpenAI-compatible server
-(``/v1/embeddings``: llama.cpp, vLLM, LM Studio…), with a default embedding model.
+"""Local LLM settings, for the features that use one: its answers (see chat_json) from Ollama
+(``/api/chat``) or an OpenAI-compatible server (``/v1/chat/completions``: llama.cpp, vLLM,
+LM Studio…); and the embeddings of texts (e.g. to classify the excerpts), from Ollama
+(``/api/embed``) or an OpenAI-compatible server (``/v1/embeddings``), with a default
+embedding model. An OpenAI-compatible server may need an API key (sent to both).
 
 Only local models are used: the servers must be on this machine or the local network (see
 is_local_url; another one is refused), and Ollama's *cloud* models (offloaded to ollama.com)
@@ -10,7 +12,8 @@ are never listed nor used. The Ollama server itself can refuse them with
 Environment variables take precedence over the stored settings: ``OLLAMA_HOST`` (the server
 URL, as for the ollama CLI), ``SCI_REPORT_ANALYZER_OLLAMA_MODEL`` and
 ``SCI_REPORT_ANALYZER_EMBED_MODEL``, ``SCI_REPORT_ANALYZER_REWRITE_MODEL`` (rewriting the
-excerpts: see rewrite_model; "none": not rewritten). A task (see TASKS) and a folder (its
+excerpts: see rewrite_model; "none": not rewritten), ``SCI_REPORT_ANALYZER_LLM_API_KEY``
+(the OpenAI-compatible servers' API key). A task (see TASKS) and a folder (its
 reports' settings: see folder_models) can use other models.
 """
 
@@ -34,6 +37,7 @@ URL_ENV = "OLLAMA_HOST"
 MODEL_ENV = "SCI_REPORT_ANALYZER_OLLAMA_MODEL"
 EMBED_MODEL_ENV = "SCI_REPORT_ANALYZER_EMBED_MODEL"
 REWRITE_MODEL_ENV = "SCI_REPORT_ANALYZER_REWRITE_MODEL"
+API_KEY_ENV = "SCI_REPORT_ANALYZER_LLM_API_KEY"
 NONE = "none"  # (a model: none, e.g. the excerpts not rewritten)
 # The tasks using the LLM: each can have its own model (none: the default one).
 TASKS = {"career": N_("Reading a person's career")}
@@ -66,6 +70,11 @@ SUGGESTED = {
 EMBED_APIS = {
     "ollama": N_("Ollama (/api/embed)"),
     "openai": N_("OpenAI-compatible (/v1/embeddings)"),
+}
+# Where the LLM's answers come from: the Ollama server, or an OpenAI-compatible one.
+CHAT_APIS = {
+    "ollama": N_("Ollama (/api/chat)"),
+    "openai": N_("OpenAI-compatible (/v1/chat/completions)"),
 }
 _SETTING = "ollama"
 # The server-side switch turning off Ollama's cloud features (https://docs.ollama.com/faq).
@@ -132,6 +141,11 @@ class OllamaSettings:
     # The model rewriting a new excerpt (and finding its years: see excerpt_rewrite; blank
     # or NONE: none).
     rewrite_model: str = ""
+    chat_api: str = "ollama"  # (see CHAT_APIS)
+    # The OpenAI-compatible server answering (its base URL, e.g. http://localhost:8080/v1).
+    chat_url: str = ""
+    # The OpenAI-compatible servers' API key (chat and embeddings; blank: none sent).
+    api_key: str = ""
 
 
 def stored_settings() -> OllamaSettings:
@@ -164,16 +178,41 @@ def settings() -> OllamaSettings:
         st.embed_model = model
     if model := os.environ.get(REWRITE_MODEL_ENV):
         st.rewrite_model = model
+    if key := os.environ.get(API_KEY_ENV):
+        st.api_key = key
     st.url = _normalize_url(st.url)
     if st.embed_api not in EMBED_APIS:
         st.embed_api = "ollama"
-    st.model = "" if is_cloud(st.model) else st.model
-    if is_cloud(st.rewrite_model):  # (refused: not the general model in its place either)
-        st.rewrite_model = NONE
+    if st.chat_api not in CHAT_APIS:
+        st.chat_api = "ollama"
+    if st.chat_api == "ollama":  # (cloud models: Ollama's only)
+        st.model = "" if is_cloud(st.model) else st.model
+        if is_cloud(st.rewrite_model):  # (refused: not the general model in its place either)
+            st.rewrite_model = NONE
     if st.embed_api == "ollama" and is_cloud(st.embed_model):
         st.embed_model = ""
     st.cluster_min, st.cluster_max = max(1, int(st.cluster_min)), max(1, int(st.cluster_max))
     return st
+
+
+def chat_server(st: OllamaSettings) -> str:
+    """The URL of the server answering (see CHAT_APIS): Ollama's, or the OpenAI-compatible
+    one's (with /v1)."""
+    return st.chat_url if st.chat_api == "openai" else st.url
+
+
+def embed_server(st: OllamaSettings) -> str:
+    """The URL of the embeddings' server (see EMBED_APIS)."""
+    return st.embed_url if st.embed_api == "openai" else st.url
+
+
+def _cloud(st: OllamaSettings, name: str) -> bool:
+    """(a model refused: Ollama's cloud one, the answers from Ollama)"""
+    return st.chat_api == "ollama" and is_cloud(name)
+
+
+def _headers(api_key: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
 
 def folder_models(folder_id: int | None) -> tuple[str, str]:
@@ -200,7 +239,7 @@ def model(folder_id: int | None = None, task: str | None = None) -> str:
     if not st.enabled:
         return ""
     chosen = folder_models(folder_id)[0] or st.tasks.get(task or "", "") or st.model
-    return "" if is_cloud(chosen) else chosen
+    return "" if _cloud(st, chosen) else chosen
 
 
 def prompt(task: str, default: str) -> str:
@@ -255,30 +294,62 @@ async def chat_json(
     timeout: float = 600.0,
     name: str | None = None,
 ) -> dict:
-    """The LLM's answer to ``messages`` (Ollama's /api/chat) for a task, as JSON following
-    ``schema`` (a structured output: constrained decoding; raises if no LLM, the server is
-    not local or unreachable). Streamed: ``progress`` is called with the phase ("reading" the
-    text, "thinking", "writing" the answer) and the characters written in it. ``name``: this
-    model instead (a local one)."""
-    name = model(folder_id, task) if name is None else ("" if is_cloud(name) else name)
+    """The LLM's answer to ``messages`` (Ollama's /api/chat, or an OpenAI-compatible
+    server's /chat/completions: see CHAT_APIS) for a task, as JSON following ``schema`` (a
+    structured output: constrained decoding; raises if no LLM, the server is not local or
+    unreachable). Streamed: ``progress`` is called with the phase ("reading" the text,
+    "thinking", "writing" the answer) and the characters written in it. ``name``: this model
+    instead (a local one)."""
+    st = settings()
+    name = model(folder_id, task) if name is None else ("" if _cloud(st, name) else name)
     if not name:
         raise RuntimeError("No LLM (Settings → Local LLM)")
-    st = settings()
+    if progress:
+        progress("reading", 0)
+    content, thought = [], 0
+
+    def received(thinking: str | None, text: str | None) -> None:
+        nonlocal thought
+        if thinking:
+            thought += len(thinking)
+            if progress:
+                progress("thinking", thought)
+        if text:
+            content.append(text)
+            if progress:
+                progress("writing", sum(map(len, content)))
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        if st.chat_api == "openai":
+            await _openai_chat(client, st, name, messages, schema, thinks(task), received)
+        else:
+            await _ollama_chat(client, st, name, messages, schema, thinks(task), received)
+    return json.loads(_THINK_BLOCK.sub("", "".join(content), count=1))
+
+
+# The reasoning some servers leave in the answer itself (e.g. qwen3's, without a parser).
+_THINK_BLOCK = re.compile(r"^\s*<think>.*?</think>", re.DOTALL)
+
+
+async def _ollama_chat(
+    client: httpx.AsyncClient,
+    st: OllamaSettings,
+    name: str,
+    messages: list[dict[str, str]],
+    schema: dict,
+    think: bool,
+    received: Callable[[str | None, str | None], None],
+) -> None:
+    """(Ollama's /api/chat, streamed: one JSON object per line)"""
     body = {
         "model": name,
         "messages": messages,
         "format": schema,
         "stream": True,
-        "think": thinks(task),
+        "think": think,
         "options": {"temperature": 0},
     }
-    if progress:
-        progress("reading", 0)
-    content, thought = [], 0
-    async with (
-        httpx.AsyncClient(timeout=timeout) as client,
-        client.stream("POST", f"{_local(st.url)}/api/chat", json=body) as r,
-    ):
+    async with client.stream("POST", f"{_local(st.url)}/api/chat", json=body) as r:
         r.raise_for_status()
         async for line in r.aiter_lines():
             if not line.strip():
@@ -287,15 +358,50 @@ async def chat_json(
             if error := chunk.get("error"):
                 raise RuntimeError(error)
             message = chunk.get("message") or {}
-            if t := message.get("thinking"):
-                thought += len(t)
-                if progress:
-                    progress("thinking", thought)
-            if c := message.get("content"):
-                content.append(c)
-                if progress:
-                    progress("writing", sum(map(len, content)))
-    return json.loads("".join(content))
+            received(message.get("thinking"), message.get("content"))
+
+
+async def _openai_chat(
+    client: httpx.AsyncClient,
+    st: OllamaSettings,
+    name: str,
+    messages: list[dict[str, str]],
+    schema: dict,
+    think: bool,
+    received: Callable[[str | None, str | None], None],
+) -> None:
+    """(an OpenAI-compatible server's /chat/completions, streamed: server-sent events; the
+    reasoning in "reasoning_content" or "reasoning", as llama.cpp and vLLM send it; thinking
+    turned on or off by the chat template, for the models that have the switch, e.g. qwen3)"""
+    body = {
+        "model": name,
+        "messages": messages,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "answer", "schema": schema},
+        },
+        "stream": True,
+        "temperature": 0,
+        "chat_template_kwargs": {"enable_thinking": think},
+    }
+    url = f"{_local(st.chat_url)}/chat/completions"
+    async with client.stream("POST", url, json=body, headers=_headers(st.api_key)) as r:
+        r.raise_for_status()
+        async for line in r.aiter_lines():
+            data = line.removeprefix("data:").strip() if line.startswith("data:") else ""
+            if not data:
+                continue
+            if data == "[DONE]":
+                break
+            chunk = json.loads(data)
+            if error := chunk.get("error"):
+                raise RuntimeError(error.get("message") if isinstance(error, dict) else error)
+            for choice in chunk.get("choices") or []:
+                delta = choice.get("delta") or choice.get("message") or {}
+                received(
+                    delta.get("reasoning_content") or delta.get("reasoning"),
+                    delta.get("content"),
+                )
 
 
 async def embed(
@@ -311,7 +417,9 @@ async def embed(
     async with httpx.AsyncClient(timeout=timeout) as client:
         if st.embed_api == "openai":
             r = await client.post(
-                f"{_local(st.embed_url)}/embeddings", json={"model": name, "input": texts}
+                f"{_local(st.embed_url)}/embeddings",
+                json={"model": name, "input": texts},
+                headers=_headers(st.api_key),
             )
             r.raise_for_status()
             rows = sorted(r.json()["data"], key=lambda d: d.get("index", 0))
@@ -331,13 +439,34 @@ async def list_models(url: str, timeout: float = 5.0) -> list[str]:
     return sorted(m["name"] for m in models if not is_cloud(m))
 
 
-async def list_embed_models(api: str, url: str, timeout: float = 5.0) -> list[str]:
+async def list_openai_models(
+    url: str, api_key: str | None = None, timeout: float = 5.0
+) -> list[str]:
+    """The models of an OpenAI-compatible server (``/models``, ``url`` with /v1; ``api_key``:
+    none, the one set; raises if not local, or unreachable)."""
+    key = settings().api_key if api_key is None else api_key
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.get(f"{_local(url)}/models", headers=_headers(key))
+        r.raise_for_status()
+    return sorted(m["id"] for m in r.json().get("data", []))
+
+
+async def list_chat_models(
+    api: str, url: str, api_key: str | None = None, timeout: float = 5.0
+) -> list[str]:
+    """The models of the server answering (see CHAT_APIS): Ollama's at ``url`` (without the
+    cloud ones), or an OpenAI-compatible one's (raises if not local, or unreachable)."""
+    if api == "openai":
+        return await list_openai_models(url, api_key, timeout=timeout)
+    return await list_models(url, timeout=timeout)
+
+
+async def list_embed_models(
+    api: str, url: str, api_key: str | None = None, timeout: float = 5.0
+) -> list[str]:
     """The models of the embeddings' server: Ollama's (at ``url``: all of them, it does not
     tell the embedding ones), or an OpenAI-compatible one's (``/models``; raises if not
     local, or unreachable)."""
     if api != "openai":
         return await list_models(url, timeout=timeout)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        r = await client.get(f"{_local(url)}/models")
-        r.raise_for_status()
-    return sorted(m["id"] for m in r.json().get("data", []))
+    return await list_openai_models(url, api_key, timeout=timeout)

@@ -2346,6 +2346,93 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
     )
 
 
+async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
+    """“Change LLM” in a new excerpt's dialog: the local LLM off, said (where to turn it on);
+    on, the passage rewritten by the models chosen, one after the other, side by side with
+    their times (a failure said); one kept: its wording and years in the excerpt, its model
+    the one rewriting the excerpts if asked."""
+    from sci_report_analyzer import categories, excerpt_rewrite, llm
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    service = categories.add(folder, "Service")
+    doc = documents.add(period, "Application.pdf", PDF)
+    line = "Entre 2019 et 2021, j'ai été membre du conseil de l'école X et trésorier."
+    x = 50 + 5 * line.index("membre")
+    documents.set_lines(doc, [{"p": 1, "t": line, "r": [50, 700, 50 + 5 * len(line), 710]}])
+    selection = {
+        "text": "membre du conseil de l'école X",
+        "p": 1,
+        "rects": [[x, 700, x + 150, 710, 1]],
+    }
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker="excerpt-change-llm")
+    user.find(marker="excerpt-change-llm").click()
+    await user.should_see(marker="change-llm-off")
+    await user.should_see(marker="change-llm-settings")
+    for dlg in user.find(ui.dialog).elements:
+        dlg.close()
+    await user.should_not_see(marker="excerpt-start")
+
+    asked = []
+
+    async def trial(text, before, after, name):
+        asked.append((name, text, before))
+        if name == "broken":
+            return excerpt_rewrite.Trial(name, None, 0.5, "out of memory")
+        r = excerpt_rewrite.Rewrite(text=f"Membre du conseil de l'école X ({name})", start=2018)
+        return excerpt_rewrite.Trial(name, r, 1.25)
+
+    async def models(api, url, api_key=None):
+        return ["broken", "gemma3:4b", "qwen3:8b"]
+
+    monkeypatch.setenv(llm.REWRITE_MODEL_ENV, "none")  # (none rewriting: still to try)
+    llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3:8b"))
+    monkeypatch.setattr(excerpt_rewrite, "trial", trial)
+    monkeypatch.setattr(llm, "list_chat_models", models)
+    try:
+        user.find(marker="pdf-excerpt").click()
+        await user.should_see(marker="excerpt-rewrite-off")
+        user.find(marker="excerpt-change-llm").click()
+        await user.should_see(marker="change-llm-models")
+        chooser = user.find(marker="change-llm-models").elements.pop()
+        for _ in range(20):  # (the server's models, loaded)
+            if "gemma3:4b" in chooser.options:
+                break
+            await asyncio.sleep(0.05)
+        assert chooser.options == ["broken", "gemma3:4b", "qwen3:8b"]
+        chooser.value = ["gemma3:4b", "broken"]
+        user.find(marker="change-llm-run").click()
+        await user.should_see(marker="change-llm-text-0")
+        await user.should_see(marker="change-llm-failed-1")
+        await user.should_see("out of memory")
+        await user.should_see(marker="change-llm-time-0")
+        assert [a[0] for a in asked] == ["gemma3:4b", "broken"]
+        assert asked[0][1:] == (selection["text"], "Entre 2019 et 2021, j'ai été ")
+        await user.should_not_see(marker="change-llm-keep-1")
+        user.find(marker="change-llm-default").elements.pop().value = True
+        user.find(marker="change-llm-keep-0").click()
+        await user.should_not_see(marker="change-llm-models")
+        assert user.find(marker="excerpt-text").elements.pop().value == (
+            "Membre du conseil de l'école X (gemma3:4b)"
+        )
+        assert user.find(marker="excerpt-start").elements.pop().value == 2018
+        assert llm.stored_settings().rewrite_model == "gemma3:4b"
+        user.find(marker=f"pick-category-{service}").click()
+        await user.should_see("Added to Service")
+        [e] = categories.excerpts(period)
+        assert (e.text, e.original, e.start_year) == (
+            "Membre du conseil de l'école X (gemma3:4b)",
+            "membre du conseil de l'école X",
+            2018,
+        )
+    finally:
+        llm.save_settings(llm.OllamaSettings())
+
+
 async def test_pdfs_beside_the_person_page(user: User, fake_viewer):
     """The PDFs open beside a person's page (from the address, else as left): one shown, the
     others listed below, the person's documents within the folder always; shown, minimized,
