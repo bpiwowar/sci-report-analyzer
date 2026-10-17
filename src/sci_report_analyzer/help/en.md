@@ -469,8 +469,12 @@ starts with the earliest of their career, theses and excerpts (their papers at m
 years before; the earlier ones counted below). It opens zoomed in (years twice as wide as
 fitting the width), scrolled to their period in the folder; the magnifiers widen or narrow
 the years (the text stays the same size), down to the whole timeline fitting the width. Each
-kind is shown or hidden with its switch; one they have none of is said so. The excerpts
-without years, and the lines of the career without dates, are listed apart, below.
+kind is shown or hidden with its switch; one they have none of is said so. An excerpt has
+a switch of its own (in the details below, or its button in the Excerpts tab): off, it is
+left out of the timeline (still kept), listed apart below, where it is switched back on. The
+excerpts without years, and the lines of the career without dates, are listed apart, below.
+The timeline takes the full width: a PDF shown beside the page is set aside meanwhile (still
+in the strip below), and shown again when leaving the tab.
 
 Folders can be **within other folders**: the Reports page shows them as a **tree**, each
 folder expanded showing the folders within it then its people, one line each (their period,

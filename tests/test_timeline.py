@@ -5,11 +5,11 @@ from dataclasses import replace
 from datetime import date
 
 import pytest
-from helpers import add_source, make_person, pub, thesis
+from helpers import PDF, add_source, make_person, pub, thesis
 from nicegui.testing import User
 from sqlalchemy import select
 
-from sci_report_analyzer import career, categories, folders, timeline
+from sci_report_analyzer import career, categories, documents, folders, timeline
 from sci_report_analyzer.career import Entry
 from sci_report_analyzer.db.models import Publication
 from sci_report_analyzer.db.session import session_scope
@@ -259,3 +259,64 @@ def test_lanes_with_room() -> None:
     assert timeline.lanes(spans) == 1
     assert timeline.lanes(spans, room=3) == 2
     assert [t.lane for t in spans] == [0, 1, 0]
+
+
+async def test_timeline_excerpt_left_out(user: User) -> None:
+    """An excerpt's switch off: not on the timeline, listed apart (put back from there); its
+    button in the Excerpts tab too."""
+    pid, period, cats, _paper = _seed()
+    add = categories.add_excerpt
+    kept = add(cats["Research"], period, "Led a project.", 1, [], start=2021)
+    out = add(cats["Teaching"], period, "Taught a course.", 1, [], start=2022)
+    categories.set_in_timeline(out, False)
+    left: list[categories.ExcerptView] = []
+    dated, _undated = categories.timeline(period, left)
+    assert [d.excerpt.id for _y, items in dated for d in items] == [kept]
+    assert [e.id for e in left] == [out]
+
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see(marker=f"timeline-span-{kept}")
+    await user.should_not_see(marker=f"timeline-span-{out}")
+    await user.should_see("1 excerpt left out of the timeline", marker="timeline-left-out")
+    user.find(marker=f"timeline-switch-{out}").elements.pop().set_value(True)
+    await user.should_see(marker=f"timeline-span-{out}")
+    await user.should_not_see(marker="timeline-left-out")
+    # Off from the details of its year.
+    user.find(marker="timeline-tick-2021").click()
+    await user.should_see(marker=f"timeline-switch-{kept}")
+    user.find(marker=f"timeline-switch-{kept}").elements.pop().set_value(False)
+    await user.should_see(marker="timeline-left-out")
+    await user.should_not_see(marker=f"timeline-span-{kept}")
+    # Off when shown alone in the details: they closed.
+    user.find(marker=f"timeline-switch-{kept}").elements.pop().set_value(True)
+    await user.should_see(marker=f"timeline-span-{kept}")
+    user.find(marker="timeline-details-close").click()
+    await user.should_see(marker="timeline-details-hint")
+    user.find(marker=f"timeline-span-{kept}").click()
+    await user.should_not_see(marker="timeline-details-hint")
+    user.find(marker=f"timeline-switch-{kept}").elements.pop().set_value(False)
+    await user.should_see(marker="timeline-details-hint")
+    assert not next(e for e in categories.excerpts(period) if e.id == kept).in_timeline
+    # From the Excerpts tab: back on it.
+    await user.open(f"/person/{pid}/{period}?tab=excerpts")
+    user.find(marker=f"excerpt-timeline-{kept}").click()
+    await user.should_see(marker="excerpts-side")
+    assert next(e for e in categories.excerpts(period) if e.id == kept).in_timeline
+
+
+async def test_timeline_full_width(user: User, fake_viewer) -> None:
+    """The timeline of the full width: the PDF shown set aside, shown again after."""
+    pid, period, _cats, _paper = _seed()
+    doc = documents.add(period, "Application.pdf", PDF)
+    await user.open(f"/person/{pid}/{period}?tab=report&pdfs=d{doc}&pdf=d{doc}")
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    user.find(marker="tab-timeline").click()
+    await user.should_see(marker="timeline")
+    await user.should_not_see(marker=f"dock-frame-d{doc}")
+    await user.should_see(marker=f"dock-tab-d{doc}")  # (still in the strip)
+    user.find(marker="tab-report").click()
+    await user.should_see(marker=f"dock-frame-d{doc}")
+    # Opened there on the timeline: set aside too.
+    await user.open(f"/person/{pid}/{period}?tab=timeline&pdfs=d{doc}&pdf=d{doc}")
+    await user.should_see(marker="timeline")
+    await user.should_not_see(marker=f"dock-frame-d{doc}")

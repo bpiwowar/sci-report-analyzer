@@ -723,6 +723,7 @@ class ExcerptView:
     salient: bool = False
     caveat: bool = False
     discarded: bool = False  # (left out of the generated text: see set_discarded)
+    in_timeline: bool = True  # (else left out of the timeline: see set_in_timeline)
     level: str | None = None  # (its level's key, see reports.levels; none: the folder's default)
     comment: str | None = None  # (a commentary, Markdown; leading a group: the group's)
     minor: bool = False
@@ -927,6 +928,7 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
                 salient=e.salient,
                 caveat=e.caveat,
                 discarded=e.discarded,
+                in_timeline=e.in_timeline,
                 level=e.level,
                 comment=e.comment,
                 minor=e.minor,
@@ -953,11 +955,17 @@ class Dated:
     paper_year: bool = False
 
 
-def timeline(period_id: int) -> tuple[list[tuple[int, list[Dated]]], list[ExcerptView]]:
+def timeline(
+    period_id: int, left_out: list[ExcerptView] | None = None
+) -> tuple[list[tuple[int, list[Dated]]], list[ExcerptView]]:
     """The excerpts of a person in a folder (groups: their leads) by year, the most recent
     first, each in the order of the categories within a year; and those without a year (nor
-    a paper's), in their order."""
+    a paper's), in their order. Those left out of the timeline (see set_in_timeline): not
+    there, but added to ``left_out`` (if given)."""
     views = excerpts(period_id, grouped=True)
+    if left_out is not None:
+        left_out.extend(v for v in views if not v.in_timeline)
+    views = [v for v in views if v.in_timeline]
     found = folders.folder_of_period(period_id)
     order = {n.id: i for i, n in enumerate(tree(found[0]))} if found else {}
     pubs = {v.publication_id for v in views if v.publication_id}
@@ -1121,6 +1129,7 @@ def remove_excerpt(excerpt_id: int) -> None:
                 lead.start_year, lead.end_year = e.start_year, e.end_year
                 lead.influence, lead.salient, lead.caveat = e.influence, e.salient, e.caveat
                 lead.minor, lead.discarded, lead.level = e.minor, e.discarded, e.level
+                lead.in_timeline = e.in_timeline
                 lead.group_text, lead.comment, lead.url = e.group_text, e.comment, e.url
                 lead.tags = list(e.tags)
                 for x in others[1:]:
@@ -1198,6 +1207,14 @@ def set_discarded(excerpt_id: int, discarded: bool) -> None:
     with session_scope() as s:
         if e := s.get(Excerpt, excerpt_id):
             e.discarded = discarded
+
+
+def set_in_timeline(excerpt_id: int, shown: bool) -> None:
+    """Show an excerpt (the group it leads) on the person's timeline, or leave it out of it
+    (still kept, and listed)."""
+    with session_scope() as s:
+        if e := s.get(Excerpt, excerpt_id):
+            e.in_timeline = shown
 
 
 def set_group_text(excerpt_id: int, text: str | None) -> None:

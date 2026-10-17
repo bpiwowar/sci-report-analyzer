@@ -402,7 +402,8 @@ class Excerpt(Base):
     markers: whether it shows the person's influence ("rayonnement": invited talks, prizes,
     committees…), is salient ("saillant"), minor ("mineur"), or a caveat ("bémol"); its level
     (e.g. national: one of the folder's, see reports.levels; none: the folder's default);
-    whether it is discarded from the generated text; a commentary on it, and a link (URL)."""
+    whether it is discarded from the generated text, or left out of the timeline; a commentary
+    on it, and a link (URL)."""
 
     __tablename__ = "excerpt"
 
@@ -434,6 +435,9 @@ class Excerpt(Base):
     # Left out of the generated text (the notes, the reports), still kept and listed; that of
     # the group it leads.
     discarded: Mapped[bool] = mapped_column(default=False, server_default="0")
+    # Shown on the person's timeline (else left out of it, still kept); that of the group it
+    # leads.
+    in_timeline: Mapped[bool] = mapped_column(default=True, server_default="1")
     # Merged with others: the excerpt leading the group (its category, years… are the
     # group's), else none.
     group_id: Mapped[int | None] = mapped_column(

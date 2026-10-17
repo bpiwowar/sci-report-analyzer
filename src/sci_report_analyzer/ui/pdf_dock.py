@@ -66,6 +66,7 @@ class PdfDock:
         self.folder: int | None = None  # (the period, within a folder, documents are added to)
         self.on_added: Callable[[], None] | None = None  # (a document added: the menu's listing)
         self.last: str | None = None  # (the PDF shown last)
+        self.aside: str | None = None  # (the PDF hidden for a tab of the full width)
         self.left = annotations.ui_state(SIDE, "right") == "left"
         scripts({"dockMin": WIDTH_MIN, "dockLeft": self.left}, "dock.js")
         width = max(WIDTH_MIN, int(annotations.ui_state(WIDTH, WIDTH_DEFAULT) or WIDTH_DEFAULT))
@@ -187,10 +188,12 @@ class PdfDock:
         """For the address of the page."""
         if not self.keys:
             return {}
-        return {"pdfs": ",".join(self.keys), **({"pdf": self.shown} if self.shown else {})}
+        shown = self.shown or self.aside  # (set aside: shown again, the page reloaded)
+        return {"pdfs": ",".join(self.keys), **({"pdf": shown} if shown else {})}
 
     def open(self, key: str, page: int | None = None) -> None:
         """Show the PDF ``key`` (opened first, if need be), at ``page``."""
+        self.aside = None
         if key not in self.keys:
             if not self._known(key):
                 ui.notify(_("No such PDF"), type="warning")
@@ -220,8 +223,22 @@ class PdfDock:
         if self.keys or self.docs:
             self.open(self.last if self.last in self.keys else (self.keys or self.docs)[0])
 
+    def set_aside(self, aside: bool) -> None:
+        """Hidden for a tab of the full width (the timeline), the PDF shown; shown again
+        after (unless another was opened meanwhile, or none is)."""
+        if aside:
+            if self.shown is not None:
+                self.aside = self.shown
+                self.minimize()
+        elif self.aside is not None:
+            key, self.aside = self.aside, None
+            if self.shown is None and key in self.keys:
+                self.open(key)
+
     def close(self, key: str) -> None:
         """Out of the view (nothing deleted)."""
+        if self.aside == key:
+            self.aside = None
         if key in self.keys:
             self.keys.remove(key)
         if (frame := self.frames.pop(key, None)) is not None:
@@ -264,7 +281,7 @@ class PdfDock:
         if not changed:
             return
         annotations.save_ui_state(
-            _state_key(self.person_id), {"open": self.keys, "shown": self.shown}
+            _state_key(self.person_id), {"open": self.keys, "shown": self.shown or self.aside}
         )
         self._on_change()
         for f in self.on_shown:

@@ -118,6 +118,7 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
             panel.push_url()
 
         def tab_changed(e) -> None:
+            dock.set_aside(e.value == "timeline")  # (of the full width)
             address()
             if e.value in REPORT_TABS:
                 report.fill(e.value)
@@ -175,6 +176,7 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
         }
         if tab in REPORT_TABS:
             report.fill(tab)
+        dock.set_aside(tab == "timeline")
 
 
 def page_header(person_id: int, period_id: int | None, tab: str) -> None:
