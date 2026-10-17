@@ -39,6 +39,7 @@ class Member:
     end_year: int | None
     stars: int
     tags: list[str] = field(default_factory=list)
+    documents: int = 0  # (attached to their period)
 
 
 @dataclass
@@ -77,6 +78,11 @@ def folders(*, include_hidden: bool = True) -> list[FolderView]:
         if not include_hidden:
             q = q.where(Folder.hidden.is_(False))
         paths = _paths(s)
+        documents = dict(
+            s.execute(
+                select(PeriodDocument.period_id, func.count()).group_by(PeriodDocument.period_id)
+            ).all()
+        )
         out = [
             FolderView(
                 f.id,
@@ -94,6 +100,7 @@ def folders(*, include_hidden: bool = True) -> list[FolderView]:
                             p.end_year,
                             len(p.stars),
                             list(p.tags or []),
+                            documents.get(p.id, 0),
                         )
                         for p in f.periods
                     ),

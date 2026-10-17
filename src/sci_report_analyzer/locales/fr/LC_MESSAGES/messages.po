@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-17 11:13+0200\n"
+"POT-Creation-Date: 2026-10-17 11:16+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -3151,6 +3151,9 @@ msgstr "Aucun filtre de copie activé : voir Paramètres → Filtres de copie"
 msgid "No document"
 msgstr "Aucun document"
 
+msgid "No document attached in this folder"
+msgstr "Aucun document joint dans ce dossier"
+
 msgid "No excerpt filed yet: nothing to learn from"
 msgstr "Aucun extrait classé : rien à apprendre"
 
@@ -5725,7 +5728,9 @@ msgstr ""
 "modifie le texte du groupe)."
 
 msgid "They have excerpts, and this folder's settings (its categories) differ"
-msgstr "Cette personne a des extraits, et les réglages de ce dossier (ses catégories) diffèrent"
+msgstr ""
+"Cette personne a des extraits, et les réglages de ce dossier (ses "
+"catégories) diffèrent"
 
 msgid "Thinks"
 msgstr "Réfléchit"
@@ -7431,6 +7436,12 @@ msgid "{n} decision the group lacks"
 msgid_plural "{n} decisions the group lacks"
 msgstr[0] "{n} décision que le groupe n'a pas"
 msgstr[1] "{n} décisions que le groupe n'a pas"
+
+#, python-brace-format
+msgid "{n} document attached in this folder"
+msgid_plural "{n} documents attached in this folder"
+msgstr[0] "{n} document joint dans ce dossier"
+msgstr[1] "{n} documents joints dans ce dossier"
 
 #, python-brace-format
 msgid "{n} hidden by the filters"

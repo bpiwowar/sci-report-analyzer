@@ -653,6 +653,25 @@ def _person_row(
                 ).tooltip(_("Starred papers"))
             _tags_editor(member, folder_tags)
         with ui.row().classes("items-center gap-1 no-wrap ml-auto"):
+            if member.documents:
+                with (
+                    ui.link(target=f"{url}?tab=report")
+                    .classes("row items-center no-wrap text-grey-8 no-underline mr-1")
+                    .mark(f"documents-{member.period_id}")
+                ):
+                    ui.icon("description", size="xs")
+                    ui.label(str(member.documents)).classes("text-xs")
+                    ui.tooltip(
+                        ngettext(
+                            "{n} document attached in this folder",
+                            "{n} documents attached in this folder",
+                            member.documents,
+                        ).format(n=member.documents)
+                    )
+            else:
+                ui.icon("description", size="xs", color="grey-4").classes("mr-1").tooltip(
+                    _("No document attached in this folder")
+                ).mark(f"no-documents-{member.period_id}")
             for ln in validated:
                 with source_tag(
                     ln.source, url=ln.url or ADAPTERS[ln.source].profile_url(ln.external_id)

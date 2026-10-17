@@ -3316,3 +3316,22 @@ async def test_a_person_with_excerpts_is_not_moved_to_other_settings(user: User)
     await user.should_see("They have excerpts")
     assert not next(f for f in folders.folders() if f.id == b).members
     assert [n.path for n in categories.tree(b)] == ["Activities"]
+
+
+async def test_the_folder_view_shows_the_documents_attached(user: User) -> None:
+    from helpers import PDF
+
+    from sci_report_analyzer import documents, folders
+
+    fid = folders.save_folder(None, "Committee A")
+    ann = folders.add_person(fid, make_person("Ann Smith"))
+    bob = folders.add_person(fid, make_person("Bob Jones"))
+    documents.add(ann, "cv.pdf", PDF)
+    documents.add(ann, "letter.pdf", PDF)
+    assert {m.name: m.documents for m in folders.folders()[0].members} == {
+        "Ann Smith": 2,
+        "Bob Jones": 0,
+    }
+    await user.open(f"/?folder={fid}")
+    await user.should_see(marker=f"documents-{ann}")
+    await user.should_see(marker=f"no-documents-{bob}")
