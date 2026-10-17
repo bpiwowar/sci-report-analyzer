@@ -43,7 +43,7 @@ from ..sync import (
     sync_link,
 )
 from .dialogs import actions, close_then, ok_handler, transient_dialog
-from .documents_page import open_document, page_url_of, report_view
+from .documents_page import LINES_JS, open_document, page_url_of, report_view
 from .folder_notes import NOTES_TIP
 from .panel import PublicationsPanel, period_label
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
@@ -635,25 +635,7 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                 ui.label(_("No document")).classes("text-sm text-grey").mark(
                     "career-extract-no-document"
                 )
-            for d in docs:
-                with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                    ui.checkbox(
-                        d.name,
-                        value=d.id in chosen_docs,
-                        on_change=lambda e, d=d: choose_doc(d, e.value),
-                    ).props("" if d.read else "disable").mark(f"career-extract-doc-{d.id}")
-                    if d.period:
-                        ui.label(d.period).classes("text-xs text-grey")
-                    if not d.read:
-                        ui.label(_("not read yet: open it once in the viewer")).classes(
-                            "text-xs text-warning"
-                        )
-                        ui.button(
-                            icon="open_in_new",
-                            on_click=lambda d=d: ui.navigate.to(page_url_of(d.id), new_tab=True),
-                        ).props("flat round dense size=sm").tooltip(
-                            _("Open it (its text is extracted there), then Refresh")
-                        ).mark(f"career-extract-open-{d.id}")
+            doc_list()
             ui.separator()
             with ui.row().classes("w-full items-center"):
                 summary()
@@ -675,6 +657,59 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
             ui.space()
             ui.button(_("Cancel"), on_click=dlg.close).props("flat")
             ui.button(_("Next"), icon="arrow_forward", on_click=review).mark("career-extract-next")
+
+    reading: dict[int, str] = {}  # (the documents whose text is extracted: none, or why not)
+
+    @ui.refreshable
+    def doc_list() -> None:
+        for d in docs:
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                ui.checkbox(
+                    d.name,
+                    value=d.id in chosen_docs,
+                    on_change=lambda e, d=d: choose_doc(d, e.value),
+                ).props("" if d.read else "disable").mark(f"career-extract-doc-{d.id}")
+                if d.period:
+                    ui.label(d.period).classes("text-xs text-grey")
+                if d.read:
+                    continue
+                if reading.get(d.id) == "":
+                    ui.spinner(size="xs")
+                    ui.label(_("reading its text…")).classes("text-xs text-grey").mark(
+                        f"career-extract-reading-{d.id}"
+                    )
+                    continue
+                ui.label(
+                    _("its text could not be read: {error}").format(error=reading[d.id])
+                    if reading.get(d.id)
+                    else _("not read yet: open it once in the viewer")
+                ).classes("text-xs text-warning")
+                ui.button(
+                    icon="open_in_new",
+                    on_click=lambda d=d: ui.navigate.to(page_url_of(d.id), new_tab=True),
+                ).props("flat round dense size=sm").tooltip(
+                    _("Open it (its text is extracted there), then Refresh")
+                ).mark(f"career-extract-open-{d.id}")
+
+    async def read_texts() -> None:
+        """The text of the documents not read yet extracted (in the browser, with PDF.js, as
+        in the viewer), one after the other; each then ticked, with its likely pages."""
+        for d in docs:
+            if d.read or d.id in reading:
+                continue
+            reading[d.id] = ""
+            doc_list.refresh()
+            try:
+                error = await ui.run_javascript(LINES_JS + f"sraReadText({d.id})", timeout=300)
+            except Exception as e:  # (the dialog closed, the browser too slow…)
+                error = str(e) or type(e).__name__
+            if error:
+                reading[d.id] = error
+            else:
+                reading.pop(d.id)
+                d.read = True
+                choose_doc(d, True)
+            doc_list.refresh()
 
     def refresh_docs() -> None:
         docs[:] = career_extract.person_documents(person_id)
@@ -939,6 +974,9 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                 ui.button(_("Add the ticked ones"), on_click=add_ticked).mark("career-extract-add")
 
     choose()
+    if pdfs.has_viewer() and any(not d.read for d in docs):
+        with dlg:
+            ui.timer(0.1, read_texts, once=True)
 
 
 def _career_dialog(person_id: int, entry: career.Entry | None, on_change) -> None:

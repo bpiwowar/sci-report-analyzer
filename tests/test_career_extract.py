@@ -3,6 +3,7 @@ CV suggested (checked against the text, without those known), the dialog to add 
 
 import asyncio
 import json
+import re
 
 import httpx
 import pytest
@@ -10,7 +11,7 @@ import respx
 from helpers import PDF, make_person
 from nicegui.testing import User
 
-from sci_report_analyzer import career, career_extract, documents, folders, llm, persons
+from sci_report_analyzer import career, career_extract, documents, folders, llm, pdfs, persons
 
 pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
 
@@ -234,7 +235,7 @@ def test_extract(answering) -> None:
     assert [p.page for p in career_extract.pages(pid, [letters])] == []  # (not read)
 
 
-async def test_extract_dialog(user: User, answering) -> None:
+async def test_extract_dialog(user: User, answering, monkeypatch) -> None:
     pid, doc, letters = _person_with_document()
     await user.open(f"/person/{pid}?tab=career")
     await user.should_see(marker="career-extract")
@@ -250,6 +251,21 @@ async def test_extract_dialog(user: User, answering) -> None:
         unread = user.find(marker=f"career-extract-doc-{letters}").elements.pop()
         assert not unread.value and "disable" in unread.props
         await user.should_see(marker=f"career-extract-open-{letters}")
+        # (PDF.js installed: their text read when the dialog opens, as in the viewer)
+        monkeypatch.setattr(pdfs, "has_viewer", lambda: True)
+        user.javascript_rules[re.compile(r"(?s).*sraReadText\((\d+)\)$")] = lambda m: (
+            documents.set_lines(int(m.group(1)), [_line(1, "Dear committee")]) or ""
+        )
+        await user.open(f"/person/{pid}?tab=career")
+        user.find(marker="career-extract").click()
+        await user.should_see(marker=f"career-extract-doc-{letters}")
+        for _ in range(50):
+            letters_box = user.find(marker=f"career-extract-doc-{letters}").elements.pop()
+            if letters_box.value:
+                break
+            await asyncio.sleep(0.05)
+        assert letters_box.value and "disable" not in letters_box.props
+        assert documents.lines_of(letters) is not None
         await user.should_see("2 pages ticked")
 
         def page(n: int):

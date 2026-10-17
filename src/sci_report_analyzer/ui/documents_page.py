@@ -21,46 +21,67 @@ from .tags import note_editor
 from .theme import DEFAULT_COLOUR, bare_page
 from .viewer_side import Side, bookmarks_section, categories_section
 
+# A PDF's lines of text (PDF.js: each with its page, text, rectangle and runs), as the server
+# keeps them (see documents.set_lines); and a document's, extracted and sent.
+LINES_JS = """
+window.sraLines = window.sraLines || (async (d) => {
+  const out = [];
+  const round = (r) => r.map(v => Math.round(v * 10) / 10);
+  for (let p = 1; p <= d.numPages; p++) {
+    const page = await d.getPage(p);
+    const tc = await page.getTextContent();
+    let cur = null;
+    const flush = () => {
+      if (cur && cur.t.trim()) out.push({p, t: cur.t, r: round(cur.r), c: cur.c});
+      cur = null;
+    };
+    for (const it of tc.items) {
+      if (typeof it.str !== 'string') continue;
+      const t = it.transform, h = Math.hypot(t[2], t[3]) || it.height || 1;
+      const x = t[4], y = t[5];
+      if (it.str) {
+        if (cur && (Math.abs(y - cur.y) > h * 0.6 || x - cur.end > h * 3)) flush();
+        if (!cur) cur = {t: '', y, end: x, r: [x, y - h * 0.2, x, y + h * 0.8], c: []};
+        else if (x - cur.end > h * 0.15 && !/\\s$/.test(cur.t) && !/^\\s/.test(it.str)) {
+          cur.t += ' ';
+        }
+        // (each run: its offset in the line, and where it starts and ends)
+        cur.c.push([cur.t.length, Math.round(x * 10) / 10, Math.round((x + it.width) * 10) / 10]);
+        cur.t += it.str; cur.end = x + it.width;
+        cur.r[0] = Math.min(cur.r[0], x); cur.r[2] = Math.max(cur.r[2], x + it.width);
+        cur.r[1] = Math.min(cur.r[1], y - h * 0.2); cur.r[3] = Math.max(cur.r[3], y + h * 0.8);
+      }
+      if (it.hasEOL) flush();
+    }
+    flush();
+    page.cleanup();
+  }
+  return out;
+});
+window.sraReadText = window.sraReadText || (async (id) => {
+  try {
+    const lib = await import('/pdfjs/build/pdf.mjs');
+    lib.GlobalWorkerOptions.workerSrc = '/pdfjs/build/pdf.worker.mjs';
+    const d = await lib.getDocument({url: '/doc-file/' + id}).promise;
+    const res = await fetch('/doc-text/' + id, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(await sraLines(d)),
+    });
+    return res.ok ? '' : await res.text();
+  } catch (e) { return String(e); }
+});
+"""
+
 # Extracts the document's lines of text (sent once, to find its papers in), and shows the
 # papers found: their places underlined, a button at each to show the paper.
 _DOC_SCRIPT = """
 <script>
+%(lines)s
 Object.assign(window.vrDoc, {
   id: %(id)s, needText: %(need)s,
   texts: %(texts)s,
   async extract() {
-    const d = vrPdf.app().pdfDocument, out = [];
-    const round = (r) => r.map(v => Math.round(v * 10) / 10);
-    for (let p = 1; p <= d.numPages; p++) {
-      const page = await d.getPage(p);
-      const tc = await page.getTextContent();
-      let cur = null;
-      const flush = () => {
-        if (cur && cur.t.trim()) out.push({p, t: cur.t, r: round(cur.r), c: cur.c});
-        cur = null;
-      };
-      for (const it of tc.items) {
-        if (typeof it.str !== 'string') continue;
-        const t = it.transform, h = Math.hypot(t[2], t[3]) || it.height || 1;
-        const x = t[4], y = t[5];
-        if (it.str) {
-          if (cur && (Math.abs(y - cur.y) > h * 0.6 || x - cur.end > h * 3)) flush();
-          if (!cur) cur = {t: '', y, end: x, r: [x, y - h * 0.2, x, y + h * 0.8], c: []};
-          else if (x - cur.end > h * 0.15 && !/\\s$/.test(cur.t) && !/^\\s/.test(it.str)) {
-            cur.t += ' ';
-          }
-          // (each run: its offset in the line, and where it starts and ends)
-          cur.c.push([cur.t.length, Math.round(x * 10) / 10, Math.round((x + it.width) * 10) / 10]);
-          cur.t += it.str; cur.end = x + it.width;
-          cur.r[0] = Math.min(cur.r[0], x); cur.r[2] = Math.max(cur.r[2], x + it.width);
-          cur.r[1] = Math.min(cur.r[1], y - h * 0.2); cur.r[3] = Math.max(cur.r[3], y + h * 0.8);
-        }
-        if (it.hasEOL) flush();
-      }
-      flush();
-      page.cleanup();
-    }
-    return out;
+    return await sraLines(vrPdf.app().pdfDocument);
   },
   async sendText() {
     this.needText = false;
@@ -200,6 +221,7 @@ class DocumentPage:
             ("doc", d.id),
             _DOC_SCRIPT
             % {
+                "lines": LINES_JS,
                 "id": d.id,
                 "need": json.dumps(not d.has_lines),
                 "texts": json.dumps(
