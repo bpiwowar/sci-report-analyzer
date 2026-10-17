@@ -1655,11 +1655,12 @@ async def test_excerpt_years_from_its_text(user: User, fake_viewer):
     await user.should_see(marker=f"pick-category-{research}")
     start, end = (user.find(marker=m).elements.pop() for m in ("excerpt-start", "excerpt-end"))
     assert (start.value, end.value) == (2026, 2032)
-    await user.should_see("“Led the Quokka project”")
+    text = user.find(marker="excerpt-text").elements.pop()
+    assert text.value == "Led the Quokka project"
     # Cleared: no years, the text as selected.
     user.find(marker="excerpt-years-clear").click()
     assert (start.value, end.value) == (None, None)
-    await user.should_see("“2026-32: Led the Quokka project”")
+    assert text.value == "2026-32: Led the Quokka project"
     user.find(marker=f"pick-category-{research}").click()
     await user.should_see("Added to Research")
     [e] = categories.excerpts(period)
@@ -1667,11 +1668,19 @@ async def test_excerpt_years_from_its_text(user: User, fake_viewer):
     # Ending it (after a colon): taken out too; kept, they are its years.
     selection["text"] = "Led the Wombat network: 2018-22."
     user.find(marker="pdf-excerpt").click()
-    await user.should_see("“Led the Wombat network.”")
+    await user.should_see(marker="excerpt-text")
+    field = user.find(marker="excerpt-text").elements.pop()
+    assert field.value == "Led the Wombat network."
+    field.value = "Led the Wombat network (12 labs)."  # (edited at once: filed so)
     user.find(marker=f"pick-category-{research}").click()
     await user.should_see("Added to Research")
     [e2] = [x for x in categories.excerpts(period) if x.id != e.id]
-    assert (e2.text, e2.start_year, e2.end_year) == ("Led the Wombat network.", 2018, 2022)
+    assert (e2.text, e2.start_year, e2.end_year) == (
+        "Led the Wombat network (12 labs).",
+        2018,
+        2022,
+    )
+    assert e2.original == "Led the Wombat network: 2018-22."
 
 
 async def test_categories_editor(user: User, fake_viewer):

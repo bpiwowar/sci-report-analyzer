@@ -1398,11 +1398,28 @@ def category_picker(
     with side.host.dialogs, transient_dialog(_(title), width="w-full max-w-xl") as (dlg, _card):
         years, filed = categories.split_years(text) if properties else (None, text)
         years = years or around
-        quote = ui.label().classes("text-sm text-grey").mark("excerpt-text")
+        selected = filed  # (its text, its years out: changed, it is kept as its original)
+        if properties:  # (to edit at once)
+
+            def typed(e) -> None:
+                nonlocal filed
+                filed = e.value or ""
+
+            quote = (
+                ui.textarea(_("Text"), value=filed, on_change=typed)
+                .props("dense outlined autogrow")
+                .classes("w-full text-sm")
+                .mark("excerpt-text")
+            )
+        else:
+            quote = ui.label().classes("text-sm text-grey").mark("excerpt-text")
 
         def show(t: str) -> None:
             nonlocal filed
             filed = t
+            if properties:
+                quote.value = t
+                return
             short = t if len(t) <= 300 else t[:299] + "…"
             quote.set_text(f"“{' '.join(short.split())}”")
 
@@ -1479,12 +1496,16 @@ def category_picker(
                     "text-xs"
                 ).mark("excerpt-rewrite-settings")
 
+        def edited() -> bool:
+            """Its text typed in (not only its years taken out, or put back)."""
+            return " ".join(filed.split()) not in (selected, " ".join(text.split()))
+
         def pick(cat_id: int) -> None:
             side.last_category = cat_id
             chosen(
                 cat_id,
-                **({"text": filed} if properties else {}),
-                **({"original": text} if rewritten else {}),
+                **({"text": " ".join(filed.split()) or selected} if properties else {}),
+                **({"original": text} if rewritten or edited() else {}),
                 **props(),
             )
             name = next((n.path for n in categories.tree(folder_id) if n.id == cat_id), "")
