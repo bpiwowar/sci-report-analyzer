@@ -333,26 +333,41 @@ def _page_chips(found: list[career_extract.Passage], mark: str) -> None:
 
 _SENT = "text-xs font-mono whitespace-pre-wrap bg-grey-2 rounded p-2 w-full overflow-auto"
 # Draws a page of a PDF in a canvas, small (with PDF.js, as the viewer; one at a time; the
-# canvas waited for, up to 5 s); hovered, the page larger beside it.
+# canvas waited for, up to 5 s); hovered, the page larger beside it. sraThumb.hover: an
+# element hovered shows a page larger, with rectangles highlighted (e.g. a quote's lines).
 _THUMBS_JS = """
 window.sraThumb = window.sraThumb || (() => {
   const docs = {}, large = {}, ZOOM = 640;
   let queue = Promise.resolve(), lib, box, shown = 0, watch;
+  const open = async (url) => {
+    if (!lib) {
+      lib = await import('/pdfjs/build/pdf.mjs');
+      lib.GlobalWorkerOptions.workerSrc = '/pdfjs/build/pdf.worker.mjs';
+    }
+    return docs[url] = docs[url] || lib.getDocument({url}).promise;
+  };
+  const element = async (id) => {  // (a dialog's content: shown after its transition)
+    let el;
+    for (let i = 0; i < 100 && !(el = document.getElementById(id)); i++)
+      await new Promise(resolve => setTimeout(resolve, 50));
+    return el;
+  };
   const hide = () => {
     shown++;
     clearInterval(watch);
     if (box) box.style.display = 'none';
   };
   const render = async (url, page, width, canvas) => {
-    const p = await (await docs[url]).getPage(page);
+    const p = await (await open(url)).getPage(page);
     const scale = width * devicePixelRatio / p.getViewport({scale: 1}).width;
     const viewport = p.getViewport({scale});
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     await p.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+    canvas.viewport = viewport;
     return canvas;
   };
-  const zoom = async (el, url, page) => {
+  const zoom = async (el, url, page, marks) => {
     const mine = ++shown;
     if (!box) {
       box = document.createElement('canvas');
@@ -366,11 +381,24 @@ window.sraThumb = window.sraThumb || (() => {
     if (mine !== shown || !el.isConnected) return;
     box.width = c.width;
     box.height = c.height;
-    box.getContext('2d').drawImage(c, 0, 0);
-    const w = Math.min(ZOOM, (innerHeight - 16) * c.width / c.height), h = w * c.height / c.width;
-    const r = el.getBoundingClientRect();
-    let left = r.right + 12;
-    if (left + w > innerWidth - 8) left = Math.max(8, r.left - w - 12);
+    const ctx = box.getContext('2d');
+    ctx.drawImage(c, 0, 0);
+    ctx.fillStyle = 'rgba(255, 213, 0, 0.35)';
+    ctx.strokeStyle = 'rgba(230, 120, 0, 0.9)';
+    ctx.lineWidth = 2 * devicePixelRatio;
+    for (const r of marks || []) {
+      const [x0, y0] = c.viewport.convertToViewportPoint(r[0], r[1]);
+      const [x1, y1] = c.viewport.convertToViewportPoint(r[2], r[3]);
+      const x = Math.min(x0, x1) - 2, y = Math.min(y0, y1) - 2;
+      ctx.fillRect(x, y, Math.abs(x1 - x0) + 4, Math.abs(y1 - y0) + 4);
+      ctx.strokeRect(x, y, Math.abs(x1 - x0) + 4, Math.abs(y1 - y0) + 4);
+    }
+    // (beside it, on the side with more room; over the page if too little)
+    const r = el.getBoundingClientRect(), ratio = c.height / c.width;
+    const room = Math.max(r.left, innerWidth - r.right) - 20;
+    const w = Math.min(ZOOM, (innerHeight - 16) / ratio, Math.max(room, 360)), h = w * ratio;
+    const left = innerWidth - r.right >= r.left
+      ? Math.min(r.right + 12, innerWidth - w - 8) : Math.max(8, r.left - w - 12);
     const top = Math.max(8, Math.min(r.top + r.height / 2 - h / 2, innerHeight - h - 8));
     Object.assign(box.style, {
       width: w + 'px', height: h + 'px', left: left + 'px', top: top + 'px', display: 'block',
@@ -378,23 +406,27 @@ window.sraThumb = window.sraThumb || (() => {
     clearInterval(watch);  // (the dialog closed, the page changed: no mouseleave)
     watch = setInterval(() => el.isConnected || hide(), 300);
   };
-  return (id, url, page) => {
+  const hovered = (el, url, page, marks) => {
+    el.addEventListener('mouseenter', () => zoom(el, url, page, marks).catch(e => {
+      console.warn('zoom', e);
+      hide();
+    }));
+    el.addEventListener('mouseleave', hide);
+  };
+  const thumb = (id, url, page) => {
     queue = queue.then(async () => {
-      if (!lib) {
-        lib = await import('/pdfjs/build/pdf.mjs');
-        lib.GlobalWorkerOptions.workerSrc = '/pdfjs/build/pdf.worker.mjs';
-      }
-      let canvas;  // (a dialog's content: shown after its transition)
-      for (let i = 0; i < 100 && !(canvas = document.getElementById(id)); i++)
-        await new Promise(resolve => setTimeout(resolve, 50));
+      const canvas = await element(id);
       if (!canvas) return;
-      docs[url] = docs[url] || lib.getDocument({url}).promise;
       await render(url, page, canvas.clientWidth || 184, canvas);
       canvas.style.aspectRatio = 'auto';
-      canvas.addEventListener('mouseenter', () => zoom(canvas, url, page).catch(hide));
-      canvas.addEventListener('mouseleave', hide);
+      hovered(canvas, url, page, []);
     }).catch(e => console.warn('thumbnail', e));
   };
+  thumb.hover = async (id, url, page, marks) => {
+    const el = await element(id);
+    if (el) hovered(el, url, page, marks);
+  };
+  return thumb;
 })();
 """
 _AROUND_QUOTE = 160  # (characters shown around the words a line comes from)
@@ -436,6 +468,7 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
         dlg,
         _card,
     ):
+        dlg.props("persistent")  # (a click outside, Escape: not closed, the work kept)
         with ui.row().classes("items-center gap-1 -mt-2 text-xs text-grey"):
             ui.icon("lock", size="xs")
             ui.label(
@@ -460,7 +493,13 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
     chosen_docs = {d.id for d in docs if d.read}
     keys = career_extract.ticked(career_extract.pages(person_id, list(chosen_docs)))
     # (all the pages shown, else those ticked)
-    state = {"profiles": bool(known), "instructions": career_extract.prompt(), "all": False}
+    state = {
+        "profiles": bool(known),
+        "instructions": career_extract.prompt(),
+        "all": False,
+        "step": 0,
+        "stopped": False,
+    }
     names = [
         _("1. Pages"),
         _("2. Instructions"),
@@ -469,6 +508,7 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
     ]
 
     def step(i: int) -> None:
+        state["step"] = i
         steps.set_text(" › ".join(f"[{n}]" if j == i else n for j, n in enumerate(names)))
 
     def chosen_pages() -> list[career_extract.Page]:
@@ -486,9 +526,18 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
             ngettext("{n} line added to the career", "{n} lines added to the career", n).format(n=n)
         )
 
+    added: set[int] = set()  # (the lines found added, edited first)
+
     def edit(i: int) -> None:
-        dlg.close()
-        _career_dialog(person_id, found[i].entry, on_change)
+        """A line found edited, then added (on top: the others kept)."""
+
+        def saved() -> None:
+            added.add(i)
+            on_change()
+            results(found, state["stopped"])
+
+        with dlg.opener:  # type: ignore[attr-defined]
+            _career_dialog(person_id, found[i].entry, saved)
 
     @ui.refreshable
     def summary() -> None:
@@ -710,6 +759,8 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                 d.read = True
                 choose_doc(d, True)
             doc_list.refresh()
+        if state["step"] == 0 and all(d.read for d in docs):
+            choose()  # (no Refresh any more)
 
     def refresh_docs() -> None:
         docs[:] = career_extract.person_documents(person_id)
@@ -932,7 +983,10 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
         """Step 4: the lines found, as the career's, each with its source."""
         step(3)
         footer.clear()
+        if got is not found:
+            added.clear()
         found[:] = got
+        state["stopped"] = stopped
         ticks.clear()
         body.clear()
         with body:
@@ -942,10 +996,18 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                 )
             if not got:
                 ui.label(_("Nothing new found")).classes("text-grey").mark("career-extract-none")
+            hovers: list[str] = []
             for i, sug in enumerate(got):
                 e = sug.entry
-                with ui.row().classes("w-full items-start gap-2 no-wrap"):
-                    ticks[i] = ui.checkbox(value=sug.checked).mark(f"career-extract-tick-{i}")
+                with ui.row().classes(
+                    "w-full items-start gap-2 no-wrap rounded hover:bg-purple-1"
+                ) as row:
+                    if i in added:
+                        ui.icon("check_circle", color="positive").classes("mt-2 mx-2").tooltip(
+                            _("Added to the career")
+                        ).mark(f"career-extract-added-{i}")
+                    else:
+                        ticks[i] = ui.checkbox(value=sug.checked).mark(f"career-extract-tick-{i}")
                     ui.icon("school" if e.kind == "diploma" else "work", color="grey").classes(
                         "mt-2"
                     )
@@ -961,9 +1023,20 @@ def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
                                 "text-sm text-grey" + (" italic" if e.kind == "diploma" else "")
                             ).mark(f"career-extract-details-{i}")
                         _source_view(sug, f"career-extract-source-{i}")
-                    ui.button(icon="edit", on_click=lambda i=i: edit(i)).props(
-                        "flat round dense size=sm"
-                    ).tooltip(_("Edit it, then add it")).mark(f"career-extract-edit-{i}")
+                    if i not in added:
+                        ui.button(icon="edit", on_click=lambda i=i: edit(i)).props(
+                            "flat round dense size=sm"
+                        ).tooltip(_("Edit it, then add it")).mark(f"career-extract-edit-{i}")
+                where = sug.pages[0] if sug.pages else None
+                if where and where.doc_id is not None and pdfs.has_viewer():
+                    # (hovered: its page, the words it comes from highlighted)
+                    marks = career_extract.quote_rects(where.doc_id, where.page, sug.quote)
+                    hovers.append(
+                        f"sraThumb.hover('c{row.id}', '/doc-file/{where.doc_id}', "
+                        f"{where.page}, {json.dumps(marks if sug.checked else [])});"
+                    )
+            if hovers:
+                ui.run_javascript(_THUMBS_JS + "".join(hovers))
         with footer:
             ui.button(_("Back"), icon="arrow_back", on_click=review).props("flat").mark(
                 "career-extract-back"

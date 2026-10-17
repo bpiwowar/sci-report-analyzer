@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-17 09:46+0200\n"
+"POT-Creation-Date: 2026-10-17 09:51+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -613,6 +613,9 @@ msgstr "Ajouter {ref}"
 
 msgid "Added by hand"
 msgstr "Ajoutés à la main"
+
+msgid "Added to the career"
+msgstr "Ajoutée au parcours"
 
 #, python-brace-format
 msgid "Added to {category}"

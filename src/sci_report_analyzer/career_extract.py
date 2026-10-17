@@ -377,6 +377,29 @@ def quoted(text: str, quote: str) -> tuple[int, int] | None:
     return m.span() if m else None
 
 
+def quote_rects(doc_id: int, page: int | None, quote: str) -> list[list[float]]:
+    """Where the words a line comes from are in a document's page: the rectangles of its
+    lines with them (none: not found)."""
+    lines = [
+        line
+        for line in documents.lines_of(doc_id) or []
+        if int(line.get("p") or 1) == page and (line.get("t") or "").strip() and line.get("r")
+    ]
+    joined, starts = "", []
+    for line in lines:
+        starts.append(len(joined))
+        joined += " ".join(line["t"].split()) + " "
+    span = quoted(joined, quote)
+    if not span:
+        return []
+    ends = [*starts[1:], len(joined)]
+    return [
+        line["r"]
+        for line, a, b in zip(lines, starts, ends, strict=True)
+        if a < span[1] and b > span[0]
+    ]
+
+
 def requests(
     person_id: int,
     chosen: list[Page] | None = None,

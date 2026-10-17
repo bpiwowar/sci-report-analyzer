@@ -9,6 +9,7 @@ import httpx
 import pytest
 import respx
 from helpers import PDF, make_person
+from nicegui import ui
 from nicegui.testing import User
 
 from sci_report_analyzer import career, career_extract, documents, folders, llm, pdfs, persons
@@ -253,6 +254,14 @@ async def test_extract_dialog(user: User, answering, monkeypatch) -> None:
         await user.should_see(marker=f"career-extract-open-{letters}")
         # (PDF.js installed: their text read when the dialog opens, as in the viewer)
         monkeypatch.setattr(pdfs, "has_viewer", lambda: True)
+        sent_js: list[str] = []
+        run_javascript = ui.run_javascript
+
+        def recorded(code, *args, **kwargs):
+            sent_js.append(code)
+            return run_javascript(code, *args, **kwargs)
+
+        monkeypatch.setattr(ui, "run_javascript", recorded)
         user.javascript_rules[re.compile(r"(?s).*sraReadText\((\d+)\)$")] = lambda m: (
             documents.set_lines(int(m.group(1)), [_line(1, "Dear committee")]) or ""
         )
@@ -304,13 +313,22 @@ async def test_extract_dialog(user: User, answering, monkeypatch) -> None:
         await user.should_see("Quokka University")
         await user.should_see("Thesis: On wombats")
         await user.should_see(marker="career-extract-source-0")  # (its page, to open)
+        # (hovered: its page, the words highlighted)
+        assert any("sraThumb.hover(" in m for m in sent_js)
         quote = user.find(marker="career-extract-source-0-text").elements.pop()
         assert "<mark>recruited as an associate professor" in quote.content
         tick = user.find(marker="career-extract-tick-1").elements.pop()
         assert not tick.value  # (its words not in the documents: not ticked)
+        # One edited then added: on top, the others kept.
+        user.find(marker="career-extract-edit-0").click()
+        await user.should_see(marker="career-title")
+        user.find(marker="career-save").click()
+        await user.should_see(marker="career-extract-added-0")
+        assert [e.title for e in career.entries(pid)] == ["Associate professor"]
+        user.find(marker="career-extract-tick-1").elements.pop().value = True
         user.find(marker="career-extract-add").click()
         await user.should_see("1 line added to the career")
-        assert [e.title for e in career.entries(pid)] == ["Associate professor"]
+        assert sorted(e.title for e in career.entries(pid)) == ["Associate professor", "PhD"]
     finally:
         llm.save_settings(llm.OllamaSettings())
         career_extract.save_prompt("")
@@ -399,6 +417,21 @@ def test_ticked(monkeypatch) -> None:
     monkeypatch.setattr(career_extract, "BUDGET", 10)
     assert career_extract.ticked(found) == {(doc, 3)}
     assert career_extract.quoted("A b\n  C d", "b c") == (2, 7)
+    # (the lines of a page with a quote, to highlight: across two lines)
+    documents.set_lines(
+        doc,
+        [
+            {"p": 1, "t": "In 2016, I was recruited as an", "r": [1, 1, 2, 2]},
+            {"p": 1, "t": "associate  professor.", "r": [3, 3, 4, 4]},
+            {"p": 1, "t": "Other", "r": [5, 5, 6, 6]},
+            {"p": 2, "t": "recruited as an associate professor", "r": [7, 7, 8, 8]},
+        ],
+    )
+    assert career_extract.quote_rects(doc, 1, "recruited as an associate professor") == [
+        [1, 1, 2, 2],
+        [3, 3, 4, 4],
+    ]
+    assert career_extract.quote_rects(doc, 1, "not there") == []
 
 
 def test_affiliations() -> None:
