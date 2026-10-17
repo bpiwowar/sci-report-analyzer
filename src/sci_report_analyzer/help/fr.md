@@ -458,21 +458,23 @@ dossier** (son onglet Rapport ; ses extraits par catégorie : l'onglet Extrait
 écrire sans ouvrir de document (par exemple quand elle n'en a aucun). La fenêtre d'un extrait nomme sa catégorie sous
 son titre. Son onglet **Chronologie** dessine ce qui est daté à son sujet le long d'un axe horizontal des années, les
 plus anciennes à gauche (chaque année une colonne, pour que les trous se voient ; l'année en cours marquée ; sa
-période dans le dossier en grisé), une ligne par sorte. Sa **carrière** (onglet Profil) : une ligne de son CV en barre
-le long de ses années (un poste actuel : jusqu'à aujourd'hui, en s'estompant), son nom au-dessus ; les **doctorants**
-qu'elle a encadrés, chacun en barre du début de la thèse à sa soutenance (en cours : jusqu'à aujourd'hui), le nom du
-doctorant au-dessus ; les barres qui se chevauchent l'une au-dessus de l'autre. Ses **extraits** dans le dossier (de
-la couleur de leur catégorie) : le début de leur texte au-dessus d'une fine barre le long de leurs années (une seule : celle-là), l'un
-au-dessus de l'autre quand ils se chevauchent ; ses **articles** : une petite barre par année, aussi haute que leur nombre (leurs titres au survol). Au
-survol, une barre dit tout d'elle ; une ligne de la carrière cliquée montre l'onglet Profil, une thèse l'onglet
-Thèses. Un extrait ou une année cliqués montrent ses extraits sous la chronologie ;
-là, un extrait cliqué est montré dans l'onglet Extraits (où ses années se modifient), son icône PDF ouvrant son PDF à
-côté de la page. L'extrait d'un article sans années est à l'année de l'article. La chronologie commence au plus ancien
-de sa carrière, de ses thèses et de ses extraits (ses articles au plus trois ans avant ; les plus anciens comptés en
-dessous) ; avec beaucoup d'années, seule une sur cinq est nommée quand c'est étroit, et la chronologie défile de côté
-quand elle est très longue. Chaque sorte s'affiche ou se masque par son interrupteur ; celle dont elle n'a aucun
-élément est signalée. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à part, en
-dessous.
+période dans le dossier sur fond turquoise), une ligne par sorte. Sa **carrière** (onglet Profil) : une ligne de son
+CV en barre le long de sa durée, au mois près quand ses dates le donnent (un poste actuel : jusqu'à aujourd'hui, en
+s'estompant), son nom au-dessus ; les **doctorants** qu'elle a encadrés, chacun en barre du début de la thèse à sa
+soutenance (en cours : jusqu'à aujourd'hui), le nom du doctorant au-dessus ; les barres qui se chevauchent l'une
+au-dessus de l'autre. Ses **extraits** dans le dossier, une ligne par catégorie principale (de la couleur de leur
+catégorie) : le début de leur texte au-dessus d'une fine barre le long de leurs années (une seule : celle-là) ; ses
+**articles** : une petite barre par année, aussi haute que leur nombre (leurs titres au survol). Au survol, une barre
+dit tout d'elle. Cliqué, ce qu'il est s'affiche sous la chronologie : une ligne de la carrière ou un doctorant, avec
+**Modifier** (sa fenêtre : la chronologie redessinée) et un bouton vers son onglet ; un extrait, ou une année (ses
+extraits), où un extrait cliqué est montré dans l'onglet Extraits (où ses années se modifient), son icône PDF ouvrant son
+PDF à côté de la page. L'extrait d'un article sans années est à l'année de l'article. La chronologie commence au plus
+ancien de sa carrière, de ses thèses et de ses extraits (ses articles au plus trois ans avant ; les plus anciens
+comptés en dessous). Elle s'ouvre agrandie (des années deux fois plus larges que pour tenir dans la largeur), défilée
+jusqu'à sa période dans le dossier ; les loupes élargissent ou resserrent les années (le texte gardant sa taille),
+jusqu'à la chronologie entière dans la largeur. Chaque sorte s'affiche ou se masque par son interrupteur ; celle dont
+elle n'a aucun élément est signalée. Les extraits sans années, et les lignes de la carrière sans dates, sont listés à
+part, en dessous.
 
 Les dossiers peuvent être **dans d'autres dossiers** : la page Rapports les montre en **arbre**, chaque dossier
 déplié montrant les dossiers qu'il contient puis ses personnes, une ligne chacune (sa période, ses étoiles, ses

@@ -17,7 +17,7 @@ from itertools import pairwise
 
 from nicegui import ui
 
-from .. import career, categories
+from .. import career, categories, persons
 from .. import timeline as tl
 from ..db.models import Period
 from ..i18n import _, ngettext
@@ -35,6 +35,9 @@ PAPERS_BEFORE = 3
 # Up to that many years, each named on the axis whatever the width (beyond: every fifth one
 # when too narrow for all, see _year_names).
 NAMED_YEARS = 16
+# The zoom: a year's width, times that of the years fitting the width (more: scrolled).
+ZOOM = (1, 1.5, 2, 3, 4)
+ZOOM_START = 2  # (twice: scrolled to the period in the folder, else to this year)
 # The width of the column of the rows' names, of a year named.
 LABEL_PX, NAMED_PX = 84, 34  # (a year at least: .95rem, see _CSS)
 
@@ -42,16 +45,18 @@ LABEL_PX, NAMED_PX = 84, 34  # (a year at least: .95rem, see _CSS)
 # years' lines, the period's band, the rows' separators; on them, the items.
 _CSS = """
 .vr-tl-wrap { overflow-x:auto; container-type:inline-size; }
-.vr-tl { --tl-bg:#fff; --tl-line:rgba(140,149,159,.25); --tl-band:rgba(9,105,218,.08);
+.vr-tl { --tl-bg:#fff; --tl-line:rgba(140,149,159,.25); --tl-band:rgba(0,150,136,.14);
+  --tl-band-edge:rgba(0,150,136,.55);
   --tl-now:#d4a72c; --label:5.25rem; display:grid; position:relative; width:100%;
   grid-template-columns:var(--label) repeat(var(--n), minmax(0, 6rem));
   min-width:calc(var(--label) + var(--n) * .95rem); font-size:.75rem; }
 body.body--dark .vr-tl { --tl-bg:var(--q-dark); --tl-line:rgba(160,170,180,.2);
-  --tl-band:rgba(88,166,255,.13); }
+  --tl-band:rgba(77,208,192,.16); --tl-band-edge:rgba(77,208,192,.6); }
 .vr-tl-col { grid-row:1/-1; border-left:1px solid var(--tl-line); }
 .vr-tl-col.now { background:linear-gradient(to right, transparent calc(50% - 1px),
   var(--tl-now) calc(50% - 1px), var(--tl-now) calc(50% + 1px), transparent calc(50% + 1px)); }
-.vr-tl-band { grid-row:1/-1; background:var(--tl-band); }
+.vr-tl-band { grid-row:1/-1; background:var(--tl-band);
+  border-left:1.5px dashed var(--tl-band-edge); border-right:1.5px dashed var(--tl-band-edge); }
 .vr-tl-sep { grid-column:1/-1; border-top:1px solid var(--tl-line); }
 .vr-tl-head { grid-column:1; position:sticky; left:0; z-index:4; display:flex; gap:.25rem;
   align-items:center; padding:.35rem .4rem .35rem .1rem; background:var(--tl-bg);
@@ -87,6 +92,28 @@ body.body--dark .vr-tl { --tl-bg:var(--q-dark); --tl-line:rgba(160,170,180,.2);
 }
 """
 ui.add_css(_CSS, shared=True)
+# A timeline wider than the page: scrolled (once laid out) to the period in the folder, whole
+# if it fits (else its start), or else to this year.
+ui.add_head_html(
+    """<script>
+window.vrTimelineScroll = (id) => {
+  const go = () => {
+    const w = getHtmlElement(id);
+    if (!w) return;
+    const b = w.querySelector('.vr-tl-band');
+    const label = w.querySelector('.vr-tl-head')?.offsetWidth || 0;
+    if (!b) { w.scrollLeft = w.scrollWidth; return; }
+    const room = w.clientWidth - label - 32;
+    w.scrollLeft = b.offsetWidth <= room
+      ? b.offsetLeft + b.offsetWidth - w.clientWidth + 32
+      : b.offsetLeft - label - 16;
+  };
+  setTimeout(go, 300);
+  setTimeout(go, 900);
+};
+</script>""",
+    shared=True,
+)
 
 
 @dataclass
@@ -118,7 +145,30 @@ def timeline_view(
     """The timeline of a person, their excerpts those in the folder of ``period``: an
     excerpt (or a year's) clicked, shown in the details below, where clicked it is selected
     in the Excerpts tab (``select``), its PDF opened beside the page (``open_pdf``); a line
-    of their career, the Profile tab shown (``show_tab``), a thesis, the Theses tab."""
+    of their career or a PhD student clicked, in the details too, edited there (or seen in
+    its tab: ``show_tab``). Drawn again once one is edited (what is shown, the zoom kept)."""
+    state: dict = {
+        "shown": {"career": True, "excerpts": True, "theses": True, "papers": True},
+        "picked": {},  # ("year", "excerpt", "career" or "thesis": shown in the details)
+        "zoom": ZOOM_START,  # (see ZOOM)
+    }
+
+    @ui.refreshable
+    def view() -> None:
+        _view(person_id, period, select, open_pdf, show_tab, state, view.refresh)
+
+    view()
+
+
+def _view(
+    person_id: int,
+    period: Period,
+    select: Callable[[int], None],
+    open_pdf: Callable[[categories.ExcerptView], None],
+    show_tab: Callable[[str], None],
+    state: dict,
+    rebuild: Callable[[], None],
+) -> None:
     dated, undated = categories.timeline(period.id)
     spans, no_date = tl.career_spans(person_id)
     directed = tl.supervised(person_id)
@@ -126,8 +176,7 @@ def timeline_view(
     nodes = categories.tree(period.folder.id)
     paths = {n.id: n.path for n in nodes}
     excerpts = [_spanned(d) for _y, items in dated for d in items]
-    shown = {"career": True, "excerpts": True, "theses": True, "papers": True}
-    picked: dict[str, int] = {}  # ("year" or "excerpt": shown in the details)
+    shown, picked = state["shown"], state["picked"]
     counts = {
         "career": len(spans) + len(no_date),
         "excerpts": len(excerpts) + len(undated),
@@ -153,8 +202,9 @@ def timeline_view(
             period,
             picked,
             pick,
-            show_tab,
+            ZOOM[state["zoom"]],
         )
+        _line_details(person_id, spans, directed, picked, pick, show_tab, rebuild)
         if on["excerpts"]:
             _details(excerpts, picked, paths, pick, select, open_pdf)
             if undated:
@@ -166,18 +216,43 @@ def timeline_view(
         shown[kind] = value
         drawn.refresh()
 
+    def zoom(by: int) -> None:
+        state["zoom"] = max(0, min(len(ZOOM) - 1, state["zoom"] + by))
+        narrower.set_enabled(state["zoom"] > 0)
+        wider.set_enabled(state["zoom"] < len(ZOOM) - 1)
+        if by:
+            drawn.refresh()
+
     with ui.column().classes("w-full gap-2").mark("timeline"):
         ui.label(
             _(
                 "What is dated about them, by year (the oldest on the left): their career and "
                 "the PhDs they supervised (a bar along their years), their excerpts (the "
                 "beginning of their text above a thin bar along their years) and their papers "
-                "(their number a year). An excerpt or a year clicked: its excerpts shown below, "
-                "where clicked one is shown in the Excerpts tab (its years edited there: its "
-                "pencil). An excerpt without years of its own is at its paper's year."
+                "(their number a year). Clicked, what it is shown below: a line of their career "
+                "or a PhD student, edited there; an excerpt, or a year's, shown in the Excerpts "
+                "tab when clicked there (its years edited there: its pencil). An excerpt without "
+                "years of its own is at its paper's year. The magnifiers widen the years."
             )
         ).classes("text-sm text-grey")
-        _legend(shown, counts, period, toggle)
+        with ui.row().classes("w-full items-start no-wrap gap-2"):
+            with ui.column().classes("grow gap-1"):
+                _legend(shown, counts, period, toggle)
+            # (wider years, the timeline then scrolled; or back to fitting the width)
+            with ui.row().classes("items-center gap-0 no-wrap").mark("timeline-zoom"):
+                narrower = (
+                    ui.button(icon="zoom_out", on_click=lambda: zoom(-1))
+                    .props("flat dense round size=sm")
+                    .tooltip(_("Narrower years"))
+                    .mark("timeline-zoom-out")
+                )
+                wider = (
+                    ui.button(icon="zoom_in", on_click=lambda: zoom(1))
+                    .props("flat dense round size=sm")
+                    .tooltip(_("Wider years (scrolled sideways)"))
+                    .mark("timeline-zoom-in")
+                )
+            zoom(0)
         drawn()
 
 
@@ -208,7 +283,7 @@ def _legend(
         if period.start_year or period.end_year:
             with ui.row().classes("items-center gap-1 no-wrap"):
                 ui.element("span").classes("inline-block w-4 h-4 rounded").style(
-                    "background:rgba(9,105,218,.15)"
+                    "background:rgba(0,150,136,.25)"
                 )
                 ui.label(
                     _("their period in the folder ({years})").format(
@@ -244,10 +319,11 @@ def _chart(
     period: Period,
     picked: dict[str, int],
     pick: Callable[..., None],
-    show_tab: Callable[[str], None],
+    zoom: float,
 ) -> None:
     """The years, from the earliest of the items (papers not much earlier than the rest) to
-    this year at least; a row for each kind (the excerpts: for each main category)."""
+    this year at least; a row for each kind (the excerpts: for each main category); a year
+    ``width`` rem wide (none: the years fitting the width)."""
     this_year = date.today().year
     core = [y for sp in [*spans, *directed, *excerpts] for y in (sp.first, sp.last)]
     if not core and not papers:
@@ -262,7 +338,7 @@ def _chart(
     hi = max([*core, *papers, this_year])
     n = hi - lo + 1
     # (the years' room for a label, about: the narrower they are, the more)
-    room = max(1, min(6, math.ceil(n / 6)))
+    room = max(1, min(6, math.ceil(n / (6 * zoom))))
 
     def col(year: int) -> int:
         return year - lo + 2
@@ -287,12 +363,20 @@ def _chart(
     total = 1 + sum(row[4] for row in rows)
     cover = {y for x in excerpts for y in range(x.first, x.last + 1)}
 
-    with ui.element("div").classes("vr-tl-wrap w-full").mark("timeline-chart"):
-        _year_names(n)
+    with ui.element("div").classes("vr-tl-wrap w-full").mark("timeline-chart") as wrap:
+        _year_names(n, zoom)
+        sized = ""
+        if zoom > 1:  # (wider than the page: scrolled to the period, else to this year)
+            year = f"max(.95rem, calc((100cqw - var(--label)) * {zoom} / {n}))"
+            sized = (
+                f";grid-template-columns:var(--label) repeat({n}, {year})"
+                ";width:max-content;min-width:100%"
+            )
+            ui.run_javascript(f"vrTimelineScroll({wrap.id})")
         with (
             ui.element("div")
-            .classes(f"vr-tl vr-tl-n{n}")
-            .style(f"--n:{n};grid-template-rows:repeat({total}, auto)")
+            .classes(f"vr-tl {_names(n, zoom)}")
+            .style(f"--n:{n};grid-template-rows:repeat({total}, auto){sized}")
         ):
             first, last = max(period.start_year or lo, lo), min(period.end_year or hi, hi)
             if (period.start_year or period.end_year) and first <= last:
@@ -338,10 +422,10 @@ def _chart(
                     ui.label(name)
                 if kind == "career":
                     for sp, end in _cells(spans, hi):
-                        _career(sp, row, col, end, show_tab)
+                        _career(sp, row, col, end, picked, pick)
                 elif kind == "theses":
                     for t, end in _cells(directed, hi):
-                        _thesis(t, row, col, end, show_tab)
+                        _thesis(t, row, col, end, picked, pick)
                 elif kind == "excerpts":
                     for x, end in _cells(xs, hi):
                         _excerpt(x, row, col, end, picked, pick)
@@ -381,13 +465,18 @@ def _by_main(
     return [(n, groups[n.id if n else 0]) for n in order]
 
 
-def _year_names(n: int) -> None:
-    """Beyond NAMED_YEARS years, those not a fifth one unnamed when too narrow for all."""
+def _names(n: int, zoom: float) -> str:
+    return f"vr-tl-n{n}-z{round(zoom * 10)}"
+
+
+def _year_names(n: int, zoom: float) -> None:
+    """Beyond NAMED_YEARS years, those not a fifth one unnamed when too narrow for all (the
+    years ``zoom`` times wider than fitting the width)."""
     if n > NAMED_YEARS:
-        width = LABEL_PX + n * NAMED_PX
+        width = LABEL_PX + n * NAMED_PX / zoom
         ui.html(
-            f"<style>@container (max-width:{width}px)"
-            f"{{.vr-tl-n{n} .vr-tl-year.minor span{{visibility:hidden}}}}</style>",
+            f"<style>@container (max-width:{width:.0f}px)"
+            f"{{.{_names(n, zoom)} .vr-tl-year.minor span{{visibility:hidden}}}}</style>",
             sanitize=False,
         ).classes("hidden")
 
@@ -445,13 +534,24 @@ def _career(
     row: int,
     col: Callable[[int], int],
     end: int,
-    show_tab: Callable[[str], None],
+    picked: dict[str, int],
+    pick: Callable[..., None],
 ) -> None:
-    """A line of the career, along its years."""
+    """A line of the career, along its years (clicked: in the details)."""
     e = sp.entry
     colour = KIND_COLOUR["diploma" if e.kind == "diploma" else "position"]
-    item = _bar(colour, sp, row, col, end, e.current, e.line(), f"timeline-career-{e.id}")
-    item.on("click", lambda: show_tab("profile"))
+    item = _bar(
+        colour,
+        sp,
+        row,
+        col,
+        end,
+        e.current,
+        e.line(),
+        f"timeline-career-{e.id}",
+        " picked" if picked.get("career") == e.id else "",
+    )
+    item.on("click", lambda: pick("career", e.id))
     with item, ui.tooltip().classes("max-w-sm"):
         with ui.row().classes("items-center gap-1 no-wrap"):
             ui.icon("school" if e.kind == "diploma" else "work", size="xs")
@@ -459,7 +559,7 @@ def _career(
         ui.label(e.line()).classes("text-sm font-medium")
         if e.details:
             ui.label(e.details)
-        ui.label(_("Edited in the Profile tab (Career)")).classes("italic")
+        ui.label(_("Click: its details, to edit it")).classes("italic")
 
 
 def _thesis(
@@ -467,14 +567,24 @@ def _thesis(
     row: int,
     col: Callable[[int], int],
     end: int,
-    show_tab: Callable[[str], None],
+    picked: dict[str, int],
+    pick: Callable[..., None],
 ) -> None:
-    """A thesis they supervised, from its start to its defence (in progress: to now)."""
+    """A thesis they supervised, from its start to its defence (in progress: to now;
+    clicked: in the details)."""
     text = t.student or t.title
     item = _bar(
-        KIND_COLOUR["thesis"], t, row, col, end, t.in_progress, text, f"timeline-thesis-{t.id}"
+        KIND_COLOUR["thesis"],
+        t,
+        row,
+        col,
+        end,
+        t.in_progress,
+        text,
+        f"timeline-thesis-{t.id}",
+        " picked" if picked.get("thesis") == t.id else "",
     )
-    item.on("click", lambda: show_tab("theses"))
+    item.on("click", lambda: pick("thesis", t.id))
     with item, ui.tooltip().classes("max-w-sm"):
         ui.label(
             _("PhD of {student}").format(student=t.student or "?")
@@ -482,7 +592,7 @@ def _thesis(
             + (f" ({_('in progress')})" if t.in_progress else "")
         )
         ui.label(t.title).classes("text-sm font-medium")
-        ui.label(_("See it in the Theses tab")).classes("italic")
+        ui.label(_("Click: its details, to edit it")).classes("italic")
 
 
 def _excerpt(
@@ -536,6 +646,68 @@ def _papers(year: int, titles: list[str], top: int, row: int, col: Callable[[int
                 ui.label(_("and {n} more").format(n=len(titles) - 20)).classes("text-xs")
 
 
+def _line_details(
+    person_id: int,
+    spans: list[tl.CareerSpan],
+    directed: list[tl.Supervised],
+    picked: dict[str, int],
+    pick: Callable[..., None],
+    show_tab: Callable[[str], None],
+    rebuild: Callable[[], None],
+) -> None:
+    """The line of their career, or the PhD student, picked: all about it, to edit (the
+    timeline drawn again then), or to see in its tab."""
+    from .person import _career_dialog, _student_dialog  # (it uses this module)
+
+    if (cid := picked.get("career")) and (
+        sp := next((x for x in spans if x.entry.id == cid), None)
+    ):
+        e = sp.entry
+        icon, colour = ("school", "diploma") if e.kind == "diploma" else ("work", "position")
+        lines = [e.when() + (f" ({_('current')})" if e.current else ""), e.details or ""]
+        title, tab, tab_name = e.line(), "profile", _("Profile tab")
+        which = f"career-{e.id}"
+        edit = lambda: _career_dialog(person_id, e, rebuild)  # noqa: E731
+    elif (tid := picked.get("thesis")) and (t := next((x for x in directed if x.id == tid), None)):
+        icon, colour = "school", "thesis"
+        lines = [
+            _("PhD of {student}").format(student=t.student or "?")
+            + (f", {t.years}" if t.years else "")
+            + (f" ({_('in progress')})" if t.in_progress else "")
+        ]
+        title, tab, tab_name = t.title, "theses", _("Theses tab")
+        which = f"thesis-{t.id}"
+
+        def edit() -> None:
+            found = next((x for x in persons.theses(person_id, "director") if x.id == tid), None)
+            if found is not None:
+                _student_dialog(person_id, found, rebuild)
+
+    else:
+        return
+    with (
+        ui.column()
+        .classes("w-full gap-1 mt-2 vr-tl-card")
+        .style(f"--c:{KIND_COLOUR[colour]};border-left:3px solid var(--c);padding-left:.5rem")
+        .mark("timeline-line-details", f"timeline-line-{which}")
+    ):
+        with ui.row().classes("items-center gap-2 w-full no-wrap"):
+            ui.icon(icon, size="sm").style(f"color:{KIND_COLOUR[colour]}")
+            ui.label(title).classes("font-medium")
+            ui.space()
+            ui.button(_("Edit"), icon="edit", on_click=edit).props("flat dense no-caps").mark(
+                "timeline-line-edit"
+            )
+            ui.button(tab_name, icon="open_in_new", on_click=lambda: show_tab(tab)).props(
+                "flat dense no-caps"
+            ).mark("timeline-line-tab")
+            ui.button(icon="close", on_click=lambda: pick()).props(
+                "flat dense round size=sm"
+            ).tooltip(_("Close")).mark("timeline-line-close")
+        for line in filter(None, lines):
+            ui.label(line).classes("text-sm text-grey-8")
+
+
 def _details(
     excerpts: list[_Span],
     picked: dict[str, int],
@@ -545,13 +717,13 @@ def _details(
     open_pdf: Callable[[categories.ExcerptView], None],
 ) -> None:
     """The excerpts picked on the timeline: those of a year (along it, or in it), or one."""
-    if not excerpts:
+    if not excerpts or picked.keys() & {"career", "thesis"}:
         return
     with ui.column().classes("w-full gap-2 mt-2").mark("timeline-details"):
         if not picked:
             with ui.row().classes("items-center gap-1 no-wrap"):
                 ui.icon("touch_app", color="grey", size="xs")
-                ui.label(_("Click an excerpt or a year to see its excerpts here.")).classes(
+                ui.label(_("Click an item or a year to see it here.")).classes(
                     "text-sm text-grey"
                 ).mark("timeline-details-hint")
             return

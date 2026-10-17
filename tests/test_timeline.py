@@ -203,12 +203,32 @@ async def test_timeline_tab_career_and_theses(user: User) -> None:
     # Every year a column, even without anything (the gaps seen); the folder's period shaded.
     await user.should_see(marker="timeline-tick-2017")
     await user.should_see(marker="timeline-period")
-    # Clicked: its tab.
+    # Clicked: all about it below, to edit (its dialog), or to see in its tab.
+    user.find(marker=f"timeline-career-{lead}").click()
+    await user.should_see(marker="timeline-line-edit")
+    user.find(marker="timeline-line-edit").click()
+    await user.should_see("Edit the line")
+    user.find(marker="career-title").clear().type("Senior lecturer")
+    user.find("Save").click()
+    await user.should_see("Senior lecturer", marker=f"timeline-career-{lead}")  # (drawn again)
     user.find(marker=f"timeline-thesis-{directed.id}").click()
+    await user.should_see(marker=f"timeline-line-thesis-{directed.id}")
+    user.find(marker="timeline-line-edit").click()
+    await user.should_see("Edit the PhD student")
+    user.find("Cancel").click()
+    user.find(marker="timeline-line-tab").click()
     tab = user.find(marker="tab-theses").elements.pop()
     assert tab.parent_slot.parent.value == "theses"
     user.find(marker="tab-timeline").click()
     await user.should_see(marker=f"timeline-career-{lead}")
+    # Zoomed in at first (the years twice as wide as fitting the width: scrolled), out to
+    # fitting it, no further.
+    out = user.find(marker="timeline-zoom-out").elements.pop()
+    assert out.enabled
+    user.find(marker="timeline-zoom-out").click()
+    user.find(marker="timeline-zoom-out").click()
+    await user.should_see(marker=f"timeline-career-{lead}")
+    assert not out.enabled
     # A kind hidden: off the timeline.
     user.find(marker="timeline-show-career").click()
     await user.should_not_see(marker=f"timeline-career-{lead}")
