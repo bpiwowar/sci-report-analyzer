@@ -456,7 +456,7 @@ column, so that the gaps show; this year marked; their period in the folder on a
 background), a row for each kind. Their **career** (Profile tab): a line of their CV as a bar
 along its time, to the month when its dates have one (a current position: up to now, fading),
 its name above it; the **PhD students** they supervised, each a bar from the thesis's start
-to its defence (in progress: up to now), the student's name above it; overlapping bars one
+to its defence (in progress: up to now), the student's name above it; the **thesis juries** they were on (each a dot at the defence, to the month if known, else the middle of its year, the student's name above it, coloured by their role: reviewer (rapporteur), examiner, president, as the legend says; hovered, its role, title, student and date; clicked, in the details, with a button to the Theses tab; hidden theses left out); overlapping bars one
 above the other. Their **excerpts** in the folder, a row for each main category (in their
 category's colour): the beginning of their text above a thin bar along their years (a single
 year: that one; since a year, without an end: up to now, fading, as a current position; a **one-off event**, a switch of its dialog: a dot in the middle of its year, never continuing; **within the period**, its other switch, for an excerpt without a precise date: along the person's period in the folder, or its own years if it has some, dotted and lighter, said “within the period (2020–2024)” in the details; one switch on turns the other off; without years of its own, placed along the period, unless the period has none either, said so, listed without years; the legend shows both looks); their **papers**: a small bar a year, as high as their number (their titles

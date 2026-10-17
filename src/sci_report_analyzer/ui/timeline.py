@@ -22,6 +22,7 @@ from .. import career, categories, persons, reports
 from .. import timeline as tl
 from ..db.models import Period
 from ..i18n import _, ngettext
+from ..sources.thesesfr import ROLE_LABELS
 from .viewer_side import MARKER_ICONS
 
 # The colours of the kinds of items (an excerpt: its category's).
@@ -29,8 +30,11 @@ KIND_COLOUR = {
     "position": "#1a7f37",
     "diploma": "#bc4c00",
     "thesis": "#6639ba",  # (as the PhD students' names: .vr-student)
+    "jury": "#0969da",
     "papers": "#8c959f",
 }
+# The roles on a thesis's jury: their colour (a dot each, at the defence).
+JURY_COLOUR = {"rapporteur": "#cf222e", "examiner": "#0969da", "president": "#9a6700"}
 # Papers earlier than the rest by more years than this: left out of the axis (counted).
 PAPERS_BEFORE = 3
 # Up to that many years, each named on the axis whatever the width (beyond: every fifth one
@@ -218,7 +222,13 @@ def timeline_view(
     seen in its tab: ``show_tab``). Drawn again once one is edited (what is shown, the zoom
     kept)."""
     state: dict = {
-        "shown": {"career": True, "excerpts": True, "theses": True, "papers": True},
+        "shown": {
+            "career": True,
+            "excerpts": True,
+            "theses": True,
+            "juries": True,
+            "papers": True,
+        },
         "picked": {},  # ("year", "excerpt", "career" or "thesis": shown in the details)
         "zoom": ZOOM_START,  # (see ZOOM_MIN)
         "drawn": False,  # (the chart drawn already: drawn again, scrolled where it was)
@@ -248,6 +258,7 @@ def _view(
     dated, undated = categories.timeline(period.id, left_out)
     spans, no_date = tl.career_spans(person_id)
     directed = tl.supervised(person_id)
+    juries = tl.juries(person_id)
     papers = tl.papers_by_year(person_id)
     nodes = categories.tree(period.folder.id)
     paths = {n.id: n.path for n in nodes}
@@ -258,6 +269,7 @@ def _view(
         "career": len(spans) + len(no_date),
         "excerpts": len(excerpts) + len(undated) + len(left_out),
         "theses": len(directed),
+        "juries": len(juries),
         "papers": sum(map(len, papers.values())),
     }
 
@@ -320,6 +332,7 @@ def _view(
         _chart(
             spans if on_["career"] else [],
             [t for t in directed if t.year] if on_["theses"] else [],
+            [t for t in juries if t.year] if on_["juries"] else [],
             kept()[0] if on_["excerpts"] else [],
             papers if on_["papers"] else {},
             nodes,
@@ -337,7 +350,7 @@ def _view(
     def below() -> None:
         """The details of what is picked, and what is listed apart."""
         on_ = on()
-        _line_details(person_id, spans, directed, picked, pick, show_tab, rebuild)
+        _line_details(person_id, spans, directed, juries, picked, pick, show_tab, rebuild)
         if on_["excerpts"]:
             spans_, undated_, left_out_ = kept()
             _details(spans_, picked, paths, pick, acts)
@@ -477,6 +490,7 @@ def _legend(
         "career": (_("Career"), "work", KIND_COLOUR["position"]),
         "excerpts": (_("Excerpts"), "format_quote", "primary"),
         "theses": (_("Supervised theses"), "school", KIND_COLOUR["thesis"]),
+        "juries": (_("Thesis juries"), "gavel", KIND_COLOUR["jury"]),
         "papers": (_("Papers"), "article", KIND_COLOUR["papers"]),
     }
     with ui.row().classes("items-center gap-x-4 gap-y-0"):
@@ -490,6 +504,11 @@ def _legend(
                 ).props("dense").classes("ml-1").mark(f"timeline-show-{kind}").set_enabled(
                     bool(counts[kind])
                 )
+            if kind == "juries" and counts[kind]:  # (a dot each, coloured by its role)
+                with ui.row().classes("items-center gap-1 no-wrap").mark("timeline-legend-jury"):
+                    for role, colour in JURY_COLOUR.items():
+                        ui.element("span").classes("vr-tl-dot inline-block").style(f"--c:{colour}")
+                        ui.label(ROLE_LABELS[role]).classes("text-xs text-grey mr-1")
         if period.start_year or period.end_year:
             with ui.row().classes("items-center gap-1 no-wrap"):
                 ui.element("span").classes("inline-block w-4 h-4 rounded").style(
@@ -517,6 +536,7 @@ def _legend(
             "selection of a PDF beside the page), with their years, to see them here."
         ),
         "theses": _("No thesis they supervised: they come from their theses.fr profile."),
+        "juries": _("No thesis jury they were on: they come from their theses.fr profile."),
         "papers": _("No paper with a year: they come from their sources."),
     }
     for kind, text in missing.items():
@@ -530,6 +550,7 @@ def _legend(
 def _chart(
     spans: list[tl.CareerSpan],
     directed: list[tl.Supervised],
+    juries: list[tl.Jury],
     excerpts: list[_Span],
     papers: dict[int, list[str]],
     nodes: list[categories.Node],
@@ -548,7 +569,7 @@ def _chart(
     grid and the style naming its years ("grid", "names"); ``keep``: drawn again, scrolled
     where it was."""
     this_year = date.today().year
-    core = [y for sp in [*spans, *directed, *excerpts] for y in (sp.first, sp.last)]
+    core = [y for sp in [*spans, *directed, *juries, *excerpts] for y in (sp.first, sp.last)]
     if not core and not papers:
         ui.label(_("Nothing dated to place on the timeline.")).classes("text-grey").mark(
             "timeline-nothing"
@@ -577,6 +598,9 @@ def _chart(
         rows.append(
             ("theses", _("PhD students"), "school", KIND_COLOUR["thesis"], lanes, "theses", [])
         )
+    if juries:
+        lanes = tl.lanes(juries, room=room)
+        rows.append(("juries", _("Juries"), "gavel", KIND_COLOUR["jury"], lanes, "juries", []))
     for main, xs in _by_main(excerpts, nodes):
         lanes = tl.lanes(xs, room=room)
         name, colour = (main.name, main.colour) if main else (_("Excerpts"), "var(--q-primary)")
@@ -610,7 +634,9 @@ def _chart(
             ui.element("div").classes("vr-tl-head").style("grid-row:1")
             for year in range(lo, hi + 1):
                 full = year in cover or year in papers
-                full = full or any(sp.first <= year <= sp.last for sp in [*spans, *directed])
+                full = full or any(
+                    sp.first <= year <= sp.last for sp in [*spans, *directed, *juries]
+                )
                 label = (
                     ui.label()
                     .classes(
@@ -646,6 +672,9 @@ def _chart(
                 elif kind == "theses":
                     for t, end in _cells(directed, hi):
                         items["thesis", t.id] = _thesis(t, row, col, end, picked, pick)
+                elif kind == "juries":
+                    for t, end in _cells(juries, hi):
+                        items["jury", t.id] = _jury(t, row, col, end, picked, pick)
                 elif kind == "excerpts":
                     for x, end in _cells(xs, hi):
                         items["excerpt", x.d.excerpt.id] = _excerpt(x, row, col, end, picked, pick)
@@ -825,6 +854,46 @@ def _thesis(
     return item
 
 
+def _jury_line(t: tl.Jury) -> str:
+    """Its role, the student, the date of the defence."""
+    return " · ".join(
+        filter(
+            None,
+            [ROLE_LABELS[t.role], _("PhD of {student}").format(student=t.student or "?"), t.date],
+        )
+    )
+
+
+def _jury(
+    t: tl.Jury,
+    row: int,
+    col: Callable[[int], int],
+    end: int,
+    picked: dict[str, int],
+    pick: Callable[..., None],
+) -> ui.element:
+    """A thesis they were on the jury of: a dot at its defence (to the month, if known), in
+    its role's colour, the student's name above it (clicked: in the details)."""
+    item = _bar(
+        JURY_COLOUR.get(t.role, KIND_COLOUR["jury"]),
+        t,
+        row,
+        col,
+        end,
+        False,
+        t.student or t.title,
+        f"timeline-jury-{t.id}",
+        " picked" if picked.get("jury") == t.id else "",
+        dot=t.at,
+    )
+    item.on("click", lambda: pick("jury", t.id))
+    with item, ui.tooltip().classes("max-w-sm"):
+        ui.label(_jury_line(t))
+        ui.label(t.title).classes("text-sm font-medium")
+        ui.label(_("Click: its details")).classes("italic")
+    return item
+
+
 def _excerpt(
     x: _Span,
     row: int,
@@ -898,13 +967,15 @@ def _line_details(
     person_id: int,
     spans: list[tl.CareerSpan],
     directed: list[tl.Supervised],
+    juries: list[tl.Jury],
     picked: dict[str, int],
     pick: Callable[..., None],
     show_tab: Callable[[str], None],
     rebuild: Callable[[], None],
 ) -> None:
     """The line of their career, or the PhD student, picked: all about it, to edit (the
-    timeline drawn again then), or to see in its tab."""
+    timeline drawn again then), or to see in its tab; a thesis they were on the jury of,
+    to see in its tab."""
     from .person import _career_dialog, _student_dialog  # (it uses this module)
 
     if (cid := picked.get("career")) and (
@@ -931,6 +1002,12 @@ def _line_details(
             if found is not None:
                 _student_dialog(person_id, found, rebuild)
 
+    elif (jid := picked.get("jury")) and (j := next((x for x in juries if x.id == jid), None)):
+        icon, colour = "gavel", "jury"
+        lines = [_jury_line(j)]
+        title, tab, tab_name = j.title, "theses", _("Theses tab")
+        which = f"jury-{j.id}"
+        edit = None
     else:
         return
     with (
@@ -943,9 +1020,10 @@ def _line_details(
             ui.icon(icon, size="sm").style(f"color:{KIND_COLOUR[colour]}")
             ui.label(title).classes("font-medium")
             ui.space()
-            ui.button(_("Edit"), icon="edit", on_click=edit).props("flat dense no-caps").mark(
-                "timeline-line-edit"
-            )
+            if edit is not None:
+                ui.button(_("Edit"), icon="edit", on_click=edit).props("flat dense no-caps").mark(
+                    "timeline-line-edit"
+                )
             ui.button(tab_name, icon="open_in_new", on_click=lambda: show_tab(tab)).props(
                 "flat dense no-caps"
             ).mark("timeline-line-tab")
@@ -964,7 +1042,7 @@ def _details(
     acts: _Acts,
 ) -> None:
     """The excerpts picked on the timeline: those of a year (along it, or in it), or one."""
-    if not excerpts or picked.keys() & {"career", "thesis"}:
+    if not excerpts or picked.keys() & {"career", "thesis", "jury"}:
         return
     with ui.column().classes("w-full gap-2 mt-2").mark("timeline-details"):
         if not picked:

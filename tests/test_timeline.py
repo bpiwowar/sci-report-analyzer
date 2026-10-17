@@ -487,3 +487,43 @@ def test_one_off_kept_by_the_next_lead() -> None:
     categories.remove_excerpt(lead)
     (left,) = categories.excerpts(period)
     assert left.id == other and left.punctual
+
+
+async def test_timeline_juries(user: User) -> None:
+    """The theses they were on the jury of: a dot at the defence (to the month), in their
+    role's colour; clicked, in the details (to the Theses tab); hidden ones left out."""
+    pid, period, _cats, _paper = _seed()
+    rev = replace(thesis("j1", "rapporteur", "On graphs"), defence_date="2022-03-15")
+    ex = replace(thesis("j2", "examiner", "On trees"), defence_date="2019")
+    gone = replace(thesis("j3", "president", "On loops"), defence_date="2021-06-01")
+    add_source(pid, "thesesfr", "1", theses=[rev, ex, gone])
+    found = {t.title: t for t in timeline.juries(pid)}
+    assert found["On graphs"].at == pytest.approx(2022 + 2.5 / 12)
+    assert found["On trees"].at == 2019.5 and found["On trees"].role == "examiner"
+    from sci_report_analyzer.db.models import Thesis
+
+    with session_scope() as s:
+        s.get(Thesis, found["On loops"].id).hidden = True
+    assert {t.title for t in timeline.juries(pid)} == {"On graphs", "On trees"}
+    jid = found["On graphs"].id
+
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see(marker="timeline-row-juries")
+    await user.should_see(marker="timeline-legend-jury")
+    await user.should_see("A Student", marker=f"timeline-jury-{jid}")
+    await user.should_not_see(marker=f"timeline-jury-{found['On loops'].id}")
+    item = user.find(marker=f"timeline-jury-{jid}").elements.pop()
+    assert "dot" in item.classes and "#cf222e" in item.style["--c"]
+    user.find(marker=f"timeline-jury-{jid}").click()
+    await user.should_see(marker=f"timeline-line-jury-{jid}")
+    await user.should_see("On graphs", marker="timeline-line-details")
+    await user.should_not_see(marker="timeline-line-edit")
+    user.find(marker="timeline-line-tab").click()
+    tab = user.find(marker="tab-theses").elements.pop()
+    assert tab.parent_slot.parent.value == "theses"
+    # None: said so.
+    other = make_person("Bob Sample")
+    fid = folders.folders()[0].id
+    other_period = folders.add_person(fid, other)
+    await user.open(f"/person/{other}/{other_period}?tab=timeline")
+    await user.should_see(marker="timeline-none-juries")
