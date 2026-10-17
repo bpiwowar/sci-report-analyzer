@@ -1,6 +1,7 @@
 """A person's career (their CV): positions, diplomas, the current position, [[cv]]."""
 
 import asyncio
+from datetime import date
 
 import pytest
 from helpers import add_source, make_person
@@ -38,6 +39,21 @@ def test_entries_and_current():
     assert len(career.entries(pid)) == 2
 
 
+def test_years_since():
+    """The years since a line (“+12”), if asked for: a diploma's since obtained, a
+    position's since started."""
+    today = date(2026, 10, 17)
+    phd = career.Entry("diploma", "PhD", "2011", "2014-06", elapsed=True)
+    assert (phd.years(today), phd.plus(today)) == (12, "+12")
+    grade = career.Entry("position", "Professor", "2020-09", None, elapsed=True)
+    assert grade.plus(today) == "+6"
+    assert career.Entry("position", "Postdoc", "2018", "2020").plus(today) == ""
+    assert career.Entry("position", "Visitor", elapsed=True).plus(today) == ""  # (no date)
+    pid = make_person()
+    career.save(pid, phd)
+    assert career.entries(pid)[0].elapsed
+
+
 def test_valid_date():
     assert all(map(career.valid_date, ["", None, "2019", "2019-09", "2019-09-30"]))
     assert not any(map(career.valid_date, ["19", "2019-13", "Sept. 2019", "2019/09"]))
@@ -56,6 +72,7 @@ def test_own_thesis_suggested():
         "Paris 6",
         "On ranking",
     )
+    assert t.elapsed  # (the years since the PhD, by default)
     career.save(pid, t)
     assert career.own_theses(pid) == []  # (once added)
 
@@ -73,6 +90,12 @@ def test_cv_block():
         "- **2018-10–2020**: Postdoc, Inria\n"
         "- **2015–2018-09**: PhD, Sorbonne University — *Neural ranking*"
     )
+    phd = career.entries(pid)[-1]
+    phd.elapsed = True
+    career.save(pid, phd)
+    r = reports.render("[[cv]]", reports.folder_context(stats, period))
+    since = date.today().year - 2018
+    assert f"- **2015–2018-09 (+{since})**: PhD, Sorbonne University" in r.text
 
 
 async def test_career_ui(user: User) -> None:
@@ -86,11 +109,14 @@ async def test_career_ui(user: User) -> None:
     user.find(marker="career-save").click()
     await user.should_see("Dates as 2019, 2019-09 or 2019-09-01")
     user.find(marker="career-start").clear().type("2020-09")
+    user.find(marker="career-elapsed").click()
     user.find(marker="career-save").click()
     await user.should_see(marker="current-position")  # (the page reloaded: in the header)
     await user.should_see("since 2020-09")
     (e,) = career.entries(pid)
     assert (e.title, e.institution, e.current) == ("Associate professor", "ISIR", True)
+    assert e.elapsed
+    await user.should_see(f"+{date.today().year - 2020}")
     user.find(marker=f"career-edit-{e.id}").click()
     user.find(marker="career-delete").click()
     await user.should_not_see(marker="current-position")

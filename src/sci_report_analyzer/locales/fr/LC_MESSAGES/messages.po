@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-17 08:11+0200\n"
+"POT-Creation-Date: 2026-10-17 08:20+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -229,10 +229,11 @@ msgstr ""
 
 msgid ""
 "A local LLM served by Ollama (https://ollama.com), for the features that "
-"will use one."
+"use one (e.g. reading a person's career in their documents)."
 msgstr ""
 "Un LLM local servi par Ollama (https://ollama.com), pour les fonctions "
-"qui l’utiliseront."
+"qui en utilisent un (p. ex. lire le parcours d'une personne dans ses "
+"documents)."
 
 msgid "A manual variant or a more specific rule wins"
 msgstr "Une variante manuelle ou une règle plus spécifique prime"
@@ -453,6 +454,9 @@ msgstr ""
 msgid "AI"
 msgstr "IA"
 
+msgid "API key (if needed)"
+msgstr "Clé d'API (si nécessaire)"
+
 msgid "API keys"
 msgstr "Clés d’API"
 
@@ -569,6 +573,9 @@ msgstr ""
 "Ajouter le texte sélectionné (ou le surlignage cliqué) à une catégorie de"
 " {folder} (E)"
 
+msgid "Add the ticked ones"
+msgstr "Ajouter celles cochées"
+
 msgid "Add to a category"
 msgstr "Ajouter à une catégorie"
 
@@ -615,6 +622,13 @@ msgstr "Affiliation (facultative, aide à l'appariement)"
 
 msgid "After"
 msgstr "Après"
+
+msgid ""
+"After its dates, here and in the report: the years since the diploma was "
+"obtained, the position started (e.g. the thesis, a grade)"
+msgstr ""
+"Après ses dates, ici et dans le rapport : les années depuis l'obtention "
+"du diplôme, le début du poste (p. ex. la thèse, un grade)"
 
 msgid "After the PhD"
 msgstr "Après la thèse"
@@ -930,8 +944,23 @@ msgstr "Candidats à examiner"
 msgid "Cannot reach Ollama: {error}"
 msgstr "Ollama est injoignable : {error}"
 
+#, python-brace-format
+msgid "Cannot reach the server: {error}"
+msgstr "Serveur injoignable : {error}"
+
+#, python-brace-format
+msgid "Cannot read the career: {error}"
+msgstr "Impossible de lire le parcours : {error}"
+
+#, python-brace-format
+msgid "Cannot train: {error}"
+msgstr "Apprentissage impossible : {error}"
+
 msgid "Career"
 msgstr "Parcours"
+
+msgid "Career read by the LLM"
+msgstr "Parcours lu par le LLM"
 
 msgid "Categories (where excerpts of the people's documents are filed)"
 msgstr "Catégories (où sont classés les extraits des documents des personnes)"
@@ -1560,6 +1589,12 @@ msgstr "Déposer ici : au premier niveau"
 msgid "Drop here: last, at the top level"
 msgstr "Déposer ici : en dernier, au premier niveau"
 
+msgid "E.g. nomic-embed-text, bge-m3 (ollama pull <model>)"
+msgstr "P. ex. nomic-embed-text, bge-m3 (ollama pull <modèle>)"
+
+msgid "E.g. to suggest an excerpt's category (trained again if changed)"
+msgstr "P. ex. pour suggérer la catégorie d'un extrait (à réentraîner s'il change)"
+
 msgid ""
 "Each named: it is used as `.name` in the folder's notes, instead of the "
 "general template of that name (Settings → Citation templates)."
@@ -1580,6 +1615,9 @@ msgstr "Modifier (texte, années, rayonnement, étiquettes…)"
 
 msgid "Edit folder"
 msgstr "Modifier le dossier"
+
+msgid "Edit it, then add it"
+msgstr "La modifier, puis l'ajouter"
 
 msgid "Edit the categories"
 msgstr "Modifier les catégories"
@@ -1614,6 +1652,16 @@ msgstr "Modification…"
 
 msgid "Else an open-access copy found by Unpaywall"
 msgstr "Sinon une copie en accès ouvert trouvée par Unpaywall"
+
+msgid "Embedding model"
+msgstr "Modèle d'embeddings"
+
+#, python-brace-format
+msgid "Embedding model (default: {model})"
+msgstr "Modèle d'embeddings (par défaut : {model})"
+
+msgid "Embeddings"
+msgstr "Embeddings"
 
 msgid "Empty: found automatically (ranking record acronym, venue texts)"
 msgstr ""
@@ -1817,6 +1865,9 @@ msgstr "Dossier"
 
 msgid "Folders"
 msgstr "Dossiers"
+
+msgid "For the features using the local LLM"
+msgstr "Pour les fonctions utilisant le LLM local"
 
 msgid "Forget the chosen record, for all the venue's papers: match automatically"
 msgstr ""
@@ -2309,6 +2360,9 @@ msgstr ""
 msgid "Its tag in the reports (e.g. turned into an icon when copied)"
 msgstr "Son étiquette dans les rapports (par ex. changée en icône à la copie)"
 
+msgid "Its words are not in the documents: to check"
+msgstr "Ses mots ne sont pas dans les documents : à vérifier"
+
 #, python-brace-format
 msgid "Its {track} track (merged into it, its texts marked as such)"
 msgstr ""
@@ -2430,6 +2484,10 @@ msgstr "Type enregistré sur le canal de publication"
 msgid "Kinds:"
 msgstr "Types :"
 
+#, python-brace-format
+msgid "LLM (default: {model})"
+msgstr "LLM (par défaut : {model})"
+
 msgid "LaTeX ($…$ inline, $$…$$ display)"
 msgstr "LaTeX ($…$ en ligne, $$…$$ centré)"
 
@@ -2464,6 +2522,15 @@ msgstr "Dernier ({year}) : {quartile}"
 #, python-brace-format
 msgid "Latest listing ({year}): {rank}"
 msgstr "Dernier classement ({year}) : {rank}"
+
+msgid "Learn again from the excerpts filed in the folder's categories"
+msgstr "Réapprendre à partir des extraits classés dans les catégories du dossier"
+
+#, python-brace-format
+msgid "Learnt from {n} excerpt"
+msgid_plural "Learnt from {n} excerpts"
+msgstr[0] "Appris à partir de {n} extrait"
+msgstr[1] "Appris à partir de {n} extraits"
 
 msgid ""
 "Leave it out of the generated text (the notes, the reports): still kept, "
@@ -2762,6 +2829,9 @@ msgstr "Score minimal d'un appariement dans la liste des canaux prédateurs"
 msgid "Model"
 msgstr "Modèle"
 
+msgid "Models"
+msgstr "Modèles"
+
 msgid "Move"
 msgstr "Déplacer"
 
@@ -2867,6 +2937,9 @@ msgstr "Ne plus jamais proposer cette paire"
 msgid "Never pulled from this repository."
 msgstr "Jamais récupéré depuis ce dépôt."
 
+msgid "Never trained"
+msgstr "Jamais entraîné"
+
 msgid "New"
 msgstr "Nouvelle"
 
@@ -2944,6 +3017,9 @@ msgstr "Aucun filtre de copie activé : voir Paramètres → Filtres de copie"
 
 msgid "No document"
 msgstr "Aucun document"
+
+msgid "No excerpt filed yet: nothing to learn from"
+msgstr "Aucun extrait classé : rien à apprendre"
 
 msgid "No excerpt from a document yet"
 msgstr "Aucun extrait d'un document pour l’instant"
@@ -3059,6 +3135,13 @@ msgstr "Document introuvable"
 
 msgid "No such paper"
 msgstr "Article introuvable"
+
+msgid "No suggestion (train first)"
+msgstr "Aucune suggestion (entraîner d'abord)"
+
+#, python-brace-format
+msgid "No suggestion: {error}"
+msgstr "Aucune suggestion : {error}"
 
 msgid "No thesis: validate a theses.fr profile in the Sources tab."
 msgstr "Aucune thèse : validez un profil theses.fr dans l'onglet Sources."
@@ -3259,6 +3342,9 @@ msgstr "Rien n'a changé dans les fichiers du groupe."
 msgid "Nothing found on HAL"
 msgstr "Rien trouvé sur HAL"
 
+msgid "Nothing new found"
+msgstr "Rien de nouveau trouvé"
+
 msgid "Nothing new: you have the group's settings."
 msgstr "Rien de nouveau : vous avez les paramètres du groupe."
 
@@ -3300,6 +3386,9 @@ msgstr ""
 "Désactivé : seulement compté dans son type · Nombre : le nombre "
 "d'articles · Liste : leurs canaux de publication · Liste + années : avec "
 "les années"
+
+msgid "Ollama (/api/embed)"
+msgstr "Ollama (/api/embed)"
 
 msgid "Ollama is running but has no model (ollama pull <model>)"
 msgstr "Ollama fonctionne mais n’a aucun modèle (ollama pull <modèle>)"
@@ -3395,6 +3484,9 @@ msgstr "Ouvrir le site web"
 
 msgid "Open this venue (changes not saved here are lost)"
 msgstr "Ouvrir ce canal (les modifications non enregistrées ici sont perdues)"
+
+msgid "OpenAI-compatible (/v1/embeddings)"
+msgstr "Compatible OpenAI (/v1/embeddings)"
 
 msgid "OpenAlex (live fallback)"
 msgstr "OpenAlex (recours en ligne)"
@@ -3867,6 +3959,12 @@ msgstr "Extraits de rayonnement"
 msgid "Re-sync all"
 msgstr "Tout resynchroniser"
 
+msgid "Read in their documents"
+msgstr "Lire dans ses documents"
+
+msgid "Reading their documents (this may take a while)…"
+msgstr "Lecture de ses documents (cela peut prendre un moment)…"
+
 msgid "Record removed from the venue: matched automatically"
 msgstr "Entrée retirée du canal : correspondance automatique"
 
@@ -4318,6 +4416,9 @@ msgstr "Clé d'API Semantic Scholar (facultative)"
 msgid "Series"
 msgstr "Série"
 
+msgid "Server URL (with /v1)"
+msgstr "URL du serveur (avec /v1)"
+
 msgid "Set a level"
 msgstr "Définir un niveau"
 
@@ -4458,6 +4559,9 @@ msgstr ""
 "Afficher le panneau latéral (notes, extraits, signets…) dans une autre "
 "fenêtre, par exemple sur un autre écran ; à nouveau : retour ici"
 
+msgid "Show the years since (“+12”)"
+msgstr "Afficher les années depuis (« +12 »)"
+
 msgid "Show what is within it"
 msgstr "Afficher ce qu'elle contient"
 
@@ -4483,6 +4587,10 @@ msgstr ""
 
 msgid "Similarity of the venues listed as similar to a venue"
 msgstr "Similarité des canaux listés comme similaires à un canal"
+
+#, python-brace-format
+msgid "Similarity: {score:.0%}"
+msgstr "Similarité : {score:.0%}"
 
 msgid "Skip"
 msgstr "Passer"
@@ -4612,6 +4720,9 @@ msgstr "Alias de doctorant ajouté"
 msgid "Students"
 msgstr "Étudiants"
 
+msgid "Suggested from the excerpts filed (their embeddings)"
+msgstr "Suggérées d'après les extraits classés (leurs embeddings)"
+
 msgid "Suggested related venues"
 msgstr "Canaux liés suggérés"
 
@@ -4732,6 +4843,16 @@ msgstr ""
 "Texte recherché par la correspondance automatique avec les classements, à"
 " la place des textes du canal (cela ne change pas les textes qui "
 "appartiennent au canal)"
+
+msgid ""
+"Texts turned into vectors, e.g. to suggest the category of an excerpt: "
+"from Ollama, or a server with an OpenAI-compatible API (llama.cpp, vLLM, "
+"LM Studio…). A folder can use another model (its reports' settings)."
+msgstr ""
+"Des textes transformés en vecteurs, p. ex. pour suggérer la catégorie "
+"d'un extrait : par Ollama, ou un serveur avec une API compatible OpenAI "
+"(llama.cpp, vLLM, LM Studio…). Un dossier peut utiliser un autre modèle "
+"(les réglages de ses rapports)."
 
 msgid "That of the excerpts without one"
 msgstr "Celui des extraits qui n'en ont pas"
@@ -4861,6 +4982,13 @@ msgstr ""
 
 msgid "The line too"
 msgstr "La ligne aussi"
+
+msgid ""
+"The local LLM reads their documents (the passages about a career) and "
+"profiles, and suggests lines of their CV, to check"
+msgstr ""
+"Le LLM local lit ses documents (les passages sur un parcours) et ses "
+"profils, et suggère des lignes de son CV, à vérifier"
 
 msgid ""
 "The main conference a workshop text names: the text of the first group "
@@ -5169,6 +5297,9 @@ msgstr ""
 "correspondance approchée, et aucune décision manuelle (un niveau, « non "
 "classé » compris, ou une entrée de classement)"
 
+msgid "The years since (also in the report)"
+msgstr "Les années depuis (aussi dans le rapport)"
+
 #, python-brace-format
 msgid "The {source} source is disabled (Settings → Sources)"
 msgstr "La source {source} est désactivée (Paramètres → Sources)"
@@ -5388,6 +5519,15 @@ msgstr "Sessions"
 
 msgid "Tracks saved"
 msgstr "Sessions enregistrées"
+
+msgid "Train"
+msgstr "Entraîner"
+
+#, python-brace-format
+msgid "Trained on {when} ({n} excerpt)"
+msgid_plural "Trained on {when} ({n} excerpts)"
+msgstr[0] "Entraîné le {when} ({n} extrait)"
+msgstr[1] "Entraîné le {when} ({n} extraits)"
 
 msgid "Try a venue text"
 msgstr "Essayer un texte de canal de publication"
@@ -6897,8 +7037,34 @@ msgstr[0] "{n} décision que le groupe n'a pas"
 msgstr[1] "{n} décisions que le groupe n'a pas"
 
 #, python-brace-format
+msgid ""
+"{n} document not read: open it once in the viewer (its text is extracted "
+"there)"
+msgid_plural ""
+"{n} documents not read: open them once in the viewer (their text is "
+"extracted there)"
+msgstr[0] ""
+"{n} document non lu : l'ouvrir une fois dans la visionneuse (son texte y "
+"est extrait)"
+msgstr[1] ""
+"{n} documents non lus : les ouvrir une fois dans la visionneuse (leur "
+"texte y est extrait)"
+
+#, python-brace-format
 msgid "{n} hidden by the filters"
 msgstr "{n} masqués par les filtres"
+
+#, python-brace-format
+msgid "{n} line added to the career"
+msgid_plural "{n} lines added to the career"
+msgstr[0] "{n} ligne ajoutée au parcours"
+msgstr[1] "{n} lignes ajoutées au parcours"
+
+#, python-brace-format
+msgid "{n} model on the server"
+msgid_plural "{n} models on the server"
+msgstr[0] "{n} modèle sur le serveur"
+msgstr[1] "{n} modèles sur le serveur"
 
 #, python-brace-format
 msgid "{n} of {total} items matched"

@@ -74,6 +74,8 @@ class CareerEntry(Base):
     # A diploma's thesis (its title), else details (team, subject, supervisors…).
     details: Mapped[str | None]
     thesis_id: Mapped[str | None]  # (the own thesis on theses.fr it was made from)
+    # Shown with the years since (“+12”: since a diploma was obtained, a position started).
+    elapsed: Mapped[bool] = mapped_column(default=False, server_default="0")
 
     person: Mapped[Person] = relationship(back_populates="career")
 
@@ -854,3 +856,32 @@ class VenueCache(Base):
     badge: Mapped[dict[str, Any] | None]
     source: Mapped[str | None]
     ts: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+# ---- Embeddings ------------------------------------------------------------------------------
+
+
+class Embedding(Base):
+    """A text's embedding by a model (a cache, see classifier.py)."""
+
+    __tablename__ = "embedding"
+
+    model: Mapped[str] = mapped_column(primary_key=True)
+    digest: Mapped[str] = mapped_column(String(64), primary_key=True)  # (the text's SHA-256)
+    vector: Mapped[bytes]  # (float32, see array)
+
+
+class ExcerptClassifier(Base):
+    """What suggests the category of an excerpt, in some folders' settings (their
+    categories): trained on the excerpts filed in them (see classifier.py)."""
+
+    __tablename__ = "excerpt_classifier"
+
+    settings_id: Mapped[int] = mapped_column(
+        ForeignKey("folder_settings.id", ondelete="CASCADE"), primary_key=True
+    )
+    model: Mapped[str]  # (the embedding model)
+    trained_at: Mapped[datetime] = mapped_column(default=utcnow)
+    count: Mapped[int]  # (the excerpts it learnt from)
+    # {category id: the mean of its excerpts' embeddings, normalised}
+    centroids: Mapped[dict[str, Any]]

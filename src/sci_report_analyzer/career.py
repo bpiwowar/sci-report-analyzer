@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date
 
 from sqlalchemy import select
 
@@ -29,6 +30,7 @@ class Entry:
     details: str | None = None
     thesis_id: str | None = None
     id: int | None = None
+    elapsed: bool = False  # (shown with the years since: “+12”)
 
     @property
     def current(self) -> bool:
@@ -42,6 +44,21 @@ class Entry:
         if self.start and self.end and self.start != self.end:
             return f"{self.start}–{self.end}"
         return self.end or self.start or ""
+
+    def since(self) -> str | None:
+        """When it counts from: a diploma, when obtained; a position, when started."""
+        return (self.end or self.start) if self.kind == "diploma" else self.start
+
+    def years(self, today: date | None = None) -> int | None:
+        """The years since it (shown as “+12”; none: not asked for, or no date)."""
+        if not self.elapsed or not (since := self.since()):
+            return None
+        return max(0, (today or date.today()).year - int(since[:4]))
+
+    def plus(self, today: date | None = None) -> str:
+        """“+12” (the years since it), or nothing."""
+        n = self.years(today)
+        return "" if n is None else f"+{n}"
 
     def line(self) -> str:
         """“Associate professor, Sorbonne University”."""
@@ -63,7 +80,17 @@ def entries(person_id: int) -> list[Entry]:
     with session_scope() as s:
         rows = s.scalars(select(CareerEntry).where(CareerEntry.person_id == person_id))
         found = [
-            Entry(r.kind, r.title, r.start, r.end, r.institution, r.details, r.thesis_id, id=r.id)
+            Entry(
+                r.kind,
+                r.title,
+                r.start,
+                r.end,
+                r.institution,
+                r.details,
+                r.thesis_id,
+                id=r.id,
+                elapsed=r.elapsed,
+            )
             for r in rows
         ]
     return sorted(found, key=_sort_key, reverse=True)
@@ -88,7 +115,7 @@ def save(person_id: int, entry: Entry) -> int:
         row.kind, row.title = entry.kind, entry.title.strip()
         row.start, row.end = _clean(entry.start), _clean(entry.end)
         row.institution, row.details = _clean(entry.institution), _clean(entry.details)
-        row.thesis_id = entry.thesis_id
+        row.thesis_id, row.elapsed = entry.thesis_id, entry.elapsed
         s.flush()
         return row.id
 
@@ -122,6 +149,7 @@ def own_theses(person_id: int) -> list[Entry]:
                 institution=t.institution,
                 details=t.title,
                 thesis_id=t.thesis_id,
+                elapsed=True,
             )
             for t in theses
             if t.thesis_id not in known
@@ -129,10 +157,12 @@ def own_theses(person_id: int) -> list[Entry]:
 
 
 def markdown(person_id: int) -> str:
-    """The CV in a report: a list, the most recent first (in the current language)."""
+    """The CV in a report: a list, the most recent first (in the current language); the
+    years since a line, if asked for, after its dates (“**2014 (+12)**: PhD”)."""
     lines = []
     for e in entries(person_id):
-        text = f"**{e.when()}**: {e.line()}" if e.when() else e.line()
+        when = " ".join(x for x in (e.when(), e.plus() and f"({e.plus()})") if x)
+        text = f"**{when}**: {e.line()}" if when else e.line()
         if e.details:
             text += f" — *{e.details}*" if e.kind == "diploma" else f" ({e.details})"
         lines.append(f"- {text}")

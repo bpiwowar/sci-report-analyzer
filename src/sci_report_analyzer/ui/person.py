@@ -4,12 +4,23 @@ theses."""
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from html import escape
 
 from fastapi import Request
 from nicegui import background_tasks, ui
 
-from .. import annotations, career, folders, manual, persons, source_settings, theses
+from .. import (
+    annotations,
+    career,
+    career_extract,
+    folders,
+    llm,
+    manual,
+    persons,
+    source_settings,
+    theses,
+)
 from ..db.models import Person, SourceLink, Thesis
 from ..i18n import _, ngettext
 from ..sources import ADAPTERS
@@ -231,6 +242,17 @@ def career_view(person_id: int) -> None:
         ui.button(
             _("Add"), icon="add", on_click=lambda: _career_dialog(person_id, None, listing.refresh)
         ).props("flat dense").mark("career-add")
+        if llm.model():
+            ui.button(
+                _("Read in their documents"),
+                icon="auto_awesome",
+                on_click=lambda: _extract_dialog(person_id, listing.refresh),
+            ).props("flat dense color=purple").tooltip(
+                _(
+                    "The local LLM reads their documents (the passages about a career) and "
+                    "profiles, and suggests lines of their CV, to check"
+                )
+            ).mark("career-extract")
 
     @ui.refreshable
     def listing() -> None:
@@ -257,6 +279,10 @@ def career_view(person_id: int) -> None:
                             ui.label(e.line()).classes("font-medium" if e.current else "")
                             if e.current:
                                 ui.badge(_("current"), color="primary").props("outline")
+                            if plus := e.plus():
+                                ui.badge(plus, color="blue-grey").props("outline").tooltip(
+                                    _("The years since (also in the report)")
+                                ).mark(f"career-plus-{e.id}")
                         if e.details:
                             ui.label(e.details).classes(
                                 "text-sm text-grey" + (" italic" if e.kind == "diploma" else "")
@@ -279,6 +305,92 @@ def career_view(person_id: int) -> None:
                 ).props("flat dense size=sm").mark("career-add-thesis")
 
     listing()
+
+
+def _extract_dialog(person_id: int, on_change: Callable[[], None]) -> None:
+    """The lines of the CV the LLM reads in the person's documents (see career_extract): ticked
+    ones added, or one edited then added; each with the words it comes from."""
+    with transient_dialog(_("Career read by the LLM"), width="w-full max-w-3xl") as (
+        dlg,
+        _card,
+    ):
+        body = ui.column().classes("w-full gap-1").mark("career-extract-body")
+        with body, ui.row().classes("items-center gap-2"):
+            ui.spinner()
+            ui.label(_("Reading their documents (this may take a while)…")).classes("text-grey")
+        footer = ui.row().classes("w-full items-center")
+    ticks: dict[int, ui.checkbox] = {}
+    found: list[career_extract.Suggestion] = []
+
+    def add_ticked() -> None:
+        n = 0
+        for i, box in ticks.items():
+            if box.value:
+                career.save(person_id, found[i].entry)
+                n += 1
+        dlg.close()
+        on_change()
+        ui.notify(
+            ngettext("{n} line added to the career", "{n} lines added to the career", n).format(n=n)
+        )
+
+    def edit(i: int) -> None:
+        dlg.close()
+        _career_dialog(person_id, found[i].entry, on_change)
+
+    async def run() -> None:
+        try:
+            got, unread = await career_extract.extract(person_id)
+        except Exception as e:
+            body.clear()
+            with body:
+                ui.label(_("Cannot read the career: {error}").format(error=e)).classes(
+                    "text-negative"
+                )
+            return
+        found.extend(got)
+        body.clear()
+        with body:
+            if unread:
+                ui.label(
+                    ngettext(
+                        "{n} document not read: open it once in the viewer (its text is "
+                        "extracted there)",
+                        "{n} documents not read: open them once in the viewer (their text is "
+                        "extracted there)",
+                        unread,
+                    ).format(n=unread)
+                ).classes("text-sm text-warning").mark("career-extract-unread")
+            if not got:
+                ui.label(_("Nothing new found")).classes("text-grey").mark("career-extract-none")
+            for i, sug in enumerate(got):
+                e = sug.entry
+                with ui.row().classes("w-full items-start gap-2 no-wrap"):
+                    ticks[i] = ui.checkbox(value=sug.checked).mark(f"career-extract-tick-{i}")
+                    ui.icon("school" if e.kind == "diploma" else "work", color="grey").classes(
+                        "mt-2"
+                    )
+                    ui.label(e.when()).classes("w-28 shrink-0 text-grey mt-2")
+                    with ui.column().classes("gap-0 grow min-w-0 mt-1"):
+                        ui.label(e.line()).classes("font-medium")
+                        if e.details:
+                            ui.label(e.details).classes("text-sm text-grey")
+                        with ui.row().classes("items-center gap-1 text-xs text-grey"):
+                            if not sug.checked:
+                                ui.icon("warning", color="warning", size="xs").tooltip(
+                                    _("Its words are not in the documents: to check")
+                                )
+                            ui.label(f"{sug.source}: “{sug.quote}”").classes("italic ellipsis")
+                    ui.button(icon="edit", on_click=lambda i=i: edit(i)).props(
+                        "flat round dense size=sm"
+                    ).tooltip(_("Edit it, then add it")).mark(f"career-extract-edit-{i}")
+        with footer:
+            ui.space()
+            ui.button(_("Cancel"), on_click=dlg.close).props("flat")
+            if got:
+                ui.button(_("Add the ticked ones"), on_click=add_ticked).mark("career-extract-add")
+
+    ui.timer(0.05, run, once=True)
 
 
 def _career_dialog(person_id: int, entry: career.Entry | None, on_change) -> None:
@@ -337,6 +449,17 @@ def _career_dialog(person_id: int, entry: career.Entry | None, on_change) -> Non
             )
         )
 
+        elapsed = (
+            ui.checkbox(_("Show the years since (“+12”)"), value=e.elapsed)
+            .tooltip(
+                _(
+                    "After its dates, here and in the report: the years since the diploma was "
+                    "obtained, the position started (e.g. the thesis, a grade)"
+                )
+            )
+            .mark("career-elapsed")
+        )
+
         before = career.current(person_id)
 
         def changed() -> None:
@@ -362,6 +485,7 @@ def _career_dialog(person_id: int, entry: career.Entry | None, on_change) -> Non
                     details.value,
                     e.thesis_id,
                     id=e.id,
+                    elapsed=bool(elapsed.value),
                 ),
             )
             changed()

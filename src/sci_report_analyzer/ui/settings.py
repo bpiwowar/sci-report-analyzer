@@ -1297,7 +1297,10 @@ def keys_tab() -> None:
 def llm_tab() -> None:
     st = llm.stored_settings()
     ui.label(
-        _("A local LLM served by Ollama (https://ollama.com), for the features that will use one.")
+        _(
+            "A local LLM served by Ollama (https://ollama.com), for the features that use one "
+            "(e.g. reading a person's career in their documents)."
+        )
     ).classes("text-sm text-grey-8 max-w-[48rem]")
     enabled = ui.switch(_("Use the local LLM"), value=st.enabled).mark("llm-enabled")
     url = (
@@ -1357,12 +1360,92 @@ def llm_tab() -> None:
     local_only.on_value_change(lambda: load())
     ui.timer(0.1, load, once=True)
 
+    ui.label(_("Embeddings")).classes("text-lg mt-4")
+    ui.label(
+        _(
+            "Texts turned into vectors, e.g. to suggest the category of an excerpt: from "
+            "Ollama, or a server with an OpenAI-compatible API (llama.cpp, vLLM, LM Studio…). "
+            "A folder can use another model (its reports' settings)."
+        )
+    ).classes("text-sm text-grey-8 max-w-[48rem]")
+    embed_api = (
+        ui.toggle({k: _(v) for k, v in llm.EMBED_APIS.items()}, value=st.embed_api)
+        .props("dense no-caps")
+        .mark("llm-embed-api")
+    )
+    with ui.column().classes("gap-1").bind_visibility_from(embed_api, "value", value="openai"):
+        embed_url = (
+            ui.input(
+                _("Server URL (with /v1)"),
+                value=st.embed_url,
+                placeholder="http://localhost:8080/v1",
+            )
+            .classes("w-[32rem]")
+            .mark("llm-embed-url")
+        )
+        embed_key = (
+            ui.input(_("API key (if needed)"), value=st.embed_key, password=True)
+            .classes("w-[32rem]")
+            .mark("llm-embed-key")
+        )
+    with ui.row().classes("items-center gap-2"):
+        embed_model = (
+            ui.select(
+                [st.embed_model] if st.embed_model else [],
+                value=st.embed_model or None,
+                label=_("Embedding model"),
+                with_input=True,
+                new_value_mode="add-unique",
+            )
+            .classes("w-[32rem]")
+            .tooltip(_("E.g. nomic-embed-text, bge-m3 (ollama pull <model>)"))
+            .mark("llm-embed-model")
+        )
+        embed_refresh = ui.button(icon="refresh").props("flat round dense")
+        embed_refresh.tooltip(_("Reload the models from the server")).mark("llm-embed-refresh")
+    ui.label(_("(or set the {env} environment variable)").format(env=llm.EMBED_MODEL_ENV)).classes(
+        "text-xs text-grey"
+    )
+    embed_status = ui.label().classes("text-xs")
+
+    async def load_embed(notify: bool = False) -> None:
+        openai = embed_api.value == "openai"
+        try:
+            models = await llm.list_embed_models(
+                embed_api.value,
+                (embed_url.value if openai else url.value) or llm.DEFAULT_URL,
+                embed_key.value or "",
+                local_only=bool(local_only.value),
+            )
+        except Exception as e:
+            message = _("Cannot reach the server: {error}").format(error=e)
+            embed_status.set_text(message)
+            embed_status.classes(replace="text-xs text-negative")
+            if notify:
+                ui.notify(message, type="negative")
+            return
+        value = embed_model.value
+        embed_model.set_options(sorted({*models, *([value] if value else [])}), value=value)
+        message = ngettext("{n} model on the server", "{n} models on the server", len(models))
+        embed_status.set_text(message.format(n=len(models)))
+        embed_status.classes(replace="text-xs text-grey")
+        if notify:
+            ui.notify(message.format(n=len(models)), type="positive")
+
+    embed_refresh.on_click(lambda: load_embed(notify=True))
+    embed_api.on_value_change(lambda: load_embed())
+    ui.timer(0.1, load_embed, once=True)
+
     def values() -> llm.OllamaSettings:
         return llm.OllamaSettings(
             enabled=bool(enabled.value),
             url=(url.value or "").strip() or llm.DEFAULT_URL,
             model=model.value or "",
             local_only=bool(local_only.value),
+            embed_api=embed_api.value or "ollama",
+            embed_url=(embed_url.value or "").strip(),
+            embed_key=(embed_key.value or "").strip(),
+            embed_model=(embed_model.value or "").strip(),
         )
 
     def save() -> None:

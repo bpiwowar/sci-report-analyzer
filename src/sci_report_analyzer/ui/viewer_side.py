@@ -10,8 +10,19 @@ from typing import TYPE_CHECKING
 
 from nicegui import ui
 
-from .. import annotations, categories, documents, folders, manual, pdftext, reflist, reports
-from ..i18n import N_, _
+from .. import (
+    annotations,
+    categories,
+    classifier,
+    documents,
+    folders,
+    llm,
+    manual,
+    pdftext,
+    reflist,
+    reports,
+)
+from ..i18n import N_, _, ngettext
 from ..sources.base import SourceError
 from . import section_text
 from .categories_editor import categories_dialog
@@ -23,7 +34,7 @@ from .panel import PublicationsPanel
 from .pdf_viewer import changed, page_url, watch
 from .pub_details import show_details
 from .reflist import tag_from_list
-from .theme import NOTE_EXTRAS, chip_html, int_or_none, span
+from .theme import NOTE_EXTRAS, chip_html, fmt_dt, int_or_none, span
 
 ui.add_css(
     ".vr-excerpt-on { background: rgba(255, 160, 0, 0.15); border-radius: 4px;"
@@ -1093,6 +1104,82 @@ def similar_excerpts(
             listing()
 
 
+def category_suggestions(folder_id: int, text: str, pick: Callable[[int], None]) -> None:
+    """The categories suggested for a passage (those closest to its embedding: see
+    classifier.py), clicked to pick one; when they were learnt (from the excerpts filed), and
+    a button to learn again."""
+    names = {n.id: n.path for n in categories.tree(folder_id)}
+    with ui.row().classes("w-full items-center gap-1 no-wrap").mark("category-suggestions"):
+        ui.icon("auto_awesome", size="xs", color="purple").tooltip(
+            _("Suggested from the excerpts filed (their embeddings)")
+        )
+        chips = ui.row().classes("gap-1 grow items-center min-w-0")
+        info = ui.label().classes("text-xs text-grey shrink-0").mark("classifier-trained")
+        train_button = (
+            ui.button(_("Train"), icon="model_training")
+            .props("flat dense size=sm no-caps color=purple")
+            .tooltip(_("Learn again from the excerpts filed in the folder's categories"))
+            .mark("classifier-train")
+        )
+
+    def show_trained() -> None:
+        t = classifier.trained(folder_id)
+        info.set_text(
+            ngettext(
+                "Trained on {when} ({n} excerpt)", "Trained on {when} ({n} excerpts)", t.count
+            ).format(when=fmt_dt(t.trained_at), n=t.count)
+            if t
+            else _("Never trained")
+        )
+
+    async def load() -> None:
+        try:
+            found = await classifier.suggest(folder_id, text)
+        except Exception as e:
+            found, error = [], str(e)
+        else:
+            error = None
+        chips.clear()
+        with chips:
+            if error:
+                ui.label(_("No suggestion: {error}").format(error=error)).classes(
+                    "text-xs text-negative ellipsis"
+                )
+            elif not found:
+                ui.label(_("No suggestion (train first)")).classes("text-xs text-grey")
+            for cat, score in found:
+                if cat in names:
+                    ui.chip(names[cat], on_click=lambda cat=cat: pick(cat)).props(
+                        "dense clickable outline color=purple"
+                    ).tooltip(_("Similarity: {score:.0%}").format(score=score)).mark(
+                        f"category-suggested-{cat}"
+                    )
+
+    async def train() -> None:
+        train_button.props("loading")
+        try:
+            t = await classifier.train(folder_id)
+        except ValueError:
+            ui.notify(_("No excerpt filed yet: nothing to learn from"), type="warning")
+        except Exception as e:
+            ui.notify(_("Cannot train: {error}").format(error=e), type="negative")
+        else:
+            ui.notify(
+                ngettext("Learnt from {n} excerpt", "Learnt from {n} excerpts", t.count).format(
+                    n=t.count
+                ),
+                type="positive",
+            )
+        finally:
+            train_button.props(remove="loading")
+        show_trained()
+        await load()
+
+    train_button.on_click(train)
+    show_trained()
+    ui.timer(0.05, load, once=True)
+
+
 def category_picker(
     side: Side,
     text: str,
@@ -1226,6 +1313,8 @@ def category_picker(
 
         search.on_value_change(lambda: listing.refresh())
         search.on("keydown.enter", enter)
+        if llm.embed_model(folder_id):
+            category_suggestions(folder_id, filed, pick)
         with ui.column().classes("w-full gap-0 max-h-96 overflow-auto"):
             listing()
         if last is not None:  # (scrolled to, once shown)

@@ -8,7 +8,17 @@ from html import escape
 
 from nicegui import ui
 
-from .. import annotations, folders, i18n, manual, persons, pubview, reports, source_settings
+from .. import (
+    annotations,
+    folders,
+    i18n,
+    llm,
+    manual,
+    persons,
+    pubview,
+    reports,
+    source_settings,
+)
 from ..db.models import Person
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
@@ -779,6 +789,69 @@ def markers_section(folder_id: int) -> Callable[[], dict[str, reports.Marker]]:
     }
 
 
+def models_section(folder_id: int) -> Callable[[], tuple[str, str]]:
+    """The models the folder uses instead of the default ones (Settings → Local LLM): the LLM
+    and the embedding model (blank: the default; those of the servers proposed); returns
+    their values."""
+    st = llm.settings()
+    model, embed = llm.folder_models(folder_id)
+    ui.label(_("Models")).classes("text-base mt-2")
+    with ui.row().classes("w-full gap-2 no-wrap"):
+        inputs = [
+            ui.select(
+                [value] if value else [],
+                value=value or None,
+                label=label,
+                with_input=True,
+                new_value_mode="add-unique",
+                clearable=True,
+            )
+            .classes("grow")
+            .tooltip(tip)
+            .mark(mark)
+            for value, label, tip, mark in (
+                (
+                    model,
+                    _("LLM (default: {model})").format(model=st.model or _("none")),
+                    _("For the features using the local LLM"),
+                    "folder-llm-model",
+                ),
+                (
+                    embed,
+                    _("Embedding model (default: {model})").format(
+                        model=st.embed_model or _("none")
+                    ),
+                    _("E.g. to suggest an excerpt's category (trained again if changed)"),
+                    "folder-embed-model",
+                ),
+            )
+        ]
+
+    async def load() -> None:
+        for select, listing in (
+            (inputs[0], llm.list_models(st.url, local_only=st.local_only)),
+            (
+                inputs[1],
+                llm.list_embed_models(
+                    st.embed_api,
+                    st.embed_url if st.embed_api == "openai" else st.url,
+                    st.embed_key,
+                    local_only=st.local_only,
+                ),
+            ),
+        ):
+            try:
+                found = await listing
+            except Exception:
+                continue  # (the server is not running: typed)
+            value = select.value
+            select.set_options(sorted({*found, *([value] if value else [])}), value=value)
+
+    if st.enabled:
+        ui.timer(0.1, load, once=True)
+    return lambda: (inputs[0].value or "", inputs[1].value or "")
+
+
 def levels_section(folder_id: int) -> Callable[[], tuple[list[reports.Level], str | None]]:
     """The levels an excerpt can have (e.g. local, national, international), in order: their
     tags in the reports (blank: the default, in their language; a new one: added below,
@@ -905,7 +978,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 hidden = ui.checkbox(_("Archived"), value=f.hidden if f else False).tooltip(
                     _(ARCHIVED_TIP)
                 )
-            influence = lang = primary = marker_fields = level_fields = None
+            influence = lang = primary = marker_fields = level_fields = model_fields = None
             if f is not None:
                 with ui.tab_panel("notes").classes("p-0 gap-2"):
                     from .citations import folder_citations_section
@@ -956,6 +1029,7 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                         .mark("folder-primary")
                     )
                     citations_save = folder_citations_section(f.id)
+                    model_fields = models_section(f.id)
 
         def save() -> bool | None:
             if not name.value.strip():
@@ -978,6 +1052,8 @@ def folder_dialog(f: folders.FolderView | None) -> None:
                 reports.save_levels(f.id, *level_fields())
             if lang is not None:
                 reports.save_language(f.id, lang.value or None)
+            if model_fields is not None:
+                llm.save_folder_models(f.id, *model_fields())
             if primary is not None:
                 folders.set_primary_source(f.id, primary.value)
             fid = folders.save_folder(
