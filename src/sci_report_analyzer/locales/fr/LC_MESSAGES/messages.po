@@ -28,6 +28,9 @@ msgstr " — règle {rules}"
 msgid " — same cleaned text"
 msgstr " — même texte nettoyé"
 
+msgid "([link]({url}))"
+msgstr "([lien]({url}))"
+
 msgid "(automatic)"
 msgstr "(automatique)"
 
@@ -238,6 +241,9 @@ msgstr ""
 " années qu'aucune période ne couvre gardent le classement ci-dessous "
 "(entrée de classement ou automatique). « Non classé » : vérifié, dans "
 "aucun classement (à la différence d'un canal que personne n'a vérifié)."
+
+msgid "A link (URL), written after the excerpt in the notes"
+msgstr "Un lien (URL), écrit après l'extrait dans les notes"
 
 msgid ""
 "A local LLM served by Ollama (https://ollama.com), for the features that "
@@ -1000,6 +1006,9 @@ msgstr "Catégories (où sont classés les extraits des documents des personnes)
 msgid "Categories of {folder}"
 msgstr "Catégories de {folder}"
 
+msgid "Category"
+msgstr "Catégorie"
+
 #, python-brace-format
 msgid "Category “{name}” created"
 msgstr "Catégorie « {name} » créée"
@@ -1046,6 +1055,9 @@ msgstr "Choisissez une étiquette"
 
 msgid "Choose at least one decision"
 msgstr "Choisissez au moins une décision"
+
+msgid "Choose the category to merge it into"
+msgstr "Choisissez la catégorie où la fusionner"
 
 msgid "Choose the venue these texts belong to."
 msgstr "Choisissez le canal de publication auquel ces textes appartiennent."
@@ -1660,6 +1672,9 @@ msgstr "Édition"
 msgid "Edit (text, years, influence, tags…)"
 msgstr "Modifier (texte, années, rayonnement, étiquettes…)"
 
+msgid "Edit (text, years, markers, tags…; category; notes)"
+msgstr "Modifier (texte, années, marqueurs, étiquettes… ; catégorie ; notes)"
+
 msgid "Edit folder"
 msgstr "Modifier le dossier"
 
@@ -1815,6 +1830,16 @@ msgid "Excerpts are filed in the categories of a folder: open the PDF from one."
 msgstr ""
 "Les extraits sont classés dans les catégories d'un dossier : ouvrez le "
 "PDF depuis l'un d'eux."
+
+msgid ""
+"Excerpts of the people's documents (a passage selected in a PDF) are "
+"filed in them; in this order in the reports. Drag to order and nest them."
+" Its colour tints its excerpts."
+msgstr ""
+"Les extraits des documents des personnes (un passage sélectionné dans un "
+"PDF) y sont classés ; dans cet ordre dans les rapports. Faites-les "
+"glisser pour les ordonner et les imbriquer. Sa couleur teinte ses "
+"extraits."
 
 msgid ""
 "Excerpts of the people's documents (a passage selected in a PDF) are "
@@ -2191,10 +2216,12 @@ msgstr "Dans"
 
 msgid ""
 "In [[excerpts]] (and the copied excerpts), the excerpts flagged "
-"“rayonnement”"
+"“rayonnement”; their section where [[influence]] is in the report, else "
+"at the end of [[excerpts]]"
 msgstr ""
 "Dans [[excerpts]] (et les extraits copiés), les extraits marqués « "
-"rayonnement »"
+"rayonnement » ; leur section là où est [[influence]] dans le rapport, "
+"sinon à la fin de [[excerpts]]"
 
 msgid "In folders"
 msgstr "Dans les dossiers"
@@ -2223,6 +2250,11 @@ msgid "In their order on the chart (e.g. from doing the work to supervising it).
 msgstr ""
 "Dans leur ordre sur le graphique (p. ex. de la réalisation du travail à "
 "son encadrement)."
+
+msgid "In {category}: pick another one to move it there (and save)"
+msgstr ""
+"Dans {category} : choisissez-en une autre pour l'y déplacer (et "
+"enregistrer)"
 
 #, python-brace-format
 msgid "In {folder}: no tag"
@@ -2334,6 +2366,13 @@ msgstr ""
 
 msgid "Its commentary (click to edit it)"
 msgstr "Son commentaire (cliquer pour le modifier)"
+
+msgid ""
+"Its commentary: in the notes and the copy, a comment after the excerpt "
+"(%% … %%), kept for reference, not shown. Empty: none."
+msgstr ""
+"Son commentaire : dans les notes et la copie, un commentaire après "
+"l'extrait (%% … %%), gardé pour référence, non affiché. Vide : aucun."
 
 msgid ""
 "Its conferences, in order: without a name, it is named after them (its "
@@ -2795,8 +2834,14 @@ msgstr "Fusionner"
 msgid "Merge all into “{name}”"
 msgstr "Tout fusionner dans « {name} »"
 
+msgid "Merge into"
+msgstr "Fusionner dans"
+
 msgid "Merge into one venue"
 msgstr "Fusionner en un seul canal de publication"
+
+msgid "Merge it into another category"
+msgstr "La fusionner dans une autre catégorie"
 
 msgid "Merge the selected venues"
 msgstr "Fusionner les canaux sélectionnés"
@@ -2837,6 +2882,14 @@ msgstr[1] "Fusionner {n} canaux dans celui-ci"
 #, python-brace-format
 msgid "Merge “{first}” with “{second}”?"
 msgstr "Fusionner « {first} » avec « {second} » ?"
+
+msgid ""
+"Merge “{name}” into another category: its excerpts, its sections' texts "
+"and its subcategories go there, after its own; then “{name}” is deleted."
+msgstr ""
+"Fusionner « {name} » dans une autre catégorie : ses extraits, les textes "
+"de ses sections et ses sous-catégories y vont, après les siens ; puis « "
+"{name} » est supprimée."
 
 msgid "Merged"
 msgstr "Fusionné"
@@ -2899,6 +2952,9 @@ msgstr ""
 
 msgid "Minimum score of a match in the list of predatory venues"
 msgstr "Score minimal d'un appariement dans la liste des canaux prédateurs"
+
+msgid "Minor"
+msgstr "Mineur"
 
 msgid "Model"
 msgstr "Modèle"
@@ -3476,6 +3532,9 @@ msgstr "ORCID (facultatif)"
 msgid "ORCID {orcid} set: candidates with it are shown in green"
 msgstr "ORCID {orcid} défini : les candidats qui l'ont sont affichés en vert"
 
+msgid "Of lesser weight (“mineur”)"
+msgstr "De moindre poids"
+
 msgid "Of what is generated: references, excerpts, summary…"
 msgstr "De ce qui est généré : références, extraits, résumé…"
 
@@ -3596,6 +3655,9 @@ msgstr "L'ouvrir à cette page"
 
 msgid "Open its document (at its page)"
 msgstr "Ouvrir son document (à sa page)"
+
+msgid "Open the link"
+msgstr "Ouvrir le lien"
 
 msgid ""
 "Open the profile, click **Show more** until every paper is listed, then "
@@ -5117,6 +5179,12 @@ msgstr "La couleur de ses extraits (leur teinte dans les PDF)"
 
 msgid "The conferences found in its texts (on saving)."
 msgstr "Les conférences trouvées dans ses textes (à l'enregistrement)."
+
+msgid "The excerpts flagged “rayonnement”, by category"
+msgstr "Les extraits de rayonnement, par catégorie"
+
+msgid "The excerpts of a category"
+msgstr "Les extraits d'une catégorie"
 
 msgid "The excerpts, as selected"
 msgstr "Les extraits, tels que sélectionnés"

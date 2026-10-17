@@ -160,3 +160,35 @@ def test_shared_settings_c3e8a1f5d7b9(tmp_path):
     assert json.loads(rows[2]) == [{"type": "conference", "rank": "A"}]
     assert rows[3] is None
     assert {"decided_by", "decided_on"} <= cols
+
+
+def test_rayonnement_category_c4f7a2e9d1b6(tmp_path):
+    """The excerpts of the "rayonnement" category (and below it) marked "influence" instead;
+    the categories' years dropped."""
+    db = tmp_path / "db.sqlite"
+    _upgrade(db, "b5d2e8f1a7c3")
+    with sqlite3.connect(db) as c:
+        _person(c, 1, [])
+        c.execute("INSERT INTO folder (id, name, hidden) VALUES (1, 'F', 0)")
+        c.execute("INSERT INTO folder_settings (id, citations) VALUES (10, NULL)")
+        c.execute(
+            "INSERT INTO period (id, person_id, folder_id, name, tags) VALUES (1, 1, 1, 'p', '[]')"
+        )
+        for cid, parent, influence in ((1, None, 0), (2, None, 1), (3, 2, 0)):
+            c.execute(
+                "INSERT INTO category (id, settings_id, parent_id, name, position, start_year,"
+                " influence) VALUES (?, 10, ?, 'C', 0, 2020, ?)",
+                (cid, parent, influence),
+            )
+        for eid, cid in ((1, 1), (2, 2), (3, 3)):
+            c.execute(
+                "INSERT INTO excerpt (id, category_id, period_id, rects, text, created_at)"
+                " VALUES (?, ?, 1, '[]', 'x', '2026-01-01')",
+                (eid, cid),
+            )
+    _upgrade(db, "c4f7a2e9d1b6")
+    with sqlite3.connect(db) as c:
+        flags = dict(c.execute("SELECT id, influence FROM excerpt"))
+        cols = {r[1] for r in c.execute("PRAGMA table_info(category)")}
+    assert flags == {1: 0, 2: 1, 3: 1}
+    assert not {"influence", "start_year", "end_year"} & cols

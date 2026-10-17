@@ -485,27 +485,47 @@ class Side:
             )
 
     def insert_tools(self) -> None:
-        """In the toolbar of the folder's notes: insert a block (kept up to date)."""
-        with (
-            ui.button(icon="playlist_add")
-            .props("flat dense round size=sm")
-            .tooltip(_("Insert a block (kept up to date)"))
-            .mark("folder-note-insert"),
-            ui.menu(),
-        ):
+        """In the toolbar of the folder's notes: insert a block (kept up to date); those of
+        the categories with an id (``[[excerpts#key]]``) too, as they are when opened."""
+
+        def insert(block: str) -> None:
+            self.folder_editor.insert_block(f"[[{block}]]")
+
+        @ui.refreshable
+        def items() -> None:
             for name, label in (
                 (
                     "publications",
                     _("The summary of the period’s publications (as set in the Summary)"),
                 ),
                 ("excerpts", _("The excerpts, by category")),
+                ("influence", _("The excerpts flagged “rayonnement”, by category")),
                 ("cv", _("The career (CV)")),
                 ("references", _("The papers cited (else at the end, when copied)")),
             ):
+                ui.menu_item(label, on_click=lambda name=name: insert(name)).mark(
+                    f"folder-note-{name}"
+                )
+            keyed = [n for n in categories.tree(self.folder[0]) if n.key] if self.folder else []
+            if keyed:
+                ui.separator()
+                ui.label(_("The excerpts of a category")).classes(
+                    "text-xs text-grey uppercase px-4 pt-2"
+                )
+            for n in keyed:
                 ui.menu_item(
-                    label,
-                    on_click=lambda name=name: self.folder_editor.insert_block(f"[[{name}]]"),
-                ).mark(f"folder-note-{name}")
+                    f"{n.path} — #{n.key}", on_click=lambda n=n: insert(f"excerpts#{n.key}")
+                ).mark(f"folder-note-excerpts-{n.key}")
+
+        with (
+            ui.button(icon="playlist_add")
+            .props("flat dense round size=sm")
+            .tooltip(_("Insert a block (kept up to date)"))
+            .mark("folder-note-insert"),
+            ui.menu() as menu,
+        ):
+            items()
+        menu.on("before-show", lambda: items.refresh())
 
     def template_tools(self) -> None:
         """In the toolbar of the folder's notes: start them from a report template (asked
@@ -935,6 +955,7 @@ MARKER_ICONS = {
         "public",
         "teal",
     ),
+    "minor": (N_("Minor"), N_("Of lesser weight (“mineur”)"), "south", "blue-grey"),
     "caveat": (N_("Caveat"), N_("A reservation (“bémol”)"), "report", "deep-orange"),
 }
 
@@ -946,6 +967,7 @@ def excerpt_properties(
     tags: list[str] | None = None,
     *,
     salient: bool = False,
+    minor: bool = False,
     caveat: bool = False,
     cleared: Callable[[], None] | None = None,
     folder_id: int | None = None,
@@ -970,7 +992,7 @@ def excerpt_properties(
         ui.button(icon="event_busy", on_click=clear).props("flat dense round size=sm").classes(
             "-ml-1"
         ).tooltip(_("Clear the years")).mark("excerpt-years-clear")
-    on = {"salient": salient, "influence": influence, "caveat": caveat}
+    on = {"salient": salient, "influence": influence, "minor": minor, "caveat": caveat}
     marker_in = MarkerBadges(next((k for k, v in on.items() if v), "")).classes("-mt-2")
     level_in = LevelBadges(folder_id, level).classes("-mt-2")
     tags_in = (
@@ -1286,7 +1308,7 @@ def category_picker(
     cited), the similar ones shown with a warning. The category chosen last (here, else that
     of the excerpt filed last) is proposed: marked, scrolled to, and Enter picks it (nothing
     typed)."""
-    folder_id, folder_name = side.folder
+    folder_id = side.folder[0]
     tree = categories.tree(folder_id)
     last = side.last_category
     if last is None and side.period_id is not None:
@@ -1313,111 +1335,129 @@ def category_picker(
             if properties
             else dict
         )
-        search = (
-            ui.input(
-                placeholder=(
-                    _("Find a category of {folder} (Enter: the last one chosen)")
-                    if last is not None
-                    else _("Find a category of {folder} (Enter: the first one)")
-                ).format(folder=folder_name)
-            )
-            .props("dense outlined clearable autofocus")
-            .classes("w-full")
-            .mark("category-search")
-        )
-
-        def matching() -> list[categories.Node]:
-            q = (search.value or "").lower().strip()
-            nodes = categories.tree(folder_id)
-            return [n for n in nodes if q in n.path.lower()] if q else nodes
 
         def pick(cat_id: int) -> None:
-            if cat_id == current:
-                return
             side.last_category = cat_id
             chosen(cat_id, **({"text": filed} if properties else {}), **props())
             name = next((n.path for n in categories.tree(folder_id) if n.id == cat_id), "")
             ui.notify(_(done).format(category=name))
             close(dlg)
 
-        @ui.refreshable
-        def listing() -> None:
-            nodes = matching()
-            if not nodes:
-                ui.label(
-                    _("No category yet: type a name, then Enter (or ‘create’)")
-                    if not search.value
-                    else _("No such category: Enter (or ‘create’) creates it")
-                ).classes("text-sm text-grey").mark("category-none")
-            q = (search.value or "").strip()
-            for n in nodes:
-                indent = 0 if q else n.depth
-                with (
-                    ui.row()
-                    .classes("w-full items-center no-wrap gap-1 cursor-pointer hover:bg-grey-2")
-                    .style(f"padding-left:{1.2 * indent}rem")
-                    .classes("vr-last-category bg-blue-1" if n.id == last else "")
-                    .on("click", lambda n=n: pick(n.id))
-                    .mark(f"pick-category-{n.id}")
-                ):
-                    ui.icon("label" if n.depth else "folder_special", size="xs", color="primary")
-                    ui.label(n.path if q else n.name).classes(
-                        "grow" + (" text-grey" if n.id == current else "")
-                    )
-                    if n.id == last:
-                        ui.icon("history", size="xs", color="primary").tooltip(
-                            _("The last category chosen (Enter, nothing typed)")
-                        ).mark("category-last")
-                    if n.id == current:
-                        ui.label(_("(its category)")).classes("text-xs text-grey")
-                    if n.years:
-                        ui.label(n.years).classes("text-xs text-grey")
-
-        def enter() -> None:
-            nodes = matching()
-            if last is not None and not (search.value or "").strip():
-                pick(last)
-            elif nodes:
-                pick(nodes[0].id)
-            elif (search.value or "").strip():
-                create()
-
-        def create() -> None:
-            """A new category (the dialog stays open: click it to file the excerpt)."""
-            name = (search.value or "").strip()
-            if not name:
-                return
-            categories.add(folder_id, name, parent.value or None)
-            search.value = ""
-            listing.refresh()
-            parent.set_options(parents(), value=parent.value)
-            ui.notify(_("Category “{name}” created").format(name=name))
-
-        def parents() -> dict[int, str]:
-            return {0: _("(top level)"), **{n.id: n.path for n in categories.tree(folder_id)}}
-
-        search.on_value_change(lambda: listing.refresh())
-        search.on("keydown.enter", enter)
-        category_suggestions(folder_id, filed, pick)
-        with ui.column().classes("w-full gap-0 max-h-96 overflow-auto"):
-            listing()
-        if last is not None:  # (scrolled to, once shown)
-            ui.run_javascript(
-                "setTimeout(() => document.querySelector('.vr-last-category')"
-                "?.scrollIntoView({block: 'nearest'}), 200);"
-            )
-        with ui.row().classes("w-full items-center gap-2"):
-            parent = (
-                ui.select(parents(), value=0, label=_("Create under"))
-                .props("dense outlined options-dense")
-                .classes("w-56")
-                .mark("category-parent")
-            )
-            ui.button(_("Create"), icon="add", on_click=create).props("flat dense").tooltip(
-                _("Create a category named as typed above")
-            ).mark("category-create")
+        with category_list(side, filed, pick, current=current, last=last):
             ui.space()
             ui.button(_("Close"), on_click=dlg.close).props("flat").mark("category-close")
+
+
+def category_list(
+    side: Side,
+    text: str,
+    pick: Callable[[int], None],
+    *,
+    current: int | None = None,
+    last: int | None = None,
+) -> ui.row:
+    """The folder's categories to pick one (``pick`` is called with it, but ``current``):
+    click it, or type to find it (Enter: ``last``, nothing typed, else the first one), or name
+    a new one; those suggested for ``text`` first. Returns the row of its buttons (to add
+    others)."""
+    folder_id, folder_name = side.folder
+    search = (
+        ui.input(
+            placeholder=(
+                _("Find a category of {folder} (Enter: the last one chosen)")
+                if last is not None
+                else _("Find a category of {folder} (Enter: the first one)")
+            ).format(folder=folder_name)
+        )
+        .props("dense outlined clearable autofocus")
+        .classes("w-full")
+        .mark("category-search")
+    )
+
+    def matching() -> list[categories.Node]:
+        q = (search.value or "").lower().strip()
+        nodes = categories.tree(folder_id)
+        return [n for n in nodes if q in n.path.lower()] if q else nodes
+
+    def chosen(cat_id: int) -> None:
+        if cat_id != current:
+            pick(cat_id)
+
+    @ui.refreshable
+    def listing() -> None:
+        nodes = matching()
+        if not nodes:
+            ui.label(
+                _("No category yet: type a name, then Enter (or ‘create’)")
+                if not search.value
+                else _("No such category: Enter (or ‘create’) creates it")
+            ).classes("text-sm text-grey").mark("category-none")
+        q = (search.value or "").strip()
+        for n in nodes:
+            indent = 0 if q else n.depth
+            with (
+                ui.row()
+                .classes("w-full items-center no-wrap gap-1 cursor-pointer hover:bg-grey-2")
+                .style(f"padding-left:{1.2 * indent}rem")
+                .classes("vr-last-category bg-blue-1" if n.id == last else "")
+                .on("click", lambda n=n: chosen(n.id))
+                .mark(f"pick-category-{n.id}")
+            ):
+                ui.icon("label" if n.depth else "folder_special", size="xs", color="primary")
+                ui.label(n.path if q else n.name).classes(
+                    "grow" + (" text-grey" if n.id == current else "")
+                )
+                if n.id == last:
+                    ui.icon("history", size="xs", color="primary").tooltip(
+                        _("The last category chosen (Enter, nothing typed)")
+                    ).mark("category-last")
+                if n.id == current:
+                    ui.label(_("(its category)")).classes("text-xs text-grey")
+
+    def enter() -> None:
+        nodes = matching()
+        if last is not None and not (search.value or "").strip():
+            chosen(last)
+        elif nodes:
+            chosen(nodes[0].id)
+        elif (search.value or "").strip():
+            create()
+
+    def create() -> None:
+        """A new category (the list stays: click it to file the excerpt)."""
+        name = (search.value or "").strip()
+        if not name:
+            return
+        categories.add(folder_id, name, parent.value or None)
+        search.value = ""
+        listing.refresh()
+        parent.set_options(parents(), value=parent.value)
+        ui.notify(_("Category “{name}” created").format(name=name))
+
+    def parents() -> dict[int, str]:
+        return {0: _("(top level)"), **{n.id: n.path for n in categories.tree(folder_id)}}
+
+    search.on_value_change(lambda: listing.refresh())
+    search.on("keydown.enter", enter)
+    category_suggestions(folder_id, text, chosen)
+    with ui.column().classes("w-full gap-0 max-h-96 overflow-auto"):
+        listing()
+    if last is not None:  # (scrolled to, once shown)
+        ui.run_javascript(
+            "setTimeout(() => document.querySelector('.vr-last-category')"
+            "?.scrollIntoView({block: 'nearest'}), 200);"
+        )
+    with ui.row().classes("w-full items-center gap-2") as row:
+        parent = (
+            ui.select(parents(), value=0, label=_("Create under"))
+            .props("dense outlined options-dense")
+            .classes("w-56")
+            .mark("category-parent")
+        )
+        ui.button(_("Create"), icon="add", on_click=create).props("flat dense").tooltip(
+            _("Create a category named as typed above")
+        ).mark("category-create")
+    return row
 
 
 COLLAPSED = "ui.excerpts.collapsed"  # the categories shown collapsed in the excerpts (sticky)
@@ -1569,12 +1609,6 @@ class _ExcerptsSection:
                     f"category-dot-{n.id}"
                 )
                 ui.label(n.name).classes("font-medium text-sm" if not n.depth else "text-sm")
-                if n.influence:
-                    ui.icon("campaign", size="xs", color="amber-9").tooltip(
-                        _("The “rayonnement” category: it also lists the influence excerpts")
-                    )
-                if n.years:
-                    ui.label(n.years).classes("text-xs text-grey")
                 if items:
                     ui.badge(str(len(items))).props("rounded color=amber-8")
                 section_text.edit_button(self.side, n)
@@ -1584,23 +1618,6 @@ class _ExcerptsSection:
             # (summarised by its text only: its excerpts not listed in the notes, here yes)
             hidden = len(items) if n.id in summarised else None
             section_text.show(self.side, n, texts.get(n.id, ""), hidden)
-            if n.influence:  # (after its own: those flagged elsewhere, as copied)
-                paths = {c.id: c.path for c in nodes}
-                flagged = [
-                    e
-                    for c in nodes
-                    if c.id != n.id
-                    for e in by_cat.get(c.id, [])
-                    if e.influence and not e.discarded
-                ]
-                for e in flagged:
-                    ui.label(f"{paths[e.category_id]} · {e.quoted}").classes(
-                        "text-xs text-grey italic line-clamp-2"
-                    ).style(f"padding-left:{1.2 * n.depth + 0.6}rem").tooltip(
-                        _("Flagged “influence” in {category} (copied here too)").format(
-                            category=paths[e.category_id]
-                        )
-                    ).mark(f"excerpt-influence-copy-{e.id}")
             for e in items:  # (an excerpt, or a group: its lead, then the others)
                 with (
                     ui.column()
@@ -1630,7 +1647,7 @@ class _ExcerptsSection:
                         with (
                             ui.row()
                             .classes("w-full items-start no-wrap gap-1 cursor-pointer")
-                            .on("click", lambda e=e: self.comment(e))
+                            .on("click", lambda e=e: self.edit_excerpt(e, "notes"))
                             .tooltip(_("Its commentary (click to edit it)"))
                             .mark(f"excerpt-comment-text-{e.id}")
                         ):
@@ -1766,6 +1783,13 @@ class _ExcerptsSection:
                         ).tooltip(
                             _("Its level (the folder's default)") if level[1] else _("Its level")
                         ).mark(f"excerpt-level-{x.id}")
+                    if not member and lead.url:
+                        ui.button(
+                            icon="link",
+                            on_click=lambda: ui.navigate.to(lead.url, new_tab=True),
+                        ).props("flat dense round size=xs color=primary").classes(
+                            "shrink-0"
+                        ).tooltip(lead.url).mark(f"excerpt-url-{x.id}")
                     cite = (  # (in a group, its text not edited: quote it, or only cite it)
                         [
                             (
@@ -1794,7 +1818,7 @@ class _ExcerptsSection:
                             (
                                 "edit",
                                 "edit",
-                                _("Edit (text, years, influence, tags…)"),
+                                _("Edit (text, years, markers, tags…; category; notes)"),
                                 self.edit_excerpt,
                             ),
                             (
@@ -1804,10 +1828,15 @@ class _ExcerptsSection:
                                     "Its commentary (Markdown): in the notes, a comment after "
                                     "it (%% … %%, not shown)"
                                 ),
-                                lambda x: self.comment(lead),
+                                lambda x: self.edit_excerpt(lead, "notes"),
                             ),
                             *cite,
-                            ("move", "drive_file_move", _("Move to another category"), self.move),
+                            (
+                                "move",
+                                "drive_file_move",
+                                _("Move to another category"),
+                                lambda x: self.edit_excerpt(lead, "move"),
+                            ),
                             (
                                 "discard",
                                 "replay" if lead.discarded else "clear",
@@ -1951,20 +1980,6 @@ class _ExcerptsSection:
                 mark="excerpt-remove-confirm",
             )
 
-    def move(self, e: categories.ExcerptView) -> None:
-        def to(cat_id: int, **_props) -> None:
-            categories.move_excerpt(e.id, cat_id)
-            self.side.refresh_excerpts()
-
-        category_picker(
-            self.side,
-            e.text,
-            to,
-            title=N_("Move to a category"),
-            done=N_("Moved to {category}"),
-            current=e.category_id,
-        )
-
     def originals(self, e: categories.ExcerptView, text: ui.textarea) -> None:
         """The passages as selected (of each excerpt of a group): where, how edited since; to
         copy into the text (that of a group: added to it), or to open (their PDF, at their
@@ -2010,70 +2025,113 @@ class _ExcerptsSection:
                         _("Open its document (at its page)")
                     ).mark(f"excerpt-original-open-{x.id}")
 
-    def comment(self, e: categories.ExcerptView) -> None:
-        """A dialog: the commentary on an excerpt (that of the group it leads), in Markdown
-        (empty: none)."""
+    def edit_excerpt(self, e: categories.ExcerptView, tab: str = "text") -> None:
+        """A dialog on an excerpt (that of its group), in tabs: its text (that of a group),
+        years, markers, level and tags, the passages as selected shown; its category (one
+        picked: all saved, then moved there); its commentary (Markdown) and link."""
         side = self.side
-        title = _("Commentary on the merged excerpts") if e.members else _("Commentary")
-        with side.host.dialogs, transient_dialog(title, width="w-[48rem] max-w-full") as (dlg, _c):
-            ui.label(e.quoted).classes("text-sm text-grey-8 italic line-clamp-3")
-            editor = MarkdownEditor(
-                e.comment or "",
-                render=lambda t: (
-                    reports.render(t, reports.folder_context(side.stats, side.period_id)).text
-                ),
-                mode="split",
-                mark="excerpt-comment-input",
-                height="10rem",
-            )
-            editor.open_cited = side.open_cited
-            ui.label(
-                _(
-                    "In the notes and the copy, a comment after the excerpt (%% … %%): kept "
-                    "for reference, not shown. Empty: none."
-                )
-            ).classes("text-xs text-grey")
-
-            def save() -> None:
-                categories.set_comment(e.id, editor.value)
-                side.refresh_excerpts()
-
-            actions(dlg, _("Save"), save, mark="excerpt-comment-save")
-        editor.focus()
-
-    def edit_excerpt(self, e: categories.ExcerptView) -> None:
-        """Its text (that of a group), years, "influence" flag and tags; the passages as
-        selected shown."""
         with (
-            self.side.host.dialogs,
+            side.host.dialogs,
             transient_dialog(
-                _("Merged excerpts") if e.members else _("Excerpt"), width="w-[32rem]"
+                _("Merged excerpts") if e.members else _("Excerpt"), width="w-[40rem] max-w-full"
             ) as (dialog, _card),
         ):
-            text = (
-                ui.textarea(_("Text of the group") if e.members else _("Text"), value=e.quoted)
-                .props("outlined autogrow")
-                .classes("w-full")
-            )
-            text.mark("excerpt-edit-text")
-            if e.members:
-                ui.label(
-                    _(
-                        "Its quotes, joined; edited, it is the text of the group (its excerpts: "
-                        "their places only). Blank: its quotes again."
+            with ui.tabs().props("dense align=left no-caps").classes("w-full") as tabs:
+                tab_text = ui.tab("text", _("Excerpt"), icon="format_quote").mark(
+                    "excerpt-tab-text"
+                )
+                ui.tab("move", _("Category"), icon="drive_file_move").mark("excerpt-tab-move")
+                ui.tab("notes", _("Notes"), icon="comment").mark("excerpt-tab-notes")
+            with ui.tab_panels(tabs, value=tab).classes("w-full"):
+                with ui.tab_panel(tab_text).classes("p-1 gap-2"):
+                    text = (
+                        ui.textarea(
+                            _("Text of the group") if e.members else _("Text"), value=e.quoted
+                        )
+                        .props("outlined autogrow")
+                        .classes("w-full")
+                        .mark("excerpt-edit-text")
                     )
-                ).classes("text-xs text-grey")
-            self.originals(e, text)
-            props = excerpt_properties(
-                e.start_year,
-                e.end_year,
-                e.influence,
-                e.tag_names,
-                salient=e.salient,
-                caveat=e.caveat,
-                folder_id=self.side.folder[0] if self.side.folder else None,
-                level=e.level,
-            )
+                    if e.members:
+                        ui.label(
+                            _(
+                                "Its quotes, joined; edited, it is the text of the group (its "
+                                "excerpts: their places only). Blank: its quotes again."
+                            )
+                        ).classes("text-xs text-grey")
+                    self.originals(e, text)
+                    props = excerpt_properties(
+                        e.start_year,
+                        e.end_year,
+                        e.influence,
+                        e.tag_names,
+                        salient=e.salient,
+                        minor=e.minor,
+                        caveat=e.caveat,
+                        folder_id=side.folder[0] if side.folder else None,
+                        level=e.level,
+                    )
+                with ui.tab_panel("move").classes("p-1 gap-2"):
+                    path = next(
+                        (n.path for n in categories.tree(side.folder[0]) if n.id == e.category_id),
+                        "",
+                    )
+                    ui.label(
+                        _("In {category}: pick another one to move it there (and save)").format(
+                            category=path
+                        )
+                    ).classes("text-sm text-grey")
+
+                    def moved(cat_id: int) -> None:
+                        save()
+                        categories.move_excerpt(e.id, cat_id)
+                        side.last_category = cat_id
+                        name = next(
+                            (n.path for n in categories.tree(side.folder[0]) if n.id == cat_id),
+                            "",
+                        )
+                        ui.notify(_("Moved to {category}").format(category=name))
+                        close(dialog)
+                        side.refresh_excerpts()
+
+                    category_list(side, e.quoted, moved, current=e.category_id)
+                with ui.tab_panel("notes").classes("p-1 gap-2"):
+                    editor = MarkdownEditor(
+                        e.comment or "",
+                        render=lambda t: (
+                            reports.render(
+                                t, reports.folder_context(side.stats, side.period_id)
+                            ).text
+                        ),
+                        mode="split",
+                        mark="excerpt-comment-input",
+                        height="10rem",
+                    )
+                    editor.open_cited = side.open_cited
+                    ui.label(
+                        _(
+                            "Its commentary: in the notes and the copy, a comment after the "
+                            "excerpt (%% … %%), kept for reference, not shown. Empty: none."
+                        )
+                    ).classes("text-xs text-grey")
+                    with ui.row().classes("w-full items-center no-wrap gap-1"):
+                        url = (
+                            ui.input(_("Link"), value=e.url or "", placeholder="https://…")
+                            .props("dense outlined clearable")
+                            .classes("grow")
+                            .tooltip(_("A link (URL), written after the excerpt in the notes"))
+                            .mark("excerpt-url")
+                        )
+                        ui.button(
+                            icon="open_in_new",
+                            on_click=lambda: (
+                                ui.navigate.to(url.value.strip(), new_tab=True)
+                                if (url.value or "").strip()
+                                else None
+                            ),
+                        ).props("flat dense round size=sm color=grey-7").tooltip(
+                            _("Open the link")
+                        ).mark("excerpt-url-open")
 
             def save() -> None:
                 if e.members:
@@ -2081,9 +2139,13 @@ class _ExcerptsSection:
                     edited = " ".join((text.value or "").split())
                     categories.set_group_text(e.id, None if edited == joined else edited)
                 categories.update_excerpt(e.id, text=None if e.members else text.value, **props())
-                self.side.refresh_excerpts()
+                categories.set_comment(e.id, editor.value)
+                categories.set_url(e.id, url.value)
+                side.refresh_excerpts()
 
             actions(dialog, _("Save"), save, mark="excerpt-edit-save")
+        if tab == "notes":
+            editor.focus()
 
 
 def categories_section(side: Side) -> Callable[[], None]:

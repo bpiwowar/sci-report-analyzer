@@ -103,17 +103,9 @@ class Node:
     parent_id: int | None
     depth: int
     path: str  # "Research › Projects"
-    start_year: int | None
-    end_year: int | None
     children: list[Node] = field(default_factory=list)
-    influence: bool = False  # (the folder's "rayonnement": see set_influence)
     colour: str = DEFAULT_COLOUR  # (that of its excerpts: their tint on the PDFs)
     key: str | None = None  # (its id in the reports: [[excerpts#key]])
-
-    @property
-    def years(self) -> str:
-        """Its years ("2020–2025", "since 2020", "until 2025"), if any."""
-        return years_label(self.start_year, self.end_year)
 
 
 def tree(folder_id: int) -> list[Node]:
@@ -140,8 +132,7 @@ def _tree(s, settings_id: int) -> list[Node]:
         nodes = []
         for c in kids.get(parent, []):
             path = f"{prefix} › {c.name}" if prefix else c.name
-            n = Node(c.id, c.name, c.parent_id, depth, path, c.start_year, c.end_year)
-            n.influence = bool(c.influence)
+            n = Node(c.id, c.name, c.parent_id, depth, path)
             n.colour = c.colour or DEFAULT_COLOUR
             n.key = c.key
             out.append(n)
@@ -187,14 +178,10 @@ def _add(s, settings_id: int, name: str, parent_id: int | None, **values) -> int
     return c.id
 
 
-def update(
-    cat_id: int, name: str | None = None, start: int | None = None, end: int | None = None
-) -> None:
+def rename(cat_id: int, name: str) -> None:
     with session_scope() as s:
-        if c := s.get(Category, cat_id):
-            if name is not None and name.strip():
-                c.name = name.strip()
-            c.start_year, c.end_year = start, end
+        if (c := s.get(Category, cat_id)) and name.strip():
+            c.name = name.strip()
 
 
 def clean_key(key: str | None) -> str:
@@ -225,15 +212,6 @@ def set_colour(cat_id: int, colour: str | None) -> None:
     with session_scope() as s:
         if c := s.get(Category, cat_id):
             c.colour = colour or None
-
-
-def set_influence(folder_id: int, cat_id: int | None) -> None:
-    """The category gathering the excerpts flagged "influence" of the others (none:
-    ``None``); at most one per folder."""
-    with session_scope() as s:
-        sid = folders.settings_id(s, folder_id)
-        for c in s.scalars(select(Category).where(Category.settings_id == sid)):
-            c.influence = c.id == cat_id
 
 
 def move(cat_id: int, delta: int) -> None:
@@ -352,6 +330,45 @@ def move_excerpts(cat_id: int, target_id: int) -> int:
         return len(moved)
 
 
+def merge(cat_id: int, target_id: int) -> bool:
+    """Merge a category into another one (not within it): its excerpts (with their groups)
+    after the target's, its sections' texts after the target's, its subcategories after the
+    target's; the target keeps its name and colour (its id: the merged one's if it has none).
+    Returns whether it was merged."""
+    if target_id in subtree(cat_id):
+        return False
+    with session_scope() as s:
+        c, t = s.get(Category, cat_id), s.get(Category, target_id)
+        if c is None or t is None or c.settings_id != t.settings_id:
+            return False
+        moved = list(
+            s.scalars(
+                select(Excerpt)
+                .where(Excerpt.category_id == cat_id)
+                .order_by(Excerpt.position, Excerpt.id)
+            )
+        )
+        last: dict[int, int] = {}
+        for e in moved:
+            if e.period_id not in last:
+                last[e.period_id] = _last(s, target_id, e.period_id)
+            last[e.period_id] += 1
+            e.category_id, e.position = target_id, last[e.period_id]
+        _move_texts(s, [cat_id], lambda _i: target_id)
+        kids = s.scalars(
+            select(Category).where(Category.parent_id == cat_id).order_by(Category.position)
+        )
+        at = s.scalar(select(func.max(Category.position)).where(Category.parent_id == target_id))
+        for k, x in enumerate(kids, (at or 0) + 1):
+            x.parent_id, x.position = target_id, k
+        key = c.key
+        s.flush()
+        s.delete(c)
+        s.flush()
+        t.key = t.key or key
+    return True
+
+
 def delete(cat_id: int) -> bool:
     """Delete a category, with its subcategories, if no excerpt is filed there (else
     False: to move them first)."""
@@ -382,9 +399,6 @@ def copy_settings(s, source_id: int, settings_id: int) -> int:
             parent_id=ids.get(n.parent_id) if n.parent_id else None,
             name=n.name,
             position=len(ids) + 1,
-            start_year=n.start_year,
-            end_year=n.end_year,
-            influence=n.influence,
             colour=n.colour,
             key=n.key,
         )
@@ -409,7 +423,7 @@ def _places(nodes: list[Node]) -> dict[int, tuple]:
 def remap(s, period_ids: list[int], source_id: int, settings_id: int) -> int:
     """File the excerpts of some people (their periods) filed in categories of some settings
     in the categories of others, at the same place (same names; see _places), with their
-    sections' texts; those missing are added (with their colour and years). Returns how many
+    sections' texts; those missing are added (with their colour). Returns how many
     were added."""
     if not period_ids or source_id == settings_id:
         return 0
@@ -451,8 +465,6 @@ def remap(s, period_ids: list[int], source_id: int, settings_id: int) -> int:
                 n.name,
                 parent,
                 colour=n.colour,
-                start_year=n.start_year,
-                end_year=n.end_year,
             )
             there[places[n.id]] = found
             added += 1
@@ -642,6 +654,8 @@ class ExcerptView:
     discarded: bool = False  # (left out of the generated text: see set_discarded)
     level: str | None = None  # (its level's key, see reports.levels; none: the folder's default)
     comment: str | None = None  # (a commentary, Markdown; leading a group: the group's)
+    minor: bool = False
+    url: str | None = None  # (a link; leading a group: the group's)
 
     @property
     def tag_names(self) -> list[str]:
@@ -699,6 +713,7 @@ def similar_excerpts(
                 [
                     e.group_text or "",
                     e.comment or "",
+                    e.url or "",
                     *(f"{x.text} {x.source}" for x in e.parts),
                     *(f"#{t}" for t in e.tag_names),
                 ]
@@ -724,6 +739,7 @@ def add_excerpt(
     end: int | None = None,
     influence: bool = False,
     salient: bool = False,
+    minor: bool = False,
     caveat: bool = False,
     tags: list[str] | None = None,
     level: str | None = None,
@@ -762,6 +778,7 @@ def add_excerpt(
             end_year=end,
             influence=influence,
             salient=salient,
+            minor=minor,
             caveat=caveat,
             level=level or None,
         )
@@ -840,6 +857,8 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
                 discarded=e.discarded,
                 level=e.level,
                 comment=e.comment,
+                minor=e.minor,
+                url=e.url,
             )
             for e, doc, title, colour in rows
         ]
@@ -853,7 +872,7 @@ def excerpts(period_id: int, *, grouped: bool = False) -> list[ExcerptView]:
 
 
 # An excerpt's markers as shown on a PDF, next to it (as the copy filters do by default).
-MARKER_SYMBOLS = {"salient": "⭐", "influence": "🌍", "caveat": "⚠️"}
+MARKER_SYMBOLS = {"salient": "⭐", "influence": "🌍", "minor": "🔹", "caveat": "⚠️"}
 
 
 def tints(period_id: int, document_id: int, names: dict[int, str]) -> list[dict]:
@@ -980,8 +999,8 @@ def remove_excerpt(excerpt_id: int) -> None:
                 lead.group_id = None
                 lead.start_year, lead.end_year = e.start_year, e.end_year
                 lead.influence, lead.salient, lead.caveat = e.influence, e.salient, e.caveat
-                lead.discarded, lead.level = e.discarded, e.level
-                lead.group_text, lead.comment = e.group_text, e.comment
+                lead.minor, lead.discarded, lead.level = e.minor, e.discarded, e.level
+                lead.group_text, lead.comment, lead.url = e.group_text, e.comment, e.url
                 lead.tags = list(e.tags)
                 for x in others[1:]:
                     x.group_id = lead.id
@@ -996,11 +1015,13 @@ def update_excerpt(
     end: int | None = None,
     influence: bool = False,
     salient: bool = False,
+    minor: bool = False,
     caveat: bool = False,
     tags: list[str] | None = None,
     level: str | None = None,
 ) -> None:
-    """Its text (unless None or blank), years, markers ("influence", "salient", "caveat"),
+    """Its text (unless None or blank), years, markers ("influence", "salient", "minor",
+    "caveat"),
     tags (by name; None: unchanged) and level (its key, see reports.levels; none: the
     folder's default)."""
     with session_scope() as s:
@@ -1010,7 +1031,7 @@ def update_excerpt(
             firsts = _firsts(e.period_id)
             before = _rank(e, firsts)
             e.start_year, e.end_year, e.influence = start, end, influence
-            e.salient, e.caveat, e.level = salient, caveat, level or None
+            e.salient, e.minor, e.caveat, e.level = salient, minor, caveat, level or None
             if _rank(e, firsts) != before:  # (checked or unchecked: moved, see _place_by_rank)
                 s.flush()
                 _place_by_rank(s, e, firsts)
@@ -1022,7 +1043,7 @@ def merge_excerpts(source_id: int, target_id: int, *, ref_only: bool = False) ->
     """Group an excerpt (with its group, if any) with another one: each keeps its text and
     place (``ref_only``: only its place is cited); the group takes the target group's
     category, years, markers and text, the tags of both, and their commentaries (the
-    target's first). Returns why it cannot be done, if so."""
+    target's first), and its link (else the source's). Returns why it cannot be done, if so."""
     with session_scope() as s:
         a, b = s.get(Excerpt, source_id), s.get(Excerpt, target_id)
         if a is None or b is None:
@@ -1034,6 +1055,7 @@ def merge_excerpts(source_id: int, target_id: int, *, ref_only: bool = False) ->
         source.group_text = None
         lead.comment = "\n\n".join(c for c in (lead.comment, source.comment) if c) or None
         source.comment = None
+        lead.url, source.url = lead.url or source.url, None
         lead.tags = sorted({*lead.tags, *source.tags}, key=lambda t: t.name)
         for x in [source, *_members(s, source.id)]:
             x.group_id, x.category_id = lead.id, lead.category_id
@@ -1069,6 +1091,13 @@ def set_comment(excerpt_id: int, text: str | None) -> None:
     with session_scope() as s:
         if e := s.get(Excerpt, excerpt_id):
             e.comment = text.strip() if text and text.strip() else None
+
+
+def set_url(excerpt_id: int, url: str | None) -> None:
+    """The link of an excerpt (that of the group it leads; blank: none)."""
+    with session_scope() as s:
+        if e := s.get(Excerpt, excerpt_id):
+            e.url = url.strip() if url and url.strip() else None
 
 
 def split_excerpt(excerpt_id: int) -> None:
@@ -1111,8 +1140,9 @@ def _markdown_item(e: ExcerptView, *, comments: bool = True, marks: list[str] = 
     its markers), its quotes (a group: on one item; summarised, as one text if edited, its
     quotes kept in the comment with their places; those merged as references only: their
     places), each with its places between Obsidian comments (``%% Application, p. 4; p. 12
-    %%``; without ``comments``: in parentheses), then its years, then its commentary in an
-    Obsidian comment (without ``comments``: none; over lines: see _bullet)."""
+    %%``; without ``comments``: in parentheses), then its years, its link, then its
+    commentary in an Obsidian comment (without ``comments``: none; over lines: see
+    _bullet)."""
     from .pubview import hashtag
 
     chunks: list[tuple[str | None, list[str]]] = []  # (a quote, its places)
@@ -1138,6 +1168,8 @@ def _markdown_item(e: ExcerptView, *, comments: bool = True, marks: list[str] = 
     quotes = [(f"{t} " if t else "") + wrap.format("; ".join(places)) for t, places in chunks]
     tags = "".join(f"{t} " for t in dict.fromkeys(map(hashtag, [*e.tag_names, *marks])))
     out = tags + " […] ".join(quotes) + (f" — {e.years}" if e.years else "")
+    if e.url:
+        out += " " + _("([link]({url}))").format(url=e.url)
     if comments and e.comment:
         out += f" %% {e.comment} %%"
     return out
@@ -1161,30 +1193,31 @@ def markdown(
     root: int | None = None,
     exclude: Collection[int] = (),
     anchors: bool = False,
+    influence: str = "end",
 ) -> str:
-    """The excerpts by category (headings; a category's years in its heading), as Markdown
-    (unquoted, their places between Obsidian comments: ``%% Application, p. 4; p. 12 %%``),
-    their tags first (Obsidian #tags), with their years. The excerpts with the "influence"
-    flag (left in their categories too) are also listed, one item per category (its path in
-    bold, them nested below), in the folder's "rayonnement" category (after its own
-    excerpts; see set_influence), else in a "Rayonnement" section at the end (``mode``
-    "copy"; None: the folder's choice, see reports.influence_mode). "move": them only there
-    instead, under subsections named after their categories (as nested as these, one level
-    below), taken out of their categories ("nested" below); "mark": them only in their
-    categories, tagged as the folder says (see reports.markers: also the tags of the
-    excerpts salient or caveats; and, after these, that of their level, else of the folder's
-    default one: see reports.levels). The categories with no excerpt (nor below) are left out,
-    as are the excerpts discarded (see set_discarded). A section's text (see section_texts)
-    follows its heading; nested, that of a section left out (all its excerpts taken out) follows the
-    heading of its subsection in the Rayonnement section; a section summarised by its text
-    only (see summarised): its excerpts not listed there, but in a comment after its text
-    (see with_excerpts_comment). In the language of the folder's reports.
+    """The excerpts by category (headings), as Markdown (unquoted, their places between
+    Obsidian comments: ``%% Application, p. 4; p. 12 %%``), their tags first (Obsidian
+    #tags), with their years. The excerpts with the "influence" flag (left in their
+    categories too) are also listed, one item per category (its path in bold, them nested
+    below), in a "Rayonnement" section (``mode`` "copy"; None: the folder's choice, see
+    reports.influence_mode). "move": them only there instead, under subsections named after
+    their categories (as nested as these, one level below), taken out of their categories
+    ("nested" below); "mark": them only in their categories, tagged as the folder says (see
+    reports.markers: also the tags of the excerpts salient, minor or caveats; and, after
+    these, that of their level, else of the folder's default one: see reports.levels). The
+    categories with no excerpt (nor below) are left out, as are the excerpts discarded (see
+    set_discarded). A section's text (see section_texts) follows its heading; nested, that of
+    a section left out (all its excerpts taken out) follows the heading of its subsection in
+    the Rayonnement section; a section summarised by its text only (see summarised): its
+    excerpts not listed there, but in a comment after its text (see with_excerpts_comment).
+    In the language of the folder's reports.
 
     ``root``: only a category's section (its text and excerpts, without its heading: those
     of its subcategories at ``level``); ``exclude``: without some categories' sections (and
-    those below them), e.g. those put elsewhere in the report (``[[excerpts#key]]``). The
-    influence excerpts are gathered (see above) in the part with the "rayonnement" category,
-    else in that with all the categories (no ``root``)."""
+    those below them), e.g. those put elsewhere in the report (``[[excerpts#key]]``).
+    ``influence``: the Rayonnement section at the "end" (with all the categories: no
+    ``root``), "none" (put elsewhere in the report: ``[[influence]]``), or "only" it (its
+    content, without its heading: its subsections at ``level``)."""
     from . import reports
 
     mode = mode or reports.influence_mode(folder_id)
@@ -1199,6 +1232,7 @@ def markdown(
             exclude,
             reports.level_tags(folder_id),
             anchors,
+            influence,
         )
 
 
@@ -1212,6 +1246,7 @@ def _markdown(
     exclude: Collection[int] = (),
     levels: tuple[dict[str, str], str | None] = ({}, None),
     anchors: bool = False,
+    influence: str = "end",
 ) -> str:
     nested, marked = mode == "move", mode == "mark"
     level_tags, default_level = levels
@@ -1221,7 +1256,12 @@ def _markdown(
         return anchor + _markdown_item(e, marks=marks(e))
 
     def marks(e: ExcerptView) -> list[str]:
-        on = {"salient": e.salient, "caveat": e.caveat, "influence": marked and e.influence}
+        on = {
+            "salient": e.salient,
+            "minor": e.minor,
+            "caveat": e.caveat,
+            "influence": marked and e.influence,
+        }
         out = [m.tag for k, m in markers.items() if on[k]]
         if tag := level_tags.get(e.level or default_level or ""):
             out.append(tag)
@@ -1244,30 +1284,13 @@ def _markdown(
     for e in excerpts(period_id, grouped=True):
         if not e.discarded:
             by_cat.setdefault(e.category_id, []).append(e)
-    gather = next((n for n in nodes if n.influence), None)
-    # Those whose flagged excerpts are listed apart (nested: not those below the gathering one).
-    apart = [n for n in nodes if n is not gather]
-    if nested and gather is not None:
-        below: set[int] = set()
-
-        def mark(n: Node) -> None:
-            below.add(n.id)
-            for c in n.children:
-                mark(c)
-
-        mark(gather)
-        apart = [n for n in nodes if n.id not in below]
     flagged = {
-        n.id: [] if marked else [e for e in by_cat.get(n.id, []) if e.influence] for n in apart
+        n.id: [] if marked else [e for e in by_cat.get(n.id, []) if e.influence] for n in nodes
     }
-    shown = {
-        k: [e for e in v if not (nested and e.influence and k in flagged)]
-        for k, v in by_cat.items()
-    }
+    shown = {k: [e for e in v if not (nested and e.influence)] for k, v in by_cat.items()}
 
     def heading(n: Node, depth: int) -> str:
-        years = f" ({n.years})" if n.years else ""
-        return f"{'#' * min(depth, 6)} {n.name}{years}\n"
+        return f"{'#' * min(depth, 6)} {n.name}\n"
 
     def counted(n: Node, own: Callable[[Node], int]) -> int:
         return own(n) + sum(counted(c, own) for c in n.children)
@@ -1278,24 +1301,15 @@ def _markdown(
             t = with_excerpts_comment(t, period_id, n.id)
         return [f"{t}\n"] if t else []
 
-    # (nested: the gathering category and those above it, their sections there in any case)
-    up: set[int] = set()
-    if nested and gather is not None:
-        parents = {n.id: n.parent_id for n in nodes}
-        i: int | None = gather.id
-        while i is not None:
-            up.add(i)
-            i = parents[i]
-
     def left_out(n: Node) -> bool:
         """Nested: whether a category's own section is left out (its text then in the
         Rayonnement section)."""
-        return n.id not in up and not counted(n, lambda m: len(shown.get(m.id, [])))
+        return not counted(n, lambda m: len(shown.get(m.id, [])))
 
-    def influence(base: int) -> list[str]:
+    def gathered(base: int) -> list[str]:
         """The flagged excerpts: items (by path), or subsections below the ``base`` level."""
         out: list[str] = []
-        for n in apart:
+        for n in nodes:
             items = [item(e) for e in flagged.get(n.id, [])]
             if nested and n.id in summary_only and left_out(n):  # (its text instead)
                 items = []
@@ -1308,18 +1322,14 @@ def _markdown(
                 out += [*(_bullet(x) for x in items), *([""] if items else [])]
         return out
 
-    if gather is not None:
-        gathered = influence(level + gather.depth - shift) if gather.id in kept else []
-    else:
-        gathered = influence(level) if root is None else []
-
-    def own(n: Node) -> int:
-        here = len(shown.get(n.id, [])) if n.id in kept else 0
-        return here + (len(gathered) if n is gather else 0)
-
+    if influence == "only":
+        out = gathered(level - 1)
+        return "\n".join(out).strip() + "\n" if out else ""
     out: list[str] = []
     for n in nodes:
-        if n.id not in kept or not counted(n, own):
+        if n.id not in kept or not counted(
+            n, lambda m: len(shown.get(m.id, [])) if m.id in kept else 0
+        ):
             continue
         if n.id != root:
             out.append(heading(n, level + n.depth - shift))
@@ -1327,12 +1337,10 @@ def _markdown(
         listed = [] if n.id in summary_only else shown.get(n.id, [])
         for e in listed:  # (a group: its quotes, on one item)
             out.append(_bullet(item(e)))
-        if listed and (n is not gather or nested or not gathered):
+        if listed:
             out.append("")
-        if n is gather:
-            out += gathered + ([""] if gathered and not nested else [])
-    if gathered and gather is None:
-        out += [f"{'#' * min(level, 6)} Rayonnement\n", *gathered]
+    if influence == "end" and root is None and (rest := gathered(level)):
+        out += [f"{'#' * min(level, 6)} Rayonnement\n", *rest]
     return "\n".join(out).strip() + "\n" if out else ""
 
 

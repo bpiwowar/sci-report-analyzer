@@ -12,7 +12,6 @@ from ..i18n import _, ngettext
 from .colours import ColourMenu
 from .dialogs import actions, transient_dialog
 from .dnd import draggable, drop_zone
-from .theme import int_or_none
 
 
 def shared_note(folder_id: int) -> None:
@@ -24,7 +23,7 @@ def shared_note(folder_id: int) -> None:
 
 
 def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None) -> None:
-    """Add, rename, order, nest (subcategories), date and delete the categories."""
+    """Add, rename, order, nest (subcategories), merge and delete the categories."""
     name = next((f.name for f in folders.folders() if f.id == folder_id), "")
 
     def done() -> None:
@@ -38,8 +37,8 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
         ui.label(
             _(
                 "Excerpts of the people's documents (a passage selected in a PDF) are filed in "
-                "them; in this order in the reports. Drag to order and nest them. Years "
-                "(optional): those a category is about. Its colour tints its excerpts."
+                "them; in this order in the reports. Drag to order and nest them. Its colour "
+                "tints its excerpts."
             )
         ).classes("text-sm text-grey")
         shared_note(folder_id)
@@ -81,27 +80,14 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                         .classes("grow font-medium" if not n.depth else "grow")
                         .mark(f"category-name-{n.id}")
                     )
-                    start = (
-                        ui.number(placeholder=_("from"), value=n.start_year, format="%d")
-                        .props("dense borderless")
-                        .classes("w-16")
-                        .mark(f"category-from-{n.id}")
-                    )
-                    end = (
-                        ui.number(placeholder=_("to"), value=n.end_year, format="%d")
-                        .props("dense borderless")
-                        .classes("w-16")
-                        .mark(f"category-to-{n.id}")
-                    )
 
-                    def save(_e=None, n=n, t=title, a=start, b=end) -> None:
-                        categories.update(n.id, t.value, int_or_none(a.value), int_or_none(b.value))
+                    def save(_e=None, n=n, t=title) -> None:
+                        categories.rename(n.id, t.value)
                         if changed:
                             changed()
 
-                    for field in (title, start, end):
-                        field.on("blur", save)
-                        field.on("keydown.enter", save)
+                    title.on("blur", save)
+                    title.on("keydown.enter", save)
                     key = (
                         ui.input(placeholder=_("id"), value=n.key or "")
                         .props("dense borderless prefix=#")
@@ -128,28 +114,14 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                     key.on("blur", save_key)
                     key.on("keydown.enter", save_key)
                     ui.button(
-                        icon="campaign",
-                        on_click=lambda n=n: (
-                            categories.set_influence(folder_id, None if n.influence else n.id),
-                            done(),
-                        ),
-                    ).props(
-                        "flat dense round size=sm "
-                        + ("color=amber-9" if n.influence else "color=grey-5")
-                    ).tooltip(
-                        _("The “rayonnement” category: it also lists the influence excerpts")
-                        if n.influence
-                        else _(
-                            "Make it the “rayonnement” category: the excerpts flagged "
-                            "“influence” in the other categories are listed in it too"
-                        )
-                    ).mark(f"category-influence-{n.id}")
-                    ui.button(
                         icon="subdirectory_arrow_right",
                         on_click=lambda n=n: (categories.add(folder_id, _("New"), n.id), done()),
                     ).props("flat dense round size=sm").tooltip(_("Add a subcategory")).mark(
                         f"category-sub-{n.id}"
                     )
+                    ui.button(icon="call_merge", on_click=lambda n=n: merge(n)).props(
+                        "flat dense round size=sm"
+                    ).tooltip(_("Merge it into another category")).mark(f"category-merge-{n.id}")
                     ui.button(icon="delete", on_click=lambda n=n: delete(n)).props(
                         "flat dense round size=sm color=negative"
                     ).mark(f"category-delete-{n.id}")
@@ -173,6 +145,39 @@ def categories_dialog(folder_id: int, changed: Callable[[], None] | None = None)
                 done()
             else:
                 ui.notify(_("A category cannot go within itself"), type="warning")
+
+        def merge(n: categories.Node) -> None:
+            """Into another category (not within it), once chosen: its excerpts, texts and
+            subcategories there, then it is gone."""
+            within = set(categories.subtree(n.id))
+            targets = {c.id: c.path for c in categories.tree(folder_id) if c.id not in within}
+            if not targets:
+                ui.notify(_("No other category: create one first"), type="warning")
+                return
+            with transient_dialog(width="max-w-lg") as (confirm, _card):
+                ui.label(
+                    _(
+                        "Merge “{name}” into another category: its excerpts, its sections' "
+                        "texts and its subcategories go there, after its own; then “{name}” is "
+                        "deleted."
+                    ).format(name=n.name)
+                )
+                target = (
+                    ui.select(targets, label=_("Merge into"), with_input=True)
+                    .props("dense outlined options-dense")
+                    .classes("w-full")
+                    .mark("category-merge-target")
+                )
+
+                def ok() -> bool | None:
+                    if not target.value:
+                        ui.notify(_("Choose the category to merge it into"), type="warning")
+                        return False
+                    if not categories.merge(n.id, target.value):
+                        ui.notify(_("A category cannot go within itself"), type="warning")
+                    done()
+
+                actions(confirm, _("Merge"), ok, mark="category-merge-ok")
 
         def delete(n: categories.Node) -> None:
             """Once confirmed; with excerpts (there or below): to move them first."""

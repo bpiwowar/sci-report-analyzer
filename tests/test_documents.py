@@ -629,7 +629,7 @@ def test_categories_and_markdown():
     research = categories.add(folder, "Research")
     teaching = categories.add(folder, "Teaching")
     projects = categories.add(folder, "Projects", research)
-    categories.update(projects, "Projects", 2020, 2025)
+    categories.rename(projects, " Projects ")
     categories.move(teaching, -1)
     assert [(n.path, n.depth) for n in categories.tree(folder)] == [
         ("Teaching", 0),
@@ -645,7 +645,7 @@ def test_categories_and_markdown():
     assert len(categories.excerpts(period)) == 2 and again  # (filed there already)
     assert categories.markdown(folder, period) == (
         "## Teaching\n\n- Taught IR. %% Application, p. 1 %%\n\n"
-        "## Research\n\n### Projects (2020–2025)\n\n"
+        "## Research\n\n### Projects\n\n"
         "- Led the ANR project X. %% Application, p. 2 %%\n"
     )
     # Its influence ("rayonnement") ones: in their category, and in a last section too.
@@ -659,7 +659,7 @@ def test_categories_and_markdown():
     assert categories.markdown(folder, period) == (
         "## Teaching\n\n- Taught IR. %% Application, p. 1 %%\n"
         "- Chaired a workshop. %% Application, p. 3 %% — 2022\n\n"
-        "## Research\n\n### Projects (2020–2025)\n\n"
+        "## Research\n\n### Projects\n\n"
         "- Led the ANR project X. %% Application, p. 2 %%\n\n"
         "## Rayonnement\n\n"
         "- **Teaching**\n"
@@ -668,23 +668,15 @@ def test_categories_and_markdown():
         "- **Research › Projects**\n"
         "  - Led the ANR project X. %% Application, p. 2 %%\n"
     )
-    # A "rayonnement" category of the folder: them there too (after its own), no section.
-    outreach = categories.add(folder, "Outreach")
-    keynote = categories.add_excerpt(outreach, period, "Gave a keynote.", 4, [], document_id=doc)
-    categories.set_influence(folder, outreach)
-    assert [n.influence for n in categories.tree(folder)] == [False, False, False, True]
-    assert categories.markdown(folder, period).endswith(
-        "## Outreach\n\n- Gave a keynote. %% Application, p. 4 %%\n"
+    # Elsewhere (the block [[influence]]): not at the end; only it, without its heading.
+    assert "Rayonnement" not in categories.markdown(folder, period, influence="none")
+    assert categories.markdown(folder, period, influence="only") == (
         "- **Teaching**\n"
         "  - Taught IR. %% Application, p. 1 %%\n"
         "  - Chaired a workshop. %% Application, p. 3 %% — 2022\n"
         "- **Research › Projects**\n"
         "  - Led the ANR project X. %% Application, p. 2 %%\n"
     )
-    categories.set_influence(folder, None)
-    assert "## Rayonnement" in categories.markdown(folder, period)
-    categories.remove_excerpt(keynote)
-    assert categories.delete(outreach)
     categories.remove_excerpt(chaired)
     categories.update_excerpt(taught)
     categories.update_excerpt(led)
@@ -882,25 +874,20 @@ def test_nested_influence():
         "### Comités et sociétés savantes\n\n- Membre du Comité Galactique. %% Dossier, p. 1 %%\n\n"
         "### Recherche\n\n#### Projets\n\n- Projet Nébuleuse. %% Dossier, p. 2 %% — 2021–2024\n"
     )
-    # In the folder's "rayonnement" category: after its own excerpts, one level below it.
-    outreach = categories.add(folder, "Rayonnement")
-    categories.add_excerpt(outreach, period, "Prix Andromède.", 4, [], document_id=doc)
-    categories.set_influence(folder, outreach)
-    assert categories.markdown(folder, period, mode="move", level=3).endswith(
-        "### Rayonnement\n\n- Prix Andromède. %% Dossier, p. 4 %%\n\n"
-        "#### Comités et sociétés savantes\n\n"
+    # Only the section (the block [[influence]]): its subsections at its level.
+    assert categories.markdown(folder, period, mode="move", level=3, influence="only") == (
+        "### Comités et sociétés savantes\n\n"
         "- Membre du Comité Galactique. %% Dossier, p. 1 %%\n\n"
-        "#### Recherche\n\n##### Projets\n\n"
+        "### Recherche\n\n#### Projets\n\n"
         "- Projet Nébuleuse. %% Dossier, p. 2 %% — 2021–2024\n"
     )
-    # Marked: only in their categories (the gathering one as any other).
+    # Marked: only in their categories.
     assert categories.markdown(folder, period, mode="mark") == (
         "## Comités et sociétés savantes\n\n"
         "- #influence Membre du Comité Galactique. %% Dossier, p. 1 %%\n\n"
         "## Recherche\n\n### Projets\n\n"
         "- #influence Projet Nébuleuse. %% Dossier, p. 2 %% — 2021–2024\n"
-        "- Projet Comète. %% Dossier, p. 3 %%\n\n"
-        "## Rayonnement\n\n- Prix Andromède. %% Dossier, p. 4 %%\n"
+        "- Projet Comète. %% Dossier, p. 3 %%\n"
     )
     # The folder's choice (a block's options, formerly, ignored).
     assert reports.influence_mode(folder) == "copy"
@@ -910,6 +897,16 @@ def test_nested_influence():
     out = reports.render("# Dossier\n\n[[excerpts]]\n", ctx).text
     assert "\n## Comités" not in out and "\n### Comités et sociétés savantes\n" in out
     assert reports.render("# Dossier\n\n[]{.excerpts .flat-influence}\n", ctx).text == out
+    # Where [[influence]] (or [[rayonnement]]) is: there, no longer after [[excerpts]].
+    out = reports.render(
+        "# Dossier\n\n[[excerpts]]\n\n## Rayonnement\n\n[[rayonnement]]\n", ctx
+    ).text
+    assert out.count("Rayonnement") == 1 and out.endswith(
+        "## Rayonnement\n\n### Comités et sociétés savantes\n\n"
+        "- Membre du Comité Galactique. %% Dossier, p. 1 %%\n\n"
+        "### Recherche\n\n#### Projets\n\n"
+        "- Projet Nébuleuse. %% Dossier, p. 2 %% — 2021–2024\n"
+    )
     reports.save_influence_mode(folder, "copy")
     ctx = reports.folder_context([], period)
     assert reports.render("[]{.excerpts}", ctx).text.startswith("## Comités")
@@ -1673,15 +1670,38 @@ async def test_categories_editor(user: User, fake_viewer):
     await user.should_see("A category cannot go within itself")
     user.find(marker="category-drop-end").trigger("drop", {"id": research})
     assert [n.path for n in categories.tree(folder)] == ["Teaching", "Research", "Research › New"]
-    # One "rayonnement" category (another one chosen: it instead).
-    user.find(marker=f"category-influence-{teaching}").click()
-    user.find(marker=f"category-influence-{research}").click()
-    assert [n.influence for n in categories.tree(folder)] == [False, True, False]
     # A colour (that of its excerpts), picked.
     user.find(marker=f"category-colour-pick-{teaching}").trigger("click", "#2196f3")
     assert categories.tree(folder)[0].colour == "#2196f3"
+    # Merged into another one (not within it): its excerpts, texts and subcategories there.
+    extra = categories.add(folder, "Extra")
+    sub = categories.add(folder, "Sub", extra)
+    categories.add_excerpt(extra, period, "Filed in extra.", 1, [], document_id=doc)
+    categories.set_section_text(period, extra, "About extra.")
+    categories.set_key(extra, "extra")
+    assert not categories.merge(extra, sub)
+    user.find(marker=f"category-colour-pick-{teaching}").trigger("click", "#4caf50")  # (listed)
+    await user.should_see(marker=f"category-merge-{extra}")
+    user.find(marker=f"category-merge-{extra}").click()
+    await user.should_see(marker="category-merge-target")
+    user.find(marker="category-merge-target").elements.pop().value = teaching
+    user.find(marker="category-merge-ok").click()
+    await user.should_not_see(marker=f"category-{extra}")
+    assert [n.path for n in categories.tree(folder)] == [
+        "Teaching",
+        "Teaching › Sub",
+        "Research",
+        "Research › New",
+    ]
+    assert [e.category_id for e in categories.excerpts(period)] == [teaching]
+    assert categories.section_texts(period) == {teaching: "About extra."}
+    assert categories.tree(folder)[0].key == "extra"
+    categories.set_key(teaching, None)
+    categories.remove_excerpt(categories.excerpts(period)[0].id)
+    categories.set_section_text(period, teaching, "")
+    assert categories.delete(sub)
     # Its id in the reports ([[excerpts#id]]), unique.
-    user.find(marker=f"category-key-{teaching}").type("Teaching duties").trigger("blur")
+    user.find(marker=f"category-key-{teaching}").clear().type("Teaching duties").trigger("blur")
     assert categories.tree(folder)[0].key == "Teaching-duties"
     user.find(marker=f"category-key-{research}").type("Teaching-duties").trigger("blur")
     await user.should_see("Another category has this id")
@@ -2110,12 +2130,57 @@ async def test_excerpt_comment_in_the_viewer(user: User, fake_viewer):
     user.find(marker=f"excerpt-comment-{x}").click()
     await user.should_see(marker="excerpt-comment-input")
     user.find(marker="excerpt-comment-input").elements.pop().value = "Mostly *Zorglub*."
-    user.find(marker="excerpt-comment-save").click()
+    user.find(marker="excerpt-url").type("https://example.org/zorglub")
+    user.find(marker="excerpt-edit-save").click()
     await user.should_see(marker=f"excerpt-comment-text-{x}")
-    assert categories.excerpts(period)[0].comment == "Mostly *Zorglub*."
-    assert "%% Mostly *Zorglub*. %%" in categories.markdown(folder, period)
+    await user.should_see(marker=f"excerpt-url-{x}")
+    e = categories.excerpts(period)[0]
+    assert (e.comment, e.url) == ("Mostly *Zorglub*.", "https://example.org/zorglub")
+    assert (
+        "Ten papers. %% Application, p. 1 %% ([link](https://example.org/zorglub))"
+        " %% Mostly *Zorglub*. %%" in categories.markdown(folder, period)
+    )
     user.find(marker="excerpts-search").type("zorglub")
     await user.should_see(marker=f"excerpt-{x}")
+    # Moved (its tab of the same dialog): what was edited saved first.
+    teaching = categories.add(folder, "Teaching")
+    user.find(marker=f"excerpt-move-{x}").click()
+    await user.should_see(marker=f"pick-category-{teaching}")
+    user.find(marker="excerpt-tab-text").click()
+    await user.should_see(marker="excerpt-minor")
+    user.find(marker="excerpt-minor").click()
+    user.find(marker="excerpt-tab-move").click()
+    user.find(marker=f"pick-category-{teaching}").click()
+    await user.should_not_see(marker="excerpt-edit-save")
+    e = categories.excerpts(period)[0]
+    assert (e.category_id, e.minor, e.comment) == (teaching, True, "Mostly *Zorglub*.")
+    assert "- #minor Ten papers." in categories.markdown(folder, period)
+
+
+async def test_insert_block_of_a_category(user: User, monkeypatch, fake_viewer):
+    """The menu of blocks: also those of the categories with an id, as they are when
+    opened."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    research = categories.add(folder, "Research")
+    doc = documents.add(period, "Application.pdf", PDF)
+    inserted = []
+    monkeypatch.setattr(MarkdownEditor, "insert_block", lambda self, text: inserted.append(text))
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="folder-note-insert")
+    categories.set_key(research, "research")
+    [button] = user.find(marker="folder-note-insert").elements
+    [menu] = [c for c in button.default_slot.children if isinstance(c, ui.menu)]
+    for listener in menu._event_listeners.values():  # (opened: as they are now)
+        if listener.type == "beforeShow":
+            listener.handler()
+    menu.open()
+    await user.should_see(marker="folder-note-excerpts-research")
+    user.find(marker="folder-note-excerpts-research").click()
+    user.find(marker="folder-note-influence").click()
+    assert inserted == ["[[excerpts#research]]", "[[influence]]"]
 
 
 async def test_excerpts_collapsed_searched_discarded(user: User, fake_viewer):

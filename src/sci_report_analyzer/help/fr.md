@@ -297,7 +297,8 @@ l'emplacement des citations), encadrés, tâches, étiquettes et lignes étiquet
 (Paramètres → Filtres de copie → Étiquettes changées en texte) : un avant le texte de la ligne
 (par ex. une icône, 🌍) et un après, d'une couleur (ou surlignés), en gras, aussi le texte de la
 ligne si coché, par ex. les étiquettes des marqueurs des extraits (par défaut : 🌍 pour
-#rayonnement ou #influence, ⭐ pour #saillant ou #salient, ⚠️ pour #bemol ou #caveat ;
+#rayonnement ou #influence, ⭐ pour #saillant ou #salient, 🔹 pour #mineur ou #minor, ⚠️ pour
+#bemol ou #caveat ;
 #local, #national, #international, les niveaux, en « (national) »… après le texte de la ligne). Marmotte garde le gras, l'italique, le soulignement, les couleurs
 de texte, le surlignage, les emojis (🌍 ⭐ 📣) et les symboles (★ ✦ ◆ ➤) ; il retire les
 exposants, les tailles de police et le texte barré.
@@ -346,7 +347,7 @@ les numérotent (« [1] », dans l'ordre de première citation), la copie se t
 
 **Catégories** (page du dossier : le bouton des catégories ; ou l'onglet des catégories de la visionneuse) :
 l'arborescence ordonnée des catégories d'un dossier (par exemple une grille d'évaluation), que l'on fait glisser pour les ordonner et les imbriquer,
-chacune avec des années facultatives et un identifiant (`#id`, pour les rapports : voir plus bas) ; une catégorie contenant des extraits (directement ou en dessous, de n'importe quelle personne du dossier)
+chacune avec un identifiant facultatif (`#id`, pour les rapports : voir plus bas) ; une catégorie contenant des extraits (directement ou en dessous, de n'importe quelle personne du dossier)
 n'est supprimée qu'une fois ceux-ci déplacés vers une autre, choisie à ce moment-là. Dans le PDF d'un document (un rapport,
 un dossier de candidature… pas celui d'un article), sélectionnez un passage (ou cliquez sur un surlignage), puis « ajouter à une
 catégorie » (en-tête, ou touche E ; sur un extrait déjà classé, cliqué ou son texte
@@ -355,43 +356,48 @@ Entrée la prend ; en tapant, Entrée : la première trouvée ;
 un nouveau nom la crée, la boîte de dialogue restant ouverte), avec les années concernées (celles trouvées
 dans le passage, par exemple « 2026-32 » : 2026–2032, et retirées de son texte quand elles le commencent
 suivies de deux-points ou le terminent après eux ; son calendrier barré les efface, le texte redevenant celui
-sélectionné) et, le cas échéant, ses marqueurs : saillant (un point fort), rayonnement ou
+sélectionné) et, le cas échéant, ses marqueurs : saillant (un point fort), rayonnement, mineur (de moindre poids) ou
 bémol (une réserve) ; lorsqu'il pourrait déjà s'agir d'un extrait
 existant (mots similaires, signalé par un avertissement ; ou trouvé en tapant ses mots), fusionnez-le plutôt avec
 celui-ci, en conservant son texte ou seulement son emplacement (une référence). L'onglet des catégories liste
 les extraits de la personne (clic : aller au passage ; une catégorie repliée avec son chevron, ou toutes ;
-recherchés par leur texte, leurs étiquettes ou le texte d'une section), pour les modifier (texte, années, marqueurs, couleur :
-sa teinte sur le PDF ; les passages tels que sélectionnés sont affichés, pour y revenir ou les ajouter au texte),
-les déplacer (avec le même sélecteur), les fusionner (en faisant glisser l'un sur l'autre, ou avec son icône de fusion puis un clic sur
+recherchés par leur texte, leurs étiquettes ou le texte d'une section), pour les modifier (une seule fenêtre, en onglets : « Extrait », son texte, ses années,
+marqueurs, niveau et étiquettes, les passages tels que sélectionnés affichés, pour y revenir ou
+les ajouter au texte ; « Catégorie », pour le déplacer, avec le même sélecteur, ce qui a été
+modifié étant d'abord enregistré ; « Notes », son commentaire et un lien), les déplacer (l'onglet
+de cette fenêtre), les fusionner (en faisant glisser l'un sur l'autre, ou avec son icône de fusion puis un clic sur
 l'autre : regroupés, chacun avec sa propre citation ou seulement son emplacement, son icône lien / citation basculant de l'un à l'autre,
 sur un seul élément avec la catégorie, les années… de l'autre ; le crayon du groupe modifie son texte d'ensemble,
 par ex. une phrase qui les résume, ses extraits étant alors cités dans le commentaire qui le suit, avec leurs
 emplacements, tous toujours teintés sur le PDF ; à nouveau sortis
 avec son icône de séparation), les réordonner (en les faisant glisser sur le bord supérieur ou inférieur d'un autre), les écarter
 (son ✕ : laissés hors du texte généré, les notes et rapports, toujours conservés et listés, barrés ;
-rétablis avec le même bouton), les commenter (sa bulle : un commentaire en Markdown sur l'extrait,
-ou sur un groupe, affiché dessous et placé après son élément dans les notes en commentaire
-`%% … %%`, non affiché), les supprimer,
+rétablis avec le même bouton), les commenter (sa bulle, les « Notes » de la fenêtre : un commentaire en Markdown sur
+l'extrait, ou sur un groupe, affiché dessous et placé après son élément dans les notes en
+commentaire `%% … %%`, non affiché ; et un lien, une URL, écrit après lui dans les notes, son 🔗
+sur sa ligne), les supprimer,
 ou les copier en Markdown (sans guillemets, leurs emplacements dans des commentaires Obsidian : `%% Application, p. 4;
 p. 12 %%`, puis leurs années ; ceux qui témoignent du rayonnement sont aussi listés, par catégorie, dans une dernière
-section « Rayonnement » ; l'icône de badge nomme les documents, par exemple un long nom de fichier sous la forme
+section « Rayonnement », ou là où est le bloc `[[influence]]` (ou `[[rayonnement]]`) ; l'icône de badge nomme les documents, par exemple un long nom de fichier sous la forme
 « Application ») ;
-le menu « Insérer un bloc » du rapport les insère, par catégorie (le bloc `[[excerpts]]`, tenu à jour) ;
+le menu « Insérer un bloc » du rapport les insère, par catégorie (le bloc `[[excerpts]]`, tenu à jour),
+ceux d'une catégorie qui a un identifiant, ou la section Rayonnement ;
 `[[excerpts#id]]` insère ceux de la catégorie de cet identifiant (et en dessous ; ses
 sous-catégories en titres sous celui du bloc), alors omis de `[[excerpts]]`, par ex.
 `# Recherche` puis `[[excerpts#recherche]]`, et `# Autres activités` puis `[[excerpts]]`.
 Où vont les extraits de rayonnement, les réglages du dossier le disent (« Extraits de
-rayonnement ») : listés aussi dans la section Rayonnement (la catégorie « rayonnement »,
-sinon une dernière section), comme par défaut ; seulement là, sous des sous-sections au nom
+rayonnement ») : listés aussi dans la section Rayonnement (là où est `[[influence]]`, sinon à
+la fin de `[[excerpts]]`), comme par défaut ; seulement là, sous des sous-sections au nom
 de leurs catégories (imbriquées comme elles, un niveau plus bas), retirés de leurs catégories
 (une catégorie restée vide disparaît) ; ou seulement dans leurs catégories, avec leur
-étiquette, par ex. changée en icône par les filtres de copie (la section Rayonnement : dans
-le bloc qui a la catégorie « rayonnement », sinon dans `[[excerpts]]`). Les extraits saillants et les bémols ont toujours leur étiquette.
+étiquette, par ex. changée en icône par les filtres de copie. Les extraits saillants, mineurs
+et les bémols ont toujours leur étiquette.
 Les réglages du dossier fixent l'étiquette de chaque marqueur (par défaut dans la langue de
-ses rapports : #saillant, #rayonnement, #bemol ; en anglais #salient, #influence, #caveat) et
+ses rapports : #saillant, #rayonnement, #mineur, #bemol ; en anglais #salient, #influence,
+#minor, #caveat) et
 si un extrait se déplace quand on le marque (« En premier », par défaut) : marqué, il passe en
 tête de sa catégorie, parmi ceux marqués ainsi (les saillants d'abord, puis le rayonnement,
-puis les bémols) ; démarqué, après eux ; on peut ensuite le déplacer à son gré, le rapport
+puis les mineurs, puis les bémols) ; démarqué, après eux ; on peut ensuite le déplacer à son gré, le rapport
 suivant cet ordre.
 Un extrait peut aussi avoir un niveau (sa fenêtre d'édition : « Niveau »), par ex. local,
 national ou international, en étiquette après celles de ses marqueurs (#national) ; les

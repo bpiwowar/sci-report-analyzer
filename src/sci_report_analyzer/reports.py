@@ -22,8 +22,9 @@ syntax, substituted when shown or copied.
   category (their headings below that of the block, each followed by the section's text if
   any, see categories.section_texts; the "rayonnement" excerpts as the folder says, see
   ``influence_mode``); ``[[excerpts#key]]``: those of the category of that id (and below),
-  then left out of ``[[excerpts]]``. Pandoc's spans are read too: ``[]{.excerpts}``,
-  ``[]{.references .notes}``.
+  then left out of ``[[excerpts]]``; ``[[influence]]`` (or ``[[rayonnement]]``): the
+  Rayonnement section (by category), then not at the end of ``[[excerpts]]``. Pandoc's spans
+  are read too: ``[]{.excerpts}``, ``[]{.references .notes}``.
 
 Within a folder, the papers of its star lists (see annotations.star_lists) are numbered in
 the first one they are in (in its order, else by year), each list's numbers written as it
@@ -239,12 +240,14 @@ def papers_to_discuss(
 @dataclass
 class Block:
     """A block where it is: the level of its headings (that below the heading it is under),
-    its target (``#key``), its options, and the targets of the other blocks of that name."""
+    its target (``#key``), its options, the targets of the other blocks of that name, and the
+    names of the blocks of the text."""
 
     level: int
     target: str | None = None
     options: set[str] = field(default_factory=set)
     others: set[str] = field(default_factory=set)
+    names: set[str] = field(default_factory=set)
 
 
 class BlockError(ValueError):
@@ -549,9 +552,11 @@ def _render(text: str, ctx: Context) -> Rendered:
 
     chunks = _CODE.split(text)
     targets: dict[str, set[str]] = {}  # (by block name)
+    names: set[str] = set()
     for c in chunks[::2]:
         for m in _BLOCK.finditer(c):
             name, target, _options = block_parts(m)
+            names.add(name)
             if target:
                 targets.setdefault(name, set()).add(target)
 
@@ -568,7 +573,7 @@ def _render(text: str, ctx: Context) -> Rendered:
             level = min(len(head[-1]) + 1, 6) if head else 2
             others = targets.get(name, set()) - {target}
             try:
-                made.append(make(Block(level, target, options, others)).rstrip("\n"))
+                made.append(make(Block(level, target, options, others, names)).rstrip("\n"))
             except BlockError as e:
                 out.errors.append(str(e))
                 return f"{m.group(0)} (⚠ {e})"
@@ -685,8 +690,11 @@ def save_language(folder_id: int, lang: str | None) -> None:
 
 
 # Where the excerpts flagged "influence" go (see categories.markdown): also listed in the
-# Rayonnement section, only there (by category), or only in their categories, marked.
+# Rayonnement section (at the end of the excerpts, or where [[influence]] is), only there (by
+# category), or only in their categories, marked.
 INFLUENCE_MODES = ("copy", "move", "mark")
+# The names of the block of the Rayonnement section (the English one preferred).
+INFLUENCE_BLOCKS = ("influence", "rayonnement")
 # A block's options choosing one (and the former ones).
 
 
@@ -705,20 +713,26 @@ def save_influence_mode(folder_id: int, mode: str) -> None:
 
 
 # An excerpt's markers (see categories.ExcerptView), in their order (see Marker.first).
-MARKERS = ("salient", "influence", "caveat")
+MARKERS = ("salient", "influence", "minor", "caveat")
 # Their tags by default, in the language of the reports.
 DEFAULT_MARKER_TAGS = {
-    "en": {"salient": "salient", "influence": "influence", "caveat": "caveat"},
-    "fr": {"salient": "saillant", "influence": "rayonnement", "caveat": "bemol"},
+    "en": {"salient": "salient", "influence": "influence", "minor": "minor", "caveat": "caveat"},
+    "fr": {
+        "salient": "saillant",
+        "influence": "rayonnement",
+        "minor": "mineur",
+        "caveat": "bemol",
+    },
 }
 
 
 @dataclass(frozen=True)
 class Marker:
-    """How an excerpt's marker shows in the folder's reports: its tag (salient, caveat:
-    always; influence: in the mode "mark", see influence_mode), and whether an excerpt marked
-    (or no longer) moves first in its category (see categories.update_excerpt), among those
-    marked so (salient, influence, caveat), or after them; then moved as one likes."""
+    """How an excerpt's marker shows in the folder's reports: its tag (salient, minor,
+    caveat: always; influence: in the mode "mark", see influence_mode), and whether an excerpt
+    marked (or no longer) moves first in its category (see categories.update_excerpt), among
+    those marked so (salient, influence, minor, caveat), or after them; then moved as one
+    likes."""
 
     tag: str
     first: bool = True
@@ -836,7 +850,7 @@ def folder_context(
 
     def excerpts(block: Block) -> str:
         """Those of a category (and below: ``#key``), else all, but those of the other
-        blocks' categories."""
+        blocks' categories (and the Rayonnement section, if a block of its own)."""
         from . import categories
 
         keys = {n.key: n.id for n in categories.tree(folder_id) if n.key}
@@ -849,6 +863,14 @@ def folder_context(
             root=keys.get(block.target) if block.target else None,
             exclude=[keys[k] for k in block.others if k in keys],
             anchors=anchors,
+            influence="none" if block.names & set(INFLUENCE_BLOCKS) else "end",
+        )
+
+    def influence(block: Block) -> str:
+        from . import categories
+
+        return categories.markdown(
+            folder_id, period_id, level=block.level, anchors=anchors, influence="only"
         )
 
     n = numbering(folder_id)
@@ -874,6 +896,7 @@ def folder_context(
         blocks={
             "publications": publications,
             "excerpts": excerpts,
+            **dict.fromkeys(INFLUENCE_BLOCKS, influence),
             "cv": lambda _block: career.markdown(person_id),
         },
         lists=lists,

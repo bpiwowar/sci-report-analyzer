@@ -293,7 +293,8 @@ tasks, tags and the lines tagged #question or #to-check are left out, tables too
 instead be turned into a text (Settings → Copy filters → Tags turned into a text): one before
 the line's text (e.g. an icon, 🌍) and one after, in a colour (or highlighted), in bold, the
 line's text too if checked, e.g. the tags of the excerpts' markers (by default: 🌍 for
-#influence or #rayonnement, ⭐ for #salient or #saillant, ⚠️ for #caveat or #bemol; the
+#influence or #rayonnement, ⭐ for #salient or #saillant, 🔹 for #minor or #mineur, ⚠️ for
+#caveat or #bemol; the
 levels' #local, #national, #international as “(national)”… after the line's text). Marmotte keeps bold, italics, underlining, text colours,
 highlights, emojis (🌍 ⭐ 📣) and symbols (★ ✦ ◆ ➤); it drops superscripts, font sizes and
 strikethroughs.
@@ -344,7 +345,7 @@ number them (“[1]”, as first cited), the copy ending with the references.
 
 **Categories** (folder page: the category button; or the viewer's categories tab): a
 folder's ordered tree of categories (e.g. an evaluation grid), dragged to order and nest
-them, each with optional years and an id (`#id`, for the reports: see below); one with excerpts (there or below, of anyone in the folder)
+them, each with an optional id (`#id`, for the reports: see below); one with excerpts (there or below, of anyone in the folder)
 is deleted once they are moved to another one, chosen then. In a document's PDF (a report,
 an application… not a paper's), select a passage (or click a highlight), then ‘add to a
 category’ (header, or the E key; on an excerpt filed already, clicked or its text selected:
@@ -353,41 +354,42 @@ the first match; a new name creates it, the dialog staying open), with the years
 in the passage, e.g. “2026-32”: 2026–2032, and taken out of its text when leading it with a
 colon or ending it after one; its crossed-out calendar clears them, the text as selected
 again) and its markers if need be: salient (“saillant”, a strong point), influence
-(“rayonnement”) or caveat (“bémol”, a reservation); when it might be an excerpt
+(“rayonnement”), minor (“mineur”, of lesser weight) or caveat (“bémol”, a reservation); when it might be an excerpt
 already (similar words, shown with a warning; or found by typing its words), merge it with
 that one instead, keeping its text or only its place (a reference). The categories tab lists
 the person's excerpts (click: go to the passage; a category collapsed with its chevron, or all of
-them; searched by their text, tags or a section's text), to edit (text, years, markers, colour:
-its tint on the PDF; the passages as selected are shown, to go back to or add to the text),
-move (with the same picker), merge (drag one onto another, or its merge icon then a click on
+them; searched by their text, tags or a section's text), to edit (one dialog, in tabs: “Excerpt”, its text, years, markers, level and tags, the
+passages as selected shown, to go back to or add to the text; “Category”, to move it, with the
+same picker, what was edited saved first; “Notes”, its commentary and a link), move (its tab
+of that dialog), merge (drag one onto another, or its merge icon then a click on
 the other: grouped, each its own quote or only its place, its link / quote icon switching,
 on one item with the other's category, years…; the group's pencil edits its overall text,
 e.g. one sentence summarising them, its excerpts then quoted in the comment after it, with
 their places, all still tinted on the PDF; taken out again
 with its split icon), reorder (dragged onto the top or bottom edge of another one), discard
 (its ✕: left out of the generated text, the notes and reports, still kept and listed, struck
-through; back with the same button), annotate (its speech bubble: a commentary in Markdown on
-it, or on a group, shown under it and put after its item in the notes as a comment
-`%% … %%`, not shown), remove,
+through; back with the same button), annotate (its speech bubble, the dialog's “Notes”: a commentary in
+Markdown on it, or on a group, shown under it and put after its item in the notes as a comment
+`%% … %%`, not shown; and a link, URL, written after it in the notes, its 🔗 on its row),
+remove,
 or copy as Markdown (unquoted, their places in Obsidian comments: `%% Application, p. 4;
 p. 12 %%`, then their years; those showing influence also listed, by category, in a last
-“Rayonnement” section; the badge icon names the documents, e.g. a long file name as
+“Rayonnement” section, or where the block `[[influence]]` (or `[[rayonnement]]`) is; the badge icon names the documents, e.g. a long file name as
 “Application”);
 the report's “Insert a block” menu inserts them, by category (the block `[[excerpts]]`, kept up to
-date); `[[excerpts#id]]` inserts those of the category of that id (and below it; its
+date), those of a category with an id, or the Rayonnement section; `[[excerpts#id]]` inserts those of the category of that id (and below it; its
 subcategories as headings below the block's heading), then left out of `[[excerpts]]`, e.g.
 `# Research` then `[[excerpts#research]]`, and `# Other activities` then `[[excerpts]]`.
 Where the influence excerpts go, the folder's settings say (“Rayonnement excerpts”): also
-listed in the Rayonnement section (the “rayonnement” category, else a last section), as by
-default; only there, under subsections named after their categories (nested as these, one
+listed in the Rayonnement section (where `[[influence]]` is, else at the end of
+`[[excerpts]]`), as by default; only there, under subsections named after their categories (nested as these, one
 level below), taken out of their categories, one left empty being left out; or only in their
-categories, tagged #influence, e.g. turned into an icon by the copy filters (the Rayonnement
-section: in the block with the “rayonnement” category, else in `[[excerpts]]`). The salient
-and caveat excerpts are always tagged. The folder's settings set each marker's tag (by
-default in the language of its reports: #salient, #influence, #caveat; in French
-#saillant, #rayonnement, #bemol) and whether an excerpt moves when marked (“First”, by
+categories, tagged #influence, e.g. turned into an icon by the copy filters. The salient,
+minor and caveat excerpts are always tagged. The folder's settings set each marker's tag (by
+default in the language of its reports: #salient, #influence, #minor, #caveat; in French
+#saillant, #rayonnement, #mineur, #bemol) and whether an excerpt moves when marked (“First”, by
 default): marked, it moves to the top of its category, among those marked so (salient ones
-first, then influence, then caveats); unmarked, after them; it can then be moved as one
+first, then influence, then minor ones, then caveats); unmarked, after them; it can then be moved as one
 likes, the report following that order. An excerpt can also have a level (its edit dialog:
 “Level”), e.g. local, national or international, tagged after its markers (#national); the
 folder's settings set its levels (their tags, by default in the language of its reports; one

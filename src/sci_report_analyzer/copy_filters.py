@@ -56,12 +56,13 @@ class TagRule:
 
 
 # Until some are set: the tags of the excerpts' markers by default (see reports.markers),
-# as icons: influence ("rayonnement") a globe, salient ("saillant") a star, caveat ("bémol")
-# a warning sign; and those of the levels by default (see reports.levels), after the line's
-# text.
+# as icons: influence ("rayonnement") a globe, salient ("saillant") a star, minor ("mineur")
+# a small diamond, caveat ("bémol") a warning sign; and those of the levels by default (see
+# reports.levels), after the line's text.
 DEFAULT_TAG_RULES = [
     *(TagRule(t, "🌍") for t in ("influence", "rayonnement")),
     *(TagRule(t, "⭐") for t in ("salient", "saillant")),
+    *(TagRule(t, "🔹") for t in ("minor", "mineur")),
     *(TagRule(t, "⚠️") for t in ("caveat", "bemol")),
     *(TagRule(t, after=f"({t})") for t in ("local", "national", "international")),
 ]

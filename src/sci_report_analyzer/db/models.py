@@ -370,9 +370,8 @@ class FolderSettingsUse(Base):
 
 class Category(Base):
     """A category of the folders' grid (e.g. "Research", and under it "Projects"), in order:
-    one of their settings; excerpts of their people's documents are filed in it. Its years
-    (optional) are those it is about; one can gather the excerpts showing influence
-    (``influence``). Its colour is that of its excerpts (their tint on the PDFs)."""
+    one of their settings; excerpts of their people's documents are filed in it. Its colour is
+    that of its excerpts (their tint on the PDFs)."""
 
     __tablename__ = "category"
 
@@ -385,11 +384,6 @@ class Category(Base):
     )
     name: Mapped[str]
     position: Mapped[int] = mapped_column(default=0)  # among its siblings
-    start_year: Mapped[int | None]
-    end_year: Mapped[int | None]
-    # The settings' "rayonnement" (at most one): the excerpts flagged "influence" in the
-    # other categories are listed in it too.
-    influence: Mapped[bool] = mapped_column(default=False, server_default="0")
     colour: Mapped[str | None] = mapped_column(String(16))  # (none: the default tint)
     # Its id in the reports (`[[excerpts#id]]`: its excerpts there, not in [[excerpts]]).
     key: Mapped[str | None] = mapped_column(String(64))
@@ -399,9 +393,9 @@ class Excerpt(Base):
     """A passage of a PDF (a document's, or a paper's) of a person in a folder, filed in one
     of the categories of the folder's settings; the years it is about (optional), and its
     markers: whether it shows the person's influence ("rayonnement": invited talks, prizes,
-    committees…), is salient ("saillant"), or a caveat ("bémol"); its level (e.g. national:
-    one of the folder's, see reports.levels; none: the folder's default); whether it is
-    discarded from the generated text; a commentary on it."""
+    committees…), is salient ("saillant"), minor ("mineur"), or a caveat ("bémol"); its level
+    (e.g. national: one of the folder's, see reports.levels; none: the folder's default);
+    whether it is discarded from the generated text; a commentary on it, and a link (URL)."""
 
     __tablename__ = "excerpt"
 
@@ -426,6 +420,7 @@ class Excerpt(Base):
     end_year: Mapped[int | None]
     influence: Mapped[bool] = mapped_column(default=False, server_default="0")
     salient: Mapped[bool] = mapped_column(default=False, server_default="0")
+    minor: Mapped[bool] = mapped_column(default=False, server_default="0")
     caveat: Mapped[bool] = mapped_column(default=False, server_default="0")
     level: Mapped[str | None] = mapped_column(String(32))  # (the key of one of the folder's)
     position: Mapped[int] = mapped_column(default=0, server_default="0")  # (in its category)
@@ -445,6 +440,7 @@ class Excerpt(Base):
     # A commentary on it (Markdown; that of the group it leads): an Obsidian comment after its
     # item in the notes (``%% … %%``, not shown).
     comment: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str | None] = mapped_column(Text)  # (a link; that of the group it leads)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     # Its tags (those of the group it leads; the others of a group: none).
     tags: Mapped[list[Tag]] = relationship(
