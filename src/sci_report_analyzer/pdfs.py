@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from . import config
+from .authors import natural_order
 from .db.models import PeriodDocument, Publication, PublicationPdf, SourcePub, utcnow
 from .db.session import session_scope
 from .files import atomic_write
@@ -202,6 +203,71 @@ def cleanup() -> tuple[int, int]:
             if d.is_dir() and not any(d.iterdir()):
                 d.rmdir()
     return len(u.orphans), forgotten
+
+
+# ---- The PDFs of a list, as one ZIP file ----------------------------------------------------
+
+_UNSAFE = re.compile(r'[\x00-\x1f<>:"/\\|?*]+')  # (refused in a file name by some systems)
+
+
+def file_name(text: str | None, limit: int = 80) -> str:
+    """``text`` as (part of) a file name: without the characters some systems refuse, its
+    spaces collapsed, cut at ``limit`` (empty: nothing left)."""
+    return " ".join(_UNSAFE.sub(" ", text or "").split())[:limit].strip(" .")
+
+
+def files_of(pub_ids: Iterable[int]) -> dict[int, Path]:
+    """The stored PDFs of some papers (those still on disk)."""
+    ids = list(pub_ids)
+    with session_scope() as s:
+        rows = s.execute(
+            select(PublicationPdf.publication_id, PublicationPdf.path).where(
+                PublicationPdf.publication_id.in_(ids)
+            )
+        )
+        found = {pid: pdf_dir() / rel for pid, rel in rows}
+    return {pid: path for pid, path in found.items() if path.is_file()}
+
+
+@dataclass
+class Listed:
+    """A paper of a list put in a ZIP file, with its stored PDF (None: none)."""
+
+    title: str | None
+    year: int | None
+    first_author: str | None
+    file: Path | None
+
+
+def entry_name(n: int, width: int, paper: Listed) -> str:
+    """The file of the ``n``-th paper of a list in its ZIP file: “03 - Doe - 2021 -
+    Title.pdf” (the number, as wide as ``width``, keeps them in order and apart)."""
+    surname = natural_order(paper.first_author or "").split()[-1:]
+    parts = (
+        f"{n:0{width}d}",
+        file_name(surname[0] if surname else "", 40),
+        str(paper.year or ""),
+        file_name(paper.title, 100),
+    )
+    return " - ".join(p for p in parts if p) + ".pdf"
+
+
+def write_zip(papers: list[Listed], dest: Path, missing: tuple[str, str]) -> int:
+    """The PDFs of a list's papers written into the ZIP file ``dest``, in order (stored, not
+    compressed again: written file by file, never all in memory); those without a PDF are
+    listed in a text file (``missing``: its name and first line). Returns the PDFs put."""
+    width = max(2, len(str(len(papers))))
+    lacking = []
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_STORED, allowZip64=True) as z:
+        for n, paper in enumerate(papers, 1):
+            name = entry_name(n, width, paper)
+            if paper.file is None or not paper.file.is_file():
+                lacking.append(name.removesuffix(".pdf"))
+            else:
+                z.write(paper.file, name)
+        if lacking:
+            z.writestr(missing[0], "\n".join((missing[1], "", *lacking, "")))
+    return len(papers) - len(lacking)
 
 
 # ---- Downloads ------------------------------------------------------------------------------

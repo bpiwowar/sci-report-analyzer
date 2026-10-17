@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import inspect
 import json
+import os
 import re
+import tempfile
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -17,7 +19,8 @@ from weakref import WeakSet
 import nicegui
 from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse
-from nicegui import Client, app, background_tasks, ui
+from nicegui import Client, app, background_tasks, run, ui
+from starlette.background import BackgroundTask
 
 from .. import annotations, documents, llm, pdfs, pdftext, persons, urls
 from ..i18n import N_, _, ngettext
@@ -139,6 +142,44 @@ def register() -> None:
         if first:
             changed(found[1])
         return PlainTextResponse("ok")
+
+    @app.get("/starred-pdfs/{period_id}/{tag_id}")
+    async def starred_pdfs(period_id: int, tag_id: int) -> FileResponse:
+        """The stored PDFs of a star list's papers within a period, as one ZIP file."""
+        from ..pubview import load_stats, tag_order
+
+        person = persons.of_period(period_id)
+        tag = next((t for t in annotations.star_lists(period_id) if t.id == tag_id), None)
+        if person is None or tag is None:
+            raise HTTPException(404)
+        rows = tag_order(await load_stats(person[0]), tag_id, period_id)
+        files = pdfs.files_of(s.id for s in rows if s.pdf)
+        if not files:
+            raise HTTPException(404, "no stored PDF")
+        papers = [
+            pdfs.Listed(s.title, s.year, next(iter(s.authors), None), files.get(s.id)) for s in rows
+        ]
+        missing = (
+            _("missing PDFs.txt"),
+            _("The papers of “{tag}” without a stored PDF (by their place in the list):").format(
+                tag=tag.name
+            ),
+        )
+        fd, tmp = tempfile.mkstemp(suffix=".zip")
+        os.close(fd)
+        try:
+            await run.io_bound(pdfs.write_zip, papers, Path(tmp), missing)
+        except BaseException:
+            os.unlink(tmp)
+            raise
+        name = pdfs.file_name(f"{person[1]} - {tag.name}", 120) or "starred"
+        return FileResponse(
+            tmp,
+            media_type="application/zip",
+            filename=f"{name}.zip",
+            headers={"Cache-Control": "no-store"},
+            background=BackgroundTask(os.unlink, tmp),  # (the file sent: removed)
+        )
 
     @ui.page("/pdf/{pub_id}")
     def pdf_page(
@@ -817,3 +858,34 @@ def download_dialog(panel: PublicationsPanel, rows: list[PubStat]) -> None:
             start = ui.button(_("Download"), icon="download", on_click=run).mark("pdf-batch-ok")
             if not todo:
                 start.disable()
+
+
+def zip_button(period_id: int, tag_id: int, rows: list[PubStat], mark: str = "") -> None:
+    """A star list's button downloading the stored PDFs of its papers as one ZIP file (in
+    the list's order; those without one listed in a text file in it); without any stored
+    PDF, disabled, its tooltip saying why."""
+    n, total = sum(1 for s in rows if s.pdf), len(rows)
+    if n:
+        tip = _("Download the PDFs of this list as one ZIP file ({n} of {total} PDFs)")
+        if n < total:
+            tip += " — " + _("the papers without a stored PDF are listed in it")
+    else:
+        tip = _("No stored PDF in this list to download (the PDF icon of a paper stores it)")
+
+    def download() -> None:
+        ui.download.from_url(f"/starred-pdfs/{period_id}/{tag_id}")
+        if n < total:
+            ui.notify(
+                ngettext(
+                    "{n} paper without a stored PDF: listed in the ZIP file",
+                    "{n} papers without a stored PDF: listed in the ZIP file",
+                    total - n,
+                ).format(n=total - n)
+            )
+
+    # (the tooltip on a span: also shown when the button is disabled)
+    with ui.element("span").tooltip(tip.format(n=n, total=total)).mark(f"{mark}zip-tip"):
+        button = ui.button(icon="folder_zip", on_click=download).props("flat round dense")
+        button.mark(f"{mark}zip")
+        if not n:
+            button.disable()
