@@ -223,7 +223,10 @@ numbers' format, whether their papers are to be cited, their order). Rename and 
 categories. Each paper has a **note** (Markdown),
 plus a note within the selected period. The "tags" filter shows the papers having one of
 the chosen tags. The person's **Starred papers** tab shows each star list of the period's
-folder, in its order, with its number of papers (following the panel's period). To write
+folder, in its order, with its number of papers (following the panel's period). Its ZIP
+button downloads the stored PDFs of its papers as one file (“01 - Author - Year - Title.pdf”,
+in the list's order); the papers without one are listed in a text file in it (its tooltip
+gives “n of m PDFs”; with no stored PDF, it is disabled). To write
 about them, use the report editor (below).
 
 **Tag from a list** (the panel's list button): paste a list of publications, e.g. a report's

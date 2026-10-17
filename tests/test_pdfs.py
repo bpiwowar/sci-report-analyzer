@@ -1,14 +1,17 @@
 """Stored PDFs: downloads, the merge, the clean-up, and the viewer page."""
 
 import asyncio
+import io
+import zipfile
 
+import httpx
 import pytest
 from helpers import PDF, add_source, make_person, note_status, pub
-from nicegui import ElementFilter, ui
+from nicegui import ElementFilter, app, ui
 from nicegui.testing import User
 from sqlalchemy import select
 
-from sci_report_analyzer import annotations, pdfs, pubview, sync
+from sci_report_analyzer import annotations, folders, pdfs, pubview, sync
 from sci_report_analyzer.db.models import Publication
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.sources.base import FetchResult
@@ -287,3 +290,78 @@ def test_static_scripts_parse():
         pytest.skip("no node")
     for script in STATIC.glob("*.js"):
         subprocess.run([node, "--check", str(script)], check=True)
+
+
+def test_write_zip(tmp_path):
+    """A list's PDFs in a ZIP file: in its order, named readably; those missing listed."""
+    one, three = tmp_path / "1.pdf", tmp_path / "3.pdf"
+    one.write_bytes(PDF)
+    three.write_bytes(PDF + b"%3")
+    papers = [
+        pdfs.Listed("Deep ranking: a study?", 2021, "Jane Doe", one),
+        pdfs.Listed("Without a PDF", 2022, "Smith, Ann", None),
+        pdfs.Listed("A/B tests  of ranking.", None, "DOE Jane", three),
+        pdfs.Listed(None, 2020, None, tmp_path / "gone.pdf"),  # (its file deleted by hand)
+    ]
+    dest = tmp_path / "list.zip"
+    assert pdfs.write_zip(papers, dest, ("missing.txt", "Missing:")) == 2
+    with zipfile.ZipFile(dest) as z:
+        assert z.namelist() == [
+            "01 - Doe - 2021 - Deep ranking a study.pdf",
+            "03 - DOE - A B tests of ranking.pdf",
+            "missing.txt",
+        ]
+        assert z.read("03 - DOE - A B tests of ranking.pdf") == PDF + b"%3"
+        assert z.read("missing.txt").decode().splitlines() == [
+            "Missing:",
+            "",
+            "02 - Smith - 2022 - Without a PDF",
+            "04 - 2020",
+        ]
+    # All of them: no list of the missing ones.
+    assert pdfs.write_zip(papers[:1], dest, ("missing.txt", "Missing:")) == 1
+    with zipfile.ZipFile(dest) as z:
+        assert z.namelist() == ["01 - Doe - 2021 - Deep ranking a study.pdf"]
+
+
+async def test_starred_zip(user: User):
+    """A star list's button in the Starred tab: its stored PDFs as one ZIP file, in the
+    list's order (disabled, saying why, when none is stored)."""
+    pid, _, ids = _person()
+    a, b = ids["Deep ranking for search"], ids["Neural retrieval models for long documents"]
+    c = ids["Sparse representations"]
+    period = folders.add_person(folders.save_folder(None, "Hiring"), pid)
+    star = annotations.starred_tag_id()
+    short = annotations.save_list(None, "short list")
+    annotations.number_in_order(star, [c, a, b], period)
+    annotations.number_in_order(short, [b], period)
+    pdfs.save(a, PDF, None)
+    pdfs.save(c, PDF + b"%c", None)
+    await user.open(f"/person/{pid}/{period}?tab=starred")
+    await user.should_see(marker=f"starred-{star}-zip")
+    with user.client:
+        by_target = {e.props.get("target"): e.text for e in ElementFilter(kind=ui.tooltip)}
+    tips = {
+        m: by_target[f"#{user.find(m).elements.pop().html_id}"]
+        for m in (f"starred-{star}-zip-tip", f"starred-{short}-zip-tip")
+    }
+    assert "2 of 3 PDFs" in tips[f"starred-{star}-zip-tip"]
+    assert "No stored PDF" in tips[f"starred-{short}-zip-tip"]
+    (button,) = user.find(f"starred-{short}-zip").elements
+    assert not button.enabled
+    user.find(f"starred-{star}-zip").click()
+    await user.should_see("1 paper without a stored PDF: listed in the ZIP file")
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        res = await client.get(f"/starred-pdfs/{period}/{star}")
+        assert res.status_code == 200
+        assert "Jane%20Doe%20-%20starred.zip" in res.headers["content-disposition"]
+        with zipfile.ZipFile(io.BytesIO(res.content)) as z:
+            assert z.namelist() == [
+                "01 - 2023 - Sparse representations.pdf",
+                "02 - 2021 - Deep ranking for search.pdf",
+                "missing PDFs.txt",
+            ]
+            assert "03 - 2022 - Neural retrieval" in z.read("missing PDFs.txt").decode()
+        assert (await client.get(f"/starred-pdfs/{period}/{short}")).status_code == 404

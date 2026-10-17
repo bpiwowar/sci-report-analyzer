@@ -227,7 +227,10 @@ numéros, si leurs articles sont à citer, leur ordre). Renommez et recolorez le
 bouton 🏷 ou dans Paramètres → Étiquettes et catégories. Chaque article a une **note** (Markdown),
 plus une note propre à la période sélectionnée. Le filtre « étiquettes » affiche les articles ayant l'une
 des étiquettes choisies. L'onglet **Articles étoilés** de la personne montre chaque liste étoilée du dossier
-de la période, dans son ordre, avec son nombre d'articles (il suit la période du panneau). Pour écrire à
+de la période, dans son ordre, avec son nombre d'articles (il suit la période du panneau). Son bouton ZIP
+télécharge les PDF stockés de ses articles en un seul fichier (« 01 - Auteur - Année - Titre.pdf », dans
+l'ordre de la liste) ; les articles sans PDF y sont listés dans un fichier texte (son infobulle donne
+« n sur m PDF » ; sans aucun PDF stocké, il est désactivé). Pour écrire à
 leur sujet, utilisez l'éditeur de rapport (ci-dessous).
 
 **Étiqueter à partir d'une liste** (le bouton liste du panneau) : collez une liste de publications, par exemple la liste

@@ -39,7 +39,7 @@ from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR, TO_CHECK
 from ..ranking.kinds import KIND_SHORT
 from ..sources import ADAPTERS
 from .dialogs import actions, ok_handler, transient_dialog
-from .pdf_viewer import changed, download_dialog, pdf_button, watch
+from .pdf_viewer import changed, download_dialog, pdf_button, watch, zip_button
 from .pub_details import open_details, source_links
 from .reflist import tag_from_list
 from .tags import save_number, tag_chip, tag_order_dialog, tags_dialog
@@ -1576,6 +1576,7 @@ class StarredView:
                         ).props("flat round dense").tooltip(
                             _("Order the papers of this star list (their numbers)")
                         ).mark(f"starred-order-{tag.id}")
+                        zip_button(period.id, tag.id, rows, f"starred-{tag.id}-")
                 with ui.column().classes("w-full gap-0").mark(f"starred-list-{tag.id}"):
                     if not rows:
                         ui.label(_("No paper in this list yet (★ on a paper).")).classes(
