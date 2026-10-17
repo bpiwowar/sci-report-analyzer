@@ -71,7 +71,14 @@ NAV = (
             ("copy", N_("Copy filters")),
         ),
     ),
-    (N_("AI"), (("llm", N_("Local LLM (Ollama)")), ("career", N_("Reading a career")))),
+    (
+        N_("AI"),
+        (
+            ("llm", N_("Local LLM (Ollama)")),
+            ("career", N_("Reading a career")),
+            ("rewrite", N_("Rewriting the excerpts")),
+        ),
+    ),
     (
         N_("Data"),
         (
@@ -98,6 +105,7 @@ PANELS = {
     "copy": lambda: copy_filters_tab(),
     "llm": lambda: llm_tab(),
     "career": lambda: career_tab(),
+    "rewrite": lambda: rewrite_tab(),
     "data": lambda: data_tab(),
     "io": lambda: io_tab(),
     "shared": lambda: shared_settings.shared_tab(),
@@ -1417,9 +1425,9 @@ def llm_tab() -> None:
     ui.label(suggested("default")).classes("text-xs text-grey-8 max-w-[48rem]").mark(
         "llm-suggested-default"
     )
-    ui.label(_("A task can use another model (its own page, e.g. Reading a career)")).classes(
-        "text-xs text-grey"
-    )
+    ui.label(
+        _("A task can use another model (its own page: Reading a career, Rewriting the excerpts)")
+    ).classes("text-xs text-grey")
     think = (
         ui.switch(_("Let the model think before answering (by default)"), value=st.think)
         .tooltip(
@@ -1429,38 +1437,6 @@ def llm_tab() -> None:
             )
         )
         .mark("llm-think")
-    )
-    ui.label(_("Rewriting the excerpts")).classes("text-lg mt-4")
-    ui.label(
-        _(
-            "A new excerpt reworded (short, impersonal, without its dates) and its years read "
-            "in it and the lines around it, proposed when it is filed. None: only its years, "
-            "found around it."
-        )
-    ).classes("text-sm text-grey-8 max-w-[48rem]")
-    none = {
-        "": _("The general model ({model})").format(model=st.model or _("none")),
-        llm.NONE: _("None (no rewriting)"),
-    }
-
-    def rewrite_options(models: list[str]) -> dict[str, str]:
-        chosen = st.rewrite_model if st.rewrite_model and st.rewrite_model != llm.NONE else ""
-        return {**none, **{m: m for m in sorted({*models, *([chosen] if chosen else [])})}}
-
-    rewrite_model = (
-        ui.select(
-            rewrite_options([]),
-            value=st.rewrite_model,
-            label=_("Model rewriting the excerpts"),
-        )
-        .classes("w-[32rem]")
-        .mark("llm-rewrite-model")
-    )
-    ui.label(
-        _("(or set the {env} environment variable)").format(env=llm.REWRITE_MODEL_ENV)
-    ).classes("text-xs text-grey")
-    ui.label(suggested("rewrite")).classes("text-xs text-grey-8 max-w-[48rem]").mark(
-        "llm-suggested-rewrite"
     )
 
     async def load(notify: bool = False) -> None:
@@ -1474,7 +1450,6 @@ def llm_tab() -> None:
                 ui.notify(message, type="negative")
             return
         model.set_options(models, value=model.value if model.value in models else None)
-        rewrite_model.set_options(rewrite_options(models), value=rewrite_model.value)
         if models:
             message = ngettext(
                 "Ollama is running: {n} model", "Ollama is running: {n} models", len(models)
@@ -1593,7 +1568,7 @@ def llm_tab() -> None:
             embed_model=(embed_model.value or "").strip(),
             cluster_min=max(1, int(cluster_min.value or 1)),
             cluster_max=max(1, int(cluster_max.value or 1)),
-            rewrite_model=rewrite_model.value or "",
+            rewrite_model=llm.stored_settings().rewrite_model,  # (on its own page)
         )
 
     def save() -> bool | None:
@@ -1616,11 +1591,85 @@ def llm_tab() -> None:
         ui.button(_("Save"), on_click=save).mark("llm-save")
 
 
+def llm_off_note(st: llm.OllamaSettings) -> None:
+    """Says that the local LLM is off (a task's page), and where to turn it on."""
+    if st.enabled:
+        return
+    with ui.row().classes("items-center gap-2 no-wrap bg-orange-1 rounded p-2 max-w-[48rem]"):
+        ui.icon("power_off", color="orange-9")
+        ui.label(_("The local LLM is off: nothing below is used until it is on")).classes(
+            "text-sm text-orange-10"
+        )
+        ui.link(_("Turn it on"), "/settings?tab=llm").classes("text-sm").mark("llm-off-link")
+
+
+def rewrite_tab() -> None:
+    """Rewriting the new excerpts with the LLM (see excerpt_rewrite): its model."""
+    st = llm.stored_settings()
+    confidential_note()
+    llm_off_note(llm.settings())
+    ui.label(
+        _(
+            "A new excerpt reworded (short, impersonal, without its dates) and its years read "
+            "in it and the lines around it, proposed when it is filed. None: only its years, "
+            "found around it."
+        )
+    ).classes("text-sm text-grey-8 max-w-[48rem]")
+    none = {
+        "": _("The general model ({model})").format(model=st.model or _("none")),
+        llm.NONE: _("None (no rewriting)"),
+    }
+
+    def rewrite_options(models: list[str]) -> dict[str, str]:
+        chosen = st.rewrite_model if st.rewrite_model and st.rewrite_model != llm.NONE else ""
+        return {**none, **{m: m for m in sorted({*models, *([chosen] if chosen else [])})}}
+
+    rewrite_model = (
+        ui.select(
+            rewrite_options([]),
+            value=st.rewrite_model,
+            label=_("Model rewriting the excerpts"),
+        )
+        .classes("w-[32rem]")
+        .mark("llm-rewrite-model")
+    )
+    ui.label(
+        _("(or set the {env} environment variable)").format(env=llm.REWRITE_MODEL_ENV)
+    ).classes("text-xs text-grey")
+    ui.label(suggested("rewrite")).classes("text-xs text-grey-8 max-w-[48rem]").mark(
+        "llm-suggested-rewrite"
+    )
+
+    async def load() -> None:
+        try:
+            models = await llm.list_models(llm.settings().url)
+        except Exception:
+            return  # (the server not running: the model as saved)
+        rewrite_model.set_options(rewrite_options(models), value=rewrite_model.value)
+
+    ui.timer(0.1, load, once=True)
+
+    def values() -> str:
+        return rewrite_model.value or ""
+
+    def save() -> None:
+        stored = llm.stored_settings()
+        stored.rewrite_model = values()
+        llm.save_settings(stored)
+        ui.notify(_("Saved"), type="positive")
+
+    save = unsaved.track(values, save)
+    with ui.row().classes("gap-2"):
+        unsaved.cancel_button()
+        ui.button(_("Save"), on_click=save).mark("rewrite-save")
+
+
 def career_tab() -> None:
     """Reading a person's career with the LLM (see career_extract): its model, and the words
     finding the pages sent."""
     st = llm.settings()
     confidential_note()
+    llm_off_note(st)
     ui.label(
         _(
             "On a person's Career tab, “Read in their documents”: the local LLM reads the "

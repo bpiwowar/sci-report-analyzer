@@ -148,13 +148,17 @@ def test_fallback(model, response) -> None:
 
 @pytest.mark.nicegui_main_file("tests/app_main.py")
 async def test_settings_page(user: User, model) -> None:
-    """Settings → Local LLM: the model rewriting the excerpts, among the server's (none; by
-    default, the general one)."""
-    await user.open("/settings?tab=llm")
+    """Settings → Rewriting the excerpts: its model, among the server's (none; by default, the
+    general one); the local LLM off: said."""
+    await user.open("/settings?tab=rewrite")
     await user.should_see(marker="llm-rewrite-model")
     select = user.find(marker="llm-rewrite-model").elements.pop()
     assert select.value == "gemma3:4b" and llm.NONE in select.options and "" in select.options
     select.value = llm.NONE
-    user.find(marker="llm-save").click()
+    await user.should_not_see(marker="llm-off-link")
+    user.find(marker="rewrite-save").click()
     await user.should_see("Saved")
     assert llm.stored_settings().rewrite_model == llm.NONE and llm.rewrite_model() == ""
+    llm.save_settings(llm.OllamaSettings(enabled=False))
+    await user.open("/settings?tab=rewrite")
+    await user.should_see(marker="llm-off-link")

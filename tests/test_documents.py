@@ -2305,6 +2305,7 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
     assert user.find(marker="excerpt-start").elements.pop().value == 2019
     assert user.find(marker="excerpt-end").elements.pop().value == 2021
     await user.should_not_see(marker="excerpt-rewrite")
+    await user.should_see(marker="excerpt-rewrite-off")  # (said, with where to turn it on)
     for dlg in user.find(ui.dialog).elements:
         dlg.close()
     await user.should_not_see(marker="excerpt-start")

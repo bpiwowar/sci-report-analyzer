@@ -1441,8 +1441,12 @@ def category_picker(
                 if hint.is_deleted:
                     return
                 hint.clear()
-                if r is None:
-                    hint.set_visibility(False)
+                if r is None:  # (said, not hidden)
+                    with hint:
+                        ui.icon("auto_awesome", size="xs", color="grey-5")
+                        ui.label(_("No rewording: the local AI gave no valid answer")).classes(
+                            "text-xs text-grey"
+                        ).mark("excerpt-rewrite-failed")
                     return
                 with hint:
                     ui.icon("auto_awesome", size="xs", color="primary")
@@ -1463,6 +1467,17 @@ def category_picker(
                     )
 
             background_tasks.create(proposed(), name="excerpt-rewrite")
+        elif properties:  # (no rewriting: said, with where to turn it on)
+            with ui.row().classes("w-full items-center no-wrap gap-1").mark("excerpt-rewrite-off"):
+                ui.icon("auto_awesome", size="xs", color="grey-5")
+                ui.label(
+                    _("No rewording by the local AI: the local LLM is off")
+                    if not llm.settings().enabled
+                    else _("No rewording by the local AI: no model chosen")
+                ).classes("text-xs text-grey-6")
+                ui.link(_("Settings"), "/settings?tab=rewrite", new_tab=True).classes(
+                    "text-xs"
+                ).mark("excerpt-rewrite-settings")
 
         def pick(cat_id: int) -> None:
             side.last_category = cat_id
