@@ -233,6 +233,14 @@ papers the sources miss (by the item's HAL id / DOI, or found on HAL), then put 
 them, or put them in a star list (★, within the period) with their **numbers** in the list.
 The Starred papers tab shows that list's papers in its order (#3 on their chip), and the 🗒
 listing numbers them and ends with the items not found.
+A messy list (lines broken, words cut, items run together, page numbers mixed in): **Read
+with the LLM** (optional, see Local AI below) has the local LLM read it into references
+(title, authors, venue, year, DOI or link), shown each with its title first and matched by
+it; a long list is read in parts, in its order, the part being read shown (Stop: the parts
+not read split by their lines, as without it). A part without a valid answer is split by
+its lines too; a DOI or link the LLM gives that is not in the list is left out. An item read
+is edited by its parts (title, authors, venue, year, DOI). Off (the LLM off, or no model):
+the button is greyed, the dialog says so, with a link to its settings.
 
 **Numbers in a star list** (a paper's place in it): Alt-click a number (`#3` next to the
 list on a paper's row; in its details, where `#` is shown when it has none, a plain click
@@ -536,9 +544,12 @@ brings them back):
   Its “Change LLM” button runs the same rewriting through other models, one after the
   other, their wordings side by side with their time (the first run of a model includes its
   loading); “Keep it” takes one, and can make its model the one rewriting the excerpts.
+- **Reading a list of references**: in “Tag from a list”, “Read with the LLM” reads a pasted
+  list into references (title, authors, venue, year, DOI), matched by their title; a long
+  list in parts.
 
 When the LLM is off (or a task has no model, or gets no valid answer), the task's page and
-the excerpt dialog say so, with a link to turn it on. A folder's settings can use other
+the excerpt dialog and the Tag from a list dialog say so, with a link to turn it on. A folder's settings can use other
 models (their “Models (local AI)” section).
 
 **Backups** of the database (not of the PDFs) are made in `backups/` next to it (Settings →

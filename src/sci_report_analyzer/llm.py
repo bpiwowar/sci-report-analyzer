@@ -40,10 +40,13 @@ REWRITE_MODEL_ENV = "SCI_REPORT_ANALYZER_REWRITE_MODEL"
 API_KEY_ENV = "SCI_REPORT_ANALYZER_LLM_API_KEY"
 NONE = "none"  # (a model: none, e.g. the excerpts not rewritten)
 # The tasks using the LLM: each can have its own model (none: the default one).
-TASKS = {"career": N_("Reading a person's career")}
+TASKS = {
+    "career": N_("Reading a person's career"),
+    "reflist": N_("Reading a list of references"),
+}
 # Whether a task's model thinks by default (none: the general setting); reading a text to
 # extract facts gains little from it, and takes much longer.
-TASK_THINK = {"career": False, "rewrite": False}
+TASK_THINK = {"career": False, "rewrite": False, "reflist": False}
 # The kind of model suggested for a task (and the embeddings), its size first, then examples.
 SUGGESTED = {
     "default": N_(
@@ -59,6 +62,11 @@ SUGGESTED = {
     "rewrite": N_(
         "Suggested: a small instruction model (4–8B), multilingual (French), e.g. qwen3:8b "
         "(without thinking), gemma3:4b."
+    ),
+    "reflist": N_(
+        "Suggested: a small instruction model (4–8B) is enough to copy the parts of the "
+        "references into JSON, e.g. qwen3:8b (without thinking), gemma3:4b; 12–14B if it "
+        "merges or splits references (e.g. gemma3:12b, qwen3:14b)."
     ),
     "embed": N_(
         "Suggested: a multilingual embedding model (French and English), small (0.3–0.6B) and "

@@ -21,6 +21,7 @@ from .. import (
     keys,
     llm,
     pdfs,
+    reflist_read,
     settings_io,
     source_settings,
     venue_match,
@@ -78,6 +79,7 @@ NAV = (
             ("llm", N_("Local LLM")),
             ("career", N_("Reading a career")),
             ("rewrite", N_("Rewriting the excerpts")),
+            ("reflist", N_("Reading a list of references")),
         ),
     ),
     (
@@ -107,6 +109,7 @@ PANELS = {
     "llm": lambda: llm_tab(),
     "career": lambda: career_tab(),
     "rewrite": lambda: rewrite_tab(),
+    "reflist": lambda: reflist_tab(),
     "data": lambda: data_tab(),
     "io": lambda: io_tab(),
     "shared": lambda: shared_settings.shared_tab(),
@@ -1818,6 +1821,46 @@ def career_tab() -> None:
     with ui.row().classes("gap-2"):
         unsaved.cancel_button()
         ui.button(_("Save"), on_click=save).mark("career-save-settings")
+
+
+def reflist_tab() -> None:
+    """Reading a list of references with the LLM (see reflist_read): its model."""
+    st = llm.settings()
+    confidential_note()
+    llm_off_note(st)
+    ui.label(
+        _(
+            "In “Tag from a list”, “Read with the LLM”: the local LLM reads the list (e.g. "
+            "copied from a PDF, its lines broken) into references, their title, authors, "
+            "venue, year and DOI, matched with the papers by their title instead of the "
+            "items split by the lines. A long list is read in parts."
+        )
+    ).classes("text-sm text-grey-8 max-w-[48rem]")
+    task_values = task_model_section("reflist", st.tasks.get("reflist", ""))
+    instructions = prompt_section(
+        "reflist",
+        reflist_read.prompt(),
+        reflist_read.PROMPT,
+        _("Instructions ({text}: a part of the list)"),
+    )
+
+    def values() -> tuple[str, str, str]:
+        return *task_values(), instructions.value or ""
+
+    def save() -> None:
+        chosen, thinking, prompt = values()
+        stored = llm.stored_settings()
+        stored.tasks = {**stored.tasks, "reflist": chosen}
+        stored.tasks = {k: v for k, v in stored.tasks.items() if v}
+        save_task_think(stored, "reflist", thinking)
+        llm.save_settings(stored)
+        reflist_read.save_prompt(prompt)
+        ui.notify(_("Saved"), type="positive")
+
+    save = unsaved.track(values, save)
+    with ui.row().classes("gap-2"):
+        unsaved.cancel_button()
+        ui.button(_("Save"), on_click=save).mark("reflist-save-settings")
 
 
 # ---- venue kinds ---------------------------------------------------------------------------

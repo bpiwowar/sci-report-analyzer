@@ -237,6 +237,14 @@ articles qui manquent aux sources (par l'identifiant HAL / DOI de l'élément, o
 dans une liste étoilée (★, dans la période) avec leurs **numéros** dans la liste. L'onglet Articles
 étoilés affiche les articles de cette liste dans son ordre (#3 sur leur puce), et la liste 🗒 les numérote et
 se termine par les éléments non trouvés.
+Une liste désordonnée (lignes coupées, mots coupés, éléments collés, numéros de page mêlés) : **Lire avec le
+LLM** (facultatif, voir IA locale plus bas) la fait lire par le LLM local en références (titre, auteurs, canal,
+année, DOI ou lien), affichées chacune avec son titre en premier et appariées par celui-ci ; une longue liste
+est lue par parties, dans son ordre, la partie en cours affichée (« Arrêter » : les parties non lues
+découpées par leurs lignes, comme sans lui). Une partie sans réponse valide est aussi découpée par ses lignes ;
+un DOI ou un lien donné par le LLM qui n'est pas dans la liste est écarté. Un élément lu se modifie par ses
+parties (titre, auteurs, canal, année, DOI). Désactivé (le LLM désactivé, ou pas de modèle) : le bouton est
+grisé, la fenêtre le dit, avec un lien vers ses réglages.
 
 **Numéros dans une liste étoilée** (la place d'un article dans celle-ci) : Alt-cliquez
 sur un numéro (`#3` à côté de la liste sur la ligne d'un article ; dans ses détails, où `#`
@@ -537,9 +545,12 @@ réfléchit (« Par défaut » : non ; « Réfléchit » ; « Ne réflé
   Son bouton « Changer de LLM » fait la même réécriture avec d'autres modèles, l'un après l'autre, leurs
   formulations côte à côte avec leur durée (le premier passage d'un modèle compte son chargement) ; « Garder »
   en prend une, et peut faire de son modèle celui qui réécrit les extraits.
+- **Lecture d'une liste de références** : dans « Étiqueter à partir d'une liste », « Lire avec le
+  LLM » lit une liste collée en références (titre, auteurs, canal, année, DOI), appariées par leur titre ; une
+  longue liste par parties.
 
 Quand le LLM est désactivé (ou qu'une tâche n'a pas de modèle, ou n'obtient pas de réponse valide), la page de la
-tâche et la fenêtre de l'extrait le disent, avec un lien pour l'activer. Les réglages d'un dossier peuvent
+tâche, la fenêtre de l'extrait et celle d'Étiqueter à partir d'une liste le disent, avec un lien pour l'activer. Les réglages d'un dossier peuvent
 utiliser d'autres modèles (leur section « Modèles (IA locale) »).
 
 Des **sauvegardes** de la base de données (pas des PDF) sont faites dans `backups/` à côté de celle-ci (Paramètres →
