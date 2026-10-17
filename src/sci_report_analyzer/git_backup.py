@@ -215,7 +215,7 @@ def _read_index(repo: Path) -> dict[str, str]:
 
 def _write_index(repo: Path, entries: dict[str, str]) -> None:
     data = {"version": 1, "entries": dict(sorted(entries.items()))}
-    (repo / INDEX).write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", "utf-8")
+    (repo / INDEX).write_text(_json(data), "utf-8")
 
 
 def _relocate(repo: Path, now: dict[str, str]) -> list[tuple[str, str]]:
@@ -318,8 +318,38 @@ def row(obj: Any, *skip: str) -> dict[str, Any]:
     }
 
 
+_WIDTH = 100  # (a list or object of plain values on one line, if it fits)
+
+
 def _json(data: Any) -> str:
-    return json.dumps(data, indent=1, ensure_ascii=False, sort_keys=False) + "\n"
+    """JSON as stable as can be from a backup to the next (a change: a few lines changed,
+    not the whole file): keys sorted, an item a line, a list or object of plain values
+    (an excerpt's rectangles, a person's aliases…) on one line when short enough."""
+    return _format(data, 0) + "\n"
+
+
+def _plain(v: Any) -> bool:
+    return not isinstance(v, dict | list) or not v
+
+
+def _format(v: Any, depth: int) -> str:
+    if _plain(v):
+        return json.dumps(v, ensure_ascii=False, sort_keys=True)
+    pad, inner = "  " * depth, "  " * (depth + 1)
+    if isinstance(v, dict):
+        items = [
+            f"{json.dumps(str(k), ensure_ascii=False)}: {_format(v[k], depth + 1)}"
+            for k in sorted(v, key=str)
+        ]
+        opening, closing = "{", "}"
+    else:
+        items = [_format(x, depth + 1) for x in v]
+        opening, closing = "[", "]"
+    if all(_plain(x) for x in (v.values() if isinstance(v, dict) else v)):
+        line = opening + ", ".join(items) + closing
+        if len(pad) + len(line) <= _WIDTH and "\n" not in line:
+            return line
+    return opening + "\n" + ",\n".join(inner + i for i in items) + "\n" + pad + closing
 
 
 def _paper(p: Publication | None) -> dict[str, Any] | None:
@@ -384,13 +414,9 @@ def folder_files(folder_id: int) -> Files:
         st = s.get(FolderSettings, sid)
         paths = _category_paths(s, sid)
         cats = list(
-            s.scalars(
-                select(Category)
-                .where(Category.settings_id == sid)
-                .order_by(Category.parent_id, Category.position, Category.id)
-            )
+            s.scalars(select(Category).where(Category.settings_id == sid).order_by(Category.id))
         )
-        tags = list(s.scalars(select(Tag).where(Tag.settings_id == sid).order_by(Tag.position)))
+        tags = list(s.scalars(select(Tag).where(Tag.settings_id == sid).order_by(Tag.id)))
         out.texts["folder.json"] = _json(
             {
                 "folder": row(f),
@@ -400,12 +426,13 @@ def folder_files(folder_id: int) -> Files:
             }
         )
         if (f.notes or "").strip():
-            out.texts["notes.md"] = f.notes if f.notes.endswith("\n") else f.notes + "\n"
+            out.texts["notes.md"] = _text(f.notes)
     return out
 
 
 def _text(t: str | None) -> str:
-    t = t or ""
+    """A text as written: its line endings "\\n", ending with one."""
+    t = (t or "").replace("\r\n", "\n").replace("\r", "\n")
     return t if not t or t.endswith("\n") else t + "\n"
 
 
@@ -423,7 +450,11 @@ def period_files(period_id: int, report: str | None) -> Files:
         paths = _category_paths(s, sid) if sid else {}
         pubs = {
             x.id: x
-            for x in s.scalars(select(Publication).where(Publication.person_id == person.id))
+            for x in s.scalars(
+                select(Publication)
+                .where(Publication.person_id == person.id)
+                .order_by(Publication.id)
+            )
         }
         docs = list(
             s.scalars(
@@ -446,7 +477,7 @@ def period_files(period_id: int, report: str | None) -> Files:
             s.scalars(
                 select(Excerpt)
                 .where(Excerpt.period_id == p.id)
-                .order_by(Excerpt.position, Excerpt.id)
+                .order_by(Excerpt.id)  # (moved: only its position changes)
             )
         )
         out.texts["excerpts.json"] = _json(
@@ -454,16 +485,34 @@ def period_files(period_id: int, report: str | None) -> Files:
                 {
                     **row(e),
                     "category": paths.get(e.category_id),
-                    "tags": [t.name for t in e.tags],
+                    "tags": sorted(t.name for t in e.tags),
                     "document": doc_files.get(e.document_id),
                     "paper": _paper(pubs.get(e.publication_id)),
                 }
                 for e in excerpts
             ]
         )
-        tags = list(s.scalars(select(PeriodTag).where(PeriodTag.period_id == p.id)))
-        notes = list(s.scalars(select(PeriodNote).where(PeriodNote.period_id == p.id)))
-        texts = list(s.scalars(select(SectionText).where(SectionText.period_id == p.id)))
+        tags = list(
+            s.scalars(
+                select(PeriodTag)
+                .where(PeriodTag.period_id == p.id)
+                .order_by(PeriodTag.publication_id, PeriodTag.tag_id)
+            )
+        )
+        notes = list(
+            s.scalars(
+                select(PeriodNote)
+                .where(PeriodNote.period_id == p.id)
+                .order_by(PeriodNote.publication_id)
+            )
+        )
+        texts = list(
+            s.scalars(
+                select(SectionText)
+                .where(SectionText.period_id == p.id)
+                .order_by(SectionText.category_id)
+            )
+        )
         out.texts["period.json"] = _json(
             {
                 "period": row(p, "notes"),
@@ -494,7 +543,7 @@ def period_files(period_id: int, report: str | None) -> Files:
                         **_paper(x),
                         **{k: _value(getattr(x, k)) for k in _MANUAL},
                         "venue": x.venue.name if x.venue_manual and x.venue else None,
-                        "tags": [t.name for t in x.tags],
+                        "tags": sorted(t.name for t in x.tags),
                     }
                     for x in pubs.values()
                     if _manual(x)

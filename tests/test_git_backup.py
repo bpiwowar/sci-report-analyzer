@@ -168,3 +168,39 @@ async def test_settings_and_button(user: User, tmp_path) -> None:
     await user.should_see("Last backup:", marker="backup-status")
     git_backup.wait()
     git_backup.uninstall()
+
+
+def test_json_stable() -> None:
+    """Keys sorted, an item a line, short lists of plain values on one line."""
+    out = git_backup._json({"b": [1, 2], "a": {"rects": [[0.1, 0.2], [0.3, 0.4]], "x": None}})
+    assert out == (
+        "{\n"
+        '  "a": {\n'
+        '    "rects": [\n'
+        "      [0.1, 0.2],\n"
+        "      [0.3, 0.4]\n"
+        "    ],\n"
+        '    "x": null\n'
+        "  },\n"
+        '  "b": [1, 2]\n'
+        "}\n"
+    )
+    assert git_backup._json([]) == "[]\n"
+    long = ["a" * 60, "b" * 60]
+    assert git_backup._json(long).count("\n") == 4  # (too long: a line each)
+
+
+async def test_small_diffs(repo) -> None:
+    """An excerpt changed, another moved: a few lines of excerpts.json, the rest kept."""
+    _outer, inner, _pid, period = _seed()
+    cat = categories.add(inner, "Teaching")
+    other = categories.add_excerpt(cat, period, "Taught a course.", 2, [[1, 2, 3, 4]])
+    await git_backup.backup()
+    categories.update_excerpt(other, start=2022)
+    folders.set_notes(period, "Strong candidate.\r\nVery strong.")
+    await git_backup.backup()
+    person = "Hiring 2026/Lecturers/Ann Example"
+    stat = run(repo, "show", "--numstat", "--format=", "HEAD", "--", f"{person}/excerpts.json")
+    added, removed, _path = stat.split("\t")
+    assert int(added) == int(removed) == 1  # (its start year only)
+    assert (repo / person / "notes.md").read_bytes() == b"Strong candidate.\nVery strong.\n"
