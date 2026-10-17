@@ -29,6 +29,14 @@ from sci_report_analyzer.documents import selection_context
         ("ISBN 978-2026-1234", None),
         ("120260 and 3.2026 and 2,2026", None),
         ("In 1850", None),
+        # Open: its end none.
+        ("Leads a team (2024-)", (2024, None)),
+        ("Leads a team, 2024-...", (2024, None)),
+        ("2024–… : head of", (2024, None)),
+        ("Since 2024 - present.", (2024, None)),
+        ("de 2024 à aujourd'hui", (2024, 2024)),  # (not after a dash: its year)
+        ("2024-05 and on", (2024, 2024)),  # (a month: its year)
+        ("pp. 2024-", None),
     ],
 )
 def test_detect_years(text, years):
@@ -51,6 +59,9 @@ def test_detect_years(text, years):
         ("Led a project 2016-2032.", (2016, 2032), "Led a project 2016-2032."),
         ("2016-32:", (2016, 2032), "2016-32:"),  # (nothing else)
         ("No year", None, "No year"),
+        ("Leads a team (2024-)", (2024, None), "Leads a team"),
+        ("Leads a team: 2024-...", (2024, None), "Leads a team"),
+        ("2024 – present: Leads a team", (2024, None), "Leads a team"),
     ],
 )
 def test_split_years(text, years, rest):

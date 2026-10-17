@@ -49,13 +49,18 @@ _RANGE = re.compile(
     r"((?:19|20)\d\d|\d\d)(?!\d|[-/.,]\d)",
     re.IGNORECASE,
 )
+# What leaves a range open after its dash ("2024-", "2024–…", "2024 - present").
+_NOW = r"(?:\.{2,}|…|present|now|today|ongoing|aujourd['’]hui|présent|en cours)"
+# An open range: a year, a dash, then nothing (but its ending, "…", "present"…).
+_OPEN = re.compile(_YEAR + rf"\s*[-–—]\s*{_NOW}?(?=\s*(?:[)\]:;,]|\.(?:\s|$)|$))", re.IGNORECASE)
 _PAGES = re.compile(r"\b(?:pp?|pages?)\.?\s*$", re.IGNORECASE)
 
 
-def detect_years(text: str) -> tuple[int, int] | None:
+def detect_years(text: str) -> tuple[int, int | None] | None:
     """The years a passage is about, as (start, end): its first range ("2026-2032",
     "2026–2032", "2026 - 2032", "2026/2027", "2026 to 2032", "de 2026 à 2032"; short:
-    "2026-32" is 2026–2032, "1998-03" 1998–2003), else the span of its years ("2026": 2026–2026;
+    "2026-32" is 2026–2032, "1998-03" 1998–2003; open, its end none: "2024-", "(2024-)",
+    "2024-...", "2024 – present"), else the span of its years ("2026": 2026–2026;
     "in 2019, then 2023": 2019–2023), else None. Years are 1900–2099 (a range's end not
     before its start, a short end only right after a dash or slash); not part of a longer
     number, a decimal, a date ("2026-05-12": 2026 alone) or a DOI, nor page numbers
@@ -67,7 +72,17 @@ def detect_years(text: str) -> tuple[int, int] | None:
 
 
 def _ranges(text: str):
-    """The ranges of a text (see detect_years): their start, end and years."""
+    """The ranges of a text (see detect_years), in order: their start, end and years."""
+    return iter(sorted([*_closed(text), *_open(text)]))
+
+
+def _open(text: str):
+    for m in _OPEN.finditer(text):
+        if not _PAGES.search(text[: m.start()]):
+            yield m.start(), m.end(), (int(m[1]), None)
+
+
+def _closed(text: str):
     for m in _RANGE.finditer(text):
         a, sep, b = int(m[1]), m[2], int(m[3])
         if len(m[3]) == 2:
@@ -91,7 +106,7 @@ def _singles(text: str):
 _JOINED = re.compile(r"^[\s,]*(?:(?:and|et|or|ou|&|then|puis)[\s,]*)*$", re.IGNORECASE)
 
 
-def _expressions(text: str) -> list[tuple[int, int, tuple[int, int]]]:
+def _expressions(text: str) -> list[tuple[int, int, tuple[int, int | None]]]:
     """The dates of a text, in order (start, end, years): its ranges, and its years (those
     joined by "and", "et", a comma…: one, their span; "entre 2019 et 2021": 2019–2021)."""
     ranges = list(_ranges(text))
@@ -100,7 +115,7 @@ def _expressions(text: str) -> list[tuple[int, int, tuple[int, int]]]:
         if not any(s <= a < e for s, e, _y in ranges):
             out.append((a, b, (y, y)))
     out.sort()
-    merged: list[tuple[int, int, tuple[int, int]]] = []
+    merged: list[tuple[int, int, tuple[int, int | None]]] = []
     for a, b, y in out:
         if (
             merged
@@ -123,7 +138,7 @@ CONTEXT_LINES = 5  # lines before a passage, at most, where its years are looked
 
 def context_years(
     text: str, before: str, after: str, *, lines: int = CONTEXT_LINES
-) -> tuple[int, int] | None:
+) -> tuple[int, int | None] | None:
     """The years of a passage (see detect_years); none in it, those of its context: the
     text ``before`` and ``after`` it (around it in its PDF, its lines separated by "\n"),
     the nearest date there: in its sentence (before it, then after it: "Entre 2019 et
@@ -154,7 +169,7 @@ def context_years(
 # colon) or ending it (after a colon, a dash, or in brackets).
 _EXPR = (
     r"(?:19|20)\d\d(?:(?:\s*[-–—/]\s*|\s+(?:to|until|till|à|au|jusqu'en|jusqu’en)\s+)"
-    r"(?:(?:19|20)\d\d|\d\d))?"
+    rf"(?:(?:19|20)\d\d|\d\d)|\s*[-–—](?:\s*{_NOW})?)?"
 )
 _LEADING = re.compile(rf"^\s*(?:(?:from|de|du)\s+)?({_EXPR})\s*:\s*", re.IGNORECASE)
 _TRAILING = re.compile(
@@ -162,7 +177,7 @@ _TRAILING = re.compile(
 )
 
 
-def split_years(text: str) -> tuple[tuple[int, int] | None, str]:
+def split_years(text: str) -> tuple[tuple[int, int | None] | None, str]:
     """The years of a passage (see detect_years) and its text without them when they lead
     it, with a colon ("2026-32: Led a project" → "Led a project"), or end it after a colon,
     a dash or in brackets ("Led a project: 2026-32." → "Led a project."; the years leading
