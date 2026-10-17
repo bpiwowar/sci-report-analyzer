@@ -333,11 +333,51 @@ def _page_chips(found: list[career_extract.Passage], mark: str) -> None:
 
 _SENT = "text-xs font-mono whitespace-pre-wrap bg-grey-2 rounded p-2 w-full overflow-auto"
 # Draws a page of a PDF in a canvas, small (with PDF.js, as the viewer; one at a time; the
-# canvas waited for, up to 5 s).
+# canvas waited for, up to 5 s); hovered, the page larger beside it.
 _THUMBS_JS = """
 window.sraThumb = window.sraThumb || (() => {
-  const docs = {};
-  let queue = Promise.resolve(), lib;
+  const docs = {}, large = {}, ZOOM = 640;
+  let queue = Promise.resolve(), lib, box, shown = 0, watch;
+  const hide = () => {
+    shown++;
+    clearInterval(watch);
+    if (box) box.style.display = 'none';
+  };
+  const render = async (url, page, width, canvas) => {
+    const p = await (await docs[url]).getPage(page);
+    const scale = width * devicePixelRatio / p.getViewport({scale: 1}).width;
+    const viewport = p.getViewport({scale});
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await p.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+    return canvas;
+  };
+  const zoom = async (el, url, page) => {
+    const mine = ++shown;
+    if (!box) {
+      box = document.createElement('canvas');
+      box.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;display:none;' +
+        'background:white;border-radius:4px;box-shadow:0 4px 24px rgba(0,0,0,.35)';
+      document.body.appendChild(box);
+    }
+    const key = url + '#' + page;
+    large[key] = large[key] || render(url, page, ZOOM, document.createElement('canvas'));
+    const c = await large[key];
+    if (mine !== shown || !el.isConnected) return;
+    box.width = c.width;
+    box.height = c.height;
+    box.getContext('2d').drawImage(c, 0, 0);
+    const w = Math.min(ZOOM, (innerHeight - 16) * c.width / c.height), h = w * c.height / c.width;
+    const r = el.getBoundingClientRect();
+    let left = r.right + 12;
+    if (left + w > innerWidth - 8) left = Math.max(8, r.left - w - 12);
+    const top = Math.max(8, Math.min(r.top + r.height / 2 - h / 2, innerHeight - h - 8));
+    Object.assign(box.style, {
+      width: w + 'px', height: h + 'px', left: left + 'px', top: top + 'px', display: 'block',
+    });
+    clearInterval(watch);  // (the dialog closed, the page changed: no mouseleave)
+    watch = setInterval(() => el.isConnected || hide(), 300);
+  };
   return (id, url, page) => {
     queue = queue.then(async () => {
       if (!lib) {
@@ -349,14 +389,10 @@ window.sraThumb = window.sraThumb || (() => {
         await new Promise(resolve => setTimeout(resolve, 50));
       if (!canvas) return;
       docs[url] = docs[url] || lib.getDocument({url}).promise;
-      const p = await (await docs[url]).getPage(page);
-      const width = (canvas.clientWidth || 184) * devicePixelRatio;
-      const scale = width / p.getViewport({scale: 1}).width;
-      const viewport = p.getViewport({scale});
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      await render(url, page, canvas.clientWidth || 184, canvas);
       canvas.style.aspectRatio = 'auto';
-      await p.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+      canvas.addEventListener('mouseenter', () => zoom(canvas, url, page).catch(hide));
+      canvas.addEventListener('mouseleave', hide);
     }).catch(e => console.warn('thumbnail', e));
   };
 })();
