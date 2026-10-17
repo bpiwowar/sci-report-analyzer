@@ -343,8 +343,9 @@ le dernier), ✕ pour en fermer un (de la vue seulement : rien n'est supprimé)
 redimensionner. Ils restent ouverts pour la personne (et dans l'adresse) jusqu'à leur fermeture. Chacun a l'en-tête de
 la visionneuse (son ↗ l'ouvre dans une fenêtre à part) et son panneau latéral, masqué : pendant ce temps, les notes et
 extraits de la page sont les siens, Q citant dans les notes (l'onglet Rapport), E classant la sélection (l'onglet
-Extraits), un extrait cliqué sur ses pages sélectionné dans l'onglet Extraits, et un extrait cliqué là montré sur sa
-page.
+Extraits), F trouvant l'article de la sélection et L marquant les articles d'une liste (depuis l'onglet Rapport), B
+ajoutant un signet à l'endroit lu, un extrait cliqué sur ses pages sélectionné dans l'onglet Extraits, et un extrait
+cliqué là montré sur sa page. Un document renommé depuis son titre (double-clic) l'est aussi dans le bandeau.
 
 **Documents** (onglet Rapport de la personne, menu « Documents ») : PDF concernant la personne au sein d'un dossier ou
 d'une période (un dossier de candidature, un CV…), téléversés là et lus dans la même visionneuse (annotations, signets,
