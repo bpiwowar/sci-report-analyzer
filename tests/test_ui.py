@@ -1026,6 +1026,25 @@ async def test_settings_search(user: User) -> None:
     assert tags_header.visible
 
 
+async def test_categories_copied_from_other_settings(user: User) -> None:
+    """ "Copy those of": the other settings with categories (not folders), theirs added."""
+    from sci_report_analyzer import categories, folders
+
+    fid = folders.save_folder(None, "Committee")
+    other = folders.create_settings("Other grid")
+    categories.add(folders.SettingsRef(other), "Teaching")
+    folders.create_settings("Empty grid")
+    await user.open("/settings?tab=folders")
+    user.find(marker=f"settings-edit-{folders.default_settings()}").click()
+    await user.should_see(marker="category-copy-from")
+    source = user.find(marker="category-copy-from").elements.pop()
+    assert source.options == {other: "Other grid"}
+    source.value = other
+    user.find(marker="category-copy").click()
+    await user.should_see("1 category copied")
+    assert [n.name for n in categories.tree(fid)] == ["Teaching"]
+
+
 async def test_folder_notes_without_a_document(user: User) -> None:
     from sci_report_analyzer import categories, folders
 
