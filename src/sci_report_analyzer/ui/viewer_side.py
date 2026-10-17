@@ -1047,8 +1047,11 @@ def excerpt_properties(
     cleared: Callable[[], None] | None = None,
     folder_id: int | None = None,
     level: str | None = None,
+    punctual: bool = False,
+    in_period: bool = False,
 ) -> Callable[[], dict]:
-    """The fields of an excerpt's years (a button clears them, then calls ``cleared``),
+    """The fields of an excerpt's years (a button clears them, then calls ``cleared``), whether
+    it is a one-off event or within the person's period (not both: one on, the other off),
     markers (see MARKER_ICONS), level (one of the folder's, see reports.levels; none: its
     default) and tags (those of papers and excerpts, or new ones typed); returns their values
     (the keywords of categories.add_excerpt / update_excerpt; its ``set_years``, a function
@@ -1068,6 +1071,26 @@ def excerpt_properties(
         ui.button(icon="event_busy", on_click=clear).props("flat dense round size=sm").classes(
             "-ml-1"
         ).tooltip(_("Clear the years")).mark("excerpt-years-clear")
+    with ui.row().classes("items-center gap-x-4 gap-y-0 -mt-2"):
+        punctual_in = (
+            ui.switch(_("One-off event"), value=punctual)
+            .props("dense")
+            .tooltip(_("A single moment, no duration: a dot on the timeline, at its first year"))
+            .mark("excerpt-punctual")
+        )
+        in_period_in = (
+            ui.switch(_("Within the period"), value=in_period and not punctual)
+            .props("dense")
+            .tooltip(
+                _(
+                    "No precise date: sometime within the person's period in the folder (along "
+                    "it on the timeline, dotted; its own years, if set)"
+                )
+            )
+            .mark("excerpt-in-period")
+        )
+    punctual_in.on_value_change(lambda e: e.value and in_period_in.set_value(False))
+    in_period_in.on_value_change(lambda e: e.value and punctual_in.set_value(False))
     on = {"salient": salient, "influence": influence, "minor": minor, "caveat": caveat}
     marker_in = MarkerBadges(next((k for k, v in on.items() if v), "")).classes("-mt-2")
     level_in = LevelBadges(folder_id, level).classes("-mt-2")
@@ -1093,6 +1116,8 @@ def excerpt_properties(
             **{k: k == marker_in.value for k in MARKER_ICONS},
             "tags": list(tags_in.value or []),
             "level": level_in.value or None,
+            "punctual": bool(punctual_in.value),
+            "in_period": bool(in_period_in.value),
         }
 
     def set_years(start: int | None, end: int | None) -> None:
@@ -2432,6 +2457,8 @@ def excerpt_dialog(
                     caveat=e.caveat,
                     folder_id=side.folder[0] if side.folder else None,
                     level=e.level,
+                    punctual=e.punctual,
+                    in_period=e.in_period,
                 )
             with ui.tab_panel("move").classes("p-1 gap-2"):
                 path = next(

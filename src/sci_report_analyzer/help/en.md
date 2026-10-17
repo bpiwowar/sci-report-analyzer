@@ -459,7 +459,7 @@ its name above it; the **PhD students** they supervised, each a bar from the the
 to its defence (in progress: up to now), the student's name above it; overlapping bars one
 above the other. Their **excerpts** in the folder, a row for each main category (in their
 category's colour): the beginning of their text above a thin bar along their years (a single
-year: that one); their **papers**: a small bar a year, as high as their number (their titles
+year: that one; since a year, without an end: up to now, fading, as a current position; a **one-off event**, a switch of its dialog: a dot in the middle of its year, never continuing; **within the period**, its other switch, for an excerpt without a precise date: along the person's period in the folder, or its own years if it has some, dotted and lighter, said “within the period (2020–2024)” in the details; one switch on turns the other off; without years of its own, placed along the period, unless the period has none either, said so, listed without years; the legend shows both looks); their **papers**: a small bar a year, as high as their number (their titles
 hovered). Hovered, a bar tells all about it. Clicked, what it is is shown below the
 timeline: a line of the career or a PhD student, with **Edit** (its dialog: the timeline
 drawn again) and a button to its tab; an excerpt, or a year (its excerpts), where an excerpt

@@ -83,6 +83,11 @@ body.body--dark .vr-tl { --tl-bg:var(--q-dark); --tl-line:rgba(160,170,180,.2);
 .vr-tl-item:hover .vr-tl-bar, .vr-tl-item.picked .vr-tl-bar {
   box-shadow:0 0 0 2px color-mix(in srgb, var(--c) 40%, transparent); }
 .vr-tl-item.paper .vr-tl-bar { background:transparent; border:1.5px solid var(--c); }
+.vr-tl-item.dot .vr-tl-bar, .vr-tl-dot { height:9px !important; width:9px; border-radius:50%;
+  background:var(--c); }
+.vr-tl-item.approx .vr-tl-bar, .vr-tl-approx { height:5px; opacity:.6; border-radius:0;
+  background:repeating-linear-gradient(to right, var(--c) 0 5px, transparent 5px 9px); }
+.vr-tl-item.approx.now .vr-tl-bar { mask-image:linear-gradient(to right, #000 65%, transparent); }
 .vr-tl-papers { z-index:2; height:2.3rem; display:flex; flex-direction:column;
   align-items:center; justify-content:flex-end; padding-top:.2rem; }
 .vr-tl-papers .n { font-size:.6rem; line-height:.75rem; color:#8c959f; }
@@ -136,12 +141,17 @@ window.vrTimelineZoom = (z) => {
 @dataclass
 class _Span:
     """An excerpt (``d``) on the timeline, along its years (one: that year); ``lane``: its row
-    (see timeline.lanes)."""
+    (see timeline.lanes); ``now``: still going on (to this year, fading); ``dot``: a moment
+    (a one-off event), in the middle of its year; ``approx``: sometime within them (within
+    the person's period: dotted, lighter)."""
 
     d: categories.Dated
     first: int
     last: int
     lane: int = 0
+    now: bool = False
+    dot: bool = False
+    approx: bool = False
 
 
 @dataclass
@@ -154,14 +164,42 @@ class _Acts:
     edit: Callable[[categories.ExcerptView], Awaitable[None] | None]
     select: Callable[[int], None]
     on_timeline: Callable[[categories.ExcerptView, bool], None]
+    within: tuple[int | None, int | None] = (None, None)  # (the years of the person's period)
 
 
-def _spanned(d: categories.Dated) -> _Span:
-    """An excerpt along its years (without both: at its year)."""
+def _spanned(d: categories.Dated, this_year: int) -> _Span:
+    """An excerpt along its years: since one (not a one-off event), up to this year; a
+    one-off event, a dot at its year (its first one); without years of its own, along the
+    person's period (within it), else at its paper's year."""
     e = d.excerpt
-    if d.paper_year or not (e.start_year and e.end_year):
+    if d.period:
+        first = d.period[0] or d.period[1] or this_year
+        return _Span(
+            d, first, d.period[1] or max(first, this_year), now=not d.period[1], approx=True
+        )
+    a, b = e.start_year, e.end_year
+    if d.paper_year or not (a or b):
         return _Span(d, d.year, d.year)
-    return _Span(d, min(e.start_year, e.end_year), max(e.start_year, e.end_year))
+    if e.punctual:
+        return _Span(d, d.year, d.year, dot=True)
+    if a and b:
+        return _Span(d, min(a, b), max(a, b), approx=e.in_period)
+    if a and a < this_year:  # (still going on)
+        return _Span(d, a, this_year, now=True, approx=e.in_period)
+    return _Span(d, d.year, d.year, approx=e.in_period)
+
+
+def _when(e: categories.ExcerptView, within: tuple[int | None, int | None]) -> str:
+    """Its years, as said: since one (still going on), a one-off event's year; within the
+    person's period (``within``: its years), its own ones, else the period's (said if none)."""
+    if e.in_period:
+        years = e.years or categories.years_label(*within)
+        if not years:
+            return _("within the period (its years not set)")
+        return _("within the period ({years})").format(years=years)
+    if e.punctual:
+        return str(e.start_year or e.end_year or "")
+    return e.years
 
 
 def timeline_view(
@@ -213,7 +251,7 @@ def _view(
     papers = tl.papers_by_year(person_id)
     nodes = categories.tree(period.folder.id)
     paths = {n.id: n.path for n in nodes}
-    excerpts = [_spanned(d) for _y, items in dated for d in items]
+    excerpts = [_spanned(d, date.today().year) for _y, items in dated for d in items]
     shown, picked, filters = state["shown"], state["picked"], state["filters"]
     levels, default = reports.level_tags(period.folder.id)
     counts = {
@@ -242,7 +280,13 @@ def _view(
             picked.clear()
         rebuild()
 
-    acts = _Acts(show, lambda e: edit(e, rebuild), select, on_timeline)
+    acts = _Acts(
+        show,
+        lambda e: edit(e, rebuild),
+        select,
+        on_timeline,
+        (period.start_year, period.end_year),
+    )
 
     def on() -> dict[str, bool]:
         return {k: bool(v and counts[k]) for k, v in shown.items()}
@@ -456,6 +500,13 @@ def _legend(
                         years=categories.years_label(period.start_year, period.end_year)
                     )
                 ).classes("text-sm text-grey")
+        if counts["excerpts"]:  # (the looks of the excerpts' dates)
+            with ui.row().classes("items-center gap-1 no-wrap").mark("timeline-legend-dot"):
+                ui.element("span").classes("vr-tl-dot inline-block").style("--c:#8c959f")
+                ui.label(_("one-off event")).classes("text-sm text-grey")
+            with ui.row().classes("items-center gap-1 no-wrap").mark("timeline-legend-approx"):
+                ui.element("span").classes("vr-tl-approx inline-block w-6").style("--c:#57606a")
+                ui.label(_("within the period (no precise date)")).classes("text-sm text-grey")
     missing = {
         "career": _(
             "No line in their career yet: add their positions and diplomas in the Profile "
@@ -672,10 +723,12 @@ def _bar(
     text: str,
     mark: str,
     classes: str = "",
+    dot: float | None = None,
 ) -> ui.element:
     """A span (``sp``: its ``first``, ``last`` years, its ``lane``; see timeline.bounds) in
     its row's lane, over the years it is in: its ``text`` (as far as ``end``, where the next
-    one in its lane begins) above its bar along its time (``now``: still going on)."""
+    one in its lane begins) above its bar along its time (``now``: still going on); ``dot``:
+    a moment instead (where, in years: e.g. the middle of one), a dot there."""
     begin, stop = tl.bounds(sp)
     cell = max(sp.last + 1, math.ceil(end - 1e-9))  # (the year its cell ends at, excluded)
     span = cell - sp.first
@@ -692,9 +745,15 @@ def _bar(
         ui.label(text).classes("vr-tl-text").style(
             f"margin-left:{pct(begin - sp.first)};max-width:{pct(end - begin)}"
         )
-        ui.element("div").classes("vr-tl-bar").style(
-            f"margin-left:{pct(begin - sp.first)};width:{pct(stop - begin)}"
-        )
+        if dot is not None:
+            ui.element("div").classes("vr-tl-bar").style(
+                f"margin-left:calc({pct(dot - sp.first)} - 4.5px)"
+            )
+            item.classes(add="dot")
+        else:
+            ui.element("div").classes("vr-tl-bar").style(
+                f"margin-left:{pct(begin - sp.first)};width:{pct(stop - begin)}"
+            )
     return item
 
 
@@ -775,20 +834,37 @@ def _excerpt(
     pick: Callable[..., None],
 ) -> ui.element:
     """An excerpt: the beginning of its text above a thin bar along its years (a single
-    one: that year; at its paper's: hollow), clicked shown below."""
+    one: that year; at its paper's: hollow; within the period: dotted; since a year: up to
+    now, fading), or a dot (a one-off event); clicked shown below."""
     e = x.d.excerpt
     classes = (
         " thin"
         + (" paper" if x.d.paper_year else "")
+        + (" approx" if x.approx else "")
         + (" off" if e.discarded else "")
         + (" picked" if picked.get("excerpt") == e.id else "")
     )
-    item = _bar(e.colour, x, row, col, end, False, e.quoted, f"timeline-span-{e.id}", classes)
+    item = _bar(
+        e.colour,
+        x,
+        row,
+        col,
+        end,
+        x.now,
+        e.quoted,
+        f"timeline-span-{e.id}",
+        classes,
+        dot=x.first + 0.5 if x.dot else None,
+    )
     item.on("click", lambda: pick("excerpt", e.id))
     with item, ui.tooltip().classes("max-w-sm"):
-        ui.label(
-            _("the paper's year ({year})").format(year=x.first) if x.d.paper_year else e.years
-        ).classes("font-medium")
+        if x.d.paper_year:
+            when = _("the paper's year ({year})").format(year=x.first)
+        else:
+            when = _when(e, x.d.period or (None, None))
+        if e.punctual:
+            when += f" · {_('one-off event')}"
+        ui.label(when).classes("font-medium")
         ui.label(e.quoted).classes("line-clamp-4")
     return item
 
@@ -905,7 +981,9 @@ def _details(
             )
         else:
             found = [x for x in excerpts if x.d.excerpt.id == picked.get("excerpt")]
-            title = _("An excerpt, {years}").format(years=found[0].d.excerpt.years if found else "")
+            title = _("An excerpt, {years}").format(
+                years=_when(found[0].d.excerpt, acts.within) if found else ""
+            )
         with ui.row().classes("items-center gap-2 w-full"):
             ui.icon("format_quote", color="primary")
             ui.label(title).classes("font-medium")
@@ -1015,8 +1093,12 @@ def _item(
                 ui.badge(_("the paper's year"), color="grey").props("outline").tooltip(
                     _("No years of its own: placed at the year of its paper")
                 ).mark(f"timeline-paper-year-{e.id}")
-            elif e.years:
-                ui.badge(e.years, color="blue-grey").props("outline").mark(f"timeline-years-{e.id}")
+            elif when := _when(e, acts.within):
+                ui.badge(when, color="blue-grey").props("outline").mark(f"timeline-years-{e.id}")
+            if e.punctual:
+                ui.badge(_("one-off event"), color="blue-grey").props("outline").mark(
+                    f"timeline-punctual-{e.id}"
+                )
             for key, (label, _tip, icon, colour) in MARKER_ICONS.items():
                 if getattr(e, key):
                     ui.icon(icon, size="xs", color=colour).tooltip(_(label))

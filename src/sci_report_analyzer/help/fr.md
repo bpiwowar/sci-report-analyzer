@@ -466,7 +466,7 @@ CV en barre le long de sa durée, au mois près quand ses dates le donnent (un p
 s'estompant), son nom au-dessus ; les **doctorants** qu'elle a encadrés, chacun en barre du début de la thèse à sa
 soutenance (en cours : jusqu'à aujourd'hui), le nom du doctorant au-dessus ; les barres qui se chevauchent l'une
 au-dessus de l'autre. Ses **extraits** dans le dossier, une ligne par catégorie principale (de la couleur de leur
-catégorie) : le début de leur texte au-dessus d'une fine barre le long de leurs années (une seule : celle-là) ; ses
+catégorie) : le début de leur texte au-dessus d'une fine barre le long de leurs années (une seule : celle-là ; depuis une année, sans fin : jusqu'à aujourd'hui, en s'estompant, comme un poste actuel ; un **événement ponctuel**, un interrupteur de sa fenêtre : un point au milieu de son année, sans jamais se prolonger ; **dans la période**, son autre interrupteur, pour un extrait sans date précise : le long de la période de la personne dans le dossier, ou de ses propres années s'il en a, en pointillé et plus clair, dit « dans la période (2020–2024) » dans les détails ; allumer l'un éteint l'autre ; sans années à lui, placé le long de la période, sauf si elle n'en a pas non plus, ce qui est signalé, listé parmi les extraits sans années ; la légende montre les deux aspects) ; ses
 **articles** : une petite barre par année, aussi haute que leur nombre (leurs titres au survol). Au survol, une barre
 dit tout d'elle. Cliqué, ce qu'il est s'affiche sous la chronologie : une ligne de la carrière ou un doctorant, avec
 **Modifier** (sa fenêtre : la chronologie redessinée) et un bouton vers son onglet ; un extrait, ou une année (ses

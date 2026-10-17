@@ -419,3 +419,71 @@ async def test_timeline_filters(user: User) -> None:
     reports.save_levels(fid, [])
     await user.open(f"/person/{pid}/{period}?tab=timeline")
     await user.should_see(marker="timeline-filter-no-levels")
+
+
+async def test_timeline_open_ended_one_off_within_period(user: User) -> None:
+    """An excerpt since a year: up to now (fading); a one-off event: a dot at its year;
+    within the period: along it (its own years, if any), dotted; the period without years:
+    listed without years, said so."""
+    pid, period, cats, _paper = _seed()
+    add = categories.add_excerpt
+    since = add(cats["Research"], period, "Leads a team.", 1, [], start=2021)
+    talk = add(cats["Research"], period, "Gave a talk.", 1, [], start=2022, punctual=True)
+    sometime = add(cats["Teaching"], period, "Taught a course.", 1, [], in_period=True)
+    # (both asked: one-off only)
+    both = add(
+        cats["Teaching"], period, "Chaired.", 1, [], start=2023, punctual=True, in_period=True
+    )
+    views = {e.id: e for e in categories.excerpts(period)}
+    assert views[talk].punctual and not views[talk].in_period
+    assert views[sometime].in_period and not views[both].in_period
+    dated, undated = categories.timeline(period)
+    placed = {d.excerpt.id: d for _y, items in dated for d in items}
+    assert placed[sometime].period == (2020, 2024) and placed[sometime].year == 2020
+    assert not undated
+
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    span = user.find(marker=f"timeline-span-{since}").elements.pop()
+    assert "now" in span.classes and "dot" not in span.classes
+    dot = user.find(marker=f"timeline-span-{talk}").elements.pop()
+    assert "dot" in dot.classes and "now" not in dot.classes
+    approx = user.find(marker=f"timeline-span-{sometime}").elements.pop()
+    assert "approx" in approx.classes
+    await user.should_see(marker="timeline-legend-approx")
+    user.find(marker=f"timeline-span-{since}").click()
+    await user.should_see("An excerpt, since 2021", marker="timeline-details")
+    user.find(marker=f"timeline-span-{sometime}").click()
+    await user.should_see("within the period (2020–2024)", marker=f"timeline-years-{sometime}")
+    user.find(marker=f"timeline-span-{talk}").click()
+    await user.should_see(marker=f"timeline-punctual-{talk}")
+
+    # Set from the excerpt's dialog: one on, the other off.
+    user.find(marker=f"timeline-edit-{talk}").click()
+    await user.should_see(marker="excerpt-in-period")
+    user.find(marker="excerpt-in-period").click()
+    assert not user.find(marker="excerpt-punctual").elements.pop().value
+    user.find(marker="excerpt-edit-save").click()
+    await user.should_see(marker=f"timeline-span-{talk}")
+    talked = next(e for e in categories.excerpts(period) if e.id == talk)
+    assert talked.in_period and not talked.punctual
+
+    # A period without years: listed apart, said so.
+    folders.set_period(period, None, None)
+    dated, undated = categories.timeline(period)
+    assert [e.id for e in undated] == [sometime]
+    await user.open(f"/person/{pid}/{period}?tab=timeline")
+    await user.should_see(
+        "within the period (its years not set)", marker=f"timeline-years-{sometime}"
+    )
+
+
+def test_one_off_kept_by_the_next_lead() -> None:
+    """The lead of a group removed: the next one takes its one-off / within-the-period flags."""
+    _pid, period, cats, _paper = _seed()
+    add = categories.add_excerpt
+    lead = add(cats["Research"], period, "A talk.", 1, [], start=2021, punctual=True)
+    other = add(cats["Research"], period, "Another talk.", 2, [])
+    categories.merge_excerpts(other, lead)
+    categories.remove_excerpt(lead)
+    (left,) = categories.excerpts(period)
+    assert left.id == other and left.punctual
