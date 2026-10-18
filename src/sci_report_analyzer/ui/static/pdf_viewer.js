@@ -584,21 +584,49 @@ window.vrDoc = {
     this.selected = id;
     this.redraw();
   },
-  // A click on a page (not a text selected, nor an area drawn, nor while editing): the
-  // excerpt tinted there selected (the next one where several overlap), its entry in the
-  // side panel too; elsewhere, none. (The tints let the mouse through: text still selected.)
-  clicked(ev) {
-    const a = vrPdf.app(), w = vrPdf.win();
-    if (!a || !a.pdfViewer || ev.button !== 0 || ev.shiftKey || ev.altKey || ev.ctrlKey
-        || ev.metaKey || vrPdf.areaOn || a.pdfViewer.annotationEditorMode > 0) return;
-    const sel = w && w.getSelection();
-    if (sel && !sel.isCollapsed && sel.toString().trim()) return;
-    const t = ev.target, pageDiv = t.closest && t.closest('.page');
-    if (!pageDiv || t.closest('.vr-doc, .annotationLayer a, .annotationEditorLayer > *')) return;
+  // Where an event is: its page view and the point (PDF units) under it; null off a page.
+  at(ev) {
+    const a = vrPdf.app(), t = ev.target, pageDiv = t && t.closest && t.closest('.page');
+    if (!a || !a.pdfViewer || !pageDiv) return null;
     const pv = a.pdfViewer.getPageView(+pageDiv.dataset.pageNumber - 1), box = vrPdf.pageBox(pv);
     const [x, y] = pv.viewport.convertToPdfPoint(ev.clientX - box.left, ev.clientY - box.top);
-    const hits = this.excerpts.filter(e => e.rects.some(r => (r[4] ?? e.page) === pv.id
-      && x >= r[0] - 1 && x <= r[2] + 1 && y >= r[1] - 1 && y <= r[3] + 1)).map(e => e.id);
+    return {pv, pageDiv, x, y};
+  },
+  hit(rects, page, p) {
+    return rects.some(r => (r[4] ?? page) === p.pv.id
+      && p.x >= r[0] - 1 && p.x <= r[2] + 1 && p.y >= r[1] - 1 && p.y <= r[3] + 1);
+  },
+  // The paper linked where the mouse is (its marks let the mouse through: its text can be
+  // selected and highlighted), shown by the cursor and its title.
+  hovered(ev) {
+    const p = this.links.length && !vrPdf.areaOn && this.at(ev);
+    if (!p) return;
+    const l = this.links.find(l => this.hit(l.rects, l.page, p));
+    p.pageDiv.style.cursor = l ? 'pointer' : '';
+    p.pageDiv.title = l ? l.title : '';
+  },
+  // A click on a page (not a text selected, nor an area drawn, nor while editing): a paper
+  // linked there followed (shift: as a citation); else the excerpt tinted there selected (the
+  // next one where several overlap), its entry in the side panel too; elsewhere, none. (The
+  // tints let the mouse through: text still selected.)
+  clicked(ev) {
+    const a = vrPdf.app(), w = vrPdf.win();
+    if (!a || !a.pdfViewer || ev.button !== 0 || ev.altKey || ev.ctrlKey || ev.metaKey
+        || vrPdf.areaOn || a.pdfViewer.annotationEditorMode > 0) return;
+    const sel = w && w.getSelection();
+    if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+    const t = ev.target;
+    if (t.closest && t.closest('.vr-doc, .annotationLayer a, .annotationEditorLayer > *')) return;
+    const p = this.at(ev);
+    if (!p) return;
+    const l = this.links.find(l => this.hit(l.rects, l.page, p));
+    if (l) {
+      ev.preventDefault();
+      vrPane.emit('vr-doc-paper', {i: l.i, cite: ev.shiftKey});
+      return;
+    }
+    if (ev.shiftKey) return;
+    const hits = this.excerpts.filter(e => this.hit(e.rects, e.page, p)).map(e => e.id);
     const id = hits.length ? hits[(hits.indexOf(this.selected) + 1) % hits.length] : null;
     if (id === this.selected) return;
     this.select(id);
@@ -658,20 +686,15 @@ window.vrDoc = {
       l.rects.forEach((r, k) => {
         if ((r[4] ?? l.page) !== pv.id) return;
         const [left, top, w, h] = box(r);
-        // A paper (its reference, or a citation): a light dotted underline, itself the link.
-        const mark = doc.createElement('a');
+        // A paper (its reference, or a citation): a light dotted underline (followed: see
+        // clicked).
+        const mark = doc.createElement('div');
         mark.className = 'vr-doc';
         mark.style.userSelect = 'none';  // (never copied with the text)
-        mark.href = '#';
-        mark.title = l.title;
         Object.assign(mark.style, {
           position: 'absolute', left: left + 'px', top: top + 'px', width: w + 'px',
-          height: h + 'px', zIndex: 30, borderBottom: '1px dotted ' + l.colour, opacity: 0.8,
-          cursor: 'pointer',
-        });
-        mark.addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          vrPane.emit('vr-doc-paper', {i: l.i, cite: e.shiftKey});
+          height: h + 'px', pointerEvents: 'none', zIndex: 4,
+          borderBottom: '1px dotted ' + l.colour, opacity: 0.8,
         });
         pv.div.appendChild(mark);
       });
@@ -708,6 +731,7 @@ document.addEventListener('webviewerloaded', (e) => {
   w.addEventListener('mousemove', (ev) => vrPdf.areaMove(ev), true);
   w.addEventListener('mouseup', (ev) => vrPdf.areaUp(ev), true);
   w.addEventListener('click', (ev) => vrDoc.clicked(ev));
+  w.addEventListener('mousemove', (ev) => vrDoc.hovered(ev));
   vrPdf.nav();
   // Its style here (the viewer's actions not wanted…), and the icons' font (Material Icons,
   // the app's): linked (its policy forbids inline styles).
