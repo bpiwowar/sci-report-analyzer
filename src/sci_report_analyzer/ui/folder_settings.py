@@ -14,6 +14,7 @@ from nicegui import ui
 from .. import folders, i18n, llm, report_templates, reports, source_settings
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
+from . import llm_models
 from .categories_editor import HELP as CATEGORIES_HELP
 from .categories_editor import categories_editor
 from .dialogs import actions, confirm, transient_dialog
@@ -119,6 +120,8 @@ def models_section(folder_id: int) -> Callable[[], tuple[str, str]]:
             value = select.value
             select.set_options(sorted({*found, *([value] if value else [])}), value=value)
 
+    llm_models.watch(inputs[0], lambda: st.chat_api, lambda: st.url, load)
+    llm_models.watch(inputs[1], lambda: st.embed_api, lambda: st.url, load)
     if st.enabled:
         ui.timer(0.1, load, once=True)
     return lambda: (inputs[0].value or "", inputs[1].value or "")

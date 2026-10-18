@@ -23,14 +23,15 @@ import ipaddress
 import json
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from urllib.parse import urlsplit
 
 import httpx
 
 from .db.app_settings import delete_setting, get_setting, set_setting
-from .i18n import N_
+from .i18n import N_, _
 
 DEFAULT_URL = "http://localhost:11434"
 URL_ENV = "OLLAMA_HOST"
@@ -38,6 +39,7 @@ MODEL_ENV = "SCI_REPORT_ANALYZER_OLLAMA_MODEL"
 EMBED_MODEL_ENV = "SCI_REPORT_ANALYZER_EMBED_MODEL"
 REWRITE_MODEL_ENV = "SCI_REPORT_ANALYZER_REWRITE_MODEL"
 API_KEY_ENV = "SCI_REPORT_ANALYZER_LLM_API_KEY"
+REGISTRY = "https://registry.ollama.ai"
 NONE = "none"  # (a model: none, e.g. the excerpts not rewritten)
 # The tasks using the LLM: each can have its own model (none: the default one).
 TASKS = {
@@ -478,3 +480,154 @@ async def list_embed_models(
     if api != "openai":
         return await list_models(url, timeout=timeout)
     return await list_openai_models(url, api_key, timeout=timeout)
+
+
+def format_size(n: float) -> str:
+    """A size in bytes, readable (e.g. 4.7 GB)."""
+    for unit in ("B", "kB", "MB", "GB"):
+        if n < 1000:
+            return f"{n:.0f} {unit}" if unit in ("B", "kB") else f"{n:.1f} {unit}"
+        n /= 1000
+    return f"{n:.1f} TB"
+
+
+def can_pull(api: str, name: str) -> bool:
+    """Whether a model can be downloaded: a named one, to an Ollama server (not a cloud
+    model; an OpenAI-compatible server has no download)."""
+    return api == "ollama" and bool(name.strip()) and not is_cloud(name)
+
+
+def _manifest_url(name: str) -> str | None:
+    """(the registry's manifest of a model, ``[ns/]name[:tag]`` with the tag ``latest`` by
+    default; none for a model of another registry, e.g. hf.co/…)"""
+    repo, _sep, tag = name.strip().partition(":")
+    parts = repo.split("/")
+    if len(parts) > 2 or "." in parts[0] or not all(parts):
+        return None
+    repo = repo if len(parts) == 2 else f"library/{repo}"
+    return f"{REGISTRY}/v2/{repo}/manifests/{tag or 'latest'}"
+
+
+async def manifest_size(name: str, timeout: float = 10.0) -> int | None:
+    """The size to download of a model (the layers of its manifest on the Ollama registry;
+    none if not known: not found, unreachable, or another registry)."""
+    url = _manifest_url(name)
+    if url is None:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            r = await client.get(
+                url, headers={"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
+            )
+            r.raise_for_status()
+        m = r.json()
+        layers = [*m.get("layers", []), *([m["config"]] if m.get("config") else [])]
+        return sum(int(x.get("size", 0)) for x in layers) or None
+    except (httpx.HTTPError, ValueError, AttributeError):
+        return None
+
+
+async def pull_model(
+    url: str, name: str, progress: Callable[[str, int, int], None], timeout: float = 30.0
+) -> None:
+    """Download a model to the Ollama server at ``url`` (``/api/pull``, streamed: one JSON
+    object per line); ``progress`` is called with the status, the bytes done and the total
+    (0: unknown). Cancelled with its task; raises if the server refuses or fails."""
+    body = {"model": name, "stream": True}
+    # (no read timeout: a layer can take long to start)
+    quiet = httpx.Timeout(timeout, read=None)
+    async with (
+        httpx.AsyncClient(timeout=quiet) as client,
+        client.stream("POST", f"{_local(url)}/api/pull", json=body) as r,
+    ):
+        if r.status_code >= 400:
+            text = (await r.aread()).decode(errors="replace")
+            with suppress(ValueError, AttributeError):
+                text = json.loads(text).get("error") or text
+            raise RuntimeError(text or f"HTTP {r.status_code}")
+        async for line in r.aiter_lines():
+            if not line.strip():
+                continue
+            chunk = json.loads(line)
+            if error := chunk.get("error"):
+                raise RuntimeError(error)
+            progress(
+                chunk.get("status") or "",
+                int(chunk.get("completed") or 0),
+                int(chunk.get("total") or 0),
+            )
+
+
+async def delete_model(url: str, name: str, timeout: float = 30.0) -> None:
+    """Delete a model from the Ollama server at ``url`` (``/api/delete``)."""
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.request("DELETE", f"{_local(url)}/api/delete", json={"model": name})
+        r.raise_for_status()
+
+
+async def installed_models(url: str, timeout: float = 5.0) -> dict[str, int]:
+    """The models installed on the Ollama server at ``url`` (not the cloud ones) with their
+    size in bytes (raises if not local, or unreachable)."""
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.get(f"{_local(url)}/api/tags")
+        r.raise_for_status()
+    models = r.json().get("models", [])
+    return {m["name"]: int(m.get("size") or 0) for m in models if not is_cloud(m)}
+
+
+def _tagged(name: str) -> str:
+    name = name.strip()
+    return name if ":" in name else f"{name}:latest"
+
+
+def same_model(a: str, b: str) -> bool:
+    """Whether two names are the same model (the tag being ``latest`` by default)."""
+    return bool(a.strip() and b.strip()) and _tagged(a) == _tagged(b)
+
+
+def is_installed(name: str, installed: Iterable[str]) -> bool:
+    return any(same_model(name, m) for m in installed)
+
+
+def model_users(name: str) -> list[str]:
+    """What uses a model, said (the general models, the tasks' and the folders'; those from
+    an environment variable too); empty if nothing."""
+    users: list[str] = []
+    for st in (settings(), stored_settings()):
+        chat, embed = st.chat_api == "ollama", st.embed_api == "ollama"
+        for use, value, on in (
+            (_("the model (Settings → Local LLM)"), st.model, chat),
+            (_("the embedding model (Settings → Local LLM)"), st.embed_model, embed),
+            (_("the model rewriting the excerpts"), st.rewrite_model, chat),
+            *(
+                (_("the model of the task “{task}”").format(task=_(TASKS[t])), v, chat)
+                for t, v in st.tasks.items()
+                if t in TASKS
+            ),
+        ):
+            if on and same_model(name, value) and use not in users:
+                users.append(use)
+    users += [
+        _("the {kind} of the folder settings “{name}”").format(kind=kind, name=label)
+        for label, citations in _folder_settings()
+        for key, kind in (("llm_model", _("LLM")), ("embed_model", _("embedding model")))
+        if same_model(name, citations.get(key) or "")
+    ]
+    return users
+
+
+def _folder_settings() -> list[tuple[str, dict]]:
+    """The name and the citations of each folder settings (where the models are)."""
+    from sqlalchemy import select
+
+    from .db.models import FolderSettings
+    from .db.session import session_scope
+
+    try:
+        with session_scope() as s:
+            return [
+                (f.name or _("default"), dict(f.citations or {}))
+                for f in s.scalars(select(FolderSettings))
+            ]
+    except Exception:  # (no database: e.g. in unit tests)
+        return []

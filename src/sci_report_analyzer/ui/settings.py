@@ -41,7 +41,7 @@ from ..ranking.normalize import (
 )
 from ..ranking.service import MatchSettings, load_settings, save_settings, service
 from ..sources import ADAPTERS
-from . import git_backup, scimago_years, shared_settings, unsaved
+from . import git_backup, llm_models, scimago_years, shared_settings, unsaved
 from .colours import ColourInput
 from .dialogs import actions, confirm, transient_dialog
 from .settings_search import Search
@@ -1585,9 +1585,22 @@ def llm_tab() -> None:
         if notify:
             ui.notify(message.format(n=len(models)), type="positive")
 
+    async def reload_models() -> None:
+        await load()
+        await load_embed()
+
+    async def reload_all() -> None:
+        await reload_models()
+        await refresh_models()
+
     embed_refresh.on_click(lambda: load_embed(notify=True))
     embed_api.on_value_change(lambda: load_embed())
     ui.timer(0.1, load_embed, once=True)
+
+    ui.label(_("Installed models")).classes("text-lg mt-4")
+    refresh_models = llm_models.manager(lambda: url.value, reload_models)
+    llm_models.watch(model, lambda: chat_api.value, lambda: url.value, reload_all)
+    llm_models.watch(embed_model, lambda: embed_api.value, lambda: url.value, reload_all)
 
     ui.label(_("Suggested categories")).classes("text-md mt-2")
     ui.label(
@@ -1676,7 +1689,13 @@ def task_model_section(
         return {**fixed, **{m: m for m in sorted({*models, *kept})}}
 
     model = (
-        ui.select(options([]), value=current if current in options([]) else "", label=_("Model"))
+        ui.select(
+            options([]),
+            value=current if current in options([]) else "",
+            label=_("Model"),
+            with_input=True,
+            new_value_mode="add-unique",
+        )
         .props("options-dense")
         .classes("w-[32rem]")
         .tooltip(_("A small model (e.g. 4–8B) is often enough, and much faster"))
@@ -1715,6 +1734,7 @@ def task_model_section(
         model.set_options(options(models), value=model.value)
 
     ui.timer(0.1, load, once=True)
+    llm_models.watch(model, lambda: st.chat_api, lambda: st.url, load)
     return lambda: (model.value or "", think.value or "")
 
 
