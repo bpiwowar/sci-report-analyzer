@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-17 14:23+0200\n"
+"POT-Creation-Date: 2026-10-18 10:46+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -182,6 +182,9 @@ msgstr ""
 " suggestions venant du plus proche) : combien au plus, de quelle taille "
 "au moins (un seul s'il fait aussi bien)."
 
+msgid "A cloud model is not downloaded"
+msgstr "Un modèle cloud ne se télécharge pas"
+
 msgid "A colour is a hex code, e.g. #2196f3"
 msgstr "Une couleur est un code hexadécimal, p. ex. #2196f3"
 
@@ -281,11 +284,6 @@ msgstr "Une variante manuelle ou une règle plus spécifique prime"
 msgid "A minor difference: the workshop's venue is more precise"
 msgstr "Une différence mineure : le canal de l'atelier est plus précis"
 
-msgid "A model's first answer includes its loading: run it again for its own time"
-msgstr ""
-"La première réponse d'un modèle inclut son chargement : relancez-le pour "
-"avoir son propre temps"
-
 msgid "A name is needed"
 msgstr "Un nom est nécessaire"
 
@@ -307,6 +305,14 @@ msgstr "Un nombre, s’il vous plaît"
 
 msgid "A paper"
 msgstr "Un article"
+
+msgid ""
+"A paper more than this many years after the person's own defence: their "
+"PhD supervisors still highlighted, but no longer counted as such"
+msgstr ""
+"Une publication plus de ce nombre d'années après la soutenance de la "
+"personne : ses directeurs de thèse sont toujours mis en évidence, mais ne"
+" comptent plus comme tels"
 
 msgid ""
 "A paper of a year one covers shows that name (the name above: the current"
@@ -471,6 +477,13 @@ msgstr ""
 
 msgid "A venue text naming a journal (after the conference rule)."
 msgstr "Un texte de canal nommant une revue (après la règle des conférences)."
+
+msgid ""
+"A venue text naming a shared task (an evaluation campaign; never ranked):"
+" “… Shared Task …”."
+msgstr ""
+"Un texte de lieu nommant une campagne d'évaluation (shared task ; jamais "
+"classée) : « … Shared Task … »."
 
 msgid "A venue text naming a society or an event, not a journal."
 msgstr "Un texte de canal nommant une société ou un événement, pas une revue."
@@ -725,9 +738,6 @@ msgstr "Alias ajouté"
 msgid "Alias removed"
 msgstr "Alias supprimé"
 
-msgid "Aliases saved (reload the publications to see them)"
-msgstr "Variantes enregistrées (rechargez les publications pour les voir)"
-
 msgid "All"
 msgstr "Tout"
 
@@ -855,8 +865,18 @@ msgstr "Tels que cités dans les extraits copiés : %% Candidature, p. 4 %%"
 msgid "As selected"
 msgstr "Tel que sélectionné"
 
+msgid ""
+"As written in author lists (e.g. without a second surname): the student "
+"is then recognised in the publications"
+msgstr ""
+"Telles qu'écrites dans les listes d'auteurs (p. ex. sans second nom) : le"
+" doctorant est alors reconnu dans les publications"
+
 msgid "Ask before downloading a PDF"
 msgstr "Demander avant de télécharger un PDF"
+
+msgid "Ask the models again, even for an answer already got"
+msgstr "Interroger de nouveau les modèles, même pour une réponse déjà obtenue"
 
 msgid "Assessment"
 msgstr "Appréciation"
@@ -1080,6 +1100,14 @@ msgstr "Annuler les modifications"
 
 msgid "Candidates to review"
 msgstr "Candidats à examiner"
+
+#, python-brace-format
+msgid "Cannot delete {model}: {error}"
+msgstr "Impossible de supprimer {model} : {error}"
+
+#, python-brace-format
+msgid "Cannot download {model}: {error}"
+msgstr "Impossible de télécharger {model} : {error}"
 
 #, python-brace-format
 msgid "Cannot reach Ollama: {error}"
@@ -1623,6 +1651,9 @@ msgstr "Valeurs par défaut"
 msgid "Delete"
 msgstr "Supprimer"
 
+msgid "Delete a model"
+msgstr "Supprimer un modèle"
+
 msgid "Delete rule"
 msgstr "Supprimer la règle"
 
@@ -1675,6 +1706,9 @@ msgstr "Supprimer la session"
 
 msgid "Delete them"
 msgstr "Les supprimer"
+
+msgid "Delete this model from the server"
+msgstr "Supprimer ce modèle du serveur"
 
 #, python-brace-format
 msgid "Delete {name}?"
@@ -1783,14 +1817,21 @@ msgstr "Télécharger Scimago {year}"
 msgid "Download a copy"
 msgstr "Télécharger une copie"
 
+msgid "Download a model"
+msgstr "Télécharger un modèle"
+
 msgid "Download and open"
 msgstr "Télécharger et ouvrir"
 
 msgid "Download it"
 msgstr "Le télécharger"
 
-msgid "Download the PDF (open access) and view it (a new window)"
-msgstr "Télécharger le PDF (libre accès) et le voir (nouvelle fenêtre)"
+#, python-brace-format
+msgid "Download of {model} cancelled"
+msgstr "Téléchargement de {model} annulé"
+
+msgid "Download the PDF (open access) and view it (beside the page)"
+msgstr "Télécharger le PDF (accès ouvert) et l'afficher (à côté de la page)"
 
 msgid "Download the PDF (open access) to view and annotate it"
 msgstr "Télécharger le PDF (accès ouvert) pour le voir et l’annoter"
@@ -1812,6 +1853,14 @@ msgstr ""
 "Télécharger les PDF en libre accès des articles affichés (pour les "
 "consulter et les annoter)"
 
+#, python-brace-format
+msgid "Download {model}?"
+msgstr "Télécharger {model} ?"
+
+#, python-brace-format
+msgid "Download {model}? Its size is not known."
+msgstr "Télécharger {model} ? Sa taille n'est pas connue."
+
 msgid ""
 "Downloaded from the papers' open-access links (or uploaded), to read and "
 "annotate them in the browser. A paper that leaves the sources takes its "
@@ -1828,6 +1877,20 @@ msgstr "Téléchargement du PDF…"
 
 msgid "Downloading the Scimago journals and the predatory list…"
 msgstr "Téléchargement des revues Scimago et de la liste des revues prédatrices…"
+
+#, python-brace-format
+msgid "Downloading {model}"
+msgstr "Téléchargement de {model}"
+
+msgid "Downloading…"
+msgstr "Téléchargement…"
+
+msgid ""
+"Downloads and deletions are for the Ollama server only (an OpenAI-"
+"compatible server manages its own models)."
+msgstr ""
+"Téléchargements et suppressions : pour le serveur Ollama seulement (un "
+"serveur compatible OpenAI gère ses propres modèles)."
 
 msgid "Drag a venue onto another one to merge it into that one."
 msgstr "Faites glisser un canal sur un autre pour l'y fusionner."
@@ -1885,6 +1948,11 @@ msgstr ""
 "Chaque extrait caché puis suggéré : sa catégorie en premier {top1:.0%}, "
 "parmi les trois premières {top3:.0%} ({prototypes} groupes pour "
 "{categories} catégories)"
+
+msgid "Each model is warmed up first: its loading is not timed"
+msgstr ""
+"Chaque modèle est d'abord préchauffé : son chargement n'est pas "
+"chronométré"
 
 msgid ""
 "Each named: it is used as `.name` in the folder's notes, instead of the "
@@ -2159,10 +2227,12 @@ msgstr "Récupération de la notice du DOI…"
 msgid "Fetching the candidate's papers…"
 msgstr "Récupération des articles du candidat…"
 
-msgid "File this wording, these years, days and flags (the text selected kept)"
+msgid ""
+"File this wording, its notes, these years, days and flags (the text "
+"selected kept)"
 msgstr ""
-"Classer cette formulation, ces années, jours et marqueurs (le texte "
-"sélectionné conservé)"
+"Classer cette formulation, ses notes, ces années, jours et marqueurs (le "
+"texte sélectionné conservé)"
 
 #, python-brace-format
 msgid "Find a category of {folder} (Enter: the first one)"
@@ -2585,6 +2655,9 @@ msgstr "Insérer un bloc (tenu à jour)"
 msgid "Insert the papers not cited yet, at the cursor (as a list of citations)"
 msgstr "Insérer les articles pas encore cités, au curseur (en liste de citations)"
 
+msgid "Installed models"
+msgstr "Modèles installés"
+
 msgid "Installing the PDF viewer (PDF.js, once)…"
 msgstr "Installation de la visionneuse PDF (PDF.js, une seule fois)…"
 
@@ -2655,11 +2728,12 @@ msgid "It is matched by:"
 msgstr "Il est reconnu par :"
 
 msgid ""
-"It is stored in the data directory, and opens in a new window where you "
-"can highlight and annotate it."
+"It is stored in the data directory, and opens beside the page (elsewhere,"
+" in a new window) where you can highlight and annotate it."
 msgstr ""
-"Il est stocké dans le répertoire de données, et s'ouvre dans une nouvelle"
-" fenêtre où vous pouvez le surligner et l'annoter."
+"Il est enregistré dans le répertoire des données et s'ouvre à côté de la "
+"page (ailleurs, dans une nouvelle fenêtre), où vous pouvez le surligner "
+"et l'annoter."
 
 msgid "It is this venue"
 msgstr "C'est bien ce canal"
@@ -2693,14 +2767,6 @@ msgstr ""
 msgid "Its commentary (click to edit it)"
 msgstr "Son commentaire (cliquer pour le modifier)"
 
-#, python-format
-msgid ""
-"Its commentary: in the notes and the copy, a comment after the excerpt "
-"(%% … %%), kept for reference, not shown. Empty: none."
-msgstr ""
-"Son commentaire : dans les notes et la copie, un commentaire après "
-"l'extrait (%% … %%), gardé pour référence, non affiché. Vide : aucun."
-
 msgid ""
 "Its conferences, in order: without a name, it is named after them (its "
 "acronym too, with dashes, e.g. CORIA-TALN)."
@@ -2710,6 +2776,15 @@ msgstr ""
 
 msgid "Its demo track, one of its workshops…"
 msgstr "Sa session démo, un de ses ateliers…"
+
+#, python-format
+msgid ""
+"Its details (its text: short): in the notes and the copy, a comment after"
+" the excerpt (%% … %%), kept for reference, not shown. Empty: none."
+msgstr ""
+"Ses détails (son texte : court) : dans les notes et la copie, un "
+"commentaire après l'extrait (%% … %%), gardé pour référence, non affiché."
+" Vide : aucun."
 
 msgid "Its excerpts (and those of its subsections)"
 msgstr "Ses extraits (et ceux de ses sous-sections)"
@@ -2900,6 +2975,9 @@ msgstr "Tout garder en local"
 msgid "Keep all mine"
 msgstr "Garder tous les miens"
 
+msgid "Keep annotated files"
+msgstr "Garder les fichiers annotés"
+
 msgid "Keep as a period"
 msgstr "Garder comme période"
 
@@ -2942,6 +3020,9 @@ msgstr "Type enregistré sur le canal de publication"
 
 msgid "Kinds:"
 msgstr "Types :"
+
+msgid "LLM"
+msgstr "LLM"
 
 #, python-brace-format
 msgid "LLM (default: {model})"
@@ -3325,6 +3406,9 @@ msgstr "Mineur"
 msgid "Model"
 msgstr "Modèle"
 
+msgid "Model to download"
+msgstr "Modèle à télécharger"
+
 #, python-brace-format
 msgid "Model: {model} (local: nothing leaves this machine or the local network)"
 msgstr ""
@@ -3336,6 +3420,10 @@ msgstr "Modèles"
 
 msgid "Models (local AI)"
 msgstr "Modèles (IA locale)"
+
+#, python-brace-format
+msgid "Models to download not listed: {error}"
+msgstr "Modèles à télécharger non listés : {error}"
 
 msgid "Move"
 msgstr "Déplacer"
@@ -3516,6 +3604,9 @@ msgstr "Aucun PDF stocké pour cet article."
 msgid "No acronym"
 msgstr "Pas d'acronyme"
 
+msgid "No cache"
+msgstr "Sans cache"
+
 msgid "No candidate profile found: add their profiles by URL in the Sources tab."
 msgstr ""
 "Aucun profil candidat trouvé : ajoutez ses profils par URL dans l'onglet "
@@ -3609,6 +3700,9 @@ msgstr "Aucune correspondance dans les classements."
 
 msgid "No merge to propose."
 msgstr "Aucune fusion à proposer."
+
+msgid "No model installed"
+msgstr "Aucun modèle installé"
 
 msgid "No notes to cite in"
 msgstr "Aucune note où citer"
@@ -3767,6 +3861,9 @@ msgstr ""
 "Aucune thèse : validez un profil theses.fr dans l'onglet Sources, ou "
 "ajoutez un doctorant à la main."
 
+msgid "No thinking"
+msgstr "Sans réflexion"
+
 msgid "No title"
 msgstr "Sans titre"
 
@@ -3901,6 +3998,9 @@ msgstr "Non chargée : la télécharger"
 
 msgid "Not of the period's years"
 msgstr "Hors des années de la période"
+
+msgid "Not on the server"
+msgstr "Absent du serveur"
 
 msgid "Not on the timeline: set their dates in the Profile tab (Career)."
 msgstr ""
@@ -4243,6 +4343,9 @@ msgstr "Autre couleur"
 msgid "Other papers"
 msgstr "Autres articles"
 
+msgid "Other spellings of the name (comma-separated)"
+msgstr "Autres graphies du nom (séparées par des virgules)"
+
 msgid "Other spellings used in author lists, e.g. “B. Doe”"
 msgstr "Autres graphies utilisées dans les listes d'auteurs, p. ex. « B. Doe »"
 
@@ -4416,11 +4519,6 @@ msgstr "Doctorant supprimé"
 msgid "PhD student hidden"
 msgstr "Doctorant masqué"
 
-msgid "PhD student name aliases (for highlighting in author lists)"
-msgstr ""
-"Variantes des noms des doctorants (pour les mettre en évidence dans les "
-"listes d'auteurs)"
-
 msgid "PhD student restored"
 msgstr "Doctorant rétabli"
 
@@ -4434,8 +4532,18 @@ msgstr "doctorant·e {name} ({when})"
 msgid "PhD students"
 msgstr "Doctorants"
 
+msgid "PhD students supervised"
+msgstr "Doctorants encadrés"
+
 msgid "PhD student…"
 msgstr "Doctorant…"
+
+msgid "PhD supervisor until (years)"
+msgstr "Directeur de thèse jusqu'à (années)"
+
+#, python-brace-format
+msgid "PhD supervisor {name}"
+msgstr "Directeur de thèse {name}"
 
 msgid "Pick a ranking record"
 msgstr "Choisir une fiche de classement"
@@ -5028,6 +5136,9 @@ msgstr "Règles"
 msgid "Run"
 msgstr "Lancer"
 
+msgid "Run again"
+msgstr "Relancer"
+
 msgid "Salient"
 msgstr "Saillant"
 
@@ -5036,9 +5147,6 @@ msgstr "Même article que… (le fusionner dans celui-ci)"
 
 msgid "Save"
 msgstr "Enregistrer"
-
-msgid "Save aliases"
-msgstr "Enregistrer les variantes"
 
 msgid "Save as a report template"
 msgstr "Enregistrer comme modèle de rapport"
@@ -5581,6 +5689,9 @@ msgid_plural "Started {n} syncs"
 msgstr[0] "{n} synchronisation lancée"
 msgstr[1] "{n} synchronisations lancées"
 
+msgid "Starting…"
+msgstr "Démarrage…"
+
 msgid "Status"
 msgstr "Statut"
 
@@ -5617,9 +5728,6 @@ msgstr "PDF stockés"
 
 msgid "Student alias added"
 msgstr "Alias de doctorant ajouté"
-
-msgid "Students"
-msgstr "Étudiants"
 
 msgid "Suggested categories"
 msgstr "Catégories suggérées"
@@ -5895,6 +6003,13 @@ msgstr "Les extraits, tels que sélectionnés"
 
 msgid "The excerpts, by category"
 msgstr "Les extraits, par catégorie"
+
+msgid ""
+"The files of papers no longer in the database that hold annotations are "
+"not deleted"
+msgstr ""
+"Les fichiers de publications qui ne sont plus dans la base et qui "
+"contiennent des annotations ne sont pas supprimés"
 
 msgid ""
 "The first rule that matches gives the role, else the catch-all. A "
@@ -6453,6 +6568,12 @@ msgstr ""
 "Cette personne a des extraits, et les réglages de ce dossier (ses "
 "catégories) diffèrent"
 
+msgid "Thinking"
+msgstr "Avec réflexion"
+
+msgid "Thinking or not"
+msgstr "Réflexion ou non"
+
 msgid "Thinks"
 msgstr "Réfléchit"
 
@@ -6461,6 +6582,14 @@ msgstr "Ce doctorant, ajouté à la main, sera supprimé."
 
 msgid "This cannot be undone."
 msgstr "Cette action est irréversible."
+
+#, python-brace-format
+msgid ""
+"This deletes {model} from the Ollama server; it must be downloaded again "
+"to be used."
+msgstr ""
+"Ceci supprime {model} du serveur Ollama ; il faudra le télécharger de "
+"nouveau pour l'utiliser."
 
 msgid "This deletes:"
 msgstr "Cela supprime :"
@@ -6471,6 +6600,9 @@ msgstr "Cet extrait n'existe plus"
 #, python-brace-format
 msgid "This is {name}"
 msgstr "C'est {name}"
+
+msgid "This model cannot think: asked without"
+msgstr "Ce modèle ne sait pas réfléchir : interrogé sans"
 
 #, python-brace-format
 msgid "This page is for profile {found}, not {expected}"
@@ -6746,8 +6878,8 @@ msgstr ""
 msgid "Use this venue"
 msgstr "Utiliser ce canal"
 
-msgid "Use this wording, these years, days and flags"
-msgstr "Utiliser cette formulation, ces années, jours et marqueurs"
+msgid "Use this wording, its notes, these years, days and flags"
+msgstr "Utiliser cette formulation, ses notes, ces années, jours et marqueurs"
 
 #, python-brace-format
 msgid "Use {path}?"
@@ -6785,6 +6917,10 @@ msgid "Used by {n} folder: {folders}"
 msgid_plural "Used by {n} folders: {folders}"
 msgstr[0] "Utilisés par {n} dossier : {folders}"
 msgstr[1] "Utilisés par {n} dossiers : {folders}"
+
+#, python-brace-format
+msgid "Used by: {users}"
+msgstr "Utilisé par : {users}"
 
 msgid ""
 "Used for papers of that kind that have no rank (and no manual decision), "
@@ -6922,6 +7058,9 @@ msgstr ""
 
 msgid "Waiting…"
 msgstr "En attente…"
+
+msgid "Warming up…"
+msgstr "Préchauffage…"
 
 msgid "Web"
 msgstr "Web"
@@ -7172,6 +7311,9 @@ msgstr "toutes les années"
 msgid "also matches"
 msgstr "le reconnaît aussi"
 
+msgid "also written:"
+msgstr "aussi écrit :"
+
 msgid "an entry without an id"
 msgstr "une entrée sans identifiant"
 
@@ -7203,8 +7345,14 @@ msgstr "gras"
 msgid "by id"
 msgstr "par identifiant"
 
+msgid "cached"
+msgstr "en cache"
+
 msgid "candidate"
 msgstr "candidat"
+
+msgid "cannot think"
+msgstr "sans réflexion possible"
 
 msgid "captured by a venue rule"
 msgstr "capturé par une règle de canal"
@@ -7293,6 +7441,9 @@ msgstr "p. ex. Collaborateurs internationaux"
 
 msgid "edited"
 msgstr "modifiée"
+
+msgid "embedding model"
+msgstr "modèle d'embeddings"
 
 msgid "enabled"
 msgstr "activée"
@@ -7631,6 +7782,9 @@ msgstr "document introuvable"
 msgid "no such period"
 msgstr "période introuvable"
 
+msgid "no thinking"
+msgstr "sans réflexion"
+
 msgid "no track"
 msgstr "session normale"
 
@@ -7757,9 +7911,6 @@ msgstr "ou à côté des articles à discuter (cités ou non)"
 msgid "other"
 msgstr "autre"
 
-msgid "other spellings, comma-separated"
-msgstr "autres graphies, séparées par des virgules"
-
 msgid "otherwise (catch-all)"
 msgstr "sinon (par défaut)"
 
@@ -7785,6 +7936,11 @@ msgstr "page {page}"
 
 msgid "papers co-authored with a (confirmed) PhD student from theses.fr"
 msgstr "articles co-écrits avec un doctorant (confirmé) issu de theses.fr"
+
+msgid "papers co-authored with one of the person's PhD supervisors (theses.fr)"
+msgstr ""
+"publications cosignées avec l'un des directeurs de thèse de la personne "
+"(theses.fr)"
 
 msgid "papers from"
 msgstr "articles de"
@@ -7967,6 +8123,9 @@ msgstr "le portail CORE"
 msgid "the DOI record (registered by the publisher) is the main source"
 msgstr "la notice DOI (enregistrée par l'éditeur) est la source principale"
 
+msgid "the embedding model (Settings → Local LLM)"
+msgstr "le modèle d'embeddings (Paramètres → LLM local)"
+
 msgid "the group's settings changed meanwhile: pull them first"
 msgstr "les paramètres du groupe ont changé entre-temps : récupérez-les d'abord"
 
@@ -7981,8 +8140,18 @@ msgstr "le niveau commun à ses conférences"
 msgid "the level of the conference chosen in the venue"
 msgstr "le niveau de la conférence choisie dans le canal de publication"
 
+msgid "the model (Settings → Local LLM)"
+msgstr "le modèle (Paramètres → LLM local)"
+
+#, python-brace-format
+msgid "the model of the task “{task}”"
+msgstr "le modèle de la tâche « {task} »"
+
 msgid "the model reads the text"
 msgstr "le modèle lit le texte"
+
+msgid "the model rewriting the excerpts"
+msgstr "le modèle qui reformule les extraits"
 
 #, python-brace-format
 msgid "the model thinks ({n} characters)"
@@ -8038,12 +8207,19 @@ msgid "the workshop rather than its main conference ({names})"
 msgstr "l'atelier plutôt que sa conférence principale ({names})"
 
 #, python-brace-format
+msgid "the {kind} of the folder settings “{name}”"
+msgstr "le {kind} des réglages de dossier « {name} »"
+
+#, python-brace-format
 msgid "their period in the folder ({years})"
 msgstr "sa période dans le dossier ({years})"
 
 #, python-brace-format
 msgid "theses.fr: {start} – {end} (empty: back to these)"
 msgstr "theses.fr : {start} – {end} (vide : retour à celles-ci)"
+
+msgid "thinking"
+msgstr "avec réflexion"
 
 #, python-brace-format
 msgid "thinking ({n} characters)"
@@ -8108,6 +8284,9 @@ msgstr "règles de canal : {error}"
 msgid "venue: {name}"
 msgstr "canal de publication : {name}"
 
+msgid "warmed up"
+msgstr "préchauffé"
+
 msgid "website"
 msgstr "site web"
 
@@ -8118,8 +8297,15 @@ msgstr "pourquoi masqué ? (ajouter un commentaire)"
 msgid "with PhD student {pct}%"
 msgstr "avec doctorant {pct} %"
 
+#, python-brace-format
+msgid "with PhD supervisor {pct}%"
+msgstr "avec directeur de thèse {pct} %"
+
 msgid "with a PhD student"
 msgstr "avec un doctorant"
+
+msgid "with a PhD supervisor"
+msgstr "avec un directeur de thèse"
 
 #, python-brace-format
 msgid "with the hidden ({n})"
@@ -8172,6 +8358,10 @@ msgid "{how} (variant “{variant}”)"
 msgstr "{how} (variante « {variant} »)"
 
 #, python-brace-format
+msgid "{kept} annotated files kept"
+msgstr "{kept} fichiers annotés gardés"
+
+#, python-brace-format
 msgid "{kind}, page {pages}"
 msgstr "{kind}, page {pages}"
 
@@ -8186,6 +8376,22 @@ msgstr "{matched}/{total} articles déjà connus ({share})"
 #, python-brace-format
 msgid "{message} (applied everywhere)"
 msgstr "{message} (appliqué partout)"
+
+#, python-brace-format
+msgid "{model} cannot think"
+msgstr "{model} ne sait pas réfléchir"
+
+#, python-brace-format
+msgid "{model} deleted"
+msgstr "{model} supprimé"
+
+#, python-brace-format
+msgid "{model} downloaded"
+msgstr "{model} téléchargé"
+
+#, python-brace-format
+msgid "{model} is already downloaded"
+msgstr "{model} est déjà téléchargé"
 
 #, python-brace-format
 msgid "{model} now rewrites the excerpts"
