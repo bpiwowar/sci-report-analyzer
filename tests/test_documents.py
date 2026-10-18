@@ -2415,7 +2415,11 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
     async def rewrite(text, before, after):
         asked.append((text, before, after))
         return excerpt_rewrite.Rewrite(
-            text="Membre du conseil de l'école X", start=2019, influence=True, days=12
+            text="Membre du conseil de l'école X",
+            notes="Trésorier du conseil",
+            start=2019,
+            influence=True,
+            days=12,
         )
 
     monkeypatch.setattr(llm, "rewrite_model", lambda: "gemma3:4b")
@@ -2430,7 +2434,10 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
     facts = user.find(marker="excerpt-rewrite-years").elements.pop().text
     assert "2019" in facts and "Influence" in facts and "12 days/year" in facts
     user.find(marker="excerpt-in-period").elements.pop().value = True
+    await user.should_see(marker="excerpt-rewrite-notes")
     user.find(marker="excerpt-rewrite-use").click()
+    # (its details: its notes, under its text)
+    assert user.find(marker="excerpt-comment-input").elements.pop().value == "Trésorier du conseil"
     assert user.find(marker="excerpt-end").elements.pop().value is None  # (ongoing)
     assert user.find(marker="excerpt-days").elements.pop().value == 12
     assert user.find(marker="excerpt-in-period").elements.pop().value is False
@@ -2451,6 +2458,7 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
         False,
         12.0,
     )
+    assert e.comment == "Trésorier du conseil"
 
 
 async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):

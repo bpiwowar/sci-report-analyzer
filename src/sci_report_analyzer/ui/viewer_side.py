@@ -1520,10 +1520,17 @@ def _rewording(
                 )
                 if facts := rewrite_facts(r):
                     ui.label(facts).classes("text-xs text-grey").mark("excerpt-rewrite-years")
+                if r.notes:
+                    ui.icon("notes", size="xs", color="grey-6").tooltip(r.notes).mark(
+                        "excerpt-rewrite-notes"
+                    )
                 ui.button(_("Use it"), on_click=lambda: use(wording.value or "", r)).props(
                     "flat dense no-caps"
                 ).tooltip(
-                    _("File this wording, these years, days and flags (the text selected kept)")
+                    _(
+                        "File this wording, its notes, these years, days and flags (the text "
+                        "selected kept)"
+                    )
                 ).mark("excerpt-rewrite-use")
 
         background_tasks.create(proposed(), name="excerpt-rewrite")
@@ -1786,10 +1793,14 @@ def change_llm_dialog(
                 ).classes("text-xs text-negative").mark(f"change-llm-failed-{i}")
                 return
             ui.label(t.rewrite.text).classes("text-sm").mark(f"change-llm-text-{i}")
+            if t.rewrite.notes:
+                ui.label(t.rewrite.notes).classes("text-xs text-grey-8").mark(
+                    f"change-llm-notes-{i}"
+                )
             if facts := rewrite_facts(t.rewrite):
                 ui.label(facts).classes("text-xs text-grey").mark(f"change-llm-facts-{i}")
             ui.button(_("Keep it"), on_click=lambda: chosen(t)).props("flat dense no-caps").tooltip(
-                _("Use this wording, these years, days and flags")
+                _("Use this wording, its notes, these years, days and flags")
             ).mark(f"change-llm-keep-{i}")
 
     async def compare() -> None:
@@ -2621,8 +2632,8 @@ def excerpt_dialog(
         with ui.tabs().props("dense align=left no-caps").classes("w-full") as tabs:
             tab_text = ui.tab("text", _("Excerpt"), icon="format_quote").mark("excerpt-tab-text")
             ui.tab("move", _("Category"), icon="drive_file_move").mark("excerpt-tab-move")
-            ui.tab("notes", _("Notes"), icon="comment").mark("excerpt-tab-notes")
-        with ui.tab_panels(tabs, value=tab).classes("w-full"):
+        # (its notes: under its text)
+        with ui.tab_panels(tabs, value="text" if tab == "notes" else tab).classes("w-full"):
             with ui.tab_panel(tab_text).classes("p-1 gap-2"):
                 if new is None:
                     text = (
@@ -2668,6 +2679,8 @@ def excerpt_dialog(
                         if wording := " ".join(wording.split()):
                             text.set_value(wording)
                             rewritten = True
+                        if r.notes and not (editor.value or "").strip():  # (typed ones kept)
+                            editor.value = r.notes
                         apply_rewrite(props, r)
                         hide()
 
@@ -2681,6 +2694,45 @@ def excerpt_dialog(
                     props = excerpt_properties(
                         *(years or (None, None)), cleared=cleared, folder_id=folder_id
                     )
+                ui.label(_("Notes")).classes("text-sm text-grey-8 -mb-1")
+                editor = MarkdownEditor(
+                    (e.comment if e is not None else None) or "",
+                    render=lambda t: (
+                        reports.render(t, reports.folder_context(side.stats, side.period_id)).text
+                    ),
+                    mode="split",
+                    mark="excerpt-comment-input",
+                    height="6rem",
+                )
+                editor.open_cited = side.open_cited
+                ui.label(
+                    _(
+                        "Its details (its text: short): in the notes and the copy, a comment "
+                        "after the excerpt (%% … %%), kept for reference, not shown. Empty: none."
+                    )
+                ).classes("text-xs text-grey")
+                with ui.row().classes("w-full items-center no-wrap gap-1"):
+                    url = (
+                        ui.input(
+                            _("Link"),
+                            value=(e.url if e is not None else None) or "",
+                            placeholder="https://…",
+                        )
+                        .props("dense outlined clearable")
+                        .classes("grow")
+                        .tooltip(_("A link (URL), written after the excerpt in the notes"))
+                        .mark("excerpt-url")
+                    )
+                    ui.button(
+                        icon="open_in_new",
+                        on_click=lambda: (
+                            ui.navigate.to(url.value.strip(), new_tab=True)
+                            if (url.value or "").strip()
+                            else None
+                        ),
+                    ).props("flat dense round size=sm color=grey-7").tooltip(
+                        _("Open the link")
+                    ).mark("excerpt-url-open")
             with ui.tab_panel("move").classes("p-1 gap-2"):
                 if new is None:
                     ui.label(
@@ -2715,45 +2767,6 @@ def excerpt_dialog(
                         tabs.set_value("text")
 
                     category_list(side, new.text, picked, last=last, selecting=True)
-            with ui.tab_panel("notes").classes("p-1 gap-2"):
-                editor = MarkdownEditor(
-                    (e.comment if e is not None else None) or "",
-                    render=lambda t: (
-                        reports.render(t, reports.folder_context(side.stats, side.period_id)).text
-                    ),
-                    mode="split",
-                    mark="excerpt-comment-input",
-                    height="10rem",
-                )
-                editor.open_cited = side.open_cited
-                ui.label(
-                    _(
-                        "Its commentary: in the notes and the copy, a comment after the "
-                        "excerpt (%% … %%), kept for reference, not shown. Empty: none."
-                    )
-                ).classes("text-xs text-grey")
-                with ui.row().classes("w-full items-center no-wrap gap-1"):
-                    url = (
-                        ui.input(
-                            _("Link"),
-                            value=(e.url if e is not None else None) or "",
-                            placeholder="https://…",
-                        )
-                        .props("dense outlined clearable")
-                        .classes("grow")
-                        .tooltip(_("A link (URL), written after the excerpt in the notes"))
-                        .mark("excerpt-url")
-                    )
-                    ui.button(
-                        icon="open_in_new",
-                        on_click=lambda: (
-                            ui.navigate.to(url.value.strip(), new_tab=True)
-                            if (url.value or "").strip()
-                            else None
-                        ),
-                    ).props("flat dense round size=sm color=grey-7").tooltip(
-                        _("Open the link")
-                    ).mark("excerpt-url-open")
 
         def save(done: bool = True) -> bool | None:
             if new is not None:

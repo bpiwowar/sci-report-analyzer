@@ -1,6 +1,7 @@
 """A new excerpt rewritten by the local LLM (see llm.rewrite_model): a neutral wording of
 the text selected (impersonal, short, in its language, without its dates: « j'ai été membre
-du comité de direction de X » → « Membre du comité de direction de X ») and its years, read
+du comité de direction de X » → « Membre du comité de direction de X »), the details it
+leaves out (its notes) and its years, read
 in it and in the lines around it in the PDF (« Entre 2019 et 2021, j'ai été XXX et YYY », XXX
 selected: 2019–2021), whether it shows the person's influence (« rayonnement »), is a one-off
 event or sometime within their period (no date given), and how many days a year it takes, as
@@ -37,7 +38,8 @@ TIMEOUT = 60.0  # seconds
 class Answer(BaseModel):
     """The LLM's answer (its schema: SCHEMA)."""
 
-    text: str = Field(description="The neutral rewrite of the selected text only")
+    text: str = Field(description="The short, neutral rewrite of the selected text only")
+    notes: str = Field("", description="Its details left out of the short text, if any")
     start_year: int | None = Field(description="The year it started, if known")
     end_year: int | None = Field(description="The year it ended, if known and not ongoing")
     ongoing: bool = Field(description="Whether it is still going on")
@@ -50,7 +52,7 @@ class Answer(BaseModel):
     )
     days: float | None = Field(None, description="Days a year it takes, if it can be estimated")
 
-    @field_validator("influence", "punctual", "in_period", "days", mode="wrap")
+    @field_validator("notes", "influence", "punctual", "in_period", "days", mode="wrap")
     @classmethod
     def _lenient(cls, v: Any, handler: ValidatorFunctionWrapHandler, info) -> Any:
         """(not valid: as if not given, the rest of the answer kept)"""
@@ -75,14 +77,18 @@ The text around it in the document (for its dates only):
 
 Answer in JSON:
 - "text": the selected passage only (not what is around it), rewritten as a short, neutral, \
-impersonal entry in the passage's own language: no first person ("I", "je", "j'ai été"…), \
-no dates or years, its facts kept (names, roles, places), nothing added; e.g. \
-"j'ai été membre du comité de direction de X" → "Membre du comité de direction de X", \
+impersonal entry in the passage's own language, a line of a list (a few words, at most one \
+short sentence): no first person ("I", "je", "j'ai été"…), no dates or years, its main facts \
+(what it is, the role, the name of the project, committee or institution), nothing added; \
+e.g. "j'ai été membre du comité de direction de X" → "Membre du comité de direction de X", \
 "I was the chair of the Y committee" → "Chair of the Y committee". The most important \
-information first: what it is and its kind, then the details; e.g. a project: its type or \
-funding first, "Projet ANR Quokka (coordinateur)" rather than "Coordinateur du projet \
-Quokka financé par l'ANR", "ERC Starting Grant Wombat" rather than "Wombat, a project \
-funded by an ERC Starting Grant".
+information first: what it is and its kind; e.g. a project: its type or funding first, \
+"Projet ANR Quokka (coordinateur)" rather than "Coordinateur du projet Quokka financé par \
+l'ANR", "ERC Starting Grant Wombat" rather than "Wombat, a project funded by an ERC \
+Starting Grant".
+- "notes": the details of the selected passage left out of "text" (its topic, partners, \
+amounts, numbers, tasks…), in the same language and neutral style, briefly; nothing that is \
+not in the passage, no dates or years; "" if "text" already says it all.
 - "start_year", "end_year": the years the passage is about, read in it, else in the text \
 around it when it applies to the passage (e.g. "Between 2019 and 2021, I was A and B", \
 A selected: 2019 and 2021); null if unknown. A single year: both the same.
@@ -138,6 +144,7 @@ class Rewrite(BaseModel):
     its days a year (none: not estimated; see categories.clean_days)."""
 
     text: str
+    notes: str = ""  # (its details: see Answer)
     start: int | None = None
     end: int | None = None
     influence: bool = False
@@ -161,6 +168,7 @@ def proposal(answer: dict) -> Rewrite | None:
         start, end = end, start
     return Rewrite(
         text=text,
+        notes=" ".join(a.notes.split()),
         start=start,
         end=end,
         influence=a.influence,

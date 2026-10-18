@@ -103,9 +103,11 @@ def test_rewrite(model) -> None:
     prompt = sent["messages"][0]["content"]
     assert "Entre 2019 et 2021, j'ai été" in prompt and "Line 0" not in prompt
     assert "Line A" in prompt and "Line C" in prompt
-    assert all(f'"{k}"' in prompt for k in ("influence", "punctual", "in_period", "days"))
+    keys = ("notes", "influence", "punctual", "in_period", "days")
+    assert all(f'"{k}"' in prompt for k in keys)
     assert set(excerpt_rewrite.SCHEMA["required"]) == {
         "text",
+        "notes",
         "start_year",
         "end_year",
         "ongoing",
@@ -191,6 +193,16 @@ def test_rewrite(model) -> None:
                 "days": -3,
             },
             Rewrite(text="Reviewer"),
+        ),
+        (  # (its details: its notes)
+            {
+                "text": "Projet ANR Quokka (coordinateur)",
+                "notes": " Quatre  partenaires ",
+                "start_year": None,
+                "end_year": None,
+                "ongoing": False,
+            },
+            Rewrite(text="Projet ANR Quokka (coordinateur)", notes="Quatre partenaires"),
         ),
         ({"start_year": 2019}, None),
         ({"text": "Reviewer", "start_year": "soon", "end_year": None, "ongoing": False}, None),
