@@ -365,9 +365,10 @@ async def warm_up(name: str, timeout: float = 600.0) -> bool:
     return True
 
 
-async def can_think(name: str, timeout: float = 5.0) -> bool | None:
-    """Whether the model ``name`` can think (Ollama's capabilities); none if unknown (an
-    OpenAI-compatible server does not say, nor an unreachable one)."""
+async def capabilities(name: str, timeout: float = 5.0) -> list[str] | None:
+    """The capabilities of the model ``name`` (Ollama's: "completion", "thinking",
+    "embedding"…); none if unknown (an OpenAI-compatible server does not say, nor an
+    unreachable one)."""
     st = settings()
     if st.chat_api == "openai" or _cloud(st, name):
         return None
@@ -378,7 +379,20 @@ async def can_think(name: str, timeout: float = 5.0) -> bool | None:
             caps = r.json().get("capabilities")
     except Exception:
         return None
-    return "thinking" in caps if isinstance(caps, list) else None
+    return caps if isinstance(caps, list) else None
+
+
+async def can_think(name: str, timeout: float = 5.0) -> bool | None:
+    """Whether the model ``name`` can think (see capabilities); none if unknown."""
+    caps = await capabilities(name, timeout)
+    return None if caps is None else "thinking" in caps
+
+
+async def can_chat(name: str, timeout: float = 5.0) -> bool | None:
+    """Whether the model ``name`` can answer (not an embedding model only: see
+    capabilities); none if unknown."""
+    caps = await capabilities(name, timeout)
+    return None if caps is None else "completion" in caps
 
 
 # The reasoning some servers leave in the answer itself (e.g. qwen3's, without a parser).

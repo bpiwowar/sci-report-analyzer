@@ -374,6 +374,72 @@ def selection_context(
     return before, "\n".join([tail, *_block_after(lines, j, n)])
 
 
+def selection_text(lines: list[dict[str, Any]], rects: list[list[float]]) -> str:
+    """The text of a selection (its rectangles, as for selection_context) in a PDF's
+    ``lines``: from where it starts to where it ends, its lines separated by "\\n" (raw:
+    see pdftext.clean_pdf_text). Not found: ""."""
+    if not rects or not lines:
+        return ""
+    first, last = rects[0], rects[-1]
+    i = _line_at(lines, int(first[4]) if len(first) > 4 else 0, first[:4])
+    j = _line_at(lines, int(last[4]) if len(last) > 4 else 0, last[:4])
+    if i is None or j is None or j < i:
+        return ""
+    texts = [ln["t"] for ln in lines[i : j + 1]]
+    texts[-1] = texts[-1][: _offset(lines[j], last[2])]
+    texts[0] = texts[0][_offset(lines[i], first[0]) :]
+    return "\n".join(texts)
+
+
+def marked_context(
+    lines: list[dict[str, Any]], selections: list[list[list[float]]], n: int = 5, keep: int = 3
+) -> list[str]:
+    """Selections (each its rectangles, as for selection_context) in the text around them in
+    a PDF's ``lines``, each marked ``<selected>…</selected>``: the lines of its block (``n``
+    at most before and after it, see selection_context; ``keep`` at most), those of selections
+    next to each other (their texts overlapping) together; in the order of the PDF, a text
+    each, its lines separated by "\\n" (raw). Those not found: left out."""
+    spans = []  # (first line, offset, last line, offset, first context line, last one)
+    for rects in selections:
+        if not rects:
+            continue
+        first, last = rects[0], rects[-1]
+        i = _line_at(lines, int(first[4]) if len(first) > 4 else 0, first[:4])
+        j = _line_at(lines, int(last[4]) if len(last) > 4 else 0, last[:4])
+        if i is None or j is None or j < i:
+            continue
+        start = i - min(len(_block_before(lines, i, n)), keep)
+        end = j + min(len(_block_after(lines, j, n)), keep)
+        spans.append((i, _offset(lines[i], first[0]), j, _offset(lines[j], last[2]), start, end))
+    spans.sort()
+    groups: list[list[tuple]] = []
+    for sp in spans:
+        end = max(x[5] for x in groups[-1]) if groups else -2
+        if sp[4] <= end and lines[sp[4]]["p"] == lines[end]["p"]:  # (their texts overlap)
+            groups[-1].append(sp)
+        else:
+            groups.append([sp])
+    out = []
+    for group in groups:
+        start, end = group[0][4], max(sp[5] for sp in group)
+        marks: dict[int, list[tuple[int, str]]] = {}
+        for i, a, j, b, _s, _e in group:
+            marks.setdefault(i, []).append((a, "<selected>"))
+            marks.setdefault(j, []).append((b, "</selected>"))
+        texts = []
+        for k in range(start, end + 1):
+            t = lines[k]["t"]
+            # (from the end: the offsets before it still right; at the same place, the end
+            # of a selection before the start of the next)
+            for at, tag in sorted(
+                marks.get(k, []), key=lambda m: (m[0], m[1] == "<selected>"), reverse=True
+            ):
+                t = t[:at] + tag + t[at:]
+            texts.append(t)
+        out.append("\n".join(texts))
+    return out
+
+
 # A reference's label at the start of its line: "[11]", "[C3]", "11." or "11)".
 _LABEL = re.compile(r"^\s*(?:\[([A-Za-z]{0,3}\d{1,4})\]|(\d{1,3})[.)]\s)")
 # A citation: "[11]", "[3, 11]", "[3-5]", "[C3; J1]".

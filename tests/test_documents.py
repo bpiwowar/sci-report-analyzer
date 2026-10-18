@@ -2460,6 +2460,7 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
             start=2019,
             influence=True,
             days=12,
+            level="local",
         )
 
     monkeypatch.setattr(llm, "rewrite_model", lambda: "gemma3:4b")
@@ -2470,9 +2471,18 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
     assert user.find(marker="excerpt-rewrite-text").elements.pop().value == (
         "Membre du conseil de l'école X"
     )
-    await user.should_see(marker="excerpt-rewrite-years")  # (what it predicts, said)
-    facts = user.find(marker="excerpt-rewrite-years").elements.pop().text
-    assert "2019" in facts and "Influence" in facts and "12 days/year" in facts
+    # (what it predicts, said; its notes, to edit)
+    assert user.find(marker="excerpt-rewrite-years").elements.pop().text == "since 2019"
+    assert user.find(marker="excerpt-rewrite-influence").elements.pop().text == "Yes"
+    assert user.find(marker="excerpt-rewrite-days").elements.pop().text == "12 days/year"
+    assert user.find(marker="excerpt-rewrite-timing").elements.pop().text == "Over its years"
+    assert user.find(marker="excerpt-rewrite-level").elements.pop().text == "local"
+    # (what the LLM is given: the passage, within the text around it; the whole message)
+    await user.should_see(marker="excerpt-rewrite-sent")
+    sent = user.find(marker="excerpt-rewrite-sent").elements.pop().content
+    assert "<mark" in sent and "Entre 2019 et 2021" in sent and "trésorier" in sent
+    message = user.find(marker="excerpt-rewrite-message").elements.pop().text
+    assert "<selected>membre du conseil de l'école X</selected>" in message
     user.find(marker="excerpt-in-period").elements.pop().value = True
     await user.should_see(marker="excerpt-rewrite-notes")
     user.find(marker="excerpt-rewrite-use").click()
@@ -2499,6 +2509,7 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
         12.0,
     )
     assert e.comment == "Trésorier du conseil"
+    assert e.level == "local"  # (one of the folder's levels)
 
 
 async def test_excerpt_keeps_bold_and_italics(user: User, fake_viewer):
@@ -2562,10 +2573,11 @@ async def test_excerpt_rewrite_on_demand(user: User, monkeypatch, fake_viewer):
     rects = [[x, 700, x + 150, 710, 1]]
     selection = {"text": "membre du conseil de l'école X", "p": 1, "rects": rects}
     user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
-    asked, answers = [], [None]
+    asked, answers, documents_sent = [], [None], []
 
-    async def rewrite(text, before, after):
+    async def rewrite(text, before, after, document=""):
         asked.append((text, before, after))
+        documents_sent.append(document)
         if answers:
             return answers.pop()
         return excerpt_rewrite.Rewrite(
@@ -2598,13 +2610,21 @@ async def test_excerpt_rewrite_on_demand(user: User, monkeypatch, fake_viewer):
     await user.should_see(marker="excerpt-rewrite-ask")
     user.find(marker="excerpt-rewrite-ask").click()
     await user.should_see(marker="excerpt-rewrite-text")
+    # (its passage as in the PDF, at its place: not as filed, or edited)
     assert asked[-1] == (
-        "J'ai été membre du conseil",
+        "membre du conseil de l'école X",
         "Entre 2019 et 2021, j'ai été ",
         " et trésorier.",
     )
-    user.find(marker="excerpt-rewrite-use").click()
-    await user.should_not_see(marker="excerpt-rewrite-text")
+    # (the document sent: it marked in the text around it)
+    assert documents_sent[-1] == (
+        "Entre 2019 et 2021, j'ai été <selected>membre du conseil de l'école X</selected> "
+        "et trésorier."
+    )
+    sent = user.find(marker="excerpt-rewrite-sent").elements.pop().content
+    assert "<mark" in sent and "membre du conseil de l" in sent
+    user.find(marker="excerpt-rewrite-use").click()  # (then back to its text)
+    assert user.find(marker="excerpt-tab-text").elements.pop().parent_slot.parent.value == "text"
     assert user.find(marker="excerpt-edit-text").elements.pop().value == (
         "Membre du conseil de l'école X"
     )
@@ -2617,6 +2637,57 @@ async def test_excerpt_rewrite_on_demand(user: User, monkeypatch, fake_viewer):
         "J'ai été membre du conseil",
     )
     assert (v.start_year, v.end_year, v.comment) == (2019, 2021, "Trésorier")
+
+
+async def test_excerpt_group_reworded_with_all_its_passages(user: User, monkeypatch, fake_viewer):
+    """A group reworded: all its passages (one cited by its place too), as in the PDF, marked
+    in the text around them (next to each other: in one text)."""
+    from sci_report_analyzer import categories, excerpt_rewrite, llm
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    service = categories.add(folder, "Service")
+    doc = documents.add(period, "Application.pdf", PDF)
+    one = "Depuis 2020, je suis membre du conseil X,"
+    two = "où je préside la commission Y."
+    lines = [
+        {"p": 1, "t": one, "r": [50, 700, 50 + 5 * len(one), 710]},
+        {"p": 1, "t": two, "r": [50, 688, 50 + 5 * len(two), 698]},
+    ]
+    documents.set_lines(doc, lines)
+
+    def rect(line: dict, word: str) -> list:
+        at = line["t"].index(word)
+        return [50 + 5 * at, line["r"][1], 50 + 5 * (at + len(word)), line["r"][3], 1]
+
+    a = categories.add_excerpt(
+        service, period, "Conseil X", 1, [rect(lines[0], "membre du conseil X")], document_id=doc
+    )
+    b = categories.add_excerpt(
+        service, period, "Commission Y", 1, [rect(lines[1], "commission Y")], document_id=doc
+    )
+    categories.merge_excerpts(b, a, ref_only=True)
+    sent = []
+
+    async def rewrite(text, before, after, document=""):
+        sent.append((text, document))
+        return excerpt_rewrite.Rewrite(text="Membre du conseil X, président de la commission Y")
+
+    llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3:8b"))
+    monkeypatch.setattr(excerpt_rewrite, "rewrite", rewrite)
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker=f"excerpt-edit-{a}")
+    user.find(marker=f"excerpt-edit-{a}").click()
+    await user.should_see(marker="excerpt-rewrite-ask")
+    user.find(marker="excerpt-rewrite-ask").click()
+    await user.should_see(marker="excerpt-rewrite-text")
+    assert sent == [
+        (
+            "membre du conseil X […] commission Y",
+            "Depuis 2020, je suis <selected>membre du conseil X</selected>, où je préside la "
+            "<selected>commission Y</selected>.",
+        )
+    ]
 
 
 async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
@@ -2665,7 +2736,7 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
         )
 
     async def models(api, url, api_key=None):
-        return ["broken", "gemma3:4b", "qwen3:8b"]
+        return ["bge-m3", "broken", "gemma3:4b", "qwen3:8b"]
 
     async def library(timeout=10.0):  # (to download: after the local ones)
         return [llm.LibraryModel("gemma3:4b", False), llm.LibraryModel("absent:1b", False)]
@@ -2673,8 +2744,11 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
     async def can_think(name, timeout=5.0):
         return name != "broken"
 
+    async def can_chat(name, timeout=5.0):  # (bge-m3: an embedding model)
+        return name != "bge-m3"
+
     async def installed(url, timeout=5.0):  # (absent:1b: not downloaded)
-        return {"broken": 1, "gemma3:4b": 1, "qwen3:8b": 1}
+        return {"bge-m3": 1, "broken": 1, "gemma3:4b": 1, "qwen3:8b": 1}
 
     monkeypatch.setenv(llm.REWRITE_MODEL_ENV, "none")  # (none rewriting: still to try)
     llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3:8b"))
@@ -2683,6 +2757,7 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
     monkeypatch.setattr(llm, "installed_models", installed)
     monkeypatch.setattr(llm, "library_models", library)
     monkeypatch.setattr(llm, "can_think", can_think)
+    monkeypatch.setattr(llm, "can_chat", can_chat)
     try:
         user.find(marker="pdf-excerpt").click()
         await user.should_see(marker="excerpt-rewrite-off")
@@ -2694,12 +2769,13 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
                 break
             await asyncio.sleep(0.05)
         assert list(chooser.options.items()) == [
+            ("bge-m3", "bge-m3"),
             ("broken", "broken"),
             ("gemma3:4b", "gemma3:4b"),
             ("qwen3:8b", "qwen3:8b"),
             ("absent:1b", "↓ absent:1b"),
         ]
-        for name in ("gemma3:4b", "broken", "absent:1b", "gemma3:4b"):  # (each a badge, once)
+        for name in ("gemma3:4b", "broken", "absent:1b", "bge-m3", "gemma3:4b"):  # (once each)
             chooser.value = name
             await user.should_see(marker=f"change-llm-chip-{name}")
             for _ in range(20):  # (the list emptied, for the next one)
@@ -2727,6 +2803,7 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
         await user.should_see(marker="change-llm-time-0")
         await user.should_see(marker="change-llm-missing-2")  # (not asked: offered to download)
         await user.should_see(marker="change-llm-download-2")
+        await user.should_see(marker="change-llm-not-chat-3")  # (an embedding model: said)
         assert [a[0] for a in asked] == ["gemma3:4b", "broken"]
         assert asked[0][1:] == (selection["text"], "Entre 2019 et 2021, j'ai été ")
         await user.should_not_see(marker="change-llm-keep-1")

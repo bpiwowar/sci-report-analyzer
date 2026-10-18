@@ -4,7 +4,7 @@ split_years, context_years; documents.selection_context)."""
 import pytest
 
 from sci_report_analyzer.categories import context_years, detect_years, split_years
-from sci_report_analyzer.documents import selection_context
+from sci_report_analyzer.documents import marked_context, selection_context, selection_text
 
 
 @pytest.mark.parametrize(
@@ -154,3 +154,41 @@ def test_selection_context_beside():
     before, after = selection_context([date, text], [_rect(text, 0, 4)])
     assert context_years("Head", before, after) == (2019, 2021)
     assert selection_context([date, text], [[0, 0, 1, 1, 3]]) == ("", "")
+
+
+def test_selection_text():
+    """A selection's text read at its place (e.g. to reword an excerpt as in its PDF)."""
+    one = _line(1, 700, "Entre 2019 et 2021, j'ai été XXX et YYY,")
+    two = _line(1, 688, "trésorier du ZZZ.")
+    at = one["t"].index("XXX")
+    assert selection_text([one, two], [_rect(one, at, at + 3)]) == "XXX"
+    assert selection_text([one, two], [_rect(one, at, len(one["t"])), _rect(two, 0, 9)]) == (
+        "XXX et YYY,\ntrésorier"
+    )
+    assert selection_text([one, two], [[0, 0, 1, 1, 3]]) == ""
+    assert selection_text([], [_rect(one, 0, 3)]) == ""
+
+
+def test_marked_context():
+    """Selections marked in the text around them: those next to each other in one text,
+    distant ones (another block) apart, in the order of the PDF."""
+    lines = [
+        _line(1, 760, "Responsabilités"),
+        _line(1, 745, "XXXX YYY et encore"),
+        _line(1, 733, "ZZZ WWW UUUU fin"),
+        _line(1, 721, "suite"),
+        _line(1, 500, "Loin : AAA BBB"),
+        _line(1, 488, "après"),
+    ]
+    far, one, two = _rect(lines[4], 7, 10), _rect(lines[1], 5, 8), _rect(lines[2], 8, 12)
+    assert marked_context(lines, [[far], [two], [one]]) == [
+        "Responsabilités\nXXXX <selected>YYY</selected> et encore\n"
+        "ZZZ WWW <selected>UUUU</selected> fin\nsuite",
+        "Loin : <selected>AAA</selected> BBB\naprès",
+    ]
+    # (side by side: one after the other; at most ``keep`` lines around)
+    both = [[_rect(lines[1], 0, 4)], [_rect(lines[1], 4, 8)]]
+    assert marked_context(lines, both, keep=0) == [
+        "<selected>XXXX</selected><selected> YYY</selected> et encore"
+    ]
+    assert marked_context(lines, [[[0, 0, 1, 1, 3]]]) == []

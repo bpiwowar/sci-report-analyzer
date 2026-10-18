@@ -27,9 +27,11 @@ def model(monkeypatch):
 @pytest.fixture(autouse=True)
 def _clean():
     excerpt_rewrite._trials.clear()
+    excerpt_rewrite._kept_at.clear()
     llm._warmed.clear()
     yield
     excerpt_rewrite._trials.clear()
+    excerpt_rewrite._kept_at.clear()
     llm._warmed.clear()
 
 
@@ -67,10 +69,11 @@ def test_none_no_call(monkeypatch, model) -> None:
 def test_context_window() -> None:
     before = "Line A\nLine B\nLine C\nEntre 2019 et 2021, j'ai été "
     after = " et YYY.\nLine D\nLine E\nLine F"
-    assert context_window(before, after) == (
+    assert context_window(before, after, 2) == (
         "Line B\nLine C\nEntre 2019 et 2021, j'ai été ",
         " et YYY.\nLine D\nLine E",
     )
+    assert context_window(before, after) == (before, after)  # (3 lines: all of them)
     assert context_window(before, after, 1) == (
         "Line C\nEntre 2019 et 2021, j'ai été ",
         " et YYY.\nLine D",
@@ -90,7 +93,7 @@ def test_rewrite(model) -> None:
         got = asyncio.run(
             rewrite(
                 "membre du comité de direction de l'institut X",
-                "Line 0\nLine A\nLine B\nEntre 2019 et 2021, j'ai été ",
+                "Line 0\nLine 1\nLine A\nLine B\nEntre 2019 et 2021, j'ai été ",
                 " et trésorière de Y.\nLine C",
             )
         )
@@ -103,7 +106,7 @@ def test_rewrite(model) -> None:
     prompt = sent["messages"][0]["content"]
     assert "Entre 2019 et 2021, j'ai été" in prompt and "Line 0" not in prompt
     assert "Line A" in prompt and "Line C" in prompt
-    keys = ("notes", "influence", "punctual", "in_period", "days")
+    keys = ("notes", "influence", "punctual", "in_period", "days", "level")
     assert all(f'"{k}"' in prompt for k in keys)
     assert set(excerpt_rewrite.SCHEMA["required"]) == {
         "text",
@@ -115,6 +118,7 @@ def test_rewrite(model) -> None:
         "punctual",
         "in_period",
         "days",
+        "level",
     }
 
 
@@ -149,6 +153,7 @@ def test_rewrite(model) -> None:
                 "punctual": True,
                 "in_period": False,
                 "days": 2,
+                "level": "international",
             },
             Rewrite(
                 text="Keynote at the Z conference",
@@ -157,6 +162,7 @@ def test_rewrite(model) -> None:
                 influence=True,
                 punctual=True,
                 days=2.0,
+                level="international",
             ),
         ),
         (  # (not both one-off and within the period: one-off; days at most a year)
@@ -181,6 +187,7 @@ def test_rewrite(model) -> None:
                 "punctual": None,
                 "in_period": True,
                 "days": "a lot",
+                "level": "galactic",
             },
             Rewrite(text="Reviewer", start=2021, in_period=True),
         ),
@@ -406,3 +413,45 @@ def test_trial_think_openai(model) -> None:
         assert sent[0]["max_tokens"] == 1 and "response_format" not in sent[0]
         assert sent[-1]["chat_template_kwargs"] == {"enable_thinking": True}
         assert t.think and t.rewrite is not None
+
+
+def test_trials_kept_by_their_inputs(model, monkeypatch) -> None:
+    """An answer kept by the hash of what changes it: the instructions (edited: asked
+    again), the passage, the text around it; for a while, at most KEPT_MAX of them."""
+    key = excerpt_rewrite.trial_key("I review", "In 2020,", "", "qwen3:8b", False)
+    assert key != excerpt_rewrite.trial_key("I review", "In 2021,", "", "qwen3:8b", False)
+    try:
+        excerpt_rewrite.save_prompt("Mine: {text}")
+        assert key != excerpt_rewrite.trial_key("I review", "In 2020,", "", "qwen3:8b", False)
+    finally:
+        excerpt_rewrite.save_prompt("")
+    assert key == excerpt_rewrite.trial_key("I review", "In 2020,", "", "qwen3:8b", False)
+
+    clock = iter(range(0, 10**6, 10))
+    monkeypatch.setattr(excerpt_rewrite.time, "monotonic", lambda: float(next(clock)))
+    monkeypatch.setattr(excerpt_rewrite, "KEPT_MAX", 3)
+    t = excerpt_rewrite.Trial("qwen3:8b", Rewrite(text="Reviewer"), 1.0)
+    for k in "abcd":
+        excerpt_rewrite._keep(k, t)
+    assert set(excerpt_rewrite._trials) == {"b", "c", "d"}  # (the oldest dropped)
+    assert excerpt_rewrite._kept("d") == t
+    monkeypatch.setattr(excerpt_rewrite, "KEPT_FOR", 5.0)
+    assert excerpt_rewrite._kept("d") is None  # (expired)
+    excerpt_rewrite._keep("e", t)
+    assert set(excerpt_rewrite._trials) == {"e"}
+
+
+def test_can_chat(model) -> None:
+    """An embedding model cannot answer (e.g. not to try it to reword); unknown: none."""
+    show = "http://localhost:11434/api/show"
+    with respx.mock:
+        respx.post(show).mock(
+            return_value=httpx.Response(200, json={"capabilities": ["embedding"]})
+        )
+        assert asyncio.run(llm.can_chat("embedder")) is False
+        respx.post(show).mock(
+            return_value=httpx.Response(200, json={"capabilities": ["completion", "thinking"]})
+        )
+        assert asyncio.run(llm.can_chat("qwen3:8b")) is True
+        respx.post(show).mock(return_value=httpx.Response(404))
+        assert asyncio.run(llm.can_chat("absent")) is None

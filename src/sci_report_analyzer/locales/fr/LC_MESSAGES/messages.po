@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-18 17:24+0200\n"
+"POT-Creation-Date: 2026-10-18 23:28+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -295,12 +295,14 @@ msgstr "Un nom est nécessaire"
 
 msgid ""
 "A new excerpt reworded (short, impersonal, without its dates) and its "
-"years read in it and the lines around it, proposed when it is filed. "
-"None: only its years, found around it."
+"years read in it and the lines around it, proposed when it is filed (or "
+"on demand, “Reword”, also when editing an excerpt). None: only its years,"
+" found around it."
 msgstr ""
 "Un nouvel extrait reformulé (court, impersonnel, sans ses dates) et ses "
-"années lues dans son texte et les lignes autour, proposés quand il est "
-"classé. Aucun : seulement ses années, trouvées autour."
+"années lues dans le texte et dans les lignes autour, proposés quand il "
+"est classé (ou à la demande, « Reformuler », y compris en modifiant un "
+"extrait). Aucun : seulement ses années, trouvées autour."
 
 #, python-brace-format
 msgid "A new venue: “{text}”"
@@ -1525,6 +1527,9 @@ msgstr "Copier mon texte"
 msgid "Copy of “{name}”"
 msgstr "Copie de « {name} »"
 
+msgid "Copy the command"
+msgstr "Copier la commande"
+
 msgid "Copy the current data there"
 msgstr "Y copier les données actuelles"
 
@@ -1971,9 +1976,6 @@ msgstr "Déposer ici : en dernier, au premier niveau"
 msgid "E.g. nomic-embed-text, bge-m3 (ollama pull <model>)"
 msgstr "P. ex. nomic-embed-text, bge-m3 (ollama pull <modèle>)"
 
-msgid "E.g. to suggest an excerpt's category (trained again if changed)"
-msgstr "P. ex. pour suggérer la catégorie d'un extrait (à réentraîner s'il change)"
-
 msgid ""
 "Each excerpt hidden from what is learnt, then its category suggested: the"
 " share suggested first in the category it is filed in"
@@ -2066,12 +2068,11 @@ msgstr "Modification…"
 msgid "Else an open-access copy found by Unpaywall"
 msgstr "Sinon une copie en accès ouvert trouvée par Unpaywall"
 
+msgid "Else only on demand, with “Reword” in its dialog"
+msgstr "Sinon seulement à la demande, avec « Reformuler » dans sa fenêtre"
+
 msgid "Embedding model"
 msgstr "Modèle d'embeddings"
-
-#, python-brace-format
-msgid "Embedding model (default: {model})"
-msgstr "Modèle d'embeddings (par défaut : {model})"
 
 msgid "Embeddings"
 msgstr "Embeddings"
@@ -2269,13 +2270,6 @@ msgstr "Récupération de la notice du DOI…"
 msgid "Fetching the candidate's papers…"
 msgstr "Récupération des articles du candidat…"
 
-msgid ""
-"File this wording, its notes, these years, days and flags (the text "
-"selected kept)"
-msgstr ""
-"Classer cette formulation, ses notes, ces années, jours et marqueurs (le "
-"texte sélectionné conservé)"
-
 #, python-brace-format
 msgid "Find a category of {folder} (Enter: the first one)"
 msgstr "Trouver une catégorie de {folder} (Entrée : la première)"
@@ -2330,9 +2324,6 @@ msgid ""
 msgstr ""
 "Pour les modèles qui raisonnent (p. ex. qwen3, gpt-oss) : souvent bien "
 "plus lent, rarement utile pour lire un texte"
-
-msgid "For the features using the local LLM"
-msgstr "Pour les fonctions utilisant le LLM local"
 
 msgid "Forget the chosen record, for all the venue's papers: match automatically"
 msgstr ""
@@ -2444,6 +2435,9 @@ msgstr "Donnez un nom au canal"
 
 msgid "Give the venue a name (or the conferences of a joint one)"
 msgstr "Donnez un nom au canal (ou les conférences d'un canal conjoint)"
+
+msgid "Given to the local AI"
+msgstr "Donné à l'IA locale"
 
 msgid ""
 "Google Scholar blocked automated access — save the profile page (after "
@@ -2715,20 +2709,22 @@ msgid "Institution"
 msgstr "Établissement"
 
 #, python-brace-format
+msgid ""
+"Instructions ({document}: the passages marked <selected>…</selected> in "
+"the text around them; {text}: the passages selected; {before}, {after}: "
+"the text around it)"
+msgstr ""
+"Instructions ({document} : les passages marqués <selected>…</selected> "
+"dans le texte autour d'eux ; {text} : les passages sélectionnés ; "
+"{before}, {after} : le texte autour)"
+
+#, python-brace-format
 msgid "Instructions ({name}: the person's name)"
 msgstr "Instructions ({name} : le nom de la personne)"
 
 #, python-brace-format
 msgid "Instructions ({text}: a part of the list)"
 msgstr "Instructions ({text} : une partie de la liste)"
-
-#, python-brace-format
-msgid ""
-"Instructions ({text}: the passage selected; {before}, {after}: the text "
-"around it)"
-msgstr ""
-"Instructions ({text} : le passage sélectionné ; {before}, {after} : le "
-"texte autour)"
 
 msgid "International conference"
 msgstr "Conférence internationale"
@@ -2852,9 +2848,8 @@ msgstr ""
 "Ses titres et blocs, sans ce qui est écrit (à modifier dans les réglages "
 "du dossier) :"
 
-#, python-brace-format
-msgid "Its history: git -C “{path}” log --stat"
-msgstr "Son historique : git -C « {path} » log --stat"
+msgid "Its history:"
+msgstr "Son historique :"
 
 msgid ""
 "Its id in the reports: [[excerpts#id]] lists its excerpts (and those "
@@ -3072,13 +3067,6 @@ msgstr "Type enregistré sur le canal de publication"
 
 msgid "Kinds:"
 msgstr "Types :"
-
-msgid "LLM"
-msgstr "LLM"
-
-#, python-brace-format
-msgid "LLM (default: {model})"
-msgstr "LLM (par défaut : {model})"
 
 msgid "LaTeX ($…$ inline, $$…$$ display)"
 msgstr "LaTeX ($…$ en ligne, $$…$$ centré)"
@@ -3475,9 +3463,6 @@ msgid "Model: {model} (local: nothing leaves this machine or the local network)"
 msgstr ""
 "Modèle : {model} (local : rien ne sort de cette machine ni du réseau "
 "local)"
-
-msgid "Models (local AI)"
-msgstr "Modèles (IA locale)"
 
 #, python-brace-format
 msgid "Models to download not listed: {error}"
@@ -4023,6 +4008,11 @@ msgstr "Ni un DOI ni un document HAL (ou leur URL)"
 msgid "Not a SciReport Analyzer settings file: {error}"
 msgstr "Ce n’est pas un fichier de paramètres SciReport Analyzer : {error}"
 
+msgid "Not a chat model (embeddings only): it cannot reword"
+msgstr ""
+"Pas un modèle de conversation (embeddings seulement) : il ne peut pas "
+"reformuler"
+
 msgid "Not a joint venue"
 msgstr "Pas un canal conjoint"
 
@@ -4048,6 +4038,9 @@ msgstr ""
 "Non vérifié : aucune entrée de classement trouvée pour le canal « {venue}"
 " », et aucune décision manuelle. Marquez-le comme absent des classements "
 "une fois vérifié, ou choisissez une entrée (✎)."
+
+msgid "Not estimated"
+msgstr "Non estimé"
 
 msgid "Not fetched yet (on the next sync)"
 msgstr "Pas encore récupéré (à la prochaine synchronisation)"
@@ -4133,6 +4126,9 @@ msgstr "Pas la personne :"
 msgid "Not this paper"
 msgstr "Pas cet article"
 
+msgid "Not told"
+msgstr "Non précisé"
+
 msgid "Not wrongly found after all: find it here again"
 msgstr "Finalement pas une erreur : le retrouver ici"
 
@@ -4151,6 +4147,9 @@ msgstr "Note dans {period}"
 
 msgid "Notes"
 msgstr "Notes"
+
+msgid "Notes (its details)"
+msgstr "Notes (ses précisions)"
 
 msgid ""
 "Notes and excerpts in the folder: the person's notes, their excerpts by "
@@ -4447,6 +4446,9 @@ msgid "Otherwise only this paper is linked to it, by hand (kept on re-sync)."
 msgstr ""
 "Sinon, seul cet article y est rattaché, à la main (conservé à la "
 "resynchronisation)."
+
+msgid "Over its years"
+msgstr "Sur ses années"
 
 msgid "Override"
 msgstr "Remplacer"
@@ -5179,6 +5181,19 @@ msgstr "Réessayer"
 msgid "Reviewer (rapporteur)"
 msgstr "Rapporteur"
 
+msgid "Reword"
+msgstr "Reformuler"
+
+msgid "Reword a new excerpt at once"
+msgstr "Reformuler un nouvel extrait aussitôt"
+
+msgid ""
+"Reword it with the local AI (short, impersonal), with its notes, years, "
+"days and flags, read in it and around it"
+msgstr ""
+"Le reformuler avec l'IA locale (court, impersonnel), avec ses notes, "
+"années, jours et indicateurs, lus dans le passage et autour"
+
 msgid "Rewrite the excerpt with other models, compare them and keep the best"
 msgstr ""
 "Reformuler l'extrait avec d'autres modèles, les comparer et garder le "
@@ -5849,8 +5864,8 @@ msgid ""
 msgstr ""
 "Suggéré : un petit modèle d'instruction (4 à 8 B) suffit pour recopier "
 "des faits d'un texte en JSON, et il est bien plus rapide : p. ex. "
-"qwen3:8b (sans réflexion), gemma3:4b ; 12 à 14 B s'il oublie des lignes "
-"ou mélange des personnes (p. ex. gemma3:12b, qwen3:14b)."
+"qwen3:8b (sans chaîne de pensée), gemma3:4b ; 12 à 14 B s'il oublie des "
+"lignes ou mélange des personnes (p. ex. gemma3:12b, qwen3:14b)."
 
 msgid ""
 "Suggested: a small instruction model (4–8B) is enough to copy the parts "
@@ -5858,8 +5873,8 @@ msgid ""
 " 12–14B if it merges or splits references (e.g. gemma3:12b, qwen3:14b)."
 msgstr ""
 "Suggéré : un petit modèle d'instruction (4–8B) suffit pour recopier les "
-"parties des références en JSON, par ex. qwen3:8b (sans réflexion), "
-"gemma3:4b ; 12–14B s'il fusionne ou coupe des références (par ex. "
+"parties des références en JSON, par ex. qwen3:8b (sans chaîne de pensée),"
+" gemma3:4b ; 12–14B s'il fusionne ou coupe des références (par ex. "
 "gemma3:12b, qwen3:14b)."
 
 msgid ""
@@ -5867,7 +5882,7 @@ msgid ""
 "qwen3:8b (without thinking), gemma3:4b."
 msgstr ""
 "Suggéré : un petit modèle d'instruction (4–8B), multilingue (français), "
-"par ex. qwen3:8b (sans réflexion), gemma3:4b."
+"par ex. qwen3:8b (sans chaîne de pensée), gemma3:4b."
 
 msgid ""
 "Suggested: an instruction model of 4–14B parameters, multilingual "
@@ -6007,12 +6022,11 @@ msgstr ""
 msgid ""
 "Texts turned into vectors, e.g. to suggest the category of an excerpt: "
 "from Ollama, or a server with an OpenAI-compatible API (llama.cpp, vLLM, "
-"LM Studio…). A folder can use another model (its reports' settings)."
+"LM Studio…)."
 msgstr ""
-"Des textes transformés en vecteurs, p. ex. pour suggérer la catégorie "
+"Les textes transformés en vecteurs, par ex. pour suggérer la catégorie "
 "d'un extrait : par Ollama, ou un serveur avec une API compatible OpenAI "
-"(llama.cpp, vLLM, LM Studio…). Un dossier peut utiliser un autre modèle "
-"(les réglages de ses rapports)."
+"(llama.cpp, vLLM, LM Studio…)."
 
 msgid "That of the excerpts without one"
 msgstr "Celui des extraits qui n'en ont pas"
@@ -6174,13 +6188,6 @@ msgstr ""
 
 msgid "The line too"
 msgstr "La ligne aussi"
-
-msgid ""
-"The local AI models used for these folders instead of the default ones "
-"(Settings → Local LLM); blank: the default."
-msgstr ""
-"Les modèles d'IA locale utilisés pour ces dossiers au lieu de ceux par "
-"défaut (Paramètres → LLM local) ; vide : celui par défaut."
 
 msgid "The local AI rewrites the excerpt…"
 msgstr "L'IA locale reformule l'extrait…"
@@ -6823,6 +6830,9 @@ msgstr[1] "Entraîné le {when} ({n} extraits)"
 msgid "Try a venue text"
 msgstr "Essayer un texte de canal de publication"
 
+msgid "Try again"
+msgstr "Réessayer"
+
 msgid "Turn into a venue rule (to edit): its near variants match too"
 msgstr ""
 "En faire une règle du canal (à modifier) : ses variantes proches sont "
@@ -6973,6 +6983,13 @@ msgstr "Utiliser ce canal"
 
 msgid "Use this wording, its notes, these years, days and flags"
 msgstr "Utiliser cette formulation, ses notes, ces années, jours et marqueurs"
+
+msgid ""
+"Use this wording, its notes, these years, days and flags (the text "
+"selected kept as its original)"
+msgstr ""
+"Utiliser cette formulation, ses notes, ces années, jours et indicateurs "
+"(le texte sélectionné gardé comme original)"
 
 #, python-brace-format
 msgid "Use {path}?"
@@ -7204,6 +7221,9 @@ msgstr ""
 "un article du canal de publication) ; automatique : d'après le canal et "
 "les types de document des sources"
 
+msgid "When"
+msgstr "Quand"
+
 msgid ""
 "When copied through a filter, a tag replaced on its line by a text before"
 " it (e.g. an icon) and one after, in a colour (or highlighted), in bold, "
@@ -7229,6 +7249,9 @@ msgid ""
 msgstr ""
 "Quels articles comptent (la source principale), les listes de mise en "
 "avant, et comment les notes numérotent et citent les articles."
+
+msgid "Whole message"
+msgstr "Message complet"
 
 msgid "Why (required for this paper only)"
 msgstr "Pourquoi (obligatoire pour cet article seulement)"
@@ -7308,6 +7331,9 @@ msgstr "Année"
 
 msgid "Year gap"
 msgstr "Écart d'années"
+
+msgid "Years"
+msgstr "Années"
 
 msgid ""
 "Years of the papers it applies to (empty: every year). In its years, it "
@@ -7445,7 +7471,7 @@ msgid "candidate"
 msgstr "candidat"
 
 msgid "cannot think"
-msgstr "sans réflexion possible"
+msgstr "sans chaîne de pensée possible"
 
 msgid "captured by a venue rule"
 msgstr "capturé par une règle de canal"
@@ -7534,9 +7560,6 @@ msgstr "p. ex. Collaborateurs internationaux"
 
 msgid "edited"
 msgstr "modifiée"
-
-msgid "embedding model"
-msgstr "modèle d'embeddings"
 
 msgid "enabled"
 msgstr "activée"
@@ -7780,6 +7803,9 @@ msgstr ""
 msgid "linked by hand"
 msgstr "lié à la main"
 
+msgid "local"
+msgstr "local"
+
 #, python-brace-format
 msgid "local: {value}"
 msgstr "local : {value}"
@@ -7879,7 +7905,7 @@ msgid "no suggestion"
 msgstr "aucune suggestion"
 
 msgid "no thinking"
-msgstr "sans réflexion"
+msgstr "sans chaîne de pensée"
 
 msgid "no track"
 msgstr "session normale"
@@ -8303,10 +8329,6 @@ msgid "the workshop rather than its main conference ({names})"
 msgstr "l'atelier plutôt que sa conférence principale ({names})"
 
 #, python-brace-format
-msgid "the {kind} of the folder settings “{name}”"
-msgstr "le {kind} des réglages de dossier « {name} »"
-
-#, python-brace-format
 msgid "their period in the folder ({years})"
 msgstr "sa période dans le dossier ({years})"
 
@@ -8315,11 +8337,11 @@ msgid "theses.fr: {start} – {end} (empty: back to these)"
 msgstr "theses.fr : {start} – {end} (vide : retour à celles-ci)"
 
 msgid "thinking"
-msgstr "avec réflexion"
+msgstr "avec chaîne de pensée"
 
 #, python-brace-format
 msgid "thinking ({n} characters)"
-msgstr "réflexion ({n} caractères)"
+msgstr "chaîne de pensée ({n} caractères)"
 
 msgid "thinks"
 msgstr "réfléchit"

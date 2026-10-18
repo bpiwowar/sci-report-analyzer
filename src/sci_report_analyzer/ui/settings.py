@@ -1878,7 +1878,10 @@ def rewrite_tab() -> None:
         "rewrite",
         excerpt_rewrite.prompt(),
         excerpt_rewrite.PROMPT,
-        _("Instructions ({text}: the passage selected; {before}, {after}: the text around it)"),
+        _(
+            "Instructions ({document}: the passages marked <selected>…</selected> in the text "
+            "around them; {text}: the passages selected; {before}, {after}: the text around it)"
+        ),
     )
 
     def values() -> tuple[str, str, bool, str]:
