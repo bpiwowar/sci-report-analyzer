@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-18 17:20+0200\n"
+"POT-Creation-Date: 2026-10-18 17:24+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -2662,10 +2662,6 @@ msgstr ""
 "son encadrement)."
 
 #, python-brace-format
-msgid "In {category}"
-msgstr "Dans {category}"
-
-#, python-brace-format
 msgid "In {category}: pick another one to move it there (and save)"
 msgstr ""
 "Dans {category} : choisissez-en une autre pour l'y déplacer (et "
@@ -2690,6 +2686,9 @@ msgstr ""
 "références, avec leur titre, auteurs, support, année et DOI, rapprochées "
 "des articles par leur titre au lieu des éléments découpés par lignes. Une"
 " longue liste est lue par parties."
+
+msgid "In:"
+msgstr "Dans :"
 
 msgid "Include imported JCR rows (check you may share them)"
 msgstr "Inclure les lignes JCR importées (vérifiez que vous pouvez les partager)"
@@ -5830,6 +5829,9 @@ msgstr "Suggérées d'après les extraits classés (leurs embeddings)"
 msgid "Suggested related venues"
 msgstr "Canaux liés suggérés"
 
+msgid "Suggested:"
+msgstr "Suggérée :"
+
 msgid ""
 "Suggested: a multilingual embedding model (French and English), small "
 "(0.3–0.6B) and fast, e.g. bge-m3, qwen3-embedding:0.6b, embeddinggemma; "
@@ -8198,10 +8200,6 @@ msgstr "liste de mise en avant, dans la période"
 #, python-brace-format
 msgid "star list, within {period}"
 msgstr "liste de mise en avant, dans {period}"
-
-#, python-brace-format
-msgid "suggested: {category}"
-msgstr "suggérée : {category}"
 
 msgid "syncing…"
 msgstr "synchronisation…"

@@ -283,6 +283,8 @@ async def test_classification_dialog(user: User, embeddings) -> None:
     await user.should_see(marker="classification-rate")
     await user.should_see(marker=f"classification-category-{cats['Research']}")
     await user.should_see(marker=f"reclassify-excerpt-{wrong}")
+    await user.should_see(marker=f"reclassify-in-{wrong}")  # (its category, never cut)
+    await user.should_see(marker=f"reclassify-suggested-{wrong}")
     await user.should_see("Move to Teaching")
     user.find(marker=f"reclassify-move-{wrong}").click()
     await user.should_not_see(marker=f"reclassify-excerpt-{wrong}")

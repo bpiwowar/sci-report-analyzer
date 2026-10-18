@@ -15,6 +15,16 @@ from .dialogs import transient_dialog
 LLM_URL = "/settings?tab=llm"
 
 
+def _path_line(what: str, path: str, colour: str, mark: str) -> None:
+    """A category on its own line, wrapped (never cut): its parents, then its name in bold."""
+    *parents, leaf = path.split(" › ")
+    with ui.element("div").classes(f"text-xs {colour} break-words").mark(mark):
+        ui.label(what + " ").classes("inline")
+        if parents:
+            ui.label(" › ".join(parents) + " › ").classes("inline")
+        ui.label(leaf).classes("inline font-bold")
+
+
 def excerpt_card(
     excerpt_id: int,
     text: str,
@@ -30,15 +40,18 @@ def excerpt_card(
     its own), or kept (if ``keep``)."""
     with ui.card().classes("w-full p-2 gap-1").mark(f"reclassify-excerpt-{excerpt_id}"):
         ui.label(text).classes("text-sm line-clamp-3").tooltip(text)
-        with ui.row().classes("w-full items-center gap-2 no-wrap"):
-            ui.label(_("In {category}").format(category=names.get(category_id, "?"))).classes(
-                "text-xs text-grey min-w-0 ellipsis"
+        _path_line(
+            _("In:"), names.get(category_id, "?"), "text-grey-8", f"reclassify-in-{excerpt_id}"
+        )
+        if suggested is not None:
+            _path_line(
+                _("Suggested:"),
+                names.get(suggested, "?"),
+                "text-purple",
+                f"reclassify-suggested-{excerpt_id}",
             )
-            ui.label(
-                _("suggested: {category}").format(category=names.get(suggested, "?"))
-                if suggested is not None
-                else _("no suggestion")
-            ).classes("text-xs text-purple min-w-0 ellipsis")
+        else:
+            ui.label(_("no suggestion")).classes("text-xs text-purple")
         with ui.row().classes("w-full items-center gap-2"):
             if suggested is not None:
                 leaf = names.get(suggested, "?").split(" › ")[-1]
