@@ -285,7 +285,9 @@ class Side:
             suggest=(lambda: excerpt_rewrite.rewrite(sel["text"], before, after))
             if rewriting
             else None,
-            rewriter=(lambda name: excerpt_rewrite.trial(sel["text"], before, after, name))
+            rewriter=(
+                lambda name, **opts: excerpt_rewrite.trial(sel["text"], before, after, name, **opts)
+            )
             if llm_on
             else None,
             merge=lambda lead, ref_only: self.merge_excerpt(
@@ -1473,7 +1475,7 @@ class NewExcerpt:
     file: Callable[..., int]
     around: tuple[int, int] | None = None
     suggest: Callable[[], Awaitable[excerpt_rewrite.Rewrite | None]] | None = None
-    rewriter: Callable[[str], Awaitable[excerpt_rewrite.Trial]] | None = None
+    rewriter: Callable[..., Awaitable[excerpt_rewrite.Trial]] | None = None
     merge: Callable[[categories.ExcerptView, bool], None] | None = None
 
 
@@ -1553,13 +1555,15 @@ def _rewording(
 def change_llm_dialog(
     side: Side,
     text: str,
-    rewriter: Callable[[str], Awaitable[excerpt_rewrite.Trial]] | None,
+    rewriter: Callable[..., Awaitable[excerpt_rewrite.Trial]] | None,
     keep: Callable[[excerpt_rewrite.Rewrite], None],
 ) -> None:
     """The passage ``text`` rewritten by other models, to compare them (``rewriter``: its
     rewrite by a model, see excerpt_rewrite.trial; none: the local LLM off, said, with where
     to turn it on): those chosen run one after the other (a local server rarely holds several
-    at once), their rewrites side by side with their times; one kept (``keep`` is called with
+    at once, each warmed up first: not timed), their rewrites side by side with their times
+    (with or without thinking; an answer already got shown again, as cached, unless “No cache”
+    or “Run again”); one kept (``keep`` is called with
     it), its model made the one rewriting the excerpts if asked."""
     with (
         side.host.dialogs,
@@ -1597,9 +1601,16 @@ def change_llm_dialog(
             )
             run = ui.button(_("Run"), icon="play_arrow").props("no-caps").mark("change-llm-run")
         status = ui.label().classes("text-xs text-grey").mark("change-llm-status")
-        ui.label(
-            _("A model's first answer includes its loading: run it again for its own time")
-        ).classes("text-xs text-grey")
+        with ui.row().classes("w-full items-center gap-4"):
+            think = ui.switch(_("Thinking")).mark("change-llm-think")
+            think.tooltip(
+                _("The model reasons before answering (slower); a model without it is told")
+            )
+            fresh = ui.checkbox(_("No cache")).mark("change-llm-fresh")
+            fresh.tooltip(_("Ask the models again, even for an answer already got"))
+            ui.label(_("Each model is warmed up first: its loading is not timed")).classes(
+                "text-xs text-grey"
+            )
         default = ui.checkbox(
             _("Make the model of the one kept the model rewriting the excerpts")
         ).mark("change-llm-default")
@@ -1635,6 +1646,56 @@ def change_llm_dialog(
             ui.notify(_("{model} now rewrites the excerpts").format(model=t.model))
         close(dlg)
 
+    async def answer(i: int, name: str, body: ui.column, again: bool) -> None:
+        """Model ``name``'s answer in ``body`` (``again``: not from the cache)"""
+        body.clear()
+        with body:
+            ui.spinner(size="sm")
+            warming = ui.label().classes("text-xs text-grey").mark(f"change-llm-warming-{i}")
+
+        def warm() -> None:
+            if not warming.is_deleted:
+                warming.set_text(_("Warming up…"))
+
+        t = await rewriter(name, think=think.value, fresh=again or fresh.value, warming=warm)
+        if dlg.is_deleted:  # (closed: the others not run)
+            return
+        body.clear()
+        with body:
+            with ui.row().classes("items-center gap-1 no-wrap"):
+                ui.label(_("{seconds} s").format(seconds=f"{t.seconds:.1f}")).classes(
+                    "text-xs text-grey"
+                ).mark(f"change-llm-time-{i}")
+                if t.cached:
+                    ui.badge(_("cached")).props("outline").mark(f"change-llm-cached-{i}")
+                    ui.button(icon="refresh", on_click=lambda: answer(i, name, body, True)).props(
+                        "flat dense round size=sm"
+                    ).tooltip(_("Run again")).mark(f"change-llm-again-{i}")
+                if t.warmed:
+                    ui.label(_("warmed up")).classes("text-xs text-grey").mark(
+                        f"change-llm-warmed-{i}"
+                    )
+                ui.label(_("thinking") if t.think else _("no thinking")).classes(
+                    "text-xs text-grey"
+                ).mark(f"change-llm-thought-{i}")
+            if t.no_think:  # (said, not hidden)
+                ui.label(_("This model cannot think: asked without")).classes(
+                    "text-xs text-orange-10"
+                ).mark(f"change-llm-no-think-{i}")
+            if t.rewrite is None:  # (said)
+                ui.label(
+                    _("No valid answer: {error}").format(error=t.error)
+                    if t.error
+                    else _("No valid answer")
+                ).classes("text-xs text-negative").mark(f"change-llm-failed-{i}")
+                return
+            ui.label(t.rewrite.text).classes("text-sm").mark(f"change-llm-text-{i}")
+            if facts := rewrite_facts(t.rewrite):
+                ui.label(facts).classes("text-xs text-grey").mark(f"change-llm-facts-{i}")
+            ui.button(_("Keep it"), on_click=lambda: chosen(t)).props("flat dense no-caps").tooltip(
+                _("Use this wording, these years, days and flags")
+            ).mark(f"change-llm-keep-{i}")
+
     async def compare() -> None:
         names = list(models.value or [])
         if not names:
@@ -1651,35 +1712,12 @@ def change_llm_dialog(
                 bodies.append(body)
         try:
             for i, (name, body) in enumerate(zip(names, bodies, strict=True)):
-                body.clear()
-                with body:
-                    ui.spinner(size="sm")
                 status.set_text(
                     _("Rewriting with {model} ({i}/{n})…").format(model=name, i=i + 1, n=len(names))
                 )
-                t = await rewriter(name)
-                if dlg.is_deleted:  # (closed: the others not run)
+                await answer(i, name, body, False)
+                if dlg.is_deleted:
                     return
-                body.clear()
-                with body:
-                    ui.label(_("{seconds} s").format(seconds=f"{t.seconds:.1f}")).classes(
-                        "text-xs text-grey"
-                    ).mark(f"change-llm-time-{i}")
-                    if t.rewrite is None:  # (said)
-                        ui.label(
-                            _("No valid answer: {error}").format(error=t.error)
-                            if t.error
-                            else _("No valid answer")
-                        ).classes("text-xs text-negative").mark(f"change-llm-failed-{i}")
-                        continue
-                    ui.label(t.rewrite.text).classes("text-sm").mark(f"change-llm-text-{i}")
-                    if facts := rewrite_facts(t.rewrite):
-                        ui.label(facts).classes("text-xs text-grey").mark(f"change-llm-facts-{i}")
-                    ui.button(_("Keep it"), on_click=lambda t=t: chosen(t)).props(
-                        "flat dense no-caps"
-                    ).tooltip(_("Use this wording, these years, days and flags")).mark(
-                        f"change-llm-keep-{i}"
-                    )
             status.set_text(_("Done: keep the best one"))
         finally:
             if not run.is_deleted:

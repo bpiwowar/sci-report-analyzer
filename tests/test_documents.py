@@ -2484,16 +2484,19 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
         dlg.close()
     await user.should_not_see(marker="excerpt-start")
 
-    asked = []
+    asked, options = [], []
 
-    async def trial(text, before, after, name):
+    async def trial(text, before, after, name, **opts):
         asked.append((name, text, before))
+        options.append(opts)
         if name == "broken":
             return excerpt_rewrite.Trial(name, None, 0.5, "out of memory")
         r = excerpt_rewrite.Rewrite(
             text=f"Membre du conseil de l'école X ({name})", start=2018, in_period=True, days=0.5
         )
-        return excerpt_rewrite.Trial(name, r, 1.25)
+        return excerpt_rewrite.Trial(
+            name, r, 1.25, cached=bool(opts.get("think")), think=bool(opts.get("think"))
+        )
 
     async def models(api, url, api_key=None):
         return ["broken", "gemma3:4b", "qwen3:8b"]
@@ -2514,8 +2517,12 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
             await asyncio.sleep(0.05)
         assert chooser.options == ["broken", "gemma3:4b", "qwen3:8b"]
         chooser.value = ["gemma3:4b", "broken"]
+        user.find(marker="change-llm-think").elements.pop().value = True
         user.find(marker="change-llm-run").click()
         await user.should_see(marker="change-llm-text-0")
+        assert options[0]["think"] is True and options[0]["fresh"] is False
+        await user.should_see(marker="change-llm-cached-0")  # (marked, with a way to run again)
+        await user.should_see(marker="change-llm-again-0")
         await user.should_see(marker="change-llm-failed-1")
         await user.should_see("out of memory")
         await user.should_see(marker="change-llm-time-0")

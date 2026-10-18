@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import logging
 import os
 import re
 from collections.abc import Callable
@@ -31,6 +32,8 @@ import httpx
 
 from .db.app_settings import delete_setting, get_setting, set_setting
 from .i18n import N_
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_URL = "http://localhost:11434"
 URL_ENV = "OLLAMA_HOST"
@@ -301,13 +304,14 @@ async def chat_json(
     progress: Callable[[str, int], None] | None = None,
     timeout: float = 600.0,
     name: str | None = None,
+    think: bool | None = None,
 ) -> dict:
     """The LLM's answer to ``messages`` (Ollama's /api/chat, or an OpenAI-compatible
     server's /chat/completions: see CHAT_APIS) for a task, as JSON following ``schema`` (a
     structured output: constrained decoding; raises if no LLM, the server is not local or
     unreachable). Streamed: ``progress`` is called with the phase ("reading" the text,
     "thinking", "writing" the answer) and the characters written in it. ``name``: this model
-    instead (a local one)."""
+    instead (a local one); ``think``: whether it thinks (none: see thinks)."""
     st = settings()
     name = model(folder_id, task) if name is None else ("" if _cloud(st, name) else name)
     if not name:
@@ -327,12 +331,70 @@ async def chat_json(
             if progress:
                 progress("writing", sum(map(len, content)))
 
+    think = thinks(task) if think is None else think
     async with httpx.AsyncClient(timeout=timeout) as client:
         if st.chat_api == "openai":
-            await _openai_chat(client, st, name, messages, schema, thinks(task), received)
+            await _openai_chat(client, st, name, messages, schema, think, received)
         else:
-            await _ollama_chat(client, st, name, messages, schema, thinks(task), received)
+            await _ollama_chat(client, st, name, messages, schema, think, received)
     return json.loads(_THINK_BLOCK.sub("", "".join(content), count=1))
+
+
+# The models already warmed up (see warm_up): (API, server, model).
+_warmed: set[tuple[str, str, str]] = set()
+
+
+def is_warm(name: str) -> bool:
+    st = settings()
+    return (st.chat_api, chat_server(st), name) in _warmed
+
+
+async def warm_up(name: str, timeout: float = 600.0) -> bool:
+    """Loads the model ``name`` (a local one) by a tiny request (one token at most), once per
+    model and server (until the process ends), so that the next answer is timed without its
+    loading. True if it was sent now; an error is left to the next request (not warmed)."""
+    st = settings()
+    key = (st.chat_api, chat_server(st), name)
+    if key in _warmed or _cloud(st, name):
+        return False
+    messages = [{"role": "user", "content": "ok"}]
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            if st.chat_api == "openai":
+                body = {"model": name, "messages": messages, "max_tokens": 1}
+                url = f"{_local(st.chat_url)}/chat/completions"
+                r = await client.post(url, json=body, headers=_headers(st.api_key))
+            else:
+                body = {
+                    "model": name,
+                    "messages": messages,
+                    "stream": False,
+                    "think": False,
+                    "options": {"num_predict": 1},
+                }
+                r = await client.post(f"{_local(st.url)}/api/chat", json=body)
+            r.raise_for_status()
+    except Exception as e:  # (the answer asked for will say it)
+        logger.info("No warm-up of %s: %s", name, e)
+        return False
+    _warmed.add(key)
+    return True
+
+
+async def can_think(name: str, timeout: float = 5.0) -> bool | None:
+    """Whether the model ``name`` can think (Ollama's capabilities); none if unknown (an
+    OpenAI-compatible server does not say, nor an unreachable one)."""
+    st = settings()
+    if st.chat_api == "openai" or _cloud(st, name):
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            r = await client.post(f"{_local(st.url)}/api/show", json={"model": name})
+            r.raise_for_status()
+            caps = r.json().get("capabilities")
+    except Exception:
+        return None
+    return "thinking" in caps if isinstance(caps, list) else None
 
 
 # The reasoning some servers leave in the answer itself (e.g. qwen3's, without a parser).
