@@ -285,7 +285,7 @@ def categories_editor(folder_id: int, changed: Callable[[], None] | None = None)
         async def suggest() -> None:
             """(the category closest to each one, not within the one deleted)"""
             note.clear()
-            if not llm.embed_model(folder_id):
+            if not llm.embed_model():
                 with note:
                     ui.label(
                         _(

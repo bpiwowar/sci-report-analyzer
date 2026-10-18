@@ -507,10 +507,9 @@ They are edited in sections, in tabs atop (also the folder dialog's “Settings�
 “Folder” tab giving its name, date, notes and the settings it uses):
 **Categories** (their tree, changed at once), **Report** (the report templates, the language
 of the reports), **Excerpts** (the markers' tags and whether a marked excerpt comes first,
-the levels, where the rayonnement excerpts go), **Citations & sources** (the primary source,
-the star lists, how the notes number and cite the papers, the folder's own citation
-templates) and **Models (local AI)** (an LLM and an embedding model used instead of the
-default ones; blank: the default). Each folder uses the
+the levels, where the rayonnement excerpts go) and **Citations & sources** (the primary
+source, the star lists, how the notes number and cite the papers, the folder's own citation
+templates). Each folder uses the
 settings chosen in its dialog or its menu (an icon in the tree when not the default ones),
 else the default ones; a folder made within another one starts with its choice, and a folder
 moved keeps its settings. Choosing other settings files its people's excerpts in the
@@ -583,8 +582,7 @@ brings them back):
   that is not in the list; each keeps its number in the list (“P3.”: 3); a long list in parts.
 
 When the LLM is off (or a task has no model, or gets no valid answer), the task's page and
-the excerpt dialog and the Tag from a list dialog say so, with a link to turn it on. A folder's settings can use other
-models (their “Models (local AI)” section).
+the excerpt dialog and the Tag from a list dialog say so, with a link to turn it on.
 
 **Backups** of the database (not of the PDFs) are made in `backups/` next to it (Settings →
 Data & cache shows where): one a day at startup (the last 7 kept), and one before each upgrade of

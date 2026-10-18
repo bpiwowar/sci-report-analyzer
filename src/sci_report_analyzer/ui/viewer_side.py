@@ -1349,7 +1349,7 @@ def category_suggestions(folder_id: int, text: str, pick: Callable[[int], None])
     classifier.py), clicked to pick one; when they were learnt (from the excerpts filed), and
     a button to learn again. Without an embedding model: greyed, saying so."""
     names = {n.id: n.path for n in categories.tree(folder_id)}
-    on = bool(llm.embed_model(folder_id))
+    on = bool(llm.embed_model())
     with ui.column().classes("w-full gap-0").mark("category-suggestions"):
         # A header (what they come from, when learnt, to learn again), then the suggestions
         # one per line: the category itself stressed, its parents dimmed, its similarity

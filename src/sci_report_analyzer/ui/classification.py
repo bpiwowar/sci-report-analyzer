@@ -110,7 +110,7 @@ def classification_dialog(settings_id: int) -> None:
     async def load() -> None:
         body.clear()
         tree = categories.tree(ref)
-        if not llm.embed_model(ref):
+        if not llm.embed_model():
             unavailable(
                 _(
                     "No suggestion: turn on the local LLM and choose an embedding model "
