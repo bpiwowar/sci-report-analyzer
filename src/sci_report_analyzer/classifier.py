@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 from array import array
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -260,9 +261,12 @@ def trained(folder_id: int) -> Trained | None:
         return None if row is None else _trained(row)
 
 
-async def suggest(folder_id: int, text: str, k: int = 3) -> list[tuple[int, float]]:
-    """The categories closest to a passage (id, cosine similarity to its closest prototype),
-    the closest first; none if not trained, or with another model than the folder's now."""
+async def suggest(
+    folder_id: int, text: str, k: int = 3, exclude: Collection[int] = ()
+) -> list[tuple[int, float]]:
+    """The categories closest to a passage (id, cosine similarity to its closest prototype;
+    not those in ``exclude``), the closest first; none if not trained, or with another model
+    than the folder's now."""
     model = llm.embed_model(folder_id)
     with session_scope() as s:
         settings_id = folders.settings_id(s, folder_id)
@@ -273,7 +277,11 @@ async def suggest(folder_id: int, text: str, k: int = 3) -> list[tuple[int, floa
         existing = set(s.scalars(select(Category.id).where(Category.settings_id == settings_id)))
     (v,) = await embeddings([text.strip()], folder_id)
     v = _unit(np.array(v, dtype=float))
-    scores = [(c, float((p @ v).max())) for c, p in prototypes.items() if c in existing and len(p)]
+    scores = [
+        (c, float((p @ v).max()))
+        for c, p in prototypes.items()
+        if c in existing and c not in exclude and len(p)
+    ]
     return sorted(scores, key=lambda x: -x[1])[:k]
 
 

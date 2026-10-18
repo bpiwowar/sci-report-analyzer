@@ -308,3 +308,45 @@ async def test_classification_dialog_off(user: User, monkeypatch) -> None:
     user.find(marker=f"settings-classification-{sid}").click()
     await user.should_see(marker="classification-off")
     await user.should_see("choose an embedding model", retries=20)
+
+
+async def test_deleting_a_category_reclassifies_its_excerpts(user: User, embeddings) -> None:
+    """A category deleted with excerpts: each listed with the category suggested (not
+    itself), moved there or elsewhere one by one; all moved, deleted."""
+    folder, period, cats = _folder()
+    prize = categories.add_excerpt(cats["Awards"], period, "A teaching prize", 1, [])
+    award = next(e.id for e in categories.excerpts(period) if e.text == "Best paper award")
+    await classifier.train(folder)
+    sid = folders.settings_of(folder)
+    await user.open("/settings?tab=folders")
+    user.find(marker=f"settings-categories-{sid}").click()
+    await user.should_see(marker=f"category-delete-{cats['Awards']}")
+    user.find(marker=f"category-delete-{cats['Awards']}").click()
+    await user.should_see(marker="category-delete-blocked")
+    await user.should_see(marker=f"reclassify-excerpt-{prize}")
+    await user.should_see(marker=f"reclassify-move-{prize}")
+    await user.should_see("Move to Teaching")
+    user.find(marker=f"reclassify-move-{prize}").click()
+    await user.should_not_see(marker=f"reclassify-excerpt-{prize}")
+    user.find(marker=f"reclassify-other-{award}").elements.pop().value = cats["Research"]
+    await user.should_see(marker="category-delete-ready")
+    filed = {e.id: e.category_id for e in categories.excerpts(period)}
+    assert (filed[prize], filed[award]) == (cats["Teaching"], cats["Research"])
+    user.find(marker="category-delete-ok").click()
+    await user.should_not_see(marker=f"category-delete-{cats['Awards']}")
+    assert [n.name for n in categories.tree(folder)] == ["Research", "Teaching"]
+
+
+async def test_deleting_a_category_untrained(user: User, embeddings) -> None:
+    """Never trained: no suggestion, trained from there, then suggested."""
+    folder, period, cats = _folder()
+    award = next(e.id for e in categories.excerpts(period) if e.text == "Best paper award")
+    sid = folders.settings_of(folder)
+    await user.open("/settings?tab=folders")
+    user.find(marker=f"settings-categories-{sid}").click()
+    await user.should_see(marker=f"category-delete-{cats['Awards']}")
+    user.find(marker=f"category-delete-{cats['Awards']}").click()
+    await user.should_see(marker="category-delete-no-suggestion")
+    user.find(marker="category-delete-train").click()
+    await user.should_see(marker=f"reclassify-move-{award}")
+    assert classifier.trained(folder) is not None

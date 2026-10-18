@@ -7,7 +7,7 @@ from collections.abc import Callable
 
 from nicegui import ui
 
-from .. import categories, folders
+from .. import categories, classifier, folders, llm
 from ..i18n import N_, _, ngettext
 from .colours import ColourMenu
 from .dialogs import actions, transient_dialog
@@ -197,11 +197,16 @@ def categories_editor(folder_id: int, changed: Callable[[], None] | None = None)
             actions(confirm, _("Merge"), ok, mark="category-merge-ok")
 
     def delete(n: categories.Node) -> None:
-        """Once confirmed; with excerpts (there or below): to move them first."""
-        count = categories.excerpt_count(n.id)
+        """Once confirmed; with excerpts (there or below): to move first, one by one (each
+        with the category suggested for it, see classifier.py) or all at once."""
+        from .classification import excerpt_card
+
         within = set(categories.subtree(n.id))
-        targets = {c.id: c.path for c in categories.tree(folder_id) if c.id not in within}
-        with transient_dialog(width="max-w-lg") as (confirm, _card):
+        names = {c.id: c.path for c in categories.tree(folder_id)}
+        targets = {c: p for c, p in names.items() if c not in within}
+        count = categories.excerpt_count(n.id)
+        suggested: dict[int, int | None] = {}
+        with transient_dialog(width="max-w-2xl") as (confirm, card):
             if not count:
                 ui.label(
                     _("Delete “{name}” and its subcategories?").format(name=n.name)
@@ -211,13 +216,17 @@ def categories_editor(folder_id: int, changed: Callable[[], None] | None = None)
             else:
                 ui.label(
                     ngettext(
-                        "“{name}” has an excerpt (with its subcategories): move it first.",
-                        "“{name}” has {n} excerpts (with its subcategories): move them first.",
+                        "“{name}” has an excerpt (with its subcategories): move it first, "
+                        "where suggested or elsewhere.",
+                        "“{name}” has {n} excerpts (with its subcategories): move them first, "
+                        "one by one (where suggested, or elsewhere) or all at once.",
                         count,
                     ).format(name=n.name, n=count)
                 ).mark("category-delete-blocked")
+                note = ui.row().classes("w-full items-center gap-2")
+                pending = ui.column().classes("w-full gap-1 max-h-[50vh] overflow-auto")
                 target = (
-                    ui.select(targets, label=_("Move them to"))
+                    ui.select(targets, label=_("Move them all to"))
                     .props("dense outlined options-dense")
                     .classes("w-full")
                     .mark("category-delete-target")
@@ -226,7 +235,7 @@ def categories_editor(folder_id: int, changed: Callable[[], None] | None = None)
                     ui.label(_("No other category: create one first")).classes("text-sm text-grey")
 
             def ok() -> bool | None:
-                if count:
+                if categories.excerpt_count(n.id):
                     if not target.value:
                         ui.notify(_("Choose where to move them"), type="warning")
                         return False
@@ -235,13 +244,84 @@ def categories_editor(folder_id: int, changed: Callable[[], None] | None = None)
                     ui.notify(_("Excerpts were filed there meanwhile"), type="warning")
                 done()
 
-            actions(
+            ok_button = actions(
                 confirm,
                 _("Move, then delete") if count else _("Delete"),
                 ok,
                 danger=True,
                 mark="category-delete-ok",
             )
+
+        if not count:
+            return
+
+        def listed() -> None:
+            """The excerpts left, each with the category suggested; none: to delete."""
+            pending.clear()
+            left = categories.filed_below(n.id)
+            with pending:
+                for i, cat, text in left:
+                    excerpt_card(
+                        i,
+                        text,
+                        cat,
+                        suggested.get(i),
+                        names,
+                        lambda c, i=i: move(i, c),
+                        others=targets,
+                    )
+                if not left:
+                    ui.label(_("All moved: “{name}” can be deleted").format(name=n.name)).classes(
+                        "text-sm text-positive"
+                    ).mark("category-delete-ready")
+            target.set_visibility(bool(left))
+            ok_button.set_text(_("Move, then delete") if left else _("Delete"))
+
+        def move(excerpt_id: int, category_id: int) -> None:
+            categories.move_excerpt(excerpt_id, category_id)
+            listed()
+            done()
+
+        async def suggest() -> None:
+            """(the category closest to each one, not within the one deleted)"""
+            note.clear()
+            if not llm.embed_model(folder_id):
+                with note:
+                    ui.label(
+                        _(
+                            "No suggestion: turn on the local LLM, choose an embedding model "
+                            "(Settings)"
+                        )
+                    ).classes("text-xs text-grey").mark("category-delete-no-suggestion")
+                return
+            if classifier.trained(folder_id) is None:
+                with note:
+                    ui.label(_("No suggestion (train first)")).classes("text-xs text-grey").mark(
+                        "category-delete-no-suggestion"
+                    )
+                    ui.button(_("Train"), icon="model_training", on_click=train).props(
+                        "flat dense size=sm no-caps color=purple"
+                    ).mark("category-delete-train")
+                return
+            for i, _cat, text in categories.filed_below(n.id):
+                try:
+                    found = await classifier.suggest(folder_id, text, 1, within)
+                except Exception:
+                    found = []
+                suggested[i] = found[0][0] if found else None
+            listed()
+
+        async def train() -> None:
+            try:
+                await classifier.train(folder_id)
+            except Exception as e:
+                ui.notify(_("Cannot train: {error}").format(error=e), type="negative")
+                return
+            await suggest()
+
+        listed()
+        with card:
+            ui.timer(0.05, suggest, once=True)
 
     with ui.column().classes("w-full gap-0 max-h-[60vh] overflow-auto"):
         listing()
