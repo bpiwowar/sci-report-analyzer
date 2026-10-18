@@ -3,6 +3,7 @@ publications panel), bookmarks, and the paper of a selection."""
 
 from __future__ import annotations
 
+import html
 import inspect
 import json
 from collections.abc import Awaitable, Callable
@@ -29,7 +30,7 @@ from .. import (
 )
 from ..i18n import N_, _, ngettext
 from ..sources.base import SourceError
-from . import section_text
+from . import llm_models, section_text
 from .categories_editor import categories_dialog
 from .copying import copy_button
 from .dialogs import actions, close, confirm, ok_handler, transient_dialog
@@ -1599,13 +1600,75 @@ def change_llm_dialog(
                 .classes("grow")
                 .mark("change-llm-models")
             )
+            # (those to download: after the local ones, greyed, in italics)
+            models.add_slot(
+                "option",
+                r"""<q-item v-bind="props.itemProps"><q-item-section><q-item-label
+                :class="props.opt.label.startsWith('↓') ? 'text-grey-7 text-italic' : ''">
+                {{ props.opt.label }}</q-item-label></q-item-section></q-item>""",
+            )
             run = ui.button(_("Run"), icon="play_arrow").props("no-caps").mark("change-llm-run")
         status = ui.label().classes("text-xs text-grey").mark("change-llm-status")
+        # Whether each model chosen thinks: chosen in its chip (said in its label; one that
+        # cannot, said).
+        think: dict[str, bool] = {}
+        cannot: set[str] = set()
+        checked: set[str] = set()
+        labels: dict[str, str] = {m: m for m in models.value or []}
+
+        def relabel() -> None:
+            chosen = set(models.value or [])
+            options = {}
+            for m, label in labels.items():
+                if m in chosen and m in cannot:
+                    label += " · " + _("cannot think")
+                elif m in chosen and think.get(m):
+                    label += " · " + _("thinking")
+                options[m] = label
+            models.set_options(options, value=list(models.value or []))
+
+        def thinks(e) -> None:
+            args = e.args or {}
+            name = args.get("model")
+            if args.get("id") != models.id or name not in (models.value or []):
+                return
+            if args.get("on") and name in cannot:
+                ui.notify(_("{model} cannot think").format(model=name), type="warning")
+                return
+            think[name] = bool(args.get("on"))
+            relabel()
+
+        ui.on("vr-llm-think", thinks)
+        menu = "".join(
+            # (emitEvent, not a global of a template: that of the event's window)
+            f"""<q-item clickable v-close-popup @click="$event.view.emitEvent('vr-llm-think',
+            {{id: {models.id}, model: props.opt.value, on: {on}}})"><q-item-section>
+            {html.escape(label)}</q-item-section></q-item>"""
+            for on, label in (("true", _("Thinking")), ("false", _("No thinking")))
+        )
+        models.add_slot(
+            "selected-item",
+            f"""<q-chip dense removable :tabindex="props.tabindex" class="q-ma-xs"
+            @remove="props.removeAtIndex(props.index)">{{{{ props.opt.label }}}}
+            <q-btn flat dense round size="xs" icon="psychology" class="q-ml-xs" @click.stop>
+            <q-tooltip>{html.escape(_("Thinking or not"))}</q-tooltip>
+            <q-menu><q-list dense>{menu}</q-list></q-menu></q-btn></q-chip>""",
+        )
+
+        async def chosen_models() -> None:
+            for name in models.value or []:
+                labels.setdefault(name, name)  # (typed)
+            relabel()
+            for name in models.value or []:  # (whether a local one can think: asked once)
+                if name not in checked and name not in cannot:
+                    checked.add(name)
+                    if await llm.can_think(name) is False:
+                        cannot.add(name)
+                        if not models.is_deleted:
+                            relabel()
+
+        models.on_value_change(chosen_models)
         with ui.row().classes("w-full items-center gap-4"):
-            think = ui.switch(_("Thinking")).mark("change-llm-think")
-            think.tooltip(
-                _("The model reasons before answering (slower); a model without it is told")
-            )
             fresh = ui.checkbox(_("No cache")).mark("change-llm-fresh")
             fresh.tooltip(_("Ask the models again, even for an answer already got"))
             ui.label(_("Each model is warmed up first: its loading is not timed")).classes(
@@ -1629,9 +1692,23 @@ def change_llm_dialog(
                         _("Cannot reach the server: {error} (type the models)").format(error=e)
                     )
                 return
+            options = {m: m for m in sorted({*found, *(models.value or [])})}
+            if st.chat_api == "ollama":  # (then those to download, from Ollama's library)
+                try:
+                    library = await llm.library_models()
+                except Exception as e:  # (said: only the local ones)
+                    library = []
+                    if not status.is_deleted:
+                        status.set_text(_("Models to download not listed: {error}").format(error=e))
+                for m in library:
+                    if not llm.is_installed(m.name, options):
+                        options[m.name] = f"↓ {m.name}"
+                        if not m.thinks:
+                            cannot.add(m.name)
             if not models.is_deleted:
-                value = list(models.value or [])
-                models.set_options(sorted({*found, *value}), value=value)
+                labels.clear()
+                labels.update(options)
+                relabel()
 
         ui.timer(0.1, load, once=True)
 
@@ -1647,7 +1724,24 @@ def change_llm_dialog(
         close(dlg)
 
     async def answer(i: int, name: str, body: ui.column, again: bool) -> None:
-        """Model ``name``'s answer in ``body`` (``again``: not from the cache)"""
+        """Model ``name``'s answer in ``body`` (``again``: not from the cache); a model not
+        on the server, said, with a button downloading it (then asked)."""
+        if await llm_models.missing(name):
+            body.clear()
+            with body:
+                ui.label(_("Not on the server")).classes("text-xs text-negative").mark(
+                    f"change-llm-missing-{i}"
+                )
+                ui.button(
+                    _("Download"),
+                    icon="download",
+                    on_click=lambda: llm_models.offer_download(
+                        llm.chat_server(llm.settings()) or llm.DEFAULT_URL,
+                        name,
+                        lambda: answer(i, name, body, again),
+                    ),
+                ).props("flat dense no-caps").mark(f"change-llm-download-{i}")
+            return
         body.clear()
         with body:
             ui.spinner(size="sm")
@@ -1657,7 +1751,9 @@ def change_llm_dialog(
             if not warming.is_deleted:
                 warming.set_text(_("Warming up…"))
 
-        t = await rewriter(name, think=think.value, fresh=again or fresh.value, warming=warm)
+        t = await rewriter(
+            name, think=think.get(name, False), fresh=again or fresh.value, warming=warm
+        )
         if dlg.is_deleted:  # (closed: the others not run)
             return
         body.clear()

@@ -637,6 +637,43 @@ async def installed_models(url: str, timeout: float = 5.0) -> dict[str, int]:
     return {m["name"]: int(m.get("size") or 0) for m in models if not is_cloud(m)}
 
 
+LIBRARY = "https://ollama.com/library"
+
+
+@dataclass(frozen=True)
+class LibraryModel:
+    name: str  # (with its tag: a size, e.g. qwen3:8b)
+    thinks: bool
+
+
+_library: list[LibraryModel] | None = None
+
+
+async def library_models(timeout: float = 10.0) -> list[LibraryModel]:
+    """The models of Ollama's library, a name per size (e.g. qwen3:8b), not the embedding
+    nor the cloud-only ones; read from its page once (raises if unreachable)."""
+    global _library
+    if _library is None:
+        from bs4 import BeautifulSoup
+
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            r = await client.get(LIBRARY)
+            r.raise_for_status()
+        found: list[LibraryModel] = []
+        for a in BeautifulSoup(r.text, "html.parser").select('a[href^="/library/"]'):
+            title = a.find("div", title=True)
+            if title is None:
+                continue
+            spans = a.find_all("span", class_="rounded-md")
+            caps = {s.get_text(strip=True) for s in spans if "bg-indigo-50" in s["class"]}
+            sizes = [s.get_text(strip=True) for s in spans if "text-blue-600" in s["class"]]
+            if "embedding" in caps:
+                continue
+            found += [LibraryModel(f"{title['title']}:{z}", "thinking" in caps) for z in sizes]
+        _library = found
+    return _library
+
+
 def _tagged(name: str) -> str:
     name = name.strip()
     return name if ":" in name else f"{name}:latest"

@@ -2501,10 +2501,22 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
     async def models(api, url, api_key=None):
         return ["broken", "gemma3:4b", "qwen3:8b"]
 
+    async def library(timeout=10.0):  # (to download: after the local ones)
+        return [llm.LibraryModel("gemma3:4b", False), llm.LibraryModel("absent:1b", False)]
+
+    async def can_think(name, timeout=5.0):
+        return name != "broken"
+
+    async def installed(url, timeout=5.0):  # (absent:1b: not downloaded)
+        return {"broken": 1, "gemma3:4b": 1, "qwen3:8b": 1}
+
     monkeypatch.setenv(llm.REWRITE_MODEL_ENV, "none")  # (none rewriting: still to try)
     llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3:8b"))
     monkeypatch.setattr(excerpt_rewrite, "trial", trial)
     monkeypatch.setattr(llm, "list_chat_models", models)
+    monkeypatch.setattr(llm, "installed_models", installed)
+    monkeypatch.setattr(llm, "library_models", library)
+    monkeypatch.setattr(llm, "can_think", can_think)
     try:
         user.find(marker="pdf-excerpt").click()
         await user.should_see(marker="excerpt-rewrite-off")
@@ -2512,12 +2524,30 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
         await user.should_see(marker="change-llm-models")
         chooser = user.find(marker="change-llm-models").elements.pop()
         for _ in range(20):  # (the server's models, loaded)
-            if "gemma3:4b" in chooser.options:
+            if "absent:1b" in chooser.options:
                 break
             await asyncio.sleep(0.05)
-        assert chooser.options == ["broken", "gemma3:4b", "qwen3:8b"]
-        chooser.value = ["gemma3:4b", "broken"]
-        user.find(marker="change-llm-think").elements.pop().value = True
+        assert list(chooser.options.items()) == [
+            ("broken", "broken"),
+            ("gemma3:4b", "gemma3:4b"),
+            ("qwen3:8b", "qwen3:8b"),
+            ("absent:1b", "↓ absent:1b"),
+        ]
+        chooser.value = ["gemma3:4b", "broken", "absent:1b"]
+        for _ in range(20):  # (whether each can think, asked: said in its label)
+            if chooser.options["broken"].endswith("cannot think"):
+                break
+            await asyncio.sleep(0.05)
+        assert chooser.options["broken"] == "broken · cannot think"
+        assert chooser.options["absent:1b"] == "↓ absent:1b · cannot think"
+
+        def thinking(name, on):  # (chosen in its chip's menu)
+            _page_event(user, "vrLlmThink", {"id": chooser.id, "model": name, "on": on})
+
+        thinking("broken", True)  # (cannot: said, not taken)
+        await user.should_see("broken cannot think")
+        thinking("gemma3:4b", True)
+        assert chooser.options["gemma3:4b"] == "gemma3:4b · thinking"
         user.find(marker="change-llm-run").click()
         await user.should_see(marker="change-llm-text-0")
         assert options[0]["think"] is True and options[0]["fresh"] is False
@@ -2526,6 +2556,8 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
         await user.should_see(marker="change-llm-failed-1")
         await user.should_see("out of memory")
         await user.should_see(marker="change-llm-time-0")
+        await user.should_see(marker="change-llm-missing-2")  # (not asked: offered to download)
+        await user.should_see(marker="change-llm-download-2")
         assert [a[0] for a in asked] == ["gemma3:4b", "broken"]
         assert asked[0][1:] == (selection["text"], "Entre 2019 et 2021, j'ai été ")
         await user.should_not_see(marker="change-llm-keep-1")

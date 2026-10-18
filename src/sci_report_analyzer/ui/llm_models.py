@@ -94,6 +94,19 @@ async def offer_download(
         )
 
 
+async def missing(name: str) -> bool:
+    """Whether the chat model ``name`` could be downloaded but is not on the Ollama server
+    (false if not known: the server not reached)."""
+    st = llm.settings()
+    if not llm.can_pull(st.chat_api, name):
+        return False
+    try:
+        installed = await llm.installed_models(llm.chat_server(st) or llm.DEFAULT_URL)
+    except Exception:
+        return False
+    return not llm.is_installed(name, installed)
+
+
 def watch(
     select: ui.select,
     api: Callable[[], str],
