@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-18 17:11+0200\n"
+"POT-Creation-Date: 2026-10-18 17:20+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -81,6 +81,12 @@ msgstr "(sans titre)"
 #, python-brace-format
 msgid "({n} in total)"
 msgstr "({n} au total)"
+
+#, python-brace-format
+msgid "({n} kept in its category, not listed)"
+msgid_plural "({n} kept in their category, not listed)"
+msgstr[0] "({n} gardé dans sa catégorie, non listé)"
+msgstr[1] "({n} gardés dans leur catégorie, non listés)"
 
 msgid "+ new tag"
 msgstr "+ nouvelle étiquette"
@@ -376,6 +382,9 @@ msgstr "Un rôle n'a pas de nom"
 
 msgid "A rule added by hand"
 msgstr "Une règle ajoutée à la main"
+
+msgid "A single category with excerpts: nothing to tell apart"
+msgstr "Une seule catégorie a des extraits : rien à distinguer"
 
 msgid "A single conference: its texts name others too"
 msgstr "Une seule conférence : ses textes en nomment d'autres aussi"
@@ -753,6 +762,10 @@ msgstr ""
 "apparaissent ainsi. Il reste le canal de sa conférence, renommé du nom de"
 " la conférence."
 
+#, python-brace-format
+msgid "All moved: “{name}” can be deleted"
+msgstr "Tous déplacés : « {name} » peut être supprimée"
+
 msgid "All people"
 msgstr "Toutes les personnes"
 
@@ -827,6 +840,9 @@ msgstr "Un extrait, {years}"
 
 msgid "Annotations"
 msgstr "Annotations"
+
+msgid "Another category"
+msgstr "Une autre catégorie"
 
 msgid "Another category has this id"
 msgstr "Une autre catégorie a cet identifiant"
@@ -1113,6 +1129,10 @@ msgid "Cannot download {model}: {error}"
 msgstr "Impossible de télécharger {model} : {error}"
 
 #, python-brace-format
+msgid "Cannot evaluate: {error}"
+msgstr "Évaluation impossible : {error}"
+
+#, python-brace-format
 msgid "Cannot reach Ollama: {error}"
 msgstr "Ollama est injoignable : {error}"
 
@@ -1253,6 +1273,18 @@ msgstr "Seulement cités"
 
 msgid "Cited, but not to discuss"
 msgstr "Cités, mais pas à discuter"
+
+msgid "Classification"
+msgstr "Classification"
+
+#, python-brace-format
+msgid "Classification “{name}”"
+msgstr "Classification « {name} »"
+
+msgid "Classification: the suggested categories against those filed in"
+msgstr ""
+"Classification : les catégories suggérées face à celles où les extraits "
+"sont classés"
 
 msgid "Clean up"
 msgstr "Nettoyer"
@@ -1942,6 +1974,13 @@ msgstr "P. ex. nomic-embed-text, bge-m3 (ollama pull <modèle>)"
 msgid "E.g. to suggest an excerpt's category (trained again if changed)"
 msgstr "P. ex. pour suggérer la catégorie d'un extrait (à réentraîner s'il change)"
 
+msgid ""
+"Each excerpt hidden from what is learnt, then its category suggested: the"
+" share suggested first in the category it is filed in"
+msgstr ""
+"Chaque extrait retiré de l'apprentissage, puis sa catégorie suggérée : la"
+" part suggérée en premier dans la catégorie où il est classé"
+
 #, python-brace-format
 msgid ""
 "Each excerpt hidden then suggested: its category first {top1:.0%}, among "
@@ -2549,6 +2588,11 @@ msgstr ""
 "ex. {.number (.short-venue .year)}, .number : leur référence ; vide : la "
 "référence)"
 
+msgid "How well the suggested categories match those the excerpts are filed in"
+msgstr ""
+"À quel point les catégories suggérées correspondent à celles où les "
+"extraits sont classés"
+
 #, python-brace-format
 msgid "IF {value}"
 msgstr "FI {value}"
@@ -2616,6 +2660,10 @@ msgid "In their order on the chart (e.g. from doing the work to supervising it).
 msgstr ""
 "Dans leur ordre sur le graphique (p. ex. de la réalisation du travail à "
 "son encadrement)."
+
+#, python-brace-format
+msgid "In {category}"
+msgstr "Dans {category}"
 
 #, python-brace-format
 msgid "In {category}: pick another one to move it there (and save)"
@@ -2758,6 +2806,9 @@ msgstr ""
 
 msgid "Its category (filed on Save)"
 msgstr "Sa catégorie (classé à l'enregistrement)"
+
+msgid "Its category is the right one: no longer listed"
+msgstr "Sa catégorie est la bonne : il n'est plus listé"
 
 #, python-format
 msgid ""
@@ -3068,6 +3119,11 @@ msgstr "Dernier ({year}) : {quartile}"
 #, python-brace-format
 msgid "Latest listing ({year}): {rank}"
 msgstr "Dernier classement ({year}) : {rank}"
+
+msgid "Learn again from the excerpts as filed now (for the suggestions)"
+msgstr ""
+"Réapprendre à partir des extraits tels que classés maintenant (pour les "
+"suggestions)"
 
 msgid "Learn again from the excerpts filed in the folder's categories"
 msgstr "Réapprendre à partir des extraits classés dans les catégories du dossier"
@@ -3437,14 +3493,18 @@ msgstr "Déplacer les PDF à gauche"
 msgid "Move the PDFs to the right"
 msgstr "Déplacer les PDF à droite"
 
-msgid "Move them to"
-msgstr "Les déplacer vers"
+msgid "Move them all to"
+msgstr "Les déplacer tous vers"
 
 msgid "Move to another category"
 msgstr "Déplacer vers une autre catégorie"
 
 msgid "Move to another folder"
 msgstr "Déplacer vers un autre dossier"
+
+#, python-brace-format
+msgid "Move to {category}"
+msgstr "Déplacer vers {category}"
 
 msgid "Move to…"
 msgstr "Déplacer vers…"
@@ -3625,6 +3685,9 @@ msgstr "Aucune catégorie n'a l'identifiant « {key} »"
 msgid "No category yet"
 msgstr "Aucune catégorie pour l'instant"
 
+msgid "No category yet: add some in these settings' Categories section"
+msgstr "Aucune catégorie : ajoutez-en dans la section Catégories de ces réglages"
+
 msgid "No category yet: type a name, then Enter (or ‘create’)"
 msgstr "Aucune catégorie pour l’instant : tapez un nom, puis Entrée (ou « créer »)"
 
@@ -3646,6 +3709,13 @@ msgstr "Aucun document joint dans ce dossier"
 msgid "No document yet"
 msgstr "Aucun document pour l'instant"
 
+msgid ""
+"No excerpt filed in these categories yet: file some from people's "
+"documents"
+msgstr ""
+"Aucun extrait classé dans ces catégories : classez-en depuis les "
+"documents des personnes"
+
 msgid "No excerpt filed yet: nothing to learn from"
 msgstr "Aucun extrait classé : rien à apprendre"
 
@@ -3657,6 +3727,9 @@ msgstr "Aucun extrait n'a ces mots"
 
 msgid "No excerpt matches"
 msgstr "Aucun extrait ne correspond"
+
+msgid "No excerpt suggested elsewhere"
+msgstr "Aucun extrait suggéré ailleurs"
 
 msgid ""
 "No excerpt yet: file passages of their documents in the Excerpts tab (E "
@@ -3844,6 +3917,19 @@ msgstr "Article introuvable"
 
 msgid "No suggestion (train first)"
 msgstr "Aucune suggestion (entraîner d'abord)"
+
+msgid ""
+"No suggestion: turn on the local LLM and choose an embedding model "
+"(Settings → Local LLM; or these settings' Models section)"
+msgstr ""
+"Aucune suggestion : activez le LLM local et choisissez un modèle "
+"d'embeddings (Réglages → LLM local ; ou la section Modèles de ces "
+"réglages)"
+
+msgid "No suggestion: turn on the local LLM, choose an embedding model (Settings)"
+msgstr ""
+"Aucune suggestion : activez le LLM local, choisissez un modèle "
+"d'embeddings (Réglages)"
 
 #, python-brace-format
 msgid "No suggestion: {error}"
@@ -6721,6 +6807,9 @@ msgstr "Sessions enregistrées"
 msgid "Train"
 msgstr "Entraîner"
 
+msgid "Train on them"
+msgstr "Apprendre sur eux"
+
 #, python-brace-format
 msgid "Trained on {when} ({n} excerpt)"
 msgid_plural "Trained on {when} ({n} excerpts)"
@@ -7782,6 +7871,9 @@ msgstr "document introuvable"
 msgid "no such period"
 msgstr "période introuvable"
 
+msgid "no suggestion"
+msgstr "aucune suggestion"
+
 msgid "no thinking"
 msgstr "sans réflexion"
 
@@ -8104,6 +8196,10 @@ msgstr "liste étoilée, dans la période"
 #, python-brace-format
 msgid "star list, within {period}"
 msgstr "liste étoilée, dans {period}"
+
+#, python-brace-format
+msgid "suggested: {category}"
+msgstr "suggérée : {category}"
 
 msgid "syncing…"
 msgstr "synchronisation…"
@@ -8526,6 +8622,12 @@ msgstr[0] "{n} extrait laissé hors de la chronologie"
 msgstr[1] "{n} extraits laissés hors de la chronologie"
 
 #, python-brace-format
+msgid "{n} excerpt suggested elsewhere"
+msgid_plural "{n} excerpts suggested elsewhere"
+msgstr[0] "{n} extrait suggéré ailleurs"
+msgstr[1] "{n} extraits suggérés ailleurs"
+
+#, python-brace-format
 msgid "{n} excerpt without years"
 msgid_plural "{n} excerpts without years"
 msgstr[0] "{n} extrait sans années"
@@ -8774,6 +8876,12 @@ msgid "{path}  (from {origin})"
 msgstr "{path}  (d’après {origin})"
 
 #, python-brace-format
+msgid "{right} of {n} excerpt suggested in its category: {rate:.0%}"
+msgid_plural "{right} of {n} excerpts suggested in their category: {rate:.0%}"
+msgstr[0] "{right} sur {n} extrait suggéré dans sa catégorie : {rate:.0%}"
+msgstr[1] "{right} sur {n} extraits suggérés dans leur catégorie : {rate:.0%}"
+
+#, python-brace-format
 msgid "{role} author"
 msgstr "auteur : {role}"
 
@@ -8910,12 +9018,18 @@ msgstr ""
 "années : donnez à chacune ses années."
 
 #, python-brace-format
-msgid "“{name}” has an excerpt (with its subcategories): move it first."
-msgid_plural "“{name}” has {n} excerpts (with its subcategories): move them first."
-msgstr[0] "« {name} » a un extrait (avec ses sous-catégories) : déplacez-le d'abord."
+msgid ""
+"“{name}” has an excerpt (with its subcategories): move it first, where "
+"suggested or elsewhere."
+msgid_plural ""
+"“{name}” has {n} excerpts (with its subcategories): move them first, one "
+"by one (where suggested, or elsewhere) or all at once."
+msgstr[0] ""
+"« {name} » a un extrait (avec ses sous-catégories) : déplacez-le d'abord,"
+" là où il est suggéré ou ailleurs."
 msgstr[1] ""
 "« {name} » a {n} extraits (avec ses sous-catégories) : déplacez-les "
-"d'abord."
+"d'abord, un par un (là où c'est suggéré, ou ailleurs) ou tous à la fois."
 
 #, python-brace-format
 msgid "“{name}” is already a tag, or another folder's list"
