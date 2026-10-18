@@ -2401,12 +2401,15 @@ async def test_excerpt_dialog_originals_and_reduce(user: User, fake_viewer):
     user.find(marker="excerpt-original-use-new").click()  # (back to it)
     assert user.find(marker="excerpt-text").elements.pop().value == selection["text"]
     originals = user.find(marker="excerpt-originals").elements.pop()
+    # (never Quasar's "hidden": its "!important" hid them on a wide screen too)
+    assert "hidden" not in originals.classes and "max-lg:hidden" in originals.classes
     user.find(marker="excerpt-tab-originals").click()  # (narrow: them alone)
     await asyncio.sleep(0.05)
-    assert "hidden" not in originals.classes and "flex" in originals.classes
+    # (nor Quasar's "flex": its wrap laid them out side by side, overflowing)
+    assert "max-lg:hidden" not in originals.classes and "flex" not in originals.classes
     user.find(marker="excerpt-tab-text").click()
     await asyncio.sleep(0.05)
-    assert "hidden" in originals.classes
+    assert "max-lg:hidden" in originals.classes and "hidden" not in originals.classes
     body = user.find(marker="excerpt-text").elements.pop()
     user.find(marker="dialog-reduce").click()
     await user.should_not_see(marker="excerpt-text")

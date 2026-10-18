@@ -2673,8 +2673,10 @@ def excerpt_dialog(
 
         category_line()
         # The original excerpts: on the right (wide enough), else in their own tab.
-        with ui.row().classes("w-full no-wrap items-start gap-4"):
-            with ui.column().classes("grow min-w-0 gap-2"):
+        # (narrow: under the tabs, as wide; never Quasar's "flex", which wraps a column:
+        # theirs, of a fixed height, into columns side by side)
+        with ui.row().classes("w-full no-wrap items-start gap-4 max-lg:flex-col"):
+            with ui.column().classes("grow min-w-0 max-lg:w-full gap-2"):
                 with ui.tabs().props("dense align=left no-caps").classes("w-full") as tabs:
                     tab_text = ui.tab("text", _("Excerpt"), icon="format_quote").mark(
                         "excerpt-tab-text"
@@ -2832,7 +2834,9 @@ def excerpt_dialog(
 
             originals = (
                 ui.column()
-                .classes("hidden lg:flex w-80 shrink-0 gap-2 max-h-[70vh] overflow-auto")
+                .classes(
+                    "max-lg:hidden max-lg:w-full w-80 shrink-0 gap-2 max-h-[70vh] overflow-auto"
+                )
                 .mark("excerpt-originals")
             )
         with originals:
@@ -2843,12 +2847,13 @@ def excerpt_dialog(
                 _new_original(side, new, cleared)
 
         def shown(ev) -> None:
-            alone = ev.value == "originals"  # (their tab: narrow, them alone)
+            # (their tab: narrow, them alone; not Quasar's hidden, "!important", over lg:)
+            alone = ev.value == "originals"
             panels.classes(
-                add="hidden lg:block" if alone else "", remove="" if alone else "hidden lg:block"
+                add="max-lg:hidden" if alone else "", remove="" if alone else "max-lg:hidden"
             )
             originals.classes(
-                add="flex" if alone else "hidden", remove="hidden" if alone else "flex"
+                add="" if alone else "max-lg:hidden", remove="max-lg:hidden" if alone else ""
             )
             if not alone:
                 panels.set_value(ev.value)
