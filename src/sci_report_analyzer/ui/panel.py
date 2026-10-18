@@ -11,8 +11,9 @@ from itertools import groupby
 
 from nicegui import background_tasks, ui
 
-from .. import annotations, contribution, manual, persons, source_settings, urls
+from .. import annotations, contribution, manual, persons, source_settings, theses, urls
 from ..authors import fold_name
+from ..db.models import Thesis
 from ..i18n import N_, _, ngettext
 from ..pubview import (
     HIST_CAP,
@@ -140,6 +141,7 @@ class PublicationsPanel:
         # Where the name variants to review are shown (the Sources tab), if anywhere.
         self.names_box: ui.element | None = None
         self.stats: list[PubStat] = []
+        self.supervised: list[Thesis] = []  # (the person's supervised theses)
         self.loaded = False
         self.lo: int | None = None
         self.hi: int | None = None
@@ -300,6 +302,7 @@ class PublicationsPanel:
     async def reload(self) -> None:
         try:
             self.stats = await load_stats(self.person_id)
+            self.supervised = persons.theses(self.person_id, "director")
             self.primary = source_settings.primary_for(self.person_id, self.period_id)
             self.categories = annotations.author_categories()
             self.cat_colours = {f"cat:{c.id}": c.colour for c in self.categories}
@@ -499,7 +502,9 @@ class PublicationsPanel:
                 self._years(matching("year"), cats, sels)
                 with ui.row().classes("w-full gap-4 no-wrap vr-charts-row"):
                     self._coauthors(matching("coauthors"), sels)
-                    self._contributions(matching("contribution", "phd", "authorcat"), sels)
+                    self._contributions(
+                        matching("contribution", "phd", "supervisor", "authorcat"), sels
+                    )
             self._list(conditioned)
             ui.label(_(DISCLAIMER)).classes("text-xs text-grey")
         self.push_url()
@@ -1134,6 +1139,18 @@ class PublicationsPanel:
                     "emphasis": {"focus": "none"},
                 }
             )
+        # The PhD students supervised in each year (range), after it: "2024-26 (2)".
+        phds = [theses.student_count(self.supervised, lo, hi) for _label, lo, hi in bins]
+        labels = [
+            f"{label} ({n})" if self.supervised else label
+            for (label, _lo, _hi), n in zip(bins, phds, strict=True)
+        ]
+        phd_line = (
+            json.dumps(f"<br>{_('PhD students supervised')}: <b>") + " + phds[ps[0].dataIndex]"
+            " + '</b>'"
+            if self.supervised
+            else "''"
+        )
         chart = (
             ui.echart(
                 {
@@ -1146,11 +1163,13 @@ class PublicationsPanel:
                     "tooltip": {
                         "trigger": "axis",
                         "axisPointer": {"type": "shadow"},
-                        ":formatter": "(ps) => ps[0].axisValue + ps.filter(p => p.value > 0)"
-                        ".map(p => `<br>${p.marker}${p.seriesName}: <b>${p.value}</b>`).join('')",
+                        ":formatter": f"(ps) => {{ const phds = {json.dumps(phds)}; "
+                        "return ps[0].axisValue + ps.filter(p => p.value > 0)"
+                        ".map(p => `<br>${p.marker}${p.seriesName}: <b>${p.value}</b>`)"
+                        f".join('') + {phd_line}; }}",
                     },
                     "grid": {"left": 30, "right": 10, "top": 35, "bottom": 25},
-                    "xAxis": {"type": "category", "data": [b[0] for b in bins]},
+                    "xAxis": {"type": "category", "data": labels},
                     "yAxis": {"type": "value", "minInterval": 1},
                     "aria": {"enabled": True, "decal": {"show": False}},
                     "series": series,
@@ -1313,6 +1332,24 @@ class PublicationsPanel:
                         + " · "
                         + _(MULTI_TIP)
                     ).mark("phd-chip")
+                with_sup = sum("supervisor" in s.author_marks for s in rows)
+                if with_sup:
+                    label = _("with PhD supervisor {pct}%").format(
+                        pct=round(100 * with_sup / max(len(rows), 1))
+                    )
+                    ui.chip(
+                        f"{label} ({with_sup})",
+                        selectable=True,
+                        selected=any(x.facet == "supervisor" for x in sels),
+                    ).props("dense clickable").on(
+                        "click",
+                        lambda e: self.pick(Sel("supervisor", _("with a PhD supervisor")), e),
+                        ["shiftKey", "altKey"],
+                    ).tooltip(
+                        _("papers co-authored with one of the person's PhD supervisors (theses.fr)")
+                        + " · "
+                        + _(MULTI_TIP)
+                    ).style("--q-primary:#0a7f6f").mark("supervisor-chip")
                 for c in self.categories:
                     n = sum(f"cat:{c.id}" in s.author_marks for s in rows)
                     if not n:

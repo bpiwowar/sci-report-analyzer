@@ -65,6 +65,7 @@ CSS = """
 .vr-owner { font-weight:700; }
 .vr-student { font-weight:600; color:#6639ba; }
 .vr-former { font-style:italic; color:#8a6fc0; }
+.vr-supervisor { font-weight:600; color:#0a7f6f; }
 .vr-maybe { color:#bc4c00; border-bottom:1px dashed #bc4c00; cursor:help; }
 .vr-maybe.owner { font-weight:700; }
 /* Long venue texts / rules wrap instead of overflowing the details dialog. */
@@ -490,7 +491,7 @@ def level_legend(levels: list[str] | None = None) -> None:
 
 def author_html(name: str, mark: str | None, note: str | None, colour: str | None = None) -> str:
     """An author name styled by its highlight mark (owner / student / former student /
-    potential match / author category ``cat:<id>``, drawn in ``colour``)."""
+    PhD supervisor / potential match / author category ``cat:<id>``, drawn in ``colour``)."""
     text = escape(name)
     title = f' title="{escape(note)}"' if note else ""
     if mark and mark.startswith("cat:"):
@@ -504,6 +505,8 @@ def author_html(name: str, mark: str | None, note: str | None, colour: str | Non
         return f'<span class="vr-maybe owner"{title}>{text}</span>'
     if mark == "former":
         return f'<span class="vr-former"{title}>{text}</span>'
+    if mark in ("supervisor", "former_supervisor"):
+        return f'<span class="vr-supervisor"{title}>{text}</span>'
     if mark == "student?":
         return f'<span class="vr-maybe"{title}>{text}</span>'
     return text

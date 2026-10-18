@@ -151,20 +151,29 @@ async def test_edit_phd_students(user: User) -> None:
     user.find("theses-director").trigger("edit", row_id)
     await user.should_see("Edit the PhD student")
     user.find(marker="student-start").clear().type("2020-10")
+    # Other spellings of its student's name, set in its dialog.
+    user.find(marker="student-aliases").type("A. Student, Ann Student")
     user.find(marker="student-save").click()
     await user.should_see("PhD student saved")
     (row,) = user.find("theses-director").elements.pop().rows
     assert (row["start"], bool(row["edited"])) == ("2020-10", True)
-    # One added by hand.
+    assert row["aliases"] == "A. Student, Ann Student"
+    assert persons.student_aliases(pid) == {"A Student": ["A. Student", "Ann Student"]}
+    # One added by hand; the person highlighted among its supervisors.
     user.find(marker="thesis-add").click()
     await user.should_see("Add a PhD student")
     user.find(marker="student-name").type("Eve Madeup")
     user.find(marker="student-start").type("2022")
+    user.find(marker="student-supervisors").type("J. Doe, Bob Madeup")
     user.find(marker="student-save").click()
     await user.should_see("Supervised (2)")
     rows = user.find("theses-director").elements.pop().rows
     added = next(r for r in rows if r["student"] == "Eve Madeup")
     assert added["added"] and added["start"] == "2022"
+    assert [(x["name"], x["me"]) for x in added["sups"]] == [
+        ("J. Doe", True),
+        ("Bob Madeup", False),
+    ]
     # Removed: the one from theses.fr hidden (with why), the one added deleted.
     user.find("theses-director").trigger("remove", row_id)
     user.find(marker="student-comment").type("Not supervised")

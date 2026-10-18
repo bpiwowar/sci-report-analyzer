@@ -61,6 +61,17 @@ def in_period(t: Thesis, lo: int | None, hi: int | None) -> bool:
     return (lo is None or last >= lo) and (hi is None or first <= hi)
 
 
+def student_count(rows: list[Thesis], lo: int, hi: int) -> int:
+    """The PhD students supervised in the years [lo, hi] (dated theses only)."""
+    names = set()
+    for t in rows:
+        sp = span(t)
+        dated = sp.start_year is not None or sp.end_year is not None
+        if t.role == "director" and not t.hidden and dated and in_period(t, lo, hi):
+            names.update(n for n in (t.student or "").split(", ") if n)
+    return len(names)
+
+
 def search_links(student: str) -> list[dict[str, str]]:
     """Web searches to find out what became of a PhD student (one set per name, when the
     thesis has several students)."""

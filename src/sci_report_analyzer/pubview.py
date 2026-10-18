@@ -108,8 +108,9 @@ class PubStat:
     num_authors: int | None
     author_pos: int | None
     authors: list[str]
-    # Per author: "owner", "student", "former" (a former PhD student) or None (for
-    # highlighting).
+    # Per author: "owner", "student", "former" (a former PhD student), "supervisor" (one of
+    # the person's PhD supervisors), "former_supervisor" (one, long after the person's
+    # defence: not counted) or None (for highlighting).
     author_marks: list[str | None]
     # By author index: (tooltip, PhD student name or None).
     author_notes: dict[int, tuple[str, str | None]]
@@ -632,13 +633,16 @@ def _ordinal(n: int) -> str:
 
 @dataclass
 class PeopleIndex:
-    """Names to highlight in author lists: the person and their PhD students.
+    """Names to highlight in author lists: the person, their PhD students and their own PhD
+    supervisors.
 
     Marks: ``owner`` / ``student`` for confirmed names (exact name or alias, or an author
     position given by an id-based source), ``owner?`` / ``student?`` for potential matches
     (same surname and initial) waiting for a manual validation, ``former`` for a confirmed
     student on a paper more than ``former_student_after`` years (a setting) after their
-    defence.
+    defence, ``supervisor`` for one of the person's PhD supervisors (same name, or surname and
+    initial) on a paper at most ``supervisor_until`` years (a setting) after the person's
+    defence, ``former_supervisor`` after that (highlighted, not counted).
     """
 
     owner_exact: set[str]
@@ -647,6 +651,9 @@ class PeopleIndex:
     students: list[StudentNames]
     # Author categories: (id, name, folded names) — exact names only.
     categories: list[tuple[int, str, set[str]]] = field(default_factory=list)
+    # The person's PhD supervisors (as on theses.fr), themselves left out: the year of the
+    # person's defence (None: unknown, or in progress).
+    supervisors: dict[str, int | None] = field(default_factory=dict)
 
     @classmethod
     def for_person(cls, session, person: Person) -> PeopleIndex:
@@ -669,6 +676,13 @@ class PeopleIndex:
                         to_year(end),
                     )
         owner = [person.name, *(person.aliases or [])]
+        own = {fold_name(n) for n in owner}
+        supervisors = {
+            n: to_year(theses.span(t).end)
+            for t in session.scalars(theses.of_person(person.id).where(Thesis.role == "author"))
+            for n in t.supervisors or []
+            if n and fold_name(n) not in own and not any(same_author(n, o) for o in owner)
+        }
         names = {c.id: c.name for c in session.scalars(select(AuthorCategory))}
         categories = [
             (int(cid), names[int(cid)], {fold_name(n) for n in members})
@@ -681,6 +695,7 @@ class PeopleIndex:
             {fold_name(n) for n in rejects.get(OWNER, [])},
             list(students.values()),
             categories,
+            supervisors,
         )
 
     def marks(
@@ -694,6 +709,7 @@ class PeopleIndex:
         notes: dict[int, tuple[str, str | None]] = {}
         owner_found = False
         former_after = service.settings.former_student_after
+        supervisor_until = service.settings.supervisor_until
         for i, a in enumerate(authors):
             f = fold_name(a)
             # (a spelling said not to be them wins over a source's position)
@@ -738,6 +754,14 @@ class PeopleIndex:
                             st.name,
                         ),
                     )
+            if mark is None:
+                sup = next((n for n in self.supervisors if same_author(a, n)), None)
+                defence = self.supervisors.get(sup) if sup is not None else None
+                if sup is not None:
+                    note = _("PhD supervisor {name}").format(name=sup)
+                    past = year and defence and year - defence > supervisor_until
+                    mark = "former_supervisor" if past else "supervisor"
+                    notes[i] = (note, None)
             if mark is None:
                 for cid, cname, members in self.categories:
                     if f in members:
@@ -1040,7 +1064,7 @@ YEAR_BINS = 10
 class Sel:
     """A cross-filter selection (port of StatSel)."""
 
-    facet: str  # year | coauthors | category | contribution | phd | authorcat
+    facet: str  # year | coauthors | category | contribution | phd | supervisor | authorcat
     label: str
     lo: int = 0
     hi: int = 0
@@ -1061,6 +1085,8 @@ def match_sel(s: PubStat, sel: Sel) -> bool:
         return s.category.key == sel.key
     if sel.facet == "phd":
         return "student" in s.author_marks
+    if sel.facet == "supervisor":
+        return "supervisor" in s.author_marks
     if sel.facet == "authorcat":
         return f"cat:{sel.key}" in s.author_marks
     if sel.facet == "contribution":

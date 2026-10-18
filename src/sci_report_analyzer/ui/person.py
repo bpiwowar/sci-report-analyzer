@@ -26,6 +26,7 @@ from .. import (
     theses,
     urls,
 )
+from ..authors import fold_name, same_author
 from ..db.models import Person, SourceLink, Thesis
 from ..i18n import _, ngettext
 from ..sources import ADAPTERS
@@ -2133,43 +2134,6 @@ def move_to_folder(folder_id: int, person_id: int, to_id: int) -> bool:
 # ---- theses --------------------------------------------------------------------------------
 
 
-def student_aliases_view(person_id: int, rows: list[Thesis]) -> None:
-    """Aliases of supervised PhD students, used to highlight them in author lists."""
-    students = sorted(
-        {n for t in rows if t.role == "director" for n in (t.student or "").split(", ") if n}
-    )
-    if not students:
-        return
-    current = persons.student_aliases(person_id)
-    with ui.expansion(_("PhD student name aliases (for highlighting in author lists)")).classes(
-        "w-full"
-    ):
-        inputs = {}
-        for name in students:
-            with ui.row().classes("items-center gap-2 w-full no-wrap"):
-                ui.label(name).classes("w-56")
-                inputs[name] = (
-                    ui.input(
-                        placeholder=_("other spellings, comma-separated"),
-                        value=", ".join(current.get(name, [])),
-                    )
-                    .props("dense outlined")
-                    .classes("grow")
-                )
-
-        def save() -> None:
-            persons.save_student_aliases(
-                person_id,
-                {
-                    n: [a.strip() for a in i.value.split(",") if a.strip()]
-                    for n, i in inputs.items()
-                },
-            )
-            ui.notify(_("Aliases saved (reload the publications to see them)"))
-
-        ui.button(_("Save aliases"), icon="save", on_click=save)
-
-
 class ThesesView:
     """The person's theses by role; within the years of the publications panel (its
     period) unless "all" is asked."""
@@ -2179,7 +2143,6 @@ class ThesesView:
         self.panel = panel
         self.show_all = False
         self.shown: tuple | None = None
-        self.aliases = ui.column().classes("w-full")
         self.container = ui.column().classes("w-full gap-2").mark("theses")
         self.reload()
         panel.on_render.append(self.refresh)
@@ -2187,10 +2150,13 @@ class ThesesView:
     def reload(self) -> None:
         """Read the theses again (one edited, added, removed), and render them."""
         self.rows = persons.theses(self.person_id, hidden=True)
-        self.aliases.clear()
-        with self.aliases:
-            student_aliases_view(self.person_id, [t for t in self.rows if not t.hidden])
         self.render()
+
+    def changed(self) -> None:
+        """A thesis edited, added, removed: the theses, and the publications (their PhD
+        students' names and spellings)."""
+        self.reload()
+        background_tasks.create(self.panel.reload())
 
     def refresh(self) -> None:
         """Re-render when the period changed."""
@@ -2215,7 +2181,7 @@ class ThesesView:
             ui.button(
                 _("Add a PhD student"),
                 icon="person_add",
-                on_click=lambda: _student_dialog(self.person_id, None, self.reload),
+                on_click=lambda: _student_dialog(self.person_id, None, self.changed),
             ).props("flat dense no-caps").mark("thesis-add")
 
         with self.container:
@@ -2268,7 +2234,7 @@ class ThesesView:
             for role in ["director", "rapporteur", "examiner", "president", "author", "other"]:
                 items = [t for t in rows if t.role == role]
                 if items:
-                    _theses_table(role, items, self.person_id, outcomes, self.reload)
+                    _theses_table(role, items, self.person_id, outcomes, self.changed)
 
 
 def _theses_table(
@@ -2279,6 +2245,8 @@ def _theses_table(
     on_change: Callable[[], None],
 ) -> None:
     spans = {t.id: theses.span(t) for t in items}
+    me = persons.names(person_id)
+    aliases = persons.student_aliases(person_id)
     items.sort(key=lambda t: spans[t.id].end or spans[t.id].start or "9999", reverse=True)
     hidden = sum(t.hidden for t in items)
     label = f"{ROLE_LABELS[role]} ({len(items) - hidden})"
@@ -2317,6 +2285,7 @@ def _theses_table(
                         "student": t.student,
                         "title": t.title,
                         "sup": ", ".join(t.supervisors or []),
+                        "sups": [{"name": n, "me": _is_me(n, me)} for n in t.supervisors or []],
                         "inst": t.institution,
                         "status": _("defended")
                         if t.status == "soutenue"
@@ -2328,6 +2297,9 @@ def _theses_table(
                         **(
                             {
                                 "outcome": outcomes.get(t.student or "", ""),
+                                "aliases": ", ".join(
+                                    a for n in _names(t) for a in aliases.get(n, [])
+                                ),
                                 "links": theses.search_links(t.student or ""),
                                 "added": t.added,
                                 "comment": t.comment or "",
@@ -2363,6 +2335,17 @@ def _theses_table(
               <q-icon v-if="props.row.edited" name="edit" size="xs" class="q-ml-xs">
                 <q-tooltip>{{{{ props.row.edited }}}}</q-tooltip>
               </q-icon>
+            </q-td>""",
+        )
+        # The person among the supervisors, highlighted.
+        table.add_slot(
+            "body-cell-sup",
+            """
+            <q-td :props="props">
+              <template v-for="(s, i) in props.row.sups" :key="i">
+                <span v-if="i">, </span>
+                <span :class="s.me ? 'text-weight-bold text-primary' : ''">{{ s.name }}</span>
+              </template>
             </q-td>""",
         )
         table.add_slot(
@@ -2419,6 +2402,19 @@ def _theses_table(
             _student_slots(table, person_id, {t.id: t for t in items}, on_change)
 
 
+def _is_me(name: str, me: persons.Names) -> bool:
+    """Whether a supervisor is the person: their name, an alias, or a similar name."""
+    names = [me.name, *me.aliases]
+    return fold_name(name) in {fold_name(n) for n in names} or any(
+        same_author(name, n) for n in names
+    )
+
+
+def _names(t: Thesis) -> list[str]:
+    """The PhD students a thesis names."""
+    return [n for n in (t.student or "").split(", ") if n]
+
+
 def _edited_dates(t: Thesis) -> str:
     """The dates set by hand over theses.fr's, said (empty: none)."""
     if not (t.start_override or t.end_override):
@@ -2438,6 +2434,9 @@ def _student_slots(
         """
         <q-td :props="props">
           <span :class="props.row.hidden ? 'text-strike' : ''">{{ props.value }}</span>
+          <div v-if="props.row.aliases" class="text-grey text-caption">
+            __ALSO__ {{ props.row.aliases }}
+          </div>
           <q-badge v-if="props.row.added" outline color="primary" class="q-ml-xs"
                    label="__ADDED__" />
           <q-badge v-if="props.row.hidden" outline color="grey" class="q-ml-xs"
@@ -2451,6 +2450,7 @@ def _student_slots(
             </q-popup-edit>
           </div>
         </q-td>""".replace("__ADDED__", escape(_("added by hand"), quote=True))
+        .replace("__ALSO__", escape(_("also written:")))
         .replace("__HIDDEN__", escape(_("hidden"), quote=True))
         .replace("__ADD_COMMENT__", json.dumps(_("why hidden? (add a comment)")))
         .replace("__COMMENT_LABEL__", escape(_("Why it is hidden"), quote=True)),
@@ -2537,6 +2537,25 @@ def _student_dialog(person_id: int, t: Thesis | None, on_change: Callable[[], No
         else:
             ui.label(t.student or "").classes("font-medium")
             ui.label(t.title or "").classes("text-grey")
+        aliases = persons.student_aliases(person_id)
+        olds = _names(t) if t is not None else []
+        # (a thesis naming several students: their spellings set nowhere here)
+        spellings = (
+            ui.input(
+                _("Other spellings of the name (comma-separated)"),
+                value=", ".join(a for n in olds for a in aliases.get(n, [])),
+            )
+            .classes("w-full")
+            .mark("student-aliases")
+            .tooltip(
+                _(
+                    "As written in author lists (e.g. without a second surname): the "
+                    "student is then recognised in the publications"
+                )
+            )
+            if len(olds) <= 1
+            else None
+        )
         with ui.row().classes("w-full gap-2 no-wrap"):
             start = (
                 ui.input(
@@ -2587,6 +2606,17 @@ def _student_dialog(person_id: int, t: Thesis | None, on_change: Callable[[], No
                 )
             else:
                 theses.set_dates(t.id, start.value, end.value)
+            # The spellings: of its (only) student, renamed or not.
+            news = (
+                [n.strip() for n in fields["student"].value.split(", ") if n.strip()]
+                if added
+                else olds
+            )
+            if spellings is not None and len(news) == 1:
+                for n in olds:
+                    aliases.pop(n, None)
+                aliases[news[0]] = [a.strip() for a in spellings.value.split(",") if a.strip()]
+                persons.save_student_aliases(person_id, aliases)
             ui.notify(_("PhD student saved"))
             on_change()
 

@@ -43,6 +43,26 @@ def test_in_period() -> None:
     assert theses.in_period(_t(), 2000, 2001)  # undated: kept
 
 
+def test_student_count() -> None:
+    def student(name, **kw) -> Thesis:
+        t = _t(**kw)
+        t.student, t.hidden = name, False
+        return t
+
+    rows = [
+        student("Ann Sample", start="2018-10-01", defence="2022-06-01", status="soutenue"),
+        student("Bob Sample", start="2021-10-01", status="enCours"),
+        student("Cy Sample"),  # undated: counted nowhere
+        student("Dee Sample", role="rapporteur", defence="2021-06-01", status="soutenue"),
+    ]
+    rows.append(student("Eve Sample", start="2020-10-01", status="enCours"))
+    rows[-1].hidden = True  # (removed by hand)
+    assert theses.student_count(rows, 2017, 2017) == 0
+    assert theses.student_count(rows, 2019, 2020) == 1
+    assert theses.student_count(rows, 2021, 2022) == 2
+    assert theses.student_count(rows, 2023, 2023) == 1
+
+
 def test_start_kept_once_defended() -> None:
     pid = make_person()
     started = replace(thesis("s123", "director", "T"), start_date="2021-10-01", status="enCours")

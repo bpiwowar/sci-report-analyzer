@@ -27,3 +27,19 @@ def test_former_phd_student():
     assert people.marks(authors, None, year=2020)[0] == ["student", None]
     assert people.marks(authors, None, year=2021)[0] == ["former", None]
     assert people.marks(authors, None)[0] == ["student", None]  # no year: still a student
+
+
+def test_phd_supervisor():
+    from sci_report_analyzer.pubview import PeopleIndex, StudentNames
+
+    st = StudentNames("Ann Lee", {fold_name("Ann Lee")}, ["Ann Lee"], set(), "PhD student", None)
+    people = PeopleIndex({"jane doe"}, ["Jane Doe"], set(), [st], supervisors={"ROE Richard": 2018})
+    marks, notes = people.marks(["Jane Doe", "Ann Lee", "R. Roe", "Bob Smith"], None)
+    assert marks == ["owner", "student", "supervisor", None]
+    assert "ROE Richard" in notes[2][0]
+    # (default: until 3 years after the person's defence)
+    assert people.marks(["Jane Doe", "R. Roe"], None, year=2021)[0] == ["owner", "supervisor"]
+    assert people.marks(["Jane Doe", "R. Roe"], None, year=2022)[0] == [
+        "owner",
+        "former_supervisor",
+    ]

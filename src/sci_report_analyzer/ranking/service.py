@@ -221,6 +221,9 @@ class MatchSettings(BaseModel):
     venue_similar_score: float = 0.3
     # A PhD student on a paper more than this many years after their defence: a former one.
     former_student_after: int = 2
+    # A paper more than this many years after the person's own defence: their PhD
+    # supervisors no longer counted as such.
+    supervisor_until: int = 3
     # Ordered regex substitutions cleaning the venue texts of the sources.
     norm_rules: list[NormRule] = Field(default_factory=default_rules)
     # Venue kinds (first level): keywords deciding national vs international, the scope

@@ -538,12 +538,22 @@ THRESHOLDS = {
             0.05,
         ),
     },
-    N_("Students"): {
+    N_("PhD"): {
         "former_student_after": (
             N_("Former student after (years)"),
             N_(
                 "A PhD student on a paper more than this many years after their defence: a "
                 "former one"
+            ),
+            0,
+            10,
+            1,
+        ),
+        "supervisor_until": (
+            N_("PhD supervisor until (years)"),
+            N_(
+                "A paper more than this many years after the person's own defence: their PhD "
+                "supervisors still highlighted, but no longer counted as such"
             ),
             0,
             10,

@@ -219,6 +219,7 @@ _SCALARS = (
     "venue_merge_score",
     "venue_similar_score",
     "former_student_after",
+    "supervisor_until",
     "national_keywords",
     "international_keywords",
     "unknown_scope",
