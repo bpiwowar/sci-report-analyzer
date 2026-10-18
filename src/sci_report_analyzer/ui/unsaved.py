@@ -173,3 +173,26 @@ class Edits:
                 mark="settings-cancel-confirm",
                 cancel=_("Keep them"),
             )
+
+
+def reset_button(button: ui.button, at_default: Callable[[], bool]) -> ui.button:
+    """A button bringing the defaults back: disabled while they are there (checked as
+    the changes are)."""
+
+    def update() -> None:
+        button.set_enabled(not at_default())
+
+    update()
+    ui.timer(CHECK_EVERY, update)
+    return button
+
+
+def text_reset_button(button: ui.button, area: ui.textarea, default: str) -> ui.button:
+    """A button bringing ``default`` back in ``area``: disabled while it is there."""
+
+    def changed(_e=None) -> None:
+        button.set_enabled((area.value or "").strip() != default.strip())
+
+    changed()
+    area.on_value_change(changed)
+    return button

@@ -154,15 +154,24 @@ def words() -> dict[str, dict[str, list[str]]]:
     }
 
 
-def save_words(values: dict[str, dict[str, list[str]]]) -> None:
-    """(a group as the default one: not saved, following the defaults)"""
+def _changed(values: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, list[str]]]:
+    """The groups changed from the defaults."""
     out: dict[str, dict[str, list[str]]] = {}
     for lang in LANGUAGES:
         for g in GROUPS:
             ws = [w.strip() for w in values.get(lang, {}).get(g, []) if w.strip()]
             if ws != DEFAULTS[lang][g]:
                 out.setdefault(lang, {})[g] = ws
-    set_setting(_SETTING, out)
+    return out
+
+
+def is_default(values: dict[str, dict[str, list[str]]]) -> bool:
+    return not _changed(values)
+
+
+def save_words(values: dict[str, dict[str, list[str]]]) -> None:
+    """(a group as the default one: not saved, following the defaults)"""
+    set_setting(_SETTING, _changed(values))
     _pattern.cache_clear()
 
 
