@@ -37,6 +37,7 @@ commit_preprocessors = [
     { pattern = "#(\\d+)", replace = "[#$1](https://github.com/bpiwowar/sci-report-analyzer/issues/$1)" },
 ]
 commit_parsers = [
+    { message = "^Merge (branch|pull request|remote-tracking branch) ", skip = true },
     { message = "^feat", group = "Features" },
     { message = "^fix", group = "Bug Fixes" },
     { message = "^doc", group = "Documentation" },
