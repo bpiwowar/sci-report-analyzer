@@ -10,9 +10,12 @@ categories.context_years)."""
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import time
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 from typing import Any
 
 from pydantic import (
@@ -182,24 +185,76 @@ async def rewrite(
 @dataclass
 class Trial:
     """A passage rewritten by a model (see trial): its rewrite (none: no valid answer; the
-    ``error`` raised, if any) and how long it took (seconds)."""
+    ``error`` raised, if any) and how long it took (seconds; of the first run if ``cached``).
+    ``think``: whether the model thought (false if asked but it cannot: ``no_think``);
+    ``warmed``: the model was loaded first (not in the time)."""
 
     model: str
     rewrite: Rewrite | None
     seconds: float
     error: str = ""
+    cached: bool = False
+    think: bool = False
+    no_think: bool = False
+    warmed: bool = False
 
 
-async def trial(text: str, before: str, after: str, name: str, timeout: float = TIMEOUT) -> Trial:
+# The trials already run, by the hash of what changes the answer (see trial_key).
+_trials: dict[str, Trial] = {}
+
+
+def trial_key(text: str, before: str, after: str, name: str, think: bool) -> str:
+    """What an answer depends on, hashed: the model (and where it runs), the messages sent,
+    the schema and whether it thinks."""
+    st = llm.settings()
+    inputs = [st.chat_api, llm.chat_server(st), name, think, SCHEMA]
+    inputs.append(messages(text, before, after))
+    return hashlib.sha256(json.dumps(inputs, sort_keys=True, default=str).encode()).hexdigest()
+
+
+async def trial(
+    text: str,
+    before: str,
+    after: str,
+    name: str,
+    timeout: float = TIMEOUT,
+    think: bool | None = None,
+    fresh: bool = False,
+    warming: Callable[[], None] | None = None,
+) -> Trial:
     """The rewrite of a passage selected by the model ``name`` (e.g. to compare models: see
-    ui.viewer_side.change_llm_dialog), timed; any error caught (said in it)."""
+    ui.viewer_side.change_llm_dialog), timed; any error caught (said in it). ``think``: the
+    model thinks (none: its task's setting); if it cannot, it does not (said: ``no_think``).
+    The answer is kept (same model, passage, instructions and thinking): shown again, with its
+    time, without asking the model, unless ``fresh``. The model is warmed up first, once
+    (``warming`` is called then), not timed."""
+    think = llm.thinks("rewrite") if think is None else think
+    no_think = False
+    if think and await llm.can_think(name) is False:
+        think, no_think = False, True
+    key = trial_key(text, before, after, name, think)
+    if not fresh and (kept := _trials.get(key)) is not None:
+        return replace(kept, cached=True, no_think=no_think, warmed=False)
+    if warming and not llm.is_warm(name):
+        warming()
+    warmed = await llm.warm_up(name, timeout)
     start = time.monotonic()
     try:
         answer = await llm.chat_json(
-            messages(text, before, after), SCHEMA, task="rewrite", timeout=timeout, name=name
+            messages(text, before, after),
+            SCHEMA,
+            task="rewrite",
+            timeout=timeout,
+            name=name,
+            think=think,
         )
     except Exception as e:  # (no valid answer: the deterministic years instead)
         logger.info("No rewrite: %s", e)
-        return Trial(name, None, time.monotonic() - start, str(e) or type(e).__name__)
+        return Trial(
+            name, None, time.monotonic() - start, str(e) or type(e).__name__, False, think, no_think
+        )
     r = proposal(answer) if isinstance(answer, dict) else None
-    return Trial(name, r, time.monotonic() - start)
+    t = Trial(name, r, time.monotonic() - start, "", False, think, no_think, warmed)
+    if r is not None:
+        _trials[key] = t
+    return t
