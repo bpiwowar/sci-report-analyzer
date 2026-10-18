@@ -20,6 +20,7 @@ from .. import (
     documents,
     excerpt_rewrite,
     folders,
+    inline_md,
     llm,
     manual,
     pdftext,
@@ -281,6 +282,7 @@ class Side:
         new = NewExcerpt(
             sel["text"],
             lambda cat_id, text, **props: self.file_excerpt(cat_id, text, page, rects, **props),
+            formatting=(lambda: self._formatting(rects)) if rects else None,
             around=None if dated else categories.context_years("", before, after),
             suggest=(lambda: excerpt_rewrite.rewrite(sel["text"], before, after))
             if rewriting
@@ -296,6 +298,20 @@ class Side:
             rects=rects,
         )
         excerpt_dialog(self, None, new=new)
+
+    async def _formatting(self, rects: list) -> str:
+        """The passage within ``rects`` in the PDF open, as Markdown (its bold and italics:
+        see vrPdf.formatted; none: "")."""
+        if not rects:
+            return ""
+        try:
+            md = await ui.run_javascript(
+                f"window.vrPdf?.formatted ? vrPdf.formatted({json.dumps(rects)}) : null",
+                timeout=5,
+            )
+        except Exception:  # (not readable: plain)
+            return ""
+        return md if isinstance(md, str) else ""
 
     async def _around(self, rects: list) -> tuple[str, str]:
         """The text around a selection in the PDF (see documents.selection_context): in the
@@ -323,9 +339,8 @@ class Side:
         for e in categories.excerpts(self.period_id, grouped=True):
             for x in [e, *e.members]:
                 here = (x.document_id if kind == "doc" else x.publication_id) == key
-                if (x.id == self.excerpt and not text) or (
-                    text and here and text in (x.text, x.original)
-                ):
+                filed = (inline_md.plain(x.text), inline_md.plain(x.original or ""))
+                if (x.id == self.excerpt and not text) or (text and here and text in filed):
                     return e
         return None
 
@@ -1328,7 +1343,7 @@ def similar_excerpts(
                     .mark(f"excerpt-similar-{e.id}")
                 ):
                     with ui.column().classes("gap-0 grow min-w-0"):
-                        ui.label(e.quoted).classes("text-sm line-clamp-2")
+                        ui.label(inline_md.plain(e.quoted)).classes("text-sm line-clamp-2")
                         where = ", ".join(sorted({x.source for x in e.parts}))
                         ui.label(f"{names.get(e.category_id, '')} · {where}").classes(
                             "text-xs text-grey ellipsis"
@@ -1470,7 +1485,9 @@ class NewExcerpt:
     days a year and flags (see excerpt_rewrite; none: no model rewriting, said); ``rewriter``:
     its rewrite by a given model, to try others (see change_llm_dialog; none: the local LLM
     off, said there); ``merge``: merge it with an excerpt instead (called with it, and whether
-    only its place is cited), the similar ones shown with a warning."""
+    only its place is cited), the similar ones shown with a warning; ``formatting``: it as
+    Markdown, read in the PDF (its bold and italics kept: see inline_md.formatted_like; "":
+    none)."""
 
     text: str
     file: Callable[..., int]
@@ -1479,39 +1496,58 @@ class NewExcerpt:
     rewriter: Callable[..., Awaitable[excerpt_rewrite.Trial]] | None = None
     merge: Callable[[categories.ExcerptView, bool], None] | None = None
     rects: list | None = None  # (its rectangles in the PDF open: its formatting read there)
+    formatting: Callable[[], Awaitable[str]] | None = None
 
 
 def _rewording(
     side: Side,
-    new: NewExcerpt,
+    text: str,
+    suggest: Callable[[], Awaitable[excerpt_rewrite.Rewrite | None]] | None,
+    rewriter: Callable[..., Awaitable[excerpt_rewrite.Trial]] | None,
     use: Callable[[str, excerpt_rewrite.Rewrite], None],
+    auto: bool = True,
 ) -> Callable[[], None]:
-    """A new excerpt's rewording by the local AI (``new.suggest``), asked for at once and
-    proposed (its wording, to edit, and what it predicts: see rewrite_facts), then used
-    (``use`` is called with its wording and it) or not; no model rewriting: said, with where
-    to choose one; and “Change LLM” (see change_llm_dialog). Returns a function hiding the
-    proposal (once used)."""
+    """An excerpt's rewording (its passage ``text``) by the local AI (``suggest``): asked for
+    at once if ``auto``, else on demand (“Reword”; again if no valid answer), proposed (its
+    wording, to edit, and what it predicts: see rewrite_facts), then used (``use`` is called
+    with its wording and it) or not; no model rewriting: said, with where to choose one; and
+    “Change LLM” (``rewriter``: see change_llm_dialog). Returns a function hiding the proposal
+    (once used)."""
     hint: ui.row | None = None
-    if new.suggest is not None:
-        suggest = new.suggest
-        hint = ui.row().classes("w-full items-center no-wrap gap-2").mark("excerpt-rewrite")
-        with hint:
-            ui.spinner(size="sm")
-            ui.label(_("The local AI rewrites the excerpt…")).classes("text-xs text-grey")
+    if suggest is not None:
+        hint = row = ui.row().classes("w-full items-center no-wrap gap-2").mark("excerpt-rewrite")
+
+        def offer(label: str = "", again: bool = False) -> None:
+            """(on demand; ``label``: why asked again)"""
+            with row:
+                ui.icon("auto_awesome", size="xs", color="grey-5" if again else "primary")
+                if label:
+                    ui.label(label).classes("text-xs text-grey").mark("excerpt-rewrite-failed")
+                ui.button(_("Try again") if again else _("Reword"), on_click=ask).props(
+                    "flat dense no-caps size=sm"
+                ).tooltip(
+                    _(
+                        "Reword it with the local AI (short, impersonal), with its years, "
+                        "days and flags"
+                    )
+                ).mark("excerpt-rewrite-ask")
+
+        def ask() -> None:
+            row.clear()
+            with row:
+                ui.spinner(size="sm")
+                ui.label(_("The local AI rewrites the excerpt…")).classes("text-xs text-grey")
+            background_tasks.create(proposed(), name="excerpt-rewrite")
 
         async def proposed() -> None:
             r = await suggest()
-            if hint is None or hint.is_deleted:
+            if row.is_deleted:
                 return
-            hint.clear()
+            row.clear()
             if r is None:  # (said, not hidden)
-                with hint:
-                    ui.icon("auto_awesome", size="xs", color="grey-5")
-                    ui.label(_("No rewording: the local AI gave no valid answer")).classes(
-                        "text-xs text-grey"
-                    ).mark("excerpt-rewrite-failed")
+                offer(_("No rewording: the local AI gave no valid answer"), again=True)
                 return
-            with hint:
+            with row:
                 ui.icon("auto_awesome", size="xs", color="primary")
                 wording = (
                     ui.input(_("Neutral wording (local AI)"), value=r.text)
@@ -1534,7 +1570,7 @@ def _rewording(
                     )
                 ).mark("excerpt-rewrite-use")
 
-        background_tasks.create(proposed(), name="excerpt-rewrite")
+        ask() if auto else offer()
     else:  # (no rewriting: said, with where to turn it on)
         with ui.row().classes("w-full items-center no-wrap gap-1").mark("excerpt-rewrite-off"):
             ui.icon("auto_awesome", size="xs", color="grey-5")
@@ -1549,7 +1585,7 @@ def _rewording(
     ui.button(
         _("Change LLM"),
         icon="compare_arrows",
-        on_click=lambda: change_llm_dialog(side, new.text, new.rewriter, lambda r: use(r.text, r)),
+        on_click=lambda: change_llm_dialog(side, text, rewriter, lambda r: use(r.text, r)),
     ).props("flat dense no-caps size=sm").tooltip(
         _("Rewrite the excerpt with other models, compare them and keep the best")
     ).mark("excerpt-change-llm")
@@ -1559,6 +1595,46 @@ def _rewording(
             hint.set_visibility(False)
 
     return hide
+
+
+def _rewriters(
+    side: Side, e: categories.ExcerptView
+) -> tuple[
+    str,
+    Callable[[], Awaitable[excerpt_rewrite.Rewrite | None]] | None,
+    Callable[..., Awaitable[excerpt_rewrite.Trial]] | None,
+]:
+    """An excerpt's passage to reword (see _rewording): its text as selected (a group's: its
+    quotes as selected, joined), its rewording by the model rewriting the excerpts (none: no
+    model) and by a given one (none: the local LLM off); the text around it (a single one's)
+    read once, in its document's lines or in the PDF open."""
+    parts = [x for x in e.parts if not x.ref_only] or [e]
+    text = " […] ".join(inline_md.plain(x.original or x.text) for x in parts)
+    around: list[tuple[str, str]] = []
+
+    async def context() -> tuple[str, str]:
+        if not around:
+            x, found = parts[0], ("", "")
+            if len(parts) == 1 and x.rects:
+                if _here(side, x):
+                    found = await side._around(x.rects)
+                elif x.document_id is not None:
+                    lines = documents.lines_of(x.document_id) or []
+                    found = documents.selection_context(lines, x.rects)
+            around.append(found)
+        return around[0]
+
+    async def suggest() -> excerpt_rewrite.Rewrite | None:
+        return await excerpt_rewrite.rewrite(text, *await context())
+
+    async def rewriter(name: str, **opts) -> excerpt_rewrite.Trial:
+        return await excerpt_rewrite.trial(text, *await context(), name, **opts)
+
+    return (
+        text,
+        suggest if llm.rewrite_model() else None,
+        rewriter if llm.settings().enabled else None,
+    )
 
 
 def change_llm_dialog(
@@ -2152,7 +2228,7 @@ class _ExcerptsSection:
                         middle="merge",
                     )
                     if e.group_text:
-                        ui.label(e.group_text).classes(
+                        _text_label(e.group_text).classes(
                             "text-sm line-clamp-4" + (" line-through" if e.discarded else "")
                         ).style(f"border-left: 3px solid {e.colour}; padding-left: 0.4rem").tooltip(
                             _("The text of the group (edit it with its pencil)")
@@ -2184,9 +2260,9 @@ class _ExcerptsSection:
         """Whether an excerpt (a group) has the text searched: in its text (as edited, or
         selected; that of the group, of the others), its commentary, a tag, or its level's."""
         level = self.level(e)
-        words = [e.group_text or "", e.comment or "", *e.tag_names]
+        words = [inline_md.plain(e.group_text or ""), e.comment or "", *e.tag_names]
         words += [level[0]] if level else []
-        words += [t for x in e.parts for t in (x.text, x.original or "")]
+        words += [inline_md.plain(t) for x in e.parts for t in (x.text, x.original or "")]
         return any(query in w.casefold() for w in words)
 
     def search(self, value: str | None) -> None:
@@ -2245,7 +2321,7 @@ class _ExcerptsSection:
                 "mt-1"
             ).style(f"color: {lead.colour}")
             with ui.column().classes("gap-0 grow min-w-0"):
-                label = ui.label(x.text).classes(
+                label = _text_label(x.text).classes(
                     "cursor-pointer hover:underline "
                     + ("text-xs text-grey italic line-clamp-1" if cited else "text-sm line-clamp-3")
                     + (" line-through" if lead.discarded else "")
@@ -2478,7 +2554,8 @@ class _ExcerptsSection:
             dialog.on_value_change(lambda ev: None if ev.value else self.listing.refresh())
             ui.label(
                 _("Merge “{first}” with “{second}”?").format(
-                    first=short(source.text), second=short(target.text)
+                    first=short(inline_md.plain(source.text)),
+                    second=short(inline_md.plain(target.text)),
                 )
             )
             ui.label(
@@ -2506,7 +2583,8 @@ class _ExcerptsSection:
             categories.remove_excerpt(e.id)
             self.side.refresh_excerpts()
 
-        short = e.text if len(e.text) <= 120 else e.text[:119] + "…"
+        t = inline_md.plain(e.text)
+        short = t if len(t) <= 120 else t[:119] + "…"
         with self.side.host.dialogs:
             confirm(
                 _("Remove the excerpt “{text}”?").format(text=short),
@@ -2519,23 +2597,50 @@ class _ExcerptsSection:
         excerpt_dialog(self.side, e, tab)
 
 
+def _formatting(
+    new: NewExcerpt,
+    formatting: Callable[[], Awaitable[str]],
+    text: ui.textarea,
+    formatted: Callable[[str], None],
+) -> None:
+    """A new excerpt's bold and italics, read in its PDF (``formatting``), then kept
+    (``formatted`` is called with its Markdown): in its text if not edited since."""
+
+    async def read() -> None:
+        before = text.value or ""
+        md = await formatting()
+        if not md or text.is_deleted:
+            return
+        _years, selected = categories.split_years(new.text)
+        formatted(md)
+        if " ".join((text.value or "").split()) == " ".join(before.split()) == selected:
+            text.set_value(inline_md.formatted_like(selected, md))
+
+    ui.timer(0.05, read, once=True)  # (in its client: to ask the PDF)
+
+
+def _text_label(text: str) -> ui.element:
+    """An excerpt's text, its bold and italics shown (see inline_md; plain: a label)."""
+    if inline_md.plain(text) == text:
+        return ui.label(text)
+    return ui.html(inline_md.html(text), sanitize=False)
+
+
 def _formatted(side: Side, original: str, rects: list | None) -> None:
     """A passage as selected: as in its PDF (its bold, italics, paragraphs and lists: see
-    vrPdf.formatted) if open here (``rects``: its rectangles there), else as plain text."""
+    vrPdf.formatted) if open here (``rects``: its rectangles there), else as filed (its bold
+    and italics, if any: see inline_md)."""
     with ui.column().classes("gap-0 w-full") as box:
-        ui.label(original).classes("text-sm")
+        if inline_md.plain(original) != original:
+            ui.markdown(original).classes("text-sm vr-original").mark("excerpt-formatted")
+        else:
+            ui.label(original).classes("text-sm")
     if not rects:
         return
 
     async def fill() -> None:
-        try:
-            md = await ui.run_javascript(
-                f"window.vrPdf?.formatted ? vrPdf.formatted({json.dumps(rects)}) : null",
-                timeout=5,
-            )
-        except Exception:  # (no PDF here, or not readable: as plain text)
-            return
-        if isinstance(md, str) and md.strip() and not box.is_deleted:
+        md = await side._formatting(rects)
+        if md.strip() and not box.is_deleted:
             box.clear()
             with box:
                 ui.markdown(md).classes("text-sm vr-original").mark("excerpt-formatted")
@@ -2590,7 +2695,7 @@ def _originals(side: Side, e: categories.ExcerptView, text: ui.textarea) -> None
                         where += " · " + _("cited by its place only")
                     ui.label(where).classes("text-xs text-grey")
                     if x.text != original:
-                        ui.label(_("Edited: {text}").format(text=x.text)).classes(
+                        ui.label(_("Edited: {text}").format(text=inline_md.plain(x.text))).classes(
                             "text-xs text-grey-8 italic"
                         )
                 ui.button(icon="content_paste_go", on_click=use).props(
@@ -2632,9 +2737,10 @@ def excerpt_dialog(
     tabs: its text (that of a group), years, markers, level and tags, the passages as
     selected shown (new: its years found in its text, then taken out of it if leading or
     ending it, see categories.split_years, cleared: the text as it was; else those around
-    it; its rewording by the local AI, see _rewording); its category (one picked: all saved,
-    then moved there; new: only chosen, highlighted, then its text shown again; or merged
-    with a similar excerpt instead); its commentary (Markdown) and link. New: it opens on its
+    it; its rewording by the local AI, see _rewording: on demand when editing); its category
+    (one picked: all saved, then moved there; new: only chosen, highlighted, then its text
+    shown again; or merged with a similar excerpt instead); its commentary (Markdown) and
+    link. New: it opens on its
     category (the one chosen last proposed, see category_list), and only Save files it (its
     text as selected kept as its original if rewritten or edited; Cancel: nothing filed).
     ``then``: once saved (e.g. the timeline drawn again; the side's excerpts are)."""
@@ -2645,10 +2751,10 @@ def excerpt_dialog(
         return {n.id: n.path for n in categories.tree(folder_id)} if folder_id is not None else {}
 
     chosen: dict[str, int | None] = {"category": e.category_id if e is not None else None}
-    last, selected, rewritten = None, "", False
+    last, selected, whole, rewritten = None, "", "", False
     if new is not None:
         years, selected = categories.split_years(new.text)
-        years = years or new.around
+        years, whole = years or new.around, new.text
         last = side.last_category
         if last is None and side.period_id is not None:
             last = categories.last_category(side.period_id)
@@ -2707,6 +2813,16 @@ def excerpt_dialog(
                                         "quotes again."
                                     )
                                 ).classes("text-xs text-grey")
+
+                            def reworded(wording: str, r: excerpt_rewrite.Rewrite) -> None:
+                                if wording := " ".join(wording.split()):
+                                    text.set_value(wording)
+                                if r.notes and not (editor.value or "").strip():
+                                    editor.value = r.notes  # (typed ones kept)
+                                apply_rewrite(props, r)
+                                hide()
+
+                            hide = _rewording(side, *_rewriters(side, e), reworded, auto=False)
                             props = excerpt_properties(
                                 e.start_year,
                                 e.end_year,
@@ -2741,16 +2857,31 @@ def excerpt_dialog(
                                 apply_rewrite(props, r)
                                 hide()
 
-                            hide = _rewording(side, new, use)
+                            hide = _rewording(
+                                side,
+                                new.text,
+                                new.suggest,
+                                new.rewriter,
+                                use,
+                                auto=llm.settings().rewrite_auto,
+                            )
+
+                            def formatted(md: str) -> None:
+                                """(its bold and italics: see inline_md)"""
+                                nonlocal selected, whole
+                                selected = inline_md.formatted_like(selected, md)
+                                whole = inline_md.formatted_like(new.text, md)
 
                             def cleared() -> None:
                                 nonlocal rewritten
                                 rewritten = False
-                                text.set_value(new.text)
+                                text.set_value(whole)
 
                             props = excerpt_properties(
                                 *(years or (None, None)), cleared=cleared, folder_id=folder_id
                             )
+                            if new.formatting is not None:
+                                _formatting(new, new.formatting, text, formatted)
                         with ui.row().classes("w-full items-center no-wrap gap-1"):
                             url = (
                                 ui.input(
@@ -2884,11 +3015,11 @@ def excerpt_dialog(
                 tabs.set_value("move")
                 return False
             typed = " ".join((text.value or "").split())
-            edited = typed not in (" ".join(selected.split()), " ".join(new.text.split()))
+            edited = typed not in (" ".join(selected.split()), " ".join(whole.split()))
             excerpt_id = new.file(
                 cat_id,
                 text=typed or selected,
-                **({"original": new.text} if rewritten or edited else {}),
+                **({"original": whole} if rewritten or edited else {}),
                 **props(),
             )
             if (editor.value or "").strip() or (url.value or "").strip():

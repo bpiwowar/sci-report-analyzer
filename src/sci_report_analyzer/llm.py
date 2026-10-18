@@ -153,6 +153,8 @@ class OllamaSettings:
     # The model rewriting a new excerpt (and finding its years: see excerpt_rewrite; blank
     # or NONE: none).
     rewrite_model: str = ""
+    # Whether a new excerpt is reworded at once (else on demand: see ui.viewer_side._rewording).
+    rewrite_auto: bool = True
     chat_api: str = "ollama"  # (see CHAT_APIS)
     # The OpenAI-compatible server answering (its base URL, e.g. http://localhost:8080/v1).
     chat_url: str = ""

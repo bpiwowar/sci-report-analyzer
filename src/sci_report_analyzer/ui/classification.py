@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable
 
 from nicegui import ui
 
-from .. import categories, classifier, folders, llm
+from .. import categories, classifier, folders, inline_md, llm
 from ..i18n import _, ngettext
 from .dialogs import transient_dialog
 
@@ -193,7 +193,7 @@ def classification_dialog(settings_id: int) -> None:
             for e in wrong:
                 excerpt_card(
                     e.excerpt_id,
-                    e.text,
+                    inline_md.plain(e.text),
                     e.category_id,
                     e.suggested,
                     names,

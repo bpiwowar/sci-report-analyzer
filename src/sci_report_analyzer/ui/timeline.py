@@ -19,7 +19,7 @@ from itertools import pairwise
 
 from nicegui import ui
 
-from .. import career, categories, persons, pubview, reports
+from .. import career, categories, inline_md, persons, pubview, reports
 from .. import timeline as tl
 from ..db.models import Period
 from ..i18n import _, ngettext
@@ -986,7 +986,7 @@ def _excerpt(
         col,
         end,
         x.now,
-        e.quoted,
+        inline_md.plain(e.quoted),
         f"timeline-span-{e.id}",
         classes,
         dot=x.first + 0.5 if x.dot else None,
@@ -1003,7 +1003,7 @@ def _excerpt(
         if e.days:
             when += f" · {categories.days_label(e.days)}"
         ui.label(when).classes("font-medium")
-        ui.label(e.quoted).classes("line-clamp-4")
+        ui.label(inline_md.plain(e.quoted)).classes("line-clamp-4")
     return item
 
 
@@ -1357,7 +1357,7 @@ def _item(
                     ui.icon(icon, size="xs", color=colour).tooltip(_(label))
             if e.discarded:
                 ui.badge(_("discarded"), color="grey").props("outline")
-        ui.label(e.quoted).classes(
+        ui.label(inline_md.plain(e.quoted)).classes(
             "text-sm line-clamp-3" + (" line-through" if e.discarded else "")
         )
         with ui.row().classes("items-center gap-1 no-wrap"):

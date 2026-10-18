@@ -20,7 +20,7 @@ from typing import Any
 import numpy as np
 from sqlalchemy import select
 
-from . import folders, llm
+from . import folders, inline_md, llm
 from .db.models import AppSetting, Category, Embedding, Excerpt, ExcerptClassifier, utcnow
 from .db.session import session_scope
 
@@ -95,7 +95,9 @@ def _training_rows(settings_id: int) -> list[tuple[int, int, str]]:
         )
     category = {i: c for i, c, _g, _t in rows}
     return [
-        (i, category.get(g, c) if g else c, t.strip()) for i, c, g, t in rows if t and t.strip()
+        (i, category.get(g, c) if g else c, inline_md.plain(t).strip())
+        for i, c, g, t in rows
+        if t and t.strip()
     ]
 
 
@@ -267,6 +269,7 @@ async def suggest(
     """The categories closest to a passage (id, cosine similarity to its closest prototype;
     not those in ``exclude``), the closest first; none if not trained, or with another model
     than the current one."""
+    text = inline_md.plain(text)  # (its bold and italics: not read)
     model = llm.embed_model()
     with session_scope() as s:
         settings_id = folders.settings_id(s, folder_id)

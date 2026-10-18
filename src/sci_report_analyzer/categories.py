@@ -13,7 +13,7 @@ from types import EllipsisType
 
 from sqlalchemy import func, select
 
-from . import folders, i18n
+from . import folders, i18n, inline_md
 from .db.models import (
     Category,
     Excerpt,
@@ -800,7 +800,8 @@ class ExcerptView:
     @property
     def words(self) -> set[str]:
         """The words of the item (and of the group it leads), to find similar ones."""
-        return _words(" ".join([self.group_text or "", *(x.text for x in self.parts)]))
+        texts = [self.group_text or "", *(x.text for x in self.parts)]
+        return _words(inline_md.plain(" ".join(texts)))
 
 
 # The most days a year an excerpt may take (a full year).
@@ -833,13 +834,14 @@ def similar_excerpts(
     """The excerpts (leading a group, or alone) that ``text`` might be already: sharing at
     least ``threshold`` of the words of the shorter one (or containing it), most similar
     first; with a ``query``: those having all its words, the most similar first."""
+    text = inline_md.plain(text)
     mine, q = _words(text), query.lower().split()
     flat = " ".join(text.lower().split())
     scored = []
     for e in excerpts(period_id, grouped=True):
         words = e.words
         score = len(mine & words) / max(1, min(len(mine), len(words)))
-        if any(flat and flat in " ".join(x.text.lower().split()) for x in e.parts):
+        if any(flat and flat in " ".join(inline_md.plain(x.text).lower().split()) for x in e.parts):
             score = max(score, 1.0)
         if q:
             hay = " ".join(
@@ -851,7 +853,7 @@ def similar_excerpts(
                     *(f"#{t}" for t in e.tag_names),
                 ]
             )
-            if all(w in hay.lower() for w in q):
+            if all(w in inline_md.plain(hay).lower() for w in q):
                 scored.append((score, e))
         elif score >= threshold and mine:
             scored.append((score, e))

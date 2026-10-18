@@ -2398,8 +2398,10 @@ async def test_excerpt_dialog_originals_and_reduce(user: User, fake_viewer):
     await user.should_see(marker="excerpt-formatted")
     assert "**Chair**" in user.find(marker="excerpt-formatted").elements.pop().content
     user.find(marker="excerpt-text").elements.pop().value = "Chair"
-    user.find(marker="excerpt-original-use-new").click()  # (back to it)
-    assert user.find(marker="excerpt-text").elements.pop().value == selection["text"]
+    user.find(marker="excerpt-original-use-new").click()  # (back to it, formatted)
+    assert user.find(marker="excerpt-text").elements.pop().value == (
+        "**Chair** of the *Y* committee"
+    )
     originals = user.find(marker="excerpt-originals").elements.pop()
     # (never Quasar's "hidden": its "!important" hid them on a wide screen too)
     assert "hidden" not in originals.classes and "max-lg:hidden" in originals.classes
@@ -2497,6 +2499,124 @@ async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_vi
         12.0,
     )
     assert e.comment == "Trésorier du conseil"
+
+
+async def test_excerpt_keeps_bold_and_italics(user: User, fake_viewer):
+    """A passage filed with its bold and italics (read in the PDF: see vrPdf.formatted), its
+    years still taken out; selected again: found (by its plain text); shown formatted in
+    the list."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    service = categories.add(folder, "Service")
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {
+        "text": "2019–2021 : membre du comité Quokka (président)",
+        "p": 1,
+        "rects": [[50, 700, 300, 710, 1]],
+    }
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    user.javascript_rules[re.compile(r".*vrPdf\.formatted\(")] = lambda _: (
+        "2019–2021 : membre du **comité Quokka** (*président*)"
+    )
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker=f"pick-category-{service}")
+    body = user.find(marker="excerpt-text").elements.pop()
+    for _ in range(20):  # (read in the PDF, then in its text)
+        if body.value != "membre du comité Quokka (président)":
+            break
+        await asyncio.sleep(0.05)
+    assert body.value == "membre du **comité Quokka** (*président*)"
+    user.find(marker=f"pick-category-{service}").click()
+    user.find(marker="excerpt-edit-save").click()
+    await user.should_see("Added to Service")
+    [e] = categories.excerpts(period)
+    assert (e.text, e.start_year, e.end_year) == (
+        "membre du **comité Quokka** (*président*)",
+        2019,
+        2021,
+    )
+    assert e.original == e.text  # (not edited)
+    selection["text"] = "membre du comité Quokka (président)"
+    user.find(marker="pdf-excerpt").click()  # (already filed: edited)
+    await user.should_see(marker="excerpt-edit-text")
+    assert user.find(marker="excerpt-edit-text").elements.pop().value == e.text
+
+
+async def test_excerpt_rewrite_on_demand(user: User, monkeypatch, fake_viewer):
+    """Rewording not at once (a setting): a new excerpt's, only on demand (“Reword”; again
+    if no valid answer); an excerpt filed, reworded when editing it, from its text as
+    selected and the lines around it, its wording, notes and years saved."""
+    from sci_report_analyzer import categories, excerpt_rewrite, llm
+
+    _, period, _ = _person()
+    folder = folders.folders()[0].id
+    service = categories.add(folder, "Service")
+    doc = documents.add(period, "Application.pdf", PDF)
+    line = "Entre 2019 et 2021, j'ai été membre du conseil de l'école X et trésorier."
+    x = 50 + 5 * line.index("membre")
+    documents.set_lines(doc, [{"p": 1, "t": line, "r": [50, 700, 50 + 5 * len(line), 710]}])
+    rects = [[x, 700, x + 150, 710, 1]]
+    selection = {"text": "membre du conseil de l'école X", "p": 1, "rects": rects}
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    asked, answers = [], [None]
+
+    async def rewrite(text, before, after):
+        asked.append((text, before, after))
+        if answers:
+            return answers.pop()
+        return excerpt_rewrite.Rewrite(
+            text="Membre du conseil de l'école X", notes="Trésorier", start=2019, end=2021
+        )
+
+    llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3:8b", rewrite_auto=False))
+    monkeypatch.setattr(excerpt_rewrite, "rewrite", rewrite)
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker="excerpt-rewrite-ask")
+    await asyncio.sleep(0.05)
+    assert asked == []  # (not at once)
+    user.find(marker="excerpt-rewrite-ask").click()
+    await user.should_see(marker="excerpt-rewrite-failed")  # (no valid answer: said, again)
+    user.find(marker="excerpt-rewrite-ask").click()
+    await user.should_see(marker="excerpt-rewrite-text")
+    assert len(asked) == 2
+    for dlg in user.find(ui.dialog).elements:
+        dlg.close()
+    await user.should_not_see(marker="excerpt-start")
+
+    e = categories.add_excerpt(
+        service, period, "J'ai été membre du conseil", 1, rects, document_id=doc
+    )
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker=f"excerpt-edit-{e}")
+    user.find(marker=f"excerpt-edit-{e}").click()
+    await user.should_see(marker="excerpt-rewrite-ask")
+    user.find(marker="excerpt-rewrite-ask").click()
+    await user.should_see(marker="excerpt-rewrite-text")
+    assert asked[-1] == (
+        "J'ai été membre du conseil",
+        "Entre 2019 et 2021, j'ai été ",
+        " et trésorier.",
+    )
+    user.find(marker="excerpt-rewrite-use").click()
+    await user.should_not_see(marker="excerpt-rewrite-text")
+    assert user.find(marker="excerpt-edit-text").elements.pop().value == (
+        "Membre du conseil de l'école X"
+    )
+    user.find(marker="excerpt-edit-save").click()
+    await user.should_not_see(marker="excerpt-edit-save")
+    [v] = categories.excerpts(period)
+    assert (v.id, v.text, v.original) == (
+        e,
+        "Membre du conseil de l'école X",
+        "J'ai été membre du conseil",
+    )
+    assert (v.start_year, v.end_year, v.comment) == (2019, 2021, "Trésorier")
 
 
 async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):

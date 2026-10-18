@@ -1861,14 +1861,19 @@ def rewrite_tab() -> None:
     ui.label(
         _(
             "A new excerpt reworded (short, impersonal, without its dates) and its years read "
-            "in it and the lines around it, proposed when it is filed. None: only its years, "
-            "found around it."
+            "in it and the lines around it, proposed when it is filed (or on demand, "
+            "“Reword”, also when editing an excerpt). None: only its years, found around it."
         )
     ).classes("text-sm text-grey-8 max-w-[48rem]")
     task_values = task_model_section("rewrite", st.rewrite_model, _("None (no rewriting)"))
     ui.label(
         _("(or set the {env} environment variable)").format(env=llm.REWRITE_MODEL_ENV)
     ).classes("text-xs text-grey")
+    auto = (
+        ui.checkbox(_("Reword a new excerpt at once"), value=st.rewrite_auto)
+        .tooltip(_("Else only on demand, with “Reword” in its dialog"))
+        .mark("rewrite-auto")
+    )
     instructions = prompt_section(
         "rewrite",
         excerpt_rewrite.prompt(),
@@ -1876,13 +1881,14 @@ def rewrite_tab() -> None:
         _("Instructions ({text}: the passage selected; {before}, {after}: the text around it)"),
     )
 
-    def values() -> tuple[str, str, str]:
-        return *task_values(), instructions.value or ""
+    def values() -> tuple[str, str, bool, str]:
+        return *task_values(), bool(auto.value), instructions.value or ""
 
     def save() -> None:
-        chosen, thinking, prompt = values()
+        chosen, thinking, at_once, prompt = values()
         stored = llm.stored_settings()
         stored.rewrite_model = chosen
+        stored.rewrite_auto = at_once
         save_task_think(stored, "rewrite", thinking)
         llm.save_settings(stored)
         excerpt_rewrite.save_prompt(prompt)
