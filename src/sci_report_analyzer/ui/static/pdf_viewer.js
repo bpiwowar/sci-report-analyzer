@@ -167,6 +167,79 @@ window.vrPdf = {
     const round = (v) => Math.round(v * 10) / 10;
     return {text, p, rects: rects.map(r => [...r.slice(0, 4).map(round), r[4]])};
   },
+  // The text within rectangles (as selection()'s: PDF units, their page fifth), in
+  // Markdown: its bold and italic runs (from their fonts), its paragraphs (a gap or an
+  // indent before a line, a new page) and list items ("•", "–"…: "- "); none if not found.
+  async formatted(rects) {
+    const d = this.app()?.pdfDocument;
+    if (!d || !rects?.length) return null;
+    const lines = [];
+    for (const p of [...new Set(rects.map(r => r[4]))]) {
+      const page = await d.getPage(p);
+      const tc = await page.getTextContent();
+      const own = rects.filter(r => r[4] === p);
+      for (const it of tc.items) {
+        if (typeof it.str !== 'string' || !it.str) continue;
+        const t = it.transform, h = Math.hypot(t[2], t[3]) || it.height || 1;
+        const x = t[4], y = t[5], mid = y + h * 0.3;
+        const r = own.find(q => mid >= q[1] && mid <= q[3]);
+        if (!r) continue;
+        // (its characters within the rectangle: their width, as if all the same)
+        const n = it.str.length, w = (it.width || h * 0.5 * n) / n;
+        const i0 = Math.max(0, Math.round((r[0] - x) / w));
+        const i1 = Math.min(n, Math.round((r[2] - x) / w));
+        if (i1 <= i0) continue;
+        let font = null;
+        try { font = page.commonObjs.has(it.fontName) ? page.commonObjs.get(it.fontName) : null; }
+        catch { font = null; }
+        const name = (font && font.name) || '';
+        const bold = !!(font && (font.bold || font.black)) || /bold|black|heavy/i.test(name);
+        const italic = !!(font && font.italic) || /italic|oblique/i.test(name);
+        const x0 = x + i0 * w;
+        let line = lines[lines.length - 1];
+        if (!line || line.p !== p || Math.abs(line.y - y) > h * 0.6) {
+          lines.push(line = {p, y, x: x0, h, end: x0, runs: []});
+        } else if (x0 - line.end > h * 0.15) line.runs.push({str: ' ', bold, italic});
+        line.runs.push({str: it.str.slice(i0, i1), bold, italic});
+        line.end = x0 + (i1 - i0) * w;
+      }
+      page.cleanup();
+    }
+    if (!lines.length) return null;
+    const esc = (v) => v.replace(/([\\`*_\[\]#<>])/g, '\\$1');
+    const md = (runs) => {
+      const merged = [];
+      for (const r of runs) {
+        const last = merged[merged.length - 1];
+        if (last && (!r.str.trim() || (last.bold === r.bold && last.italic === r.italic))) {
+          last.str += r.str;
+        } else merged.push({...r});
+      }
+      return merged.map(r => {
+        const m = r.str.match(/^(\s*)(.*?)(\s*)$/s), mark = (r.bold ? '**' : '') + (r.italic ? '*' : '');
+        return m[2] ? m[1] + mark + esc(m[2]) + [...mark].reverse().join('') + m[3] : r.str;
+      }).join('');
+    };
+    const bullet = /^\s*[•▪◦●■‣–—·*-]\s+/;
+    const paras = [];
+    let prev = null;
+    for (const ln of lines) {
+      const plain = ln.runs.map(r => r.str).join('');
+      const item = bullet.test(plain);
+      if (item) ln.runs[0] = {...ln.runs[0], str: ln.runs[0].str.replace(bullet, '')};
+      const text = md(ln.runs).trim();
+      const gap = prev && (prev.p !== ln.p || prev.y - ln.y > Math.max(prev.h, ln.h) * 1.6
+                           || ln.x - prev.x > ln.h);
+      if (!prev || gap || item) paras.push((item ? '- ' : '') + text);
+      else {
+        const last = paras[paras.length - 1];
+        paras[paras.length - 1] = /\w-$/.test(last) && /^\p{Ll}/u.test(text)
+          ? last.slice(0, -1) + text : last + ' ' + text;
+      }
+      prev = ln;
+    }
+    return paras.join('\n\n');
+  },
   // The text of a page within rectangles (PDF units): from the text layer, its characters
   // whose middle is in one of them, a line per line (e.g. a list's items: see the tagging).
   textIn(pv, rects) {

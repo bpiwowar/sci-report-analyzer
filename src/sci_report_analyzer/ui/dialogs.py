@@ -17,21 +17,71 @@ from nicegui import context, ui
 
 from ..i18n import _
 
+# Its header dragged: the dialog moved (its card; a button in it: not).
+_DRAG_JS = """(e) => {
+  if (e.button !== 0 || e.target.closest('button')) return;
+  const card = e.target.closest('.q-card');
+  const [x0, y0] = (card.dataset.vrDrag || '0,0').split(',').map(Number);
+  const sx = e.clientX, sy = e.clientY;
+  const move = (m) => {
+    const x = x0 + m.clientX - sx, y = y0 + m.clientY - sy;
+    card.dataset.vrDrag = x + ',' + y;
+    card.style.transform = `translate(${x}px, ${y}px)`;
+  };
+  const up = () => {
+    removeEventListener('mousemove', move);
+    removeEventListener('mouseup', up);
+  };
+  addEventListener('mousemove', move);
+  addEventListener('mouseup', up);
+  e.preventDefault();
+}"""
+
 
 @contextmanager
 def transient_dialog(
-    title: str | None = None, *, width: str = "", persistent: bool = False
+    title: str | None = None, *, width: str = "", persistent: bool = False, movable: bool = False
 ) -> Iterator[tuple[ui.dialog, ui.card]]:
     """A dialog (its card of classes ``width``, under a ``title``), opened at the end of the
-    block and deleted once closed."""
+    block and deleted once closed. ``movable``: moved by its title (dragged), reduced to it
+    (and back), the page behind it usable meanwhile."""
     opener = context.slot
     with ui.dialog() as dlg, ui.card().classes(width) as card:
         dlg.opener = opener  # type: ignore[attr-defined]
         if persistent:
             dlg.props("persistent")
-        if title is not None:
-            ui.label(title).classes("text-lg font-medium")
-        yield dlg, card
+        if not movable:
+            if title is not None:
+                ui.label(title).classes("text-lg font-medium")
+            yield dlg, card
+        else:
+            dlg.props("seamless")
+            with (
+                ui.row()
+                .classes("w-full items-center no-wrap gap-1 cursor-move select-none")
+                .on("mousedown", js_handler=_DRAG_JS)
+                .mark("dialog-header")
+            ):
+                ui.icon("drag_indicator", color="grey-6")
+                ui.label(title or "").classes("text-lg font-medium")
+                ui.space()
+                reduce = (
+                    ui.button(icon="remove")
+                    .props("flat dense round size=sm color=grey-7")
+                    .tooltip(_("Reduce it (or back)"))
+                    .mark("dialog-reduce")
+                )
+                ui.button(icon="close", on_click=dlg.close).props(
+                    "flat dense round size=sm color=grey-7"
+                ).tooltip(_("Close")).mark("dialog-close")
+            with ui.column().classes("w-full gap-4 p-0") as body:
+                yield dlg, card
+
+            def toggle() -> None:
+                body.set_visibility(not body.visible)
+                reduce.props(f"icon={'remove' if body.visible else 'open_in_full'}")
+
+            reduce.on_click(toggle)
     dlg.on_value_change(lambda e: None if e.value or dlg.is_deleted else dlg.delete())
     dlg.open()
 

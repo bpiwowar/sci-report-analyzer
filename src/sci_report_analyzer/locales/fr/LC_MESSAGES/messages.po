@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-18 17:03+0200\n"
+"POT-Creation-Date: 2026-10-18 17:11+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -2782,12 +2782,12 @@ msgstr "Sa session démo, un de ses ateliers…"
 
 #, python-format
 msgid ""
-"Its details (its text: short): in the notes and the copy, a comment after"
-" the excerpt (%% … %%), kept for reference, not shown. Empty: none."
+"Its details (its summary: short): in the notes and the copy, a comment "
+"after the excerpt (%% … %%), kept for reference, not shown. Empty: none."
 msgstr ""
-"Ses détails (son texte : court) : dans les notes et la copie, un "
-"commentaire après l'extrait (%% … %%), gardé pour référence, non affiché."
-" Vide : aucun."
+"Ses détails (son résumé : court) : dans les notes et la copie, un "
+"commentaire après l'extrait (%% … %%), gardé pour mémoire, non affiché. "
+"Vide : aucun."
 
 msgid "Its excerpts (and those of its subsections)"
 msgstr "Ses extraits (et ceux de ses sous-sections)"
@@ -2871,12 +2871,11 @@ msgstr ""
 "dans leurs listes étoilées."
 
 msgid ""
-"Its quotes, joined; edited, it is the text of the group (its excerpts: "
-"their places only). Blank: its quotes again."
+"Its quotes, joined; edited, it is the summary of the group (its excerpts:"
+" their places only). Blank: its quotes again."
 msgstr ""
-"Ses citations, réunies ; une fois modifié, c’est le texte du groupe (ses "
-"extraits : leurs emplacements seulement). Vide : de nouveau ses "
-"citations."
+"Ses citations, jointes ; modifié, c'est le résumé du groupe (ses extraits"
+" : leurs emplacements seulement). Vide : de nouveau ses citations."
 
 msgid ""
 "Its record is fetched and merged with the other sources' (listed in the "
@@ -3120,6 +3119,10 @@ msgstr "Niveaux : {error}"
 
 msgid "Link"
 msgstr "Rattacher"
+
+msgctxt "a URL"
+msgid "Link"
+msgstr "Lien"
 
 #, python-brace-format
 msgid "Link declared in ORCID ({host})"
@@ -4325,6 +4328,9 @@ msgstr "Ordonner les articles de cette liste étoilée (leurs numéros)"
 msgid "Order the papers of “{tag}” within {period}"
 msgstr "Ordonner les articles de « {tag} » dans {period}"
 
+msgid "Original excerpts"
+msgstr "Extraits d'origine"
+
 msgid "Other"
 msgstr "Autre"
 
@@ -4874,6 +4880,9 @@ msgid "Records with one of these ISSNs belong to this venue, whatever text"
 msgstr ""
 "Les notices ayant l'un de ces ISSN appartiennent à ce canal, quel que "
 "soit leur texte"
+
+msgid "Reduce it (or back)"
+msgstr "Le réduire (ou le rétablir)"
 
 msgid "Reference"
 msgstr "Référence"
@@ -5796,6 +5805,9 @@ msgstr "Résumée par son texte, ses extraits non listés ({count})"
 msgid "Summary"
 msgstr "Résumé"
 
+msgid "Summary of the group"
+msgstr "Résumé du groupe"
+
 msgid "Summary of the publications shown, by category (to copy)"
 msgstr "Résumé des publications affichées, par catégorie (à copier)"
 
@@ -5891,12 +5903,6 @@ msgstr "Modèles du dossier"
 
 msgid "Test a venue string"
 msgstr "Tester un texte de canal"
-
-msgid "Text"
-msgstr "Texte"
-
-msgid "Text of the group"
-msgstr "Texte du groupe"
 
 #, python-brace-format
 msgid "Text of the section “{category}”"

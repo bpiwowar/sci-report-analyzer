@@ -2380,6 +2380,41 @@ async def test_excerpts_collapsed_searched_discarded(user: User, fake_viewer):
     assert "Two courses." in categories.markdown(folder, period)
 
 
+async def test_excerpt_dialog_originals_and_reduce(user: User, fake_viewer):
+    """A new excerpt's dialog: its passage as selected beside it (as formatted in the PDF;
+    on a narrow screen, in its own tab), to go back to; reduced to its title, and back."""
+    from sci_report_analyzer import categories
+
+    _, period, _ = _person()
+    categories.add(folders.folders()[0].id, "Service")
+    doc = documents.add(period, "Application.pdf", PDF)
+    selection = {"text": "Chair of the Y committee", "p": 1, "rects": [[50, 700, 200, 710, 1]]}
+    user.javascript_rules[re.compile(r"vrPdf\.(selection|excerpted)\(\)")] = lambda _: selection
+    user.javascript_rules[re.compile(r".*vrPdf\.formatted\(")] = lambda _: "**Chair** of the *Y*"
+    await user.open(f"/doc/{doc}")
+    await user.should_see(marker="pdf-excerpt")
+    user.find(marker="pdf-excerpt").click()
+    await user.should_see(marker="excerpt-original-new")
+    await user.should_see(marker="excerpt-formatted")
+    assert "**Chair**" in user.find(marker="excerpt-formatted").elements.pop().content
+    user.find(marker="excerpt-text").elements.pop().value = "Chair"
+    user.find(marker="excerpt-original-use-new").click()  # (back to it)
+    assert user.find(marker="excerpt-text").elements.pop().value == selection["text"]
+    originals = user.find(marker="excerpt-originals").elements.pop()
+    user.find(marker="excerpt-tab-originals").click()  # (narrow: them alone)
+    await asyncio.sleep(0.05)
+    assert "hidden" not in originals.classes and "flex" in originals.classes
+    user.find(marker="excerpt-tab-text").click()
+    await asyncio.sleep(0.05)
+    assert "hidden" in originals.classes
+    body = user.find(marker="excerpt-text").elements.pop()
+    user.find(marker="dialog-reduce").click()
+    await user.should_not_see(marker="excerpt-text")
+    user.find(marker="dialog-reduce").click()
+    await user.should_see(marker="excerpt-text")
+    assert body.visible
+
+
 async def test_excerpt_years_around_and_rewrite(user: User, monkeypatch, fake_viewer):
     """A passage without a date: the years around it in the PDF proposed; with a model
     rewriting the excerpts, its wording proposed too, used: filed (the text selected kept)."""
