@@ -401,6 +401,20 @@ def excerpt_count(cat_id: int) -> int:
         )
 
 
+def filed_below(cat_id: int) -> list[tuple[int, int, str]]:
+    """The excerpts filed in a category or below it, those leading a group (with it) or
+    alone: (id, category id, text: the group's, else its own), in their order."""
+    with session_scope() as s:
+        return [
+            (e.id, e.category_id, e.group_text or e.text)
+            for e in s.scalars(
+                select(Excerpt)
+                .where(Excerpt.category_id.in_(subtree(cat_id)), Excerpt.group_id.is_(None))
+                .order_by(Excerpt.category_id, Excerpt.position, Excerpt.id)
+            )
+        ]
+
+
 def move_excerpts(cat_id: int, target_id: int) -> int:
     """Move the excerpts of a category and of those below it (with their groups) to another
     one, after its own, their sections' texts after its own; returns how many excerpts
