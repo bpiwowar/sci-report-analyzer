@@ -136,7 +136,7 @@ def test_store_and_cleanup():
     # Taking the person out of the folder deletes its documents (their files: by the
     # clean-up).
     folders.remove_person(folders.folders()[0].id, pid)
-    assert documents.info(doc) is None and pdfs.cleanup() == (1, 0)
+    assert documents.info(doc) is None and pdfs.cleanup() == (1, 0, 0)
     assert not path.exists()
 
 

@@ -1189,12 +1189,13 @@ def _pdfs_section() -> None:
     status()
 
     def clean() -> None:
-        files, forgotten = pdfs.cleanup()
-        ui.notify(
-            _("{files} files deleted, {forgotten} PDFs forgotten").format(
-                files=files, forgotten=forgotten
-            )
+        files, forgotten, kept = pdfs.cleanup(keep_annotated=keep.value)
+        text = _("{files} files deleted, {forgotten} PDFs forgotten").format(
+            files=files, forgotten=forgotten
         )
+        if kept:
+            text += " · " + _("{kept} annotated files kept").format(kept=kept)
+        ui.notify(text)
         status.refresh()
 
     def set_confirm(e) -> None:
@@ -1208,6 +1209,16 @@ def _pdfs_section() -> None:
                 "whose file was deleted by hand"
             )
         ).mark("pdfs-cleanup")
+        keep = (
+            ui.checkbox(_("Keep annotated files"), value=True)
+            .tooltip(
+                _(
+                    "The files of papers no longer in the database that hold annotations "
+                    "are not deleted"
+                )
+            )
+            .mark("pdfs-keep-annotated")
+        )
         ui.checkbox(
             _("Ask before downloading a PDF"),
             value=not annotations.ui_state(pdf_viewer.NO_CONFIRM, False),

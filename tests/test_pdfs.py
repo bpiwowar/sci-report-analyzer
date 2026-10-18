@@ -111,8 +111,25 @@ def test_merge_and_cleanup():
     u = pdfs.usage()
     assert u.files == 2 and u.orphans == [pb]
     pc.unlink()  # deleted by hand
-    assert pdfs.cleanup() == (1, 1)
+    assert pdfs.cleanup() == (1, 1, 0)
     assert not pb.exists() and pdfs.stored(pid) == {a: False}
+
+
+ANNOTATED = PDF + b"\n9 0 obj\n<< /Type /Annot /Subtype /Ink >>\nendobj\n"
+
+
+def test_cleanup_keeps_annotated():
+    _, link, ids = _person()
+    b, c = ids["Neural retrieval models for long documents"], ids["Sparse representations"]
+    pb = pdfs.save(b, ANNOTATED, "https://example.org/b.pdf")
+    pc = pdfs.save(c, PDF, "https://example.org/c.pdf")
+    _resync(link, [pub("a", "Deep ranking for search", 2021, "SIGIR")])
+    assert sorted(pdfs.usage().orphans) == sorted([pb, pc])
+    assert pdfs.annotated(pb) and not pdfs.annotated(pc)
+    assert pdfs.cleanup() == (1, 0, 1)  # (the default: annotated files kept)
+    assert pb.exists() and not pc.exists()
+    assert pdfs.cleanup(keep_annotated=False) == (1, 0, 0)
+    assert not pb.exists()
 
 
 async def test_viewer_page(user: User, fake_viewer):
@@ -227,6 +244,21 @@ async def test_settings_cleanup(user: User):
     _resync(link, [pub("a", "Deep ranking for search", 2021, "SIGIR")])
     await user.open("/settings?tab=data")
     await user.should_see("1 files of papers no longer in the database")
+    user.find(marker="pdfs-cleanup").click()
+    await user.should_see("1 files deleted, 0 PDFs forgotten")
+    assert not pb.exists()
+
+
+async def test_settings_cleanup_annotated(user: User):
+    _, link, ids = _person()
+    b = ids["Neural retrieval models for long documents"]
+    pb = pdfs.save(b, PDF + b"/Subtype /Highlight", "https://example.org/b.pdf")
+    _resync(link, [pub("a", "Deep ranking for search", 2021, "SIGIR")])
+    await user.open("/settings?tab=data")
+    user.find(marker="pdfs-cleanup").click()
+    await user.should_see("0 files deleted, 0 PDFs forgotten · 1 annotated files kept")
+    assert pb.exists()
+    user.find(marker="pdfs-keep-annotated").click()  # unchecked
     user.find(marker="pdfs-cleanup").click()
     await user.should_see("1 files deleted, 0 PDFs forgotten")
     assert not pb.exists()

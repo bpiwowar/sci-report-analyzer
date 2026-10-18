@@ -185,12 +185,33 @@ def usage() -> Usage:
     return u
 
 
-def cleanup() -> tuple[int, int]:
-    """Delete the files of papers (and documents) no longer in the database, and forget the
-    PDFs whose file was deleted by hand. Returns (files deleted, PDFs forgotten)."""
+# Markup annotations (as the viewer saves them: uncompressed, appended to the file); links and
+# form fields are no one's work.
+_MARKUP = re.compile(
+    rb"/Subtype\s*/(?:Ink|FreeText|Highlight|Stamp|Text|Underline|StrikeOut|Squiggly|Square"
+    rb"|Circle|Line|Polygon|PolyLine|Caret|FileAttachment)\b"
+)
+
+
+def annotated(path: Path) -> bool:
+    """Whether a PDF file holds annotations (when in doubt: yes)."""
+    try:
+        return _MARKUP.search(path.read_bytes()) is not None
+    except OSError:
+        return True
+
+
+def cleanup(keep_annotated: bool = True) -> tuple[int, int, int]:
+    """Delete the files of papers (and documents) no longer in the database (with
+    ``keep_annotated``, not those holding annotations), and forget the PDFs whose file was
+    deleted by hand. Returns (files deleted, PDFs forgotten, annotated files kept)."""
     u = usage()
+    kept = 0
     for p in u.orphans:
-        p.unlink(missing_ok=True)
+        if keep_annotated and annotated(p):
+            kept += 1
+        else:
+            p.unlink(missing_ok=True)
     root = pdf_dir()
     forgotten = 0
     with session_scope() as s:
@@ -202,7 +223,7 @@ def cleanup() -> tuple[int, int]:
         for d in sorted(root.rglob("*"), reverse=True):  # emptied person directories
             if d.is_dir() and not any(d.iterdir()):
                 d.rmdir()
-    return len(u.orphans), forgotten
+    return len(u.orphans) - kept, forgotten, kept
 
 
 # ---- The PDFs of a list, as one ZIP file ----------------------------------------------------
