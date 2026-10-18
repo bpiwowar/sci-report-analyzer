@@ -13,8 +13,7 @@ Environment variables take precedence over the stored settings: ``OLLAMA_HOST`` 
 URL, as for the ollama CLI), ``SCI_REPORT_ANALYZER_OLLAMA_MODEL`` and
 ``SCI_REPORT_ANALYZER_EMBED_MODEL``, ``SCI_REPORT_ANALYZER_REWRITE_MODEL`` (rewriting the
 excerpts: see rewrite_model; "none": not rewritten), ``SCI_REPORT_ANALYZER_LLM_API_KEY``
-(the OpenAI-compatible servers' API key). A task (see TASKS) and a folder (its
-reports' settings: see folder_models) can use other models.
+(the OpenAI-compatible servers' API key). A task (see TASKS) can use another model.
 """
 
 from __future__ import annotations
@@ -228,30 +227,13 @@ def _headers(api_key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
 
-def folder_models(folder_id: int | None) -> tuple[str, str]:
-    """The models a folder uses instead of the default ones (its reports' settings, shared:
-    see reports._citations): the LLM and the embedding model (blank: the default)."""
-    from .reports import _citations
-
-    c = _citations(folder_id)
-    return c.get("llm_model") or "", c.get("embed_model") or ""
-
-
-def save_folder_models(folder_id: int, model: str, embed_model: str) -> None:
-    from .reports import _save_citations
-
-    _save_citations(
-        folder_id, llm_model=model.strip() or None, embed_model=embed_model.strip() or None
-    )
-
-
-def model(folder_id: int | None = None, task: str | None = None) -> str:
-    """The LLM to use for a task (see TASKS), in a folder: the folder's, else the task's,
-    else the default one (blank: none, the LLM being off or no model chosen)."""
+def model(task: str | None = None) -> str:
+    """The LLM to use for a task (see TASKS): the task's, else the default one (blank: none,
+    the LLM being off or no model chosen)."""
     st = settings()
     if not st.enabled:
         return ""
-    chosen = folder_models(folder_id)[0] or st.tasks.get(task or "", "") or st.model
+    chosen = st.tasks.get(task or "", "") or st.model
     return "" if _cloud(st, chosen) else chosen
 
 
@@ -279,13 +261,12 @@ def rewrite_model() -> str:
     return chosen if st.enabled and chosen and chosen.lower() != NONE else ""
 
 
-def embed_model(folder_id: int | None = None) -> str:
-    """The embedding model to use (in a folder; blank: none, the LLM being off or no model
-    chosen)."""
+def embed_model() -> str:
+    """The embedding model to use (blank: none, the LLM being off or no model chosen)."""
     st = settings()
     if not st.enabled:
         return ""
-    chosen = folder_models(folder_id)[1] or st.embed_model
+    chosen = st.embed_model
     return "" if st.embed_api == "ollama" and is_cloud(chosen) else chosen
 
 
@@ -301,7 +282,6 @@ def thinks(task: str | None = None) -> bool:
 async def chat_json(
     messages: list[dict[str, str]],
     schema: dict,
-    folder_id: int | None = None,
     task: str | None = None,
     progress: Callable[[str, int], None] | None = None,
     timeout: float = 600.0,
@@ -315,7 +295,7 @@ async def chat_json(
     "thinking", "writing" the answer) and the characters written in it. ``name``: this model
     instead (a local one); ``think``: whether it thinks (none: see thinks)."""
     st = settings()
-    name = model(folder_id, task) if name is None else ("" if _cloud(st, name) else name)
+    name = model(task) if name is None else ("" if _cloud(st, name) else name)
     if not name:
         raise RuntimeError("No LLM (Settings → Local LLM)")
     if progress:
@@ -476,12 +456,10 @@ async def _openai_chat(
                 )
 
 
-async def embed(
-    texts: list[str], folder_id: int | None = None, timeout: float = 120.0
-) -> list[list[float]]:
-    """The embeddings of ``texts`` with the folder's embedding model (raises if none, the
+async def embed(texts: list[str], timeout: float = 120.0) -> list[list[float]]:
+    """The embeddings of ``texts`` with the embedding model (raises if none, the
     server is not local or unreachable)."""
-    st, name = settings(), embed_model(folder_id)
+    st, name = settings(), embed_model()
     if not name:
         raise RuntimeError("No embedding model (Settings → Local LLM)")
     if not texts:
@@ -689,7 +667,7 @@ def is_installed(name: str, installed: Iterable[str]) -> bool:
 
 
 def model_users(name: str) -> list[str]:
-    """What uses a model, said (the general models, the tasks' and the folders'; those from
+    """What uses a model, said (the general models and the tasks'; those from
     an environment variable too); empty if nothing."""
     users: list[str] = []
     for st in (settings(), stored_settings()):
@@ -706,27 +684,4 @@ def model_users(name: str) -> list[str]:
         ):
             if on and same_model(name, value) and use not in users:
                 users.append(use)
-    users += [
-        _("the {kind} of the folder settings “{name}”").format(kind=kind, name=label)
-        for label, citations in _folder_settings()
-        for key, kind in (("llm_model", _("LLM")), ("embed_model", _("embedding model")))
-        if same_model(name, citations.get(key) or "")
-    ]
     return users
-
-
-def _folder_settings() -> list[tuple[str, dict]]:
-    """The name and the citations of each folder settings (where the models are)."""
-    from sqlalchemy import select
-
-    from .db.models import FolderSettings
-    from .db.session import session_scope
-
-    try:
-        with session_scope() as s:
-            return [
-                (f.name or _("default"), dict(f.citations or {}))
-                for f in s.scalars(select(FolderSettings))
-            ]
-    except Exception:  # (no database: e.g. in unit tests)
-        return []

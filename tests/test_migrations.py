@@ -325,3 +325,24 @@ def test_thesis_edits_d4a7c2e9f5b3(tmp_path):
     _downgrade(db, "a7d3f9c2e5b8")
     with sqlite3.connect(db) as c:
         assert [s for (s,) in c.execute("SELECT student FROM thesis")] == ["Carl Sample"]
+
+
+def test_no_folder_models_a7e3c9d1f5b2(tmp_path):
+    """The models chosen by folder settings gone (the rest of their citations kept)."""
+    db = tmp_path / "db.sqlite"
+    _upgrade(db, "f2c8a4d6e1b9")
+    with sqlite3.connect(db) as c:
+        c.execute(
+            "INSERT INTO folder_settings (name, is_default, citations) VALUES ('A', 0, ?)",
+            (json.dumps({"cite": "[@key]", "llm_model": "qwen3", "embed_model": "e5"}),),
+        )
+        c.execute("INSERT INTO folder_settings (name, is_default, citations) VALUES ('B', 0, NULL)")
+    _upgrade(db, "a7e3c9d1f5b2")
+    with sqlite3.connect(db) as c:
+        rows = [
+            r
+            for (r,) in c.execute(
+                "SELECT citations FROM folder_settings WHERE name IN ('A', 'B') ORDER BY name"
+            )
+        ]
+    assert [json.loads(r) if r else r for r in rows] == [{"cite": "[@key]"}, None]

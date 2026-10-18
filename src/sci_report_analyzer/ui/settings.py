@@ -1606,8 +1606,7 @@ def llm_tab() -> None:
     ui.label(
         _(
             "Texts turned into vectors, e.g. to suggest the category of an excerpt: from "
-            "Ollama, or a server with an OpenAI-compatible API (llama.cpp, vLLM, LM Studio…). "
-            "A folder can use another model (its reports' settings)."
+            "Ollama, or a server with an OpenAI-compatible API (llama.cpp, vLLM, LM Studio…)."
         )
     ).classes("text-sm text-grey-8 max-w-[48rem]")
     embed_api = (

@@ -1024,7 +1024,7 @@ async def test_settings_dialog_in_sections(user: User) -> None:
     ref = folders.SettingsRef(sid)
     await user.open("/settings?tab=folders")
     user.find(marker=f"settings-edit-{sid}").click()
-    for key in ("categories", "report", "excerpts", "citations", "models"):
+    for key in ("categories", "report", "excerpts", "citations"):
         await user.should_see(marker=f"settings-section-{key}")
     await user.should_see(marker="settings-panel-categories")
     await user.should_see("Drag to order and nest them")  # (what the section is for)

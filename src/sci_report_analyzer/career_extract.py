@@ -429,7 +429,6 @@ def requests(
 async def extract(
     person_id: int,
     chosen: list[Page] | None = None,
-    folder_id: int | None = None,
     out: list[Suggestion] | None = None,
     profiles: bool = True,
     instructions: str | None = None,
@@ -447,7 +446,7 @@ async def extract(
     for i, (part, chat) in enumerate(split):
         if progress:
             progress(i, len(split))
-        answer = await llm.chat_json(chat, SCHEMA, folder_id, task="career", progress=phase)
+        answer = await llm.chat_json(chat, SCHEMA, task="career", progress=phase)
         for sug in _suggestions(answer, part):
             if not any(_same(sug.entry, e) for e in [*have, *(x.entry for x in out)]):
                 out.append(sug)

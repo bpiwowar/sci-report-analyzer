@@ -58,10 +58,10 @@ def _settings(folder_id: int) -> int:
         return folders.settings_id(s, folder_id)
 
 
-async def embeddings(texts: list[str], folder_id: int | None) -> list[list[float]]:
-    """The embeddings of ``texts`` with the folder's model: those kept, the others asked
+async def embeddings(texts: list[str]) -> list[list[float]]:
+    """The embeddings of ``texts`` with the embedding model: those kept, the others asked
     for (then kept)."""
-    model = llm.embed_model(folder_id)
+    model = llm.embed_model()
     digests = [_digest(t) for t in texts]
     with session_scope() as s:
         known = {
@@ -73,7 +73,7 @@ async def embeddings(texts: list[str], folder_id: int | None) -> list[list[float
     missing = list({d: t for d, t in zip(digests, texts, strict=True) if d not in known}.items())
     for i in range(0, len(missing), BATCH):
         chunk = missing[i : i + BATCH]
-        vectors = await llm.embed([t for _, t in chunk], folder_id)
+        vectors = await llm.embed([t for _, t in chunk])
         with session_scope() as s:
             for (d, _t), v in zip(chunk, vectors, strict=True):
                 known[d] = v
@@ -204,10 +204,10 @@ def _prototypes(stored: dict[str, Any]) -> dict[int, np.ndarray]:
     return {int(c): np.array([v], dtype=float) for c, v in stored.items()}
 
 
-async def _fitted(folder_id: int, rows: list[tuple[int, int, str]]) -> _Fit:
+async def _fitted(rows: list[tuple[int, int, str]]) -> _Fit:
     """The best prototypes for excerpts (see _training_rows), with the settings' bounds of
     the clusters."""
-    vectors = await embeddings([t for _i, _c, t in rows], folder_id)
+    vectors = await embeddings([t for _i, _c, t in rows])
     st = llm.settings()
     return fit(
         _unit(np.array(vectors, dtype=float)),
@@ -220,14 +220,14 @@ async def _fitted(folder_id: int, rows: list[tuple[int, int, str]]) -> _Fit:
 async def train(folder_id: int) -> Trained:
     """Learn from the excerpts filed in the folder's categories (raises if there is none, or
     no embedding model)."""
-    model = llm.embed_model(folder_id)
+    model = llm.embed_model()
     if not model:
         raise RuntimeError("No embedding model (Settings → Local LLM)")
     settings_id = _settings(folder_id)
     rows = _training_rows(settings_id)
     if not rows:
         raise ValueError("No excerpt filed yet")
-    best = await _fitted(folder_id, rows)
+    best = await _fitted(rows)
     stored = {
         "prototypes": {str(c): np.round(p, 6).tolist() for c, p in best.prototypes.items()},
         "threshold": best.threshold,
@@ -266,8 +266,8 @@ async def suggest(
 ) -> list[tuple[int, float]]:
     """The categories closest to a passage (id, cosine similarity to its closest prototype;
     not those in ``exclude``), the closest first; none if not trained, or with another model
-    than the folder's now."""
-    model = llm.embed_model(folder_id)
+    than the current one."""
+    model = llm.embed_model()
     with session_scope() as s:
         settings_id = folders.settings_id(s, folder_id)
         row = s.get(ExcerptClassifier, settings_id)
@@ -275,7 +275,7 @@ async def suggest(
             return []
         prototypes = _prototypes(row.centroids)
         existing = set(s.scalars(select(Category.id).where(Category.settings_id == settings_id)))
-    (v,) = await embeddings([text.strip()], folder_id)
+    (v,) = await embeddings([text.strip()])
     v = _unit(np.array(v, dtype=float))
     scores = [
         (c, float((p @ v).max()))
@@ -359,12 +359,12 @@ async def evaluate(folder_id: int) -> Evaluation:
     hidden (raises as train). Trained as train does (not kept), each excerpt is then taken
     out of its cluster's mean (leave-one-out, the clusters and their threshold kept: a bit
     optimistic, but the clustering is done once rather than once per excerpt)."""
-    if not llm.embed_model(folder_id):
+    if not llm.embed_model():
         raise RuntimeError("No embedding model (Settings → Local LLM)")
     rows = _training_rows(_settings(folder_id))
     if not rows:
         raise ValueError("No excerpt filed yet")
-    best = await _fitted(folder_id, rows)
+    best = await _fitted(rows)
     with session_scope() as s:
         leads = dict(
             s.execute(

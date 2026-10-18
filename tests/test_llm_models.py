@@ -10,7 +10,7 @@ import pytest
 import respx
 from nicegui.testing import User
 
-from sci_report_analyzer import folders, llm
+from sci_report_analyzer import llm
 
 MANIFEST = "https://registry.ollama.ai/v2/library/qwen3/manifests/8b"
 OLLAMA = "http://localhost:11434"
@@ -160,8 +160,6 @@ def test_same_model() -> None:
 
 
 def test_model_users() -> None:
-    folder = folders.save_folder(None, "Hiring")
-    llm.save_folder_models(folder, "gemma3:4b", "e5")
     llm.save_settings(
         llm.OllamaSettings(
             enabled=True,
@@ -174,8 +172,6 @@ def test_model_users() -> None:
     assert len(llm.model_users("qwen3:8b")) == 2  # (the general model, the rewriting one)
     assert any("career" in u.lower() or "Reading" in u for u in llm.model_users("mistral:latest"))
     assert llm.model_users("bge-m3:latest")
-    assert any("folder" in u for u in llm.model_users("gemma3:4b"))
-    assert any("folder" in u for u in llm.model_users("e5"))
     assert llm.model_users("unused:1b") == []
     # (the models of an OpenAI-compatible server are not Ollama's)
     llm.save_settings(llm.OllamaSettings(model="qwen3:8b", chat_api="openai"))

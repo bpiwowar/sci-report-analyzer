@@ -1,8 +1,8 @@
 """The settings of folders (named; a folder uses those it chose, else the default ones): their
 list in the Parameters (created, copied, renamed, made the default, deleted), their editor
 in sections (their categories, report templates and language; the excerpts'
-markers and levels; the primary source, the star lists and citations; the models), and the
-choice of a folder's."""
+markers and levels; the primary source, the star lists and citations), and the choice of a
+folder's."""
 
 from __future__ import annotations
 
@@ -11,10 +11,9 @@ from contextlib import contextmanager
 
 from nicegui import ui
 
-from .. import folders, i18n, llm, report_templates, reports, source_settings
+from .. import folders, i18n, report_templates, reports, source_settings
 from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
-from . import llm_models
 from .categories_editor import HELP as CATEGORIES_HELP
 from .categories_editor import categories_editor
 from .classification import classification_dialog
@@ -70,62 +69,6 @@ def markers_section(folder_id: int) -> Callable[[], dict[str, reports.Marker]]:
         k: reports.Marker((t.value or "").strip("# "), bool(f.value))
         for k, (t, f) in fields.items()
     }
-
-
-def models_section(folder_id: int) -> Callable[[], tuple[str, str]]:
-    """The models the folder uses instead of the default ones (Settings → Local LLM): the LLM
-    and the embedding model (blank: the default; those of the servers proposed); returns
-    their values."""
-    st = llm.settings()
-    model, embed = llm.folder_models(folder_id)
-    with ui.row().classes("w-full gap-2 no-wrap"):
-        inputs = [
-            ui.select(
-                [value] if value else [],
-                value=value or None,
-                label=label,
-                with_input=True,
-                new_value_mode="add-unique",
-                clearable=True,
-            )
-            .classes("grow")
-            .tooltip(tip)
-            .mark(mark)
-            for value, label, tip, mark in (
-                (
-                    model,
-                    _("LLM (default: {model})").format(model=st.model or _("none")),
-                    _("For the features using the local LLM"),
-                    "folder-llm-model",
-                ),
-                (
-                    embed,
-                    _("Embedding model (default: {model})").format(
-                        model=st.embed_model or _("none")
-                    ),
-                    _("E.g. to suggest an excerpt's category (trained again if changed)"),
-                    "folder-embed-model",
-                ),
-            )
-        ]
-
-    async def load() -> None:
-        for select, listing in (
-            (inputs[0], llm.list_chat_models(st.chat_api, llm.chat_server(st))),
-            (inputs[1], llm.list_embed_models(st.embed_api, llm.embed_server(st))),
-        ):
-            try:
-                found = await listing
-            except Exception:
-                continue  # (the server is not running: typed)
-            value = select.value
-            select.set_options(sorted({*found, *([value] if value else [])}), value=value)
-
-    llm_models.watch(inputs[0], lambda: st.chat_api, lambda: st.url, load)
-    llm_models.watch(inputs[1], lambda: st.embed_api, lambda: st.url, load)
-    if st.enabled:
-        ui.timer(0.1, load, once=True)
-    return lambda: (inputs[0].value or "", inputs[1].value or "")
 
 
 def levels_section(folder_id: int) -> Callable[[], tuple[list[reports.Level], str | None]]:
@@ -227,15 +170,6 @@ SECTIONS = (
         N_(
             "Which papers count (the primary source), the star lists, and how the notes "
             "number and cite the papers."
-        ),
-    ),
-    (
-        "models",
-        "smart_toy",
-        N_("Models (local AI)"),
-        N_(
-            "The local AI models used for these folders instead of the default ones (Settings "
-            "→ Local LLM); blank: the default."
         ),
     ),
 )
@@ -370,8 +304,6 @@ def settings_fields(settings_id: int, section: str = "categories") -> Callable[[
             "text-sm text-grey"
         )
         citations_save = folder_citations_section(ref)
-    with panel("models"):
-        model_fields = models_section(ref)
 
     def save() -> bool | None:
         if report_save() is False:
@@ -384,7 +316,6 @@ def settings_fields(settings_id: int, section: str = "categories") -> Callable[[
         reports.save_markers(ref, marker_fields())
         reports.save_levels(ref, *level_fields())
         reports.save_language(ref, lang.value or None)
-        llm.save_folder_models(ref, *model_fields())
         folders.set_primary_source(ref, primary.value)
         return None
 

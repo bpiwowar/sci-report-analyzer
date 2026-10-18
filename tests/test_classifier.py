@@ -18,7 +18,7 @@ pytestmark = pytest.mark.nicegui_main_file("tests/app_main.py")
 VOCABULARY = ("ranking", "search", "teaching", "course", "students", "award", "prize")
 
 
-async def _fake_embed(texts, folder_id=None, timeout=0.0):
+async def _fake_embed(texts, timeout=0.0):
     """Bags of words over VOCABULARY (counted, to check what is embedded)."""
     _fake_embed.calls += len(texts)
     return [[float(w in t.lower()) for w in VOCABULARY] + [0.01] for t in texts]
@@ -80,18 +80,13 @@ def test_embed_apis(monkeypatch) -> None:
     llm.save_settings(llm.OllamaSettings())
 
 
-def test_folder_models(monkeypatch) -> None:
+def test_models(monkeypatch) -> None:
     monkeypatch.delenv(llm.MODEL_ENV, raising=False)
     monkeypatch.delenv(llm.EMBED_MODEL_ENV, raising=False)
-    folder = folders.save_folder(None, "Hiring 2026")
     llm.save_settings(llm.OllamaSettings(model="qwen3", embed_model="bge-m3"))
-    assert (llm.model(folder), llm.embed_model(folder)) == ("", "")  # (the LLM off)
+    assert (llm.model(), llm.embed_model()) == ("", "")  # (the LLM off)
     llm.save_settings(llm.OllamaSettings(enabled=True, model="qwen3", embed_model="bge-m3"))
-    assert (llm.model(folder), llm.embed_model(folder)) == ("qwen3", "bge-m3")
-    llm.save_folder_models(folder, "gemma3", " ")
-    assert llm.folder_models(folder) == ("gemma3", "")
-    assert (llm.model(folder), llm.embed_model(folder)) == ("gemma3", "bge-m3")
-    assert llm.model(None) == "qwen3"
+    assert (llm.model(), llm.embed_model()) == ("qwen3", "bge-m3")
     llm.save_settings(llm.OllamaSettings())
 
 
@@ -111,8 +106,8 @@ def test_train_and_suggest(embeddings) -> None:
     calls = _fake_embed.calls
     assert asyncio.run(classifier.train(folder)).count == 6
     assert _fake_embed.calls == calls + 1
-    # Another model in the folder: to train again.
-    llm.save_folder_models(folder, "", "bge-m3")
+    # Another model: to train again.
+    llm.save_settings(llm.OllamaSettings(enabled=True, embed_model="bge-m3"))
     assert asyncio.run(classifier.suggest(folder, "A search engine")) == []
 
 

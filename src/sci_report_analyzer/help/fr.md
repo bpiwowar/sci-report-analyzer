@@ -498,10 +498,9 @@ utilise et qu'aucun extrait n'est classé dans leurs catégories). Ils se modifi
 haut (aussi l'onglet « Paramètres » de la fenêtre du dossier, son onglet « Dossier » donnant son nom, sa date, ses
 notes et les réglages qu'il utilise) : **Catégories** (leur arborescence, modifiée aussitôt), **Rapport** (les
 modèles de rapport, la langue des rapports), **Extraits** (les étiquettes des marqueurs et si un extrait marqué
-passe en premier, les niveaux, où vont les extraits de rayonnement), **Citations et sources** (la source
+passe en premier, les niveaux, où vont les extraits de rayonnement) et **Citations et sources** (la source
 principale, les listes étoilées, la façon dont les notes numérotent et citent les articles, les modèles de
-citation propres au dossier) et **Modèles (IA locale)** (un LLM et un modèle d'embeddings utilisés à la place de
-ceux par défaut ; vide : ceux par défaut). Chaque dossier utilise les réglages choisis dans sa fenêtre ou son
+citation propres au dossier). Chaque dossier utilise les réglages choisis dans sa fenêtre ou son
 menu (une icône dans l'arbre quand ce ne sont pas ceux par défaut), sinon ceux par défaut ; un dossier créé dans
 un autre part de son choix, et un dossier déplacé garde ses réglages. Choisir d'autres réglages classe les extraits
 de ses personnes dans les catégories de mêmes noms (ajoutées si elles manquent), leurs articles étoilés dans les
@@ -569,8 +568,7 @@ réfléchit (« Par défaut » : non ; « Réfléchit » ; « Ne réflé
   longue liste par parties.
 
 Quand le LLM est désactivé (ou qu'une tâche n'a pas de modèle, ou n'obtient pas de réponse valide), la page de la
-tâche, la fenêtre de l'extrait et celle d'Étiqueter à partir d'une liste le disent, avec un lien pour l'activer. Les réglages d'un dossier peuvent
-utiliser d'autres modèles (leur section « Modèles (IA locale) »).
+tâche, la fenêtre de l'extrait et celle d'Étiqueter à partir d'une liste le disent, avec un lien pour l'activer.
 
 Des **sauvegardes** de la base de données (pas des PDF) sont faites dans `backups/` à côté de celle-ci (Paramètres →
 Données et cache indique où) : une par jour au démarrage (les 7 dernières sont conservées), et une avant chaque mise à niveau de
