@@ -2541,21 +2541,24 @@ async def test_excerpt_change_llm(user: User, monkeypatch, fake_viewer):
             ("qwen3:8b", "qwen3:8b"),
             ("absent:1b", "↓ absent:1b"),
         ]
-        chooser.value = ["gemma3:4b", "broken", "absent:1b"]
-        for _ in range(20):  # (whether each can think, asked: said in its label)
-            if chooser.options["broken"].endswith("cannot think"):
-                break
-            await asyncio.sleep(0.05)
-        assert chooser.options["broken"] == "broken · cannot think"
-        assert chooser.options["absent:1b"] == "↓ absent:1b · cannot think"
-
-        def thinking(name, on):  # (chosen in its chip's menu)
-            _page_event(user, "vrLlmThink", {"id": chooser.id, "model": name, "on": on})
-
-        thinking("broken", True)  # (cannot: said, not taken)
-        await user.should_see("broken cannot think")
-        thinking("gemma3:4b", True)
-        assert chooser.options["gemma3:4b"] == "gemma3:4b · thinking"
+        for name in ("gemma3:4b", "broken", "absent:1b", "gemma3:4b"):  # (each a badge, once)
+            chooser.value = name
+            await user.should_see(marker=f"change-llm-chip-{name}")
+            for _ in range(20):  # (the list emptied, for the next one)
+                if chooser.value is None:
+                    break
+                await asyncio.sleep(0.05)
+            assert chooser.value is None
+        assert len(user.find(marker="change-llm-chip-gemma3:4b").elements) == 1
+        # Whether each can think, asked: one that cannot, said (no switch).
+        await user.should_see(marker="change-llm-cannot-broken")
+        await user.should_see(marker="change-llm-cannot-absent:1b")
+        await user.should_not_see(marker="change-llm-think-broken")
+        user.find(marker="change-llm-think-gemma3:4b").elements.pop().value = True
+        chooser.value = "qwen3:8b"  # (added, then removed)
+        await user.should_see(marker="change-llm-remove-qwen3:8b")
+        user.find(marker="change-llm-remove-qwen3:8b").click()
+        await user.should_not_see(marker="change-llm-chip-qwen3:8b")
         user.find(marker="change-llm-run").click()
         await user.should_see(marker="change-llm-text-0")
         assert options[0]["think"] is True and options[0]["fresh"] is False

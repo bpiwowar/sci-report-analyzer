@@ -3,7 +3,6 @@ publications panel), bookmarks, and the paper of a selection."""
 
 from __future__ import annotations
 
-import html
 import inspect
 import json
 from collections.abc import Awaitable, Callable
@@ -1593,17 +1592,22 @@ def change_llm_dialog(
                 ui.button(_("Close"), on_click=dlg.close).props("flat").mark("change-llm-close")
             return
         current = llm.rewrite_model()
+        # The models chosen (in order): each a badge, with whether it thinks (a switch; one
+        # that cannot, said) and a cross removing it; added from the list (or typed).
+        picked: list[str] = [current] if current else []
+        think: dict[str, bool] = {}
+        cannot: set[str] = set()
+        checked: set[str] = set()
+        labels: dict[str, str] = {m: m for m in picked}
         with ui.row().classes("w-full items-center no-wrap gap-2"):
             models = (
                 ui.select(
-                    [current] if current else [],
-                    value=[current] if current else [],
-                    label=_("Models"),
-                    multiple=True,
+                    dict(labels),
+                    label=_("Add a model"),
                     with_input=True,
                     new_value_mode="add-unique",
                 )
-                .props("use-chips options-dense")
+                .props("options-dense")
                 .classes("grow")
                 .mark("change-llm-models")
             )
@@ -1615,66 +1619,61 @@ def change_llm_dialog(
                 {{ props.opt.label }}</q-item-label></q-item-section></q-item>""",
             )
             run = ui.button(_("Run"), icon="play_arrow").props("no-caps").mark("change-llm-run")
+        badges = ui.row().classes("w-full items-center gap-2").mark("change-llm-chosen")
         status = ui.label().classes("text-xs text-grey").mark("change-llm-status")
-        # Whether each model chosen thinks: chosen in its chip (said in its label; one that
-        # cannot, said).
-        think: dict[str, bool] = {}
-        cannot: set[str] = set()
-        checked: set[str] = set()
-        labels: dict[str, str] = {m: m for m in models.value or []}
 
-        def relabel() -> None:
-            chosen = set(models.value or [])
-            options = {}
-            for m, label in labels.items():
-                if m in chosen and m in cannot:
-                    label += " · " + _("cannot think")
-                elif m in chosen and think.get(m):
-                    label += " · " + _("thinking")
-                options[m] = label
-            models.set_options(options, value=list(models.value or []))
+        def show() -> None:
+            badges.clear()
+            with badges:
+                for name in picked:
+                    later = labels.get(name, "").startswith("↓")  # (to download)
+                    with (
+                        ui.row()
+                        .classes("items-center no-wrap gap-1 rounded-borders bg-grey-2 pl-3 pr-1")
+                        .mark(f"change-llm-chip-{name}")
+                    ):
+                        ui.label(name).classes(
+                            "text-sm" + (" text-grey-7 text-italic" if later else "")
+                        )
+                        if later:
+                            ui.icon("download", size="xs", color="grey-7").tooltip(_("To download"))
+                        if name in cannot:  # (said)
+                            ui.label(_("cannot think")).classes("text-xs text-grey").mark(
+                                f"change-llm-cannot-{name}"
+                            )
+                        else:
+                            ui.switch(
+                                _("thinking"),
+                                value=think.get(name, False),
+                                on_change=lambda e, n=name: think.__setitem__(n, e.value),
+                            ).props("dense").classes("text-xs").mark(f"change-llm-think-{name}")
+                        ui.button(icon="close", on_click=lambda n=name: remove(n)).props(
+                            "flat dense round size=xs"
+                        ).tooltip(_("Remove")).mark(f"change-llm-remove-{name}")
 
-        def thinks(e) -> None:
-            args = e.args or {}
-            name = args.get("model")
-            if args.get("id") != models.id or name not in (models.value or []):
+        def remove(name: str) -> None:
+            if name in picked:
+                picked.remove(name)
+                show()
+
+        async def add() -> None:
+            name = models.value
+            if not name:
                 return
-            if args.get("on") and name in cannot:
-                ui.notify(_("{model} cannot think").format(model=name), type="warning")
-                return
-            think[name] = bool(args.get("on"))
-            relabel()
+            models.set_value(None)
+            labels.setdefault(name, name)  # (typed)
+            if name not in picked:
+                picked.append(name)
+                show()
+            if name not in checked and name not in cannot:  # (whether it can think: asked once)
+                checked.add(name)
+                if await llm.can_think(name) is False:
+                    cannot.add(name)
+                    if not badges.is_deleted:
+                        show()
 
-        ui.on("vr-llm-think", thinks)
-        menu = "".join(
-            # (emitEvent, not a global of a template: that of the event's window)
-            f"""<q-item clickable v-close-popup @click="$event.view.emitEvent('vr-llm-think',
-            {{id: {models.id}, model: props.opt.value, on: {on}}})"><q-item-section>
-            {html.escape(label)}</q-item-section></q-item>"""
-            for on, label in (("true", _("Thinking")), ("false", _("No thinking")))
-        )
-        models.add_slot(
-            "selected-item",
-            f"""<q-chip dense removable :tabindex="props.tabindex" class="q-ma-xs"
-            @remove="props.removeAtIndex(props.index)">{{{{ props.opt.label }}}}
-            <q-btn flat dense round size="xs" icon="psychology" class="q-ml-xs" @click.stop>
-            <q-tooltip>{html.escape(_("Thinking or not"))}</q-tooltip>
-            <q-menu><q-list dense>{menu}</q-list></q-menu></q-btn></q-chip>""",
-        )
-
-        async def chosen_models() -> None:
-            for name in models.value or []:
-                labels.setdefault(name, name)  # (typed)
-            relabel()
-            for name in models.value or []:  # (whether a local one can think: asked once)
-                if name not in checked and name not in cannot:
-                    checked.add(name)
-                    if await llm.can_think(name) is False:
-                        cannot.add(name)
-                        if not models.is_deleted:
-                            relabel()
-
-        models.on_value_change(chosen_models)
+        models.on_value_change(add)
+        show()
         with ui.row().classes("w-full items-center gap-4"):
             fresh = ui.checkbox(_("No cache")).mark("change-llm-fresh")
             fresh.tooltip(_("Ask the models again, even for an answer already got"))
@@ -1699,7 +1698,7 @@ def change_llm_dialog(
                         _("Cannot reach the server: {error} (type the models)").format(error=e)
                     )
                 return
-            options = {m: m for m in sorted({*found, *(models.value or [])})}
+            options = {m: m for m in sorted({*found, *picked})}
             if st.chat_api == "ollama":  # (then those to download, from Ollama's library)
                 try:
                     library = await llm.library_models()
@@ -1715,7 +1714,8 @@ def change_llm_dialog(
             if not models.is_deleted:
                 labels.clear()
                 labels.update(options)
-                relabel()
+                models.set_options(options)
+                show()
 
         ui.timer(0.1, load, once=True)
 
@@ -1804,7 +1804,7 @@ def change_llm_dialog(
             ).mark(f"change-llm-keep-{i}")
 
     async def compare() -> None:
-        names = list(models.value or [])
+        names = list(picked)
         if not names:
             ui.notify(_("Choose the models to try first"), type="warning")
             return

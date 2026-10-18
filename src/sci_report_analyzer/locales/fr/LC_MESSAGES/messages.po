@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: SciReport Analyzer\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-18 10:46+0200\n"
+"POT-Creation-Date: 2026-10-18 17:03+0200\n"
 "PO-Revision-Date: 2026-10-03 13:47+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -581,6 +581,9 @@ msgstr "Ajouter une liste"
 
 msgid "Add a main conference"
 msgstr "Ajouter une conférence principale"
+
+msgid "Add a model"
+msgstr "Ajouter un modèle"
 
 msgid "Add a name rule"
 msgstr "Ajouter une règle de nom"
@@ -3415,9 +3418,6 @@ msgstr ""
 "Modèle : {model} (local : rien ne sort de cette machine ni du réseau "
 "local)"
 
-msgid "Models"
-msgstr "Modèles"
-
 msgid "Models (local AI)"
 msgstr "Modèles (IA locale)"
 
@@ -3860,9 +3860,6 @@ msgid ""
 msgstr ""
 "Aucune thèse : validez un profil theses.fr dans l'onglet Sources, ou "
 "ajoutez un doctorant à la main."
-
-msgid "No thinking"
-msgstr "Sans réflexion"
 
 msgid "No title"
 msgstr "Sans titre"
@@ -6568,12 +6565,6 @@ msgstr ""
 "Cette personne a des extraits, et les réglages de ce dossier (ses "
 "catégories) diffèrent"
 
-msgid "Thinking"
-msgstr "Avec réflexion"
-
-msgid "Thinking or not"
-msgstr "Réflexion ou non"
-
 msgid "Thinks"
 msgstr "Réfléchit"
 
@@ -6672,6 +6663,9 @@ msgid "To check: no rank found, or a fuzzy match, and no decision by hand"
 msgstr ""
 "À vérifier : aucun rang trouvé, ou une correspondance approchée, et "
 "aucune décision manuelle"
+
+msgid "To download"
+msgstr "À télécharger"
 
 msgid ""
 "To put it out of the way while keeping everything, better archive it "
@@ -8376,10 +8370,6 @@ msgstr "{matched}/{total} articles déjà connus ({share})"
 #, python-brace-format
 msgid "{message} (applied everywhere)"
 msgstr "{message} (appliqué partout)"
-
-#, python-brace-format
-msgid "{model} cannot think"
-msgstr "{model} ne sait pas réfléchir"
 
 #, python-brace-format
 msgid "{model} deleted"
