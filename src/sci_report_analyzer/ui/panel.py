@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import dataclasses
 import json
 import logging
@@ -38,6 +37,7 @@ from ..ranking import tracks
 from ..ranking.badge import KIND_ORDER, PREDATORY_COLOUR, TO_CHECK
 from ..ranking.kinds import KIND_SHORT
 from ..sources import ADAPTERS
+from . import nav
 from .dialogs import actions, ok_handler, transient_dialog
 from .pdf_viewer import changed, download_dialog, pdf_button, watch, zip_button
 from .pub_details import open_details, source_links
@@ -132,7 +132,10 @@ class PublicationsPanel:
         person_id: int,
         period_id: int | None = None,
         query: dict[str, str] | None = None,
+        *,
+        exact: bool = False,
     ) -> None:
+        """``exact``: the view is the address's, nothing as left (Back or Forward, see nav)."""
         self.person_id = person_id
         # Where the name variants to review are shown (the Sources tab), if anywhere.
         self.names_box: ui.element | None = None
@@ -171,14 +174,15 @@ class PublicationsPanel:
         self.cat_colours = {f"cat:{c.id}": c.colour for c in self.categories}
         # The chosen period (and its tag filter) stick across visits; a period given in the
         # URL (e.g. opened from a folder) wins.
-        state = annotations.panel_state(person_id)
+        state = {"period_id": period_id} if exact else annotations.panel_state(person_id)
         self._load_periods(period_id or state.get("period_id"))
         if period_id and any(p.id == period_id for p in self.periods):
             self.period_id = period_id
             if period_id == state.get("period_id"):
                 self._load_filters(state)
             self._apply_period()
-            self._save_state()
+            if not exact:
+                self._save_state()
         elif any(p.id == state.get("period_id") for p in self.periods):
             self.period_id = state["period_id"]
             self._load_filters(state)
@@ -186,6 +190,11 @@ class PublicationsPanel:
         # Filters from the URL (so that a reload gives back the same view).
         self.url_extra: dict[str, str] = {}
         self._from_query(query or {})
+        if exact:
+            self._save_state()  # (as shown: what sticks)
+        # How the next address goes in the history (see nav.address): the first one, in place
+        # of that given (completed); a search typed, a step for a burst of typing.
+        self._how = "replace"
 
     def _load_filters(self, state: dict) -> None:
         self._set_filters(state.get("tag_filter", []))  # (an earlier "list_filter": ignored)
@@ -271,10 +280,11 @@ class PublicationsPanel:
         return out
 
     def push_url(self) -> None:
-        """Show the current filters in the address bar (without reloading)."""
+        """Show the current view in the address bar (without reloading): a step in the
+        history (see nav)."""
         url = urls.person_url(self.person_id, self.period_id, **self.url_params())
-        with contextlib.suppress(Exception):  # e.g. the page was left meanwhile
-            ui.run_javascript(f"history.replaceState(history.state, '', {json.dumps(url)})")
+        nav.address(url, self._how, on=self.container)
+        self._how = "push"
 
     # ---- data ---------------------------------------------------------------------------
 
@@ -617,11 +627,12 @@ class PublicationsPanel:
 
             def set_text(e) -> None:
                 self.text = e.value or ""
+                self._how = "typing"
                 self.render()
 
             ui.input(
                 placeholder=_("search title / venue / author"), value=self.text, on_change=set_text
-            ).props("dense outlined clearable debounce=400").classes("w-64")
+            ).props("dense outlined clearable debounce=400").classes("w-64").mark("pub-search")
 
             def set_hide(e) -> None:
                 self.hide_preprints = e.value

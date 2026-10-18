@@ -23,7 +23,7 @@ from ..ranking.kinds import KIND_SHORT, KINDS, UNRANKED_KINDS, VENUE_KINDS, WORK
 from ..ranking.levels import NONE, clean_name, normalized, range_label
 from ..ranking.service import VenuePattern, service
 from ..sources import ADAPTERS
-from . import dnd
+from . import dnd, nav
 from .dialogs import actions, close, close_then, confirm, ok_handler, transient_dialog
 from .pub_details import MIN_SEARCH, VIA_LABEL, record_results, venue_rule_dialog
 from .theme import (
@@ -40,6 +40,7 @@ from .theme import (
     track_style,
 )
 
+DEFAULT_TAB = "conferences"
 TABS = {
     "conferences": (N_("Conferences"), venues.CONFERENCE_KINDS),
     "workshops": (N_("Workshops"), WORKSHOP_KINDS),
@@ -153,7 +154,16 @@ def _sjr_history(badge) -> None:
 
 def register() -> None:
     @ui.page("/venues")
-    async def venues_page(tab: str = "conferences", focus: int | None = None) -> None:
+    async def venues_page(
+        tab: str = DEFAULT_TAB,
+        focus: int | None = None,
+        q: str = "",
+        check: str | None = None,
+        sort: str | None = None,
+    ) -> None:
+        """A tab of venues (``focus``: the tab of a venue, opened), those matching ``q``,
+        those to check in the tabs ``check``, sorted (``sort``: the tab's, see
+        nav.sort_param): in the page's address (see _address)."""
         with frame(_("Venues")):
             ui.label(_("Venues")).classes("text-2xl")
             ui.label(
@@ -183,7 +193,9 @@ def register() -> None:
             dialogs = ui.element("div")
             # After a change (a merge...), the list is updated in place: the tab, the search
             # and the scroll stay; when rebuilt, the tab and the search are kept.
-            view = _View(tab=tab, dialogs=dialogs)
+            view = _View(tab=tab, dialogs=dialogs, filter=q, to_check=set(nav.csv(check)))
+            if sort:
+                view.sorts[tab] = sort
 
             def show_conflicts() -> None:
                 conflicts_box.clear()
@@ -208,6 +220,19 @@ def register() -> None:
             container.clear()
             with container:
                 _tabs(rows, view, focus)
+            _address(view, "replace")  # (completed: e.g. the tab of the venue focused)
+
+
+def _address(view: _View, how: str = "push") -> None:
+    """The venues page's address: the tab, the search, the tabs with the venues to check
+    only, the tab's sort."""
+    params = {
+        "tab": None if view.tab == DEFAULT_TAB else view.tab,
+        "q": view.filter or None,
+        "check": ",".join(t for t in [*TABS, "joint"] if t in view.to_check) or None,
+        "sort": view.sorts.get(view.tab),
+    }
+    nav.address("/venues" + urls.query(params), how)
 
 
 def _lookup() -> None:
@@ -646,6 +671,7 @@ class _View:
     # Shows new rows in the list in place; False: the list must be rebuilt.
     update: Callable[[list[venues.VenueRow]], bool] = lambda _rows: False
     rows: list[venues.VenueRow] = field(default_factory=list)
+    sorts: dict[str, str] = field(default_factory=dict)  # (each tab's, see nav.sort_param)
 
 
 def _tabs(rows: list[venues.VenueRow], view: _View, focus: int | None = None) -> None:
@@ -669,9 +695,12 @@ def _tabs(rows: list[venues.VenueRow], view: _View, focus: int | None = None) ->
 
     texts = labels(rows, undecided)
     tab_els: dict[str, ui.tab] = {}
-    with ui.tabs(value=tab, on_change=lambda e: setattr(view, "tab", e.value)).classes(
-        "w-full"
-    ) as tabs:
+
+    def chosen(e) -> None:
+        view.tab = e.value
+        _address(view)
+
+    with ui.tabs(value=tab, on_change=chosen).classes("w-full") as tabs:
         for name in TABS:
             tab_els[name] = ui.tab(name, texts[name])
         if undecided:
@@ -959,7 +988,12 @@ def _table(
     kinds = TABS[name][1] if name in TABS else {r.kind for r in rows}
     searching = [bool(view.filter)]
     table = (
-        ui.table(columns=columns, rows=shown(), row_key="id", pagination=50)
+        ui.table(
+            columns=columns,
+            rows=shown(),
+            row_key="id",
+            pagination=nav.pagination_of(view.sorts.get(name), 50),
+        )
         .classes("w-full")
         .props("dense flat")
     )
@@ -972,13 +1006,16 @@ def _table(
         .classes("w-64")
     )
     filt.mark(f"venue-list-filter-{name}" if name else "venue-list-filter")
+    table.filter = filt.value  # (as given, see bind_value)
     filt.bind_value(table, "filter")
     all_kinds = ui.label(_("Searching venues of every kind")).classes("text-xs text-grey")
     all_kinds.mark("venue-list-all-kinds")
     all_kinds.bind_visibility_from(table, "filter", backward=bool)
 
     def filtered(e) -> None:
-        view.filter = e.value or ""
+        if view.filter != (e.value or ""):
+            view.filter = e.value or ""
+            _address(view, "typing")
         if searching[0] != bool(view.filter):
             searching[0] = bool(view.filter)
             table.rows = shown()
@@ -986,6 +1023,18 @@ def _table(
     def checking(e) -> None:
         (view.to_check.add if e.value else view.to_check.discard)(name)
         table.rows = shown()
+        _address(view)
+
+    def sorted_by(e) -> None:
+        sort = nav.sort_param(e.value)
+        if sort != view.sorts.get(name):
+            if sort:
+                view.sorts[name] = sort
+            else:
+                view.sorts.pop(name, None)
+            _address(view)
+
+    table.on_pagination_change(sorted_by)
 
     filt.on_value_change(filtered)
     to_check = (

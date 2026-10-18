@@ -34,6 +34,7 @@ from ..sync import (
     set_orcid,
     start_sync,
 )
+from . import nav
 from .categories_editor import categories_dialog
 from .dialogs import close_then, ok_handler, transient_dialog
 from .dnd import draggable
@@ -57,9 +58,16 @@ LAST_IN_TREE = "ui.people.tree"  # the last folder selected in the tree (sticky)
 
 def register() -> None:
     @ui.page("/")
-    def index(folder: str | None = None) -> RedirectResponse | None:
+    def index(
+        folder: str | None = None,
+        tags: str | None = None,
+        q: str = "",
+        orphans: bool = False,
+        sort: str | None = None,
+    ) -> RedirectResponse | None:
         """The folder chosen (``folder``: its path, see urls.folder_url; the former ids:
-        redirected), else the last one."""
+        redirected), else the last one; its people with all the ``tags``; All people: those
+        matching ``q``, in no folder (``orphans``), sorted (``sort``, see nav.sort_param)."""
         known = {f.id: f for f in folders.folders()}
         last = annotations.ui_state(LAST_FOLDER)
         if folder is not None:
@@ -75,23 +83,26 @@ def register() -> None:
                 annotations.save_ui_state(LAST_IN_TREE, folder)
                 expand_to(folder)
         title = known[folder].name if folder in known else _("All people")
+        # (what the page shows, in its address: kept when the tree is shown again)
+        view = {"only": tuple(nav.csv(tags)), "q": q, "orphans": orphans, "sort": sort}
         with frame(title):
 
             @ui.refreshable
             def body() -> None:  # (again once the tree changed: names, places, settings)
-                _reports(folder, body.refresh)
+                _reports(folder, body.refresh, view)
 
             body()
+            _address(folder, view, "replace")  # (completed: e.g. the last folder's)
             ui.timer(2.0, lambda: _refresh_if_running())
         return None
 
 
-def _reports(folder: int, changed) -> None:
+def _reports(folder: int, changed, view: dict) -> None:
     """The folder selected (its actions, in a bar staying on top) and the tree of folders with
-    their people; else All people."""
+    their people (``view["only"]``: those having all these tags); else All people (see
+    _cleanup_view)."""
     known = {f.id: f for f in folders.folders()}
     current = known.get(folder)
-    view = {"only": ()}  # (the selected folder's people: those having all these tags)
     with (
         ui.column()
         .classes("w-full gap-1 sticky top-12 z-10 py-2 vr-toolbar")
@@ -103,9 +114,23 @@ def _reports(folder: int, changed) -> None:
                 ui.label(current.notes).classes("text-sm text-grey")
             _tag_filter(current, view)
     if current is None:
-        _cleanup_view(known)
+        _cleanup_view(known, view)
     else:
         _tree(current.id, changed, view)
+
+
+def _address(folder: int, view: dict, how: str = "push") -> None:
+    """The Reports page's address: the folder, and what it shows (see index)."""
+    if folder == ALL:
+        params = {
+            "q": view["q"] or None,
+            "orphans": "1" if view["orphans"] else None,
+            "sort": view["sort"],
+        }
+    else:
+        params = {"tags": ",".join(view["only"]) or None}
+    extra = urls.query(params)
+    nav.address(urls.folder_url(folder) + ("&" + extra[1:] if extra else ""), how)
 
 
 def _refresh_if_running() -> None:
@@ -492,13 +517,19 @@ def _documents_step(
 
 
 def _tag_filter(f: folders.FolderView, view: dict) -> None:
+    def chosen(e) -> None:
+        view["only"] = tuple(e.value or ())
+        _address(f.id, view)
+        refresh_alive(_tree)
+
     if tags := folders.tags_of(f):
+        view["only"] = tuple(t for t in view["only"] if t in tags)
         ui.select(
             tags,
-            value=[],
+            value=list(view["only"]),
             multiple=True,
             label=_("Only people tagged"),
-            on_change=lambda e: (view.update(only=tuple(e.value or ())), refresh_alive(_tree)),
+            on_change=chosen,
         ).props("dense outlined use-chips clearable").classes("w-80").mark(
             f"folder-tag-filter-{f.id}"
         )
@@ -766,7 +797,7 @@ def _period_editor(member: folders.Member) -> None:
 # ---- all people (cleanup) ------------------------------------------------------------------
 
 
-def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
+def _cleanup_view(known: dict[int, folders.FolderView], view: dict) -> None:
     ui.label(
         _(
             "Every person, with the folders they are in: select people to delete them or to put "
@@ -795,8 +826,13 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
         for r in rows
     ]
     with ui.row().classes("items-center gap-2 w-full"):
-        filt = ui.input(placeholder=_("filter")).props("dense outlined clearable").classes("w-64")
-        only_orphans = ui.switch(_("in no folder only")).mark("orphans-only")
+        filt = (
+            ui.input(placeholder=_("filter"), value=view["q"])
+            .props("dense outlined clearable")
+            .classes("w-64")
+            .mark("people-filter")
+        )
+        only_orphans = ui.switch(_("in no folder only"), value=view["orphans"]).mark("orphans-only")
         ui.space()
         target = (
             ui.select({f.id: f.name for f in known.values()}, label=_("folder"))
@@ -807,12 +843,27 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
         del_btn = ui.button(_("Delete"), icon="delete").props("dense flat color=negative")
         del_btn.mark("delete-people")
     table = (
-        ui.table(columns=columns, rows=data, row_key="id", selection="multiple", pagination=50)
+        ui.table(
+            columns=columns,
+            rows=[r for r in data if not view["orphans"] or not r["n_folders"]],
+            row_key="id",
+            selection="multiple",
+            pagination=nav.pagination_of(view["sort"], 50),
+        )
         .classes("w-full")
         .props("dense flat")
         .mark("people-table")
     )
+    table.filter = filt.value  # (as given, see bind_value)
     filt.bind_value(table, "filter")
+
+    def show(key: str, value, how: str = "push") -> None:
+        if view[key] != value:
+            view[key] = value
+            _address(ALL, view, how)
+
+    filt.on_value_change(lambda e: show("q", e.value or "", "typing"))
+    table.on_pagination_change(lambda e: show("sort", nav.sort_param(e.value)))
     table.on(
         "rowClick",
         lambda e: ui.navigate.to(urls.person_url(e.args[1]["id"])),
@@ -820,6 +871,7 @@ def _cleanup_view(known: dict[int, folders.FolderView]) -> None:
 
     def orphans(e) -> None:
         table.rows = [r for r in data if not e.value or not r["n_folders"]]
+        show("orphans", bool(e.value))
 
     only_orphans.on_value_change(orphans)
 

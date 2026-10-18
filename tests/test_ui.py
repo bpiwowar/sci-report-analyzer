@@ -1310,16 +1310,20 @@ async def test_author_menu_alias_and_category(user: User) -> None:
 
 
 async def test_filters_in_url(user: User, monkeypatch) -> None:
-    from sci_report_analyzer.ui import panel
+    from nicegui import Client
+
     from sci_report_analyzer.urls import person_url
 
     pid = _seed()
     urls: list[str] = []
-    monkeypatch.setattr(
-        panel.ui,
-        "run_javascript",
-        lambda code: urls.append(json.loads(code.split("'', ", 1)[1].rstrip(")"))),
-    )
+    run = Client.run_javascript
+
+    def recorded(self, code, **kw):
+        if m := re.fullmatch(r'window\.vrNav\?\.set\(("[^"]*"), "\w+"\)', code):
+            urls.append(json.loads(m[1]))
+        return run(self, code, **kw)
+
+    monkeypatch.setattr(Client, "run_javascript", recorded)
     # Filters given in the URL are applied (a reload gives back the same view)...
     await user.open(f"/person/{pid}?q=workshop")
     await user.should_see("A workshop contribution")

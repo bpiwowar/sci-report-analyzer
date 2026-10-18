@@ -175,6 +175,7 @@ class Search:
     badges: dict[str, ui.badge] = field(default_factory=dict)
     # (the texts of the dialogs, by what opens them: read once while searching)
     dialogs: dict[int, list[str]] = field(default_factory=dict)
+    moving: bool = False  # (the search choosing the tab shown)
 
     def box(self) -> None:
         """The search field (and below it, what it found)."""
@@ -236,7 +237,9 @@ class Search:
             label.set_visibility(any(counts.get(n) for n in names))
         found = [n for n, c in counts.items() if c]
         if found and self.tab_bar.value not in found:
+            self.moving = True  # (not a step of its own in the history, see settings_page)
             self.tab_bar.set_value(found[0])
+            self.moving = False
         self.found.text = (
             ngettext("Found in {n} screen", "Found in {n} screens", len(found)).format(n=len(found))
             if found

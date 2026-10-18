@@ -83,7 +83,8 @@ class Slugs:
         return next((i for i, s in self.persons.items() if s == slug), None)
 
 
-def _query(params: dict) -> str:
+def query(params: dict) -> str:
+    """A query string (``?a=1&b=x,y``; empty: none), the parameters None left out."""
     params = {k: v for k, v in params.items() if v is not None}
     return f"?{urlencode(params, safe='/,')}" if params else ""
 
@@ -103,7 +104,7 @@ def person_url(
     path = [*(slugs.folder_path(folder) if folder else []), slugs.persons.get(person_id)]
     if path[-1] is None:  # (unknown: as before)
         path = [str(person_id), *([str(period_id)] if period_id else [])]
-    return "/person/" + "/".join(path) + _query(params)
+    return "/person/" + "/".join(path) + query(params)
 
 
 def resolve_person(path: str) -> tuple[int, int | None] | None:

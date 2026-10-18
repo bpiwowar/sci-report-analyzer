@@ -24,6 +24,7 @@ from .. import (
     reflist_read,
     settings_io,
     source_settings,
+    urls,
     venue_match,
 )
 from ..i18n import N_, _, ngettext
@@ -41,7 +42,7 @@ from ..ranking.normalize import (
 )
 from ..ranking.service import MatchSettings, load_settings, save_settings, service
 from ..sources import ADAPTERS
-from . import git_backup, llm_models, scimago_years, shared_settings, unsaved
+from . import git_backup, llm_models, nav, scimago_years, shared_settings, unsaved
 from .colours import ColourInput
 from .dialogs import actions, confirm, transient_dialog
 from .settings_search import Search
@@ -92,6 +93,7 @@ NAV = (
         ),
     ),
 )
+DEFAULT_TAB = "sources"
 # The tabs that were elsewhere (their links kept): where they are now.
 MOVED = {"skeletons": "folders"}  # (the report templates: with each folder settings)
 PANELS = {
@@ -133,10 +135,10 @@ ui.add_css(
 
 def register() -> None:
     @ui.page("/settings")
-    def settings_page(tab: str = "sources") -> None:
-        tab = MOVED.get(tab, tab)
-        if tab not in PANELS:
-            tab = "sources"
+    def settings_page(tab: str = DEFAULT_TAB, q: str = "") -> None:
+        """A screen (``tab``), the settings searched (``q``): the page's address, each tab
+        chosen a step in the history (see nav)."""
+        tab = _known_tab(tab)
         with frame(_("Settings")):
             ui.label(_("Settings")).classes("text-2xl")
             edits = unsaved.Edits()
@@ -173,9 +175,50 @@ def register() -> None:
                 with edits_panel:
                     edits.panel()
             with search_slot:
-                Search(
+                search = Search(
                     tabs, panels, edits.tabs, {n: _(lb) for n, lb in labels.items()}, groups
-                ).box()
+                )
+                search.box()
+            _addressed(tabs, search, q)
+
+
+def _known_tab(tab: str | None) -> str:
+    tab = MOVED.get(tab or DEFAULT_TAB, tab or DEFAULT_TAB)
+    return tab if tab in PANELS else DEFAULT_TAB
+
+
+def settings_url(tab: str = DEFAULT_TAB, q: str = "") -> str:
+    """The settings' address: a screen, the settings searched."""
+    return "/settings" + urls.query({"tab": None if tab == DEFAULT_TAB else tab, "q": q or None})
+
+
+def _addressed(tabs: ui.tabs, search: Search, q: str) -> None:
+    """The tab and the search in the address: a tab chosen, a step in the history; typed (or
+    the tab chosen by the search), a step for a burst of typing; Back or Forward, shown again
+    in place (the unsaved edits kept)."""
+    restoring = [False]
+
+    def show(how: str) -> None:
+        if not restoring[0]:
+            nav.address(settings_url(tabs.value, search.input.value or ""), how)
+
+    tabs.on_value_change(lambda: show("typing" if search.moving else "push"))
+    search.input.on_value_change(lambda: show("typing"))
+
+    def restore(query: dict[str, str]) -> None:
+        restoring[0] = True
+        try:
+            tabs.set_value(_known_tab(query.get("tab")))
+            search.input.set_value(query.get("q", ""))
+        finally:
+            restoring[0] = False
+
+    nav.on_pop(restore)
+    if q:
+        restoring[0] = True
+        search.input.set_value(q)
+        restoring[0] = False
+    nav.address(settings_url(tabs.value, q), "replace")  # (completed: e.g. a moved tab's)
 
 
 def contribution_tab() -> None:
