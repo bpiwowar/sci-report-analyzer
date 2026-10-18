@@ -44,6 +44,7 @@ from ..sync import (
     suggested_orcid,
     sync_link,
 )
+from . import nav
 from .dialogs import actions, close_then, ok_handler, transient_dialog
 from .documents_page import LINES_JS, ReportTabs, page_url_of
 from .folder_notes import NOTES_TIP
@@ -127,7 +128,9 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
         tabs.on_value_change(tab_changed)
         with ui.tab_panels(tabs, value=tab).classes("w-full"):
             with ui.tab_panel("publications"):
-                panel = PublicationsPanel(person_id, period, dict(request.query_params))
+                panel = PublicationsPanel(
+                    person_id, period, dict(request.query_params), exact=nav.popped(request)
+                )
                 panel.build()
                 panel.show_starred = lambda: tabs.set_value("starred")
             with ui.tab_panel("starred"):
@@ -159,7 +162,13 @@ def _person_page(request: Request, person_id: int, tab: str, period: int | None)
             for which in REPORT_TABS:
                 with ui.tab_panel(which).classes("px-0 py-1"):
                     boxes[which] = ui.column().classes("w-full").mark(f"{which}-tab")
-        dock = PdfDock(person_id, lambda: panel.period_id, dict(request.query_params), address)
+        dock = PdfDock(
+            person_id,
+            lambda: panel.period_id,
+            dict(request.query_params),
+            address,
+            exact=nav.popped(request),
+        )
         # (the folder's seen from, else the period's)
         shown = next(
             (

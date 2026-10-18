@@ -37,7 +37,7 @@ def _state_key(person_id: int) -> str:
 class PdfDock:
     """The PDFs open beside the page of a person: from the address (``pdfs``: their keys,
     ``pdf``: the one shown, none: minimized), else as left (``on_change``: to show them
-    there)."""
+    there; ``exact``: none without ``pdfs``, see nav.popped)."""
 
     def __init__(
         self,
@@ -45,6 +45,8 @@ class PdfDock:
         period: Callable[[], int | None],
         query: dict[str, str],
         on_change: Callable[[], None],
+        *,
+        exact: bool = False,
     ) -> None:
         """``period``: that of the page (a paper's tags and notes, in its side column)."""
         self.person_id = person_id
@@ -52,8 +54,8 @@ class PdfDock:
         self._on_change = on_change
         # (the PDF shown changed: its kind and id, or None)
         self.on_shown: list[Callable[[tuple[str, int] | None], None]] = []
-        if "pdfs" in query:
-            keys, shown = query["pdfs"].split(","), query.get("pdf")
+        if "pdfs" in query or exact:
+            keys, shown = [k for k in query.get("pdfs", "").split(",") if k], query.get("pdf")
         else:
             state = annotations.ui_state(_state_key(person_id))
             state = state if isinstance(state, dict) else {}

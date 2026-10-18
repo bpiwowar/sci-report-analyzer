@@ -14,6 +14,7 @@ from .. import i18n
 from ..i18n import _
 from ..ranking import tracks
 from ..ranking.badge import LEVEL_HELP, Badge, Category, category_of, text_colour
+from . import nav
 
 SOURCE_SHORT = {
     "dblp": "DBLP",
@@ -156,6 +157,7 @@ def _menu(compact: bool = False) -> None:
 @contextmanager
 def frame(title: str) -> Iterator[None]:
     ui.page_title(f"{title} · {APP_NAME}")
+    nav.script()  # (its address in the history, see nav)
     with ui.header().classes("items-center justify-between py-1"):
         _menu()
     ui.query(".nicegui-content").style("padding-top: 0")  # (close to the menu bar)
