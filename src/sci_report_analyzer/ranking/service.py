@@ -11,16 +11,16 @@ from datetime import timedelta
 from typing import Any, Literal
 
 import httpx
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import delete, func, select
 
-from ..db.app_settings import get_setting, set_setting
+from ..db.app_settings import delete_setting, get_setting, set_setting
 from ..db.models import JcrRecord, VenueCache, utcnow
 from ..db.session import session_scope
 from ..sources.base import SourceError, user_agent
 from ..sources.openalex import params as openalex_params
 from ..text import safe_compile
-from . import datasets, detection, tracks
+from . import datasets, defaults, detection, tracks
 from .badge import (
     FINDINGS_RE,
     TOGGLABLE_SOURCES,
@@ -32,6 +32,7 @@ from .detection import DetectionRule, Rule, default_detection_rules, regex
 from .kinds import DEFAULT_INTERNATIONAL_KEYWORDS, DEFAULT_NATIONAL_KEYWORDS
 from .matcher import Matcher, MatchResult
 from .normalize import (
+    DEFAULT_NORM_RULES,
     NormRule,
     apply_rules,
     default_rules,
@@ -240,6 +241,46 @@ class MatchSettings(BaseModel):
     # CORE rank of a paper: the edition in force when it was published, or the latest.
     core_edition: Literal["publication", "latest"] = "publication"
 
+    @model_validator(mode="before")
+    @classmethod
+    def _from_stored(cls, data: Any) -> Any:
+        """(as saved, see ``stored``: the defaults for what is missing)"""
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        if isinstance(data.get("sources"), dict):
+            data["sources"] = {**_default_sources(), **data["sources"]}
+        if isinstance(data.get("norm_rules"), list):
+            data["norm_rules"] = defaults.unrefs(data["norm_rules"], _NORM_DEFAULTS)
+        if isinstance(data.get("tracks"), list):
+            data["tracks"] = defaults.unrefs(data["tracks"], tracks.DEFAULTS)
+        return data
+
+    def stored(self) -> dict[str, Any]:
+        """As saved (and exported): only what differs from the defaults, a built-in rule or
+        track as its default by its id; what is not there follows the defaults (a newer
+        one too)."""
+        default = MatchSettings().model_dump()
+        out = {k: v for k, v in self.model_dump().items() if v != default[k]}
+        sources = {k: v for k, v in self.sources.items() if v != default["sources"].get(k)}
+        out.pop("sources", None)
+        if sources:
+            out["sources"] = sources
+        out.pop("norm_rules", None)
+        if not defaults.all_default(self.norm_rules, _NORM_DEFAULTS):
+            out["norm_rules"] = defaults.refs(self.norm_rules, _NORM_DEFAULTS)
+        out.pop("detection_rules", None)
+        if edited := [
+            r.model_dump()
+            for r in self.detection_rules
+            if not defaults.is_default(r, _DETECTION_DEFAULTS)
+        ]:
+            out["detection_rules"] = edited
+        out.pop("tracks", None)
+        if not defaults.all_default(self.tracks, tracks.DEFAULTS):
+            out["tracks"] = [tracks.stored(t) for t in self.tracks]
+        return out
+
     @field_validator("detection_rules")
     @classmethod
     def _every_detection_rule(cls, rules: list[DetectionRule]) -> list[DetectionRule]:
@@ -263,9 +304,25 @@ class MatchSettings(BaseModel):
         return hashlib.sha1(dump.encode()).hexdigest()[:16]
 
 
+_NORM_DEFAULTS = {r.id: r for r in DEFAULT_NORM_RULES}
+_DETECTION_DEFAULTS = {r.id: r for r in default_detection_rules()}
+
+
 def load_settings() -> MatchSettings:
     value = get_setting(MATCHING_KEY)
-    return MatchSettings.model_validate(value) if value is not None else MatchSettings()
+    if value is None:
+        return MatchSettings()
+    settings = MatchSettings.model_validate(value)
+    if value != (stored := settings.stored()):
+        _store(stored)  # (saved by a former version: with copies of the defaults)
+    return settings
+
+
+def _store(stored: dict[str, Any]) -> None:
+    if stored:
+        set_setting(MATCHING_KEY, stored)
+    else:
+        delete_setting(MATCHING_KEY)
 
 
 def save_settings(settings: MatchSettings) -> None:
@@ -286,7 +343,7 @@ def save_settings(settings: MatchSettings) -> None:
             "tracks": authorship.stamp_rules(old.tracks, settings.tracks, tracks.DEFAULTS),
         }
     )
-    set_setting(MATCHING_KEY, settings.model_dump())
+    _store(settings.stored())
     service.invalidate(clear_cache=True)
 
 

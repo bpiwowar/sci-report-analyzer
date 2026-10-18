@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from ..i18n import language
 from ..text import ascii_fold, safe_compile
+from . import defaults
 from .inforce import InForce, leftmost
 
 FINDINGS_ID = "findings"
@@ -86,6 +88,18 @@ class Track(BaseModel):
     by: str | None = None
     on: str | None = None
     note: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _from_stored(cls, data: Any) -> Any:
+        """(its built-in rules saved by their ids, see ``stored``)"""
+        if not isinstance(data, dict):
+            return data
+        for k in ("rules", "name_rules"):
+            if any(isinstance(r, str) for r in data.get(k) or ()):
+                by_id = DEFAULT_RULES if k == "rules" else DEFAULT_NAME_RULES
+                data = {**data, k: defaults.unrefs(data[k], by_id)}
+        return data
 
     def name(self, lang: str | None = None) -> str:
         """Its name in ``lang`` (that of the moment by default), else in English."""
@@ -273,6 +287,18 @@ def origin(track: Track) -> str:
     if d is None:
         return "added"
     return "default" if track.model_dump() == d.model_dump() else "edited"
+
+
+def stored(track: Track) -> str | dict[str, Any]:
+    """A track as saved: a built-in one as its default by its id, else in full (its
+    built-in rules as their defaults by their ids)."""
+    if defaults.is_default(track, DEFAULTS):
+        return track.id
+    return {
+        **track.model_dump(),
+        "rules": defaults.refs(track.rules, DEFAULT_RULES),
+        "name_rules": defaults.refs(track.name_rules, DEFAULT_NAME_RULES),
+    }
 
 
 def name_rule_origin(rule: NameRule) -> str:

@@ -25,7 +25,7 @@ uses.
 ### Versioning
 
 `format` must be `"sci-report-analyzer-settings"`, or the file is rejected. `version` (now
-`7`; 6 had a single level per venue, `level_type` / `level_rank`, read as a level for every
+`8`; 7 had copies of the defaults in `matching`, read as before; 6 had a single level per venue, `level_type` / `level_rank`, read as a level for every
 year) must be 6 or later: older files (with `flags`, or tracks without `name_rules`) are
 refused. Every other field is optional: a missing one takes its default, an unknown one is
 ignored.
@@ -35,7 +35,7 @@ ignored.
 | Field | Type | Default | |
 |-------|------|---------|-|
 | `format` | `"sci-report-analyzer-settings"` | that | required in effect (the only accepted value) |
-| `version` | int | `7` | 6 or later |
+| `version` | int | `8` | 6 or later |
 | `exported_at` | string \| null | null | ISO 8601, UTC, seconds (`2026-10-04T09:00:00+00:00`) |
 | `matching` | [Matching](#matching) | defaults | |
 | `venues` | list of [Venue](#venue) | `[]` | only venues with a manual decision or a manual variant are exported |
@@ -43,7 +43,11 @@ ignored.
 
 ### Matching
 
-`ranking.service.MatchSettings`, as stored in the database (`app_setting` row `matching`).
+`ranking.service.MatchSettings`, as stored in the database (`app_setting` row `matching`,
+none when every field is at its default): only the fields that differ from their default
+(`sources`: the sources that do), so that a field left out follows the defaults, a newer
+one too. In `norm_rules` and `tracks` (and a track's `rules`, `name_rules`), a built-in item
+as its default is its `id` alone (a string); `detection_rules` has only the rules changed.
 
 | Field | Type | Default | |
 |-------|------|---------|-|
@@ -301,12 +305,13 @@ variant's or venue rule's track any more).
 ```json
 {
   "format": "sci-report-analyzer-settings",
-  "version": 7,
+  "version": 8,
   "exported_at": "2026-10-04T09:00:00+00:00",
   "matching": {
-    "sources": {"scimago": true, "core": true, "jcr": true, "openalex": false, "predatory": true},
-    "min_score": 0.8,
+    "sources": {"openalex": true},
+    "min_score": 0.75,
     "norm_rules": [
+      "proceedingsOf",
       {
         "id": "ordinalsEn",
         "name": "Ordinals",
@@ -321,19 +326,18 @@ variant's or venue rule's track any more).
       }
     ],
     "national_keywords": ["conférence", "colloque", "CORIA"],
-    "international_keywords": ["international", "ACM", "IEEE"],
-    "unknown_scope": "international",
     "kind_levels": {"natl_conference": "C"},
     "detection_rules": [
       {"id": "workshop", "pattern": "\\bworkshops?\\b|\\bseminars?\\b", "ignore_case": true}
     ],
     "tracks": [
+      "findings",
       {
         "id": "short",
         "names": {"en": "Short", "fr": "Court"},
         "colour": "#d4a72c",
         "rules": [
-          {"id": "track_short", "pattern": "\\bshort papers?\\b", "ignore_case": true, "language": "en", "examples": []},
+          "track_short",
           {"id": "track_short_fr", "pattern": "\\barticles? courts?\\b", "ignore_case": true, "language": "fr", "examples": []}
         ]
       },
@@ -343,8 +347,7 @@ variant's or venue rule's track any more).
         "colour": "#bf3989",
         "rules": [{"id": "industry_1", "pattern": "\\bindustry track\\b", "ignore_case": true, "language": "en", "examples": []}]
       }
-    ],
-    "core_edition": "publication"
+    ]
   },
   "venues": [
     {
