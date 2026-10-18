@@ -26,7 +26,7 @@ from lark.exceptions import (
     VisitError,
 )
 
-from .db.app_settings import get_setting, set_setting
+from .db.app_settings import get_unless_default, set_unless_default
 from .i18n import _
 
 if TYPE_CHECKING:
@@ -250,7 +250,7 @@ def role(s: PubStat, cfg: Config) -> str | None:
 
 
 def load_config() -> Config:
-    saved = dict(get_setting(KEY) or {})
+    saved = dict(get_unless_default(KEY, asdict(default_config())) or {})
     if not saved.get("roles"):
         return default_config()
     return Config(
@@ -279,9 +279,13 @@ def validate(cfg: Config) -> None:
             raise ValueError(_("Rule {n}: {error}").format(n=i, error=error))
 
 
+def is_default(cfg: Config) -> bool:
+    return asdict(cfg) == asdict(default_config())
+
+
 def save_config(cfg: Config) -> None:
     validate(cfg)
-    set_setting(KEY, asdict(cfg))
+    set_unless_default(KEY, asdict(cfg), asdict(default_config()))
 
 
 def copy(cfg: Config) -> Config:

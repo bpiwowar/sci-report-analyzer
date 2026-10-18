@@ -51,6 +51,7 @@ from .folder_notes import NOTES_TIP
 from .panel import PublicationsPanel, StarredView, period_label
 from .pdf_dock import PdfDock
 from .theme import STATUS_COLOUR, fmt_dt, frame, int_or_none, refresh_alive, source_tag
+from .unsaved import text_reset_button
 
 PROFILE_TABS = ("career", "periods", "sources")  # (the Profile tab's, in order)
 REPORT_TABS = ("report", "excerpts", "timeline")  # (filled once shown, see ReportTabs)
@@ -870,11 +871,17 @@ def _extract_dialog(
                 ui.notify(_("Saved as the default instructions"), type="positive")
 
             with ui.row().classes("gap-2"):
-                ui.button(
-                    _("Default instructions"),
-                    icon="restart_alt",
-                    on_click=lambda: area.set_value(career_extract.PROMPT),
-                ).props("flat dense no-caps").mark("career-extract-prompt-default")
+                text_reset_button(
+                    ui.button(
+                        _("Default instructions"),
+                        icon="restart_alt",
+                        on_click=lambda: area.set_value(career_extract.PROMPT),
+                    )
+                    .props("flat dense no-caps")
+                    .mark("career-extract-prompt-default"),
+                    area,
+                    career_extract.PROMPT,
+                )
                 ui.button(_("Save as the default"), icon="save", on_click=save).props(
                     "flat dense no-caps"
                 ).tooltip(_("Also in Settings → Reading a career")).mark(

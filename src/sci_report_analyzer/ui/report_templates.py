@@ -10,6 +10,7 @@ from nicegui import ui
 from .. import report_templates
 from ..i18n import N_, _
 from .dialogs import actions, close_then, confirm, ok_handler, transient_dialog
+from .unsaved import reset_button
 
 HELP = N_(
     "The texts a report can start from: its headings, the blocks `[[publications]]` (the "
@@ -69,9 +70,10 @@ def templates_editor(
         ui.button(_("Add a template"), icon="add", on_click=add).props("flat dense").mark(
             "report-skeleton-add"
         )
-        ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat dense").mark(
-            "report-skeleton-defaults"
-        )
+        reset_button(
+            ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat dense"),
+            lambda: items == report_templates.default_templates(),
+        ).mark("report-skeleton-defaults")
     return rows.refresh
 
 

@@ -7,6 +7,7 @@ import re
 import pytest
 from helpers import (
     add_source,
+    enabled,
     load_fixture,
     make_person,
     note_status,
@@ -1529,9 +1530,9 @@ async def test_track_ids_and_name_rules(user: User) -> None:
     await user.should_see("Its identifier: industry_papers2 (it cannot be changed later)")
     # A name rule edited: marked, its default shown; then reset.
     await user.should_see(marker="track-name-rule-name_demo_part")
-    await user.should_not_see(marker="track-name-rule-reset-name_demo_part")
+    await enabled(user, "track-name-rule-reset-name_demo_part", False)
     user.find("track-name-replacement-name_demo_part").elements.pop().value = " (main)"
-    await user.should_see(marker="track-name-rule-reset-name_demo_part")
+    await enabled(user, "track-name-rule-reset-name_demo_part")
     await user.should_see("“ACL 2023 (System Demonstrations)” → “ACL 2023 (main)”")
     user.find("track-add-name-rule-short").click()
     await user.should_see(marker="track-name-pattern-short_name_1")
@@ -1650,13 +1651,13 @@ async def test_rule_origins(user: User) -> None:
     changed.pattern = "changed"
     save_settings(st)
     await user.open("/settings?tab=rules")
-    await user.should_see(marker="norm-reset-0")
-    await user.should_not_see(marker="norm-reset-1")
+    await enabled(user, "norm-reset-0")
+    await enabled(user, "norm-reset-1", False)  # (as its default)
     await user.should_not_see(marker="origin-added")
     user.find("norm-add").click()
     await user.should_see(marker="origin-added")
     user.find("norm-reset-1").click()  # (the changed rule, now second)
-    await user.should_not_see(marker="norm-reset-1")
+    await enabled(user, "norm-reset-1", False)
     user.find("norm-save").click()
     await user.should_see("Cleaning rules saved")
     rule = next(r for r in load_settings().norm_rules if r.id == changed.id)

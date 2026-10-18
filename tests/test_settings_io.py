@@ -1,11 +1,21 @@
+import json
+
 from helpers import set_correction, set_kind, set_level
 from sqlalchemy import select
 
 from sci_report_analyzer import settings_io, venues
+from sci_report_analyzer.db.app_settings import get_setting
 from sci_report_analyzer.db.models import Venue, VenueKey
 from sci_report_analyzer.db.session import session_scope
 from sci_report_analyzer.ranking.normalize import NormRule
-from sci_report_analyzer.ranking.service import VenuePattern, load_settings, save_settings, service
+from sci_report_analyzer.ranking.service import (
+    MATCHING_KEY,
+    MatchSettings,
+    VenuePattern,
+    load_settings,
+    save_settings,
+    service,
+)
 
 
 def _venue_attrs():
@@ -160,3 +170,35 @@ def test_joint_venue_roundtrip():
             "manual": True,
             "use": ids[1],
         }
+
+
+def test_defaults_not_exported_and_restored_on_import():
+    """Only the changed matching settings are exported; importing a file restores the
+    defaults of the others (saved as such: not saved)."""
+    st = load_settings()
+    st.min_score = 0.7
+    save_settings(st)
+    exported = settings_io.export_settings().model_dump_json()
+    assert json.loads(exported)["matching"] == {"min_score": 0.7}
+
+    def changed_here() -> None:
+        st = load_settings()
+        st.unknown_scope = "national"
+        st.norm_rules[0].pattern = "local"
+        save_settings(st)
+
+    changed_here()
+    settings_io.import_settings(settings_io.parse_file(exported), "replace")
+    assert get_setting(MATCHING_KEY) == {"min_score": 0.7}
+    # Merged: a local change against the file's default, taken: the default.
+    changed_here()
+    data = settings_io.parse_file(exported)
+    rule = f"matching:rules.{load_settings().norm_rules[0].id}"
+    assert {"matching:unknown_scope", rule} <= {c.id for c in settings_io.find_conflicts(data)}
+    settings_io.import_settings(data, "merge", {"matching:unknown_scope", rule})
+    assert get_setting(MATCHING_KEY) == {"min_score": 0.7}
+    # A file of a former version (the defaults in full): the defaults.
+    old = settings_io.SettingsFile(version=7).model_dump(mode="json")
+    old["matching"] = MatchSettings().model_dump(mode="json")
+    settings_io.import_settings(settings_io.parse_file(json.dumps(old)), "replace")
+    assert get_setting(MATCHING_KEY) is None

@@ -102,7 +102,10 @@ def templates_section() -> None:
         ui.button(_("Add a template"), icon="add", on_click=add).props("flat").mark(
             "report-template-add"
         )
-        ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat")
+        unsaved.reset_button(
+            ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat"),
+            lambda: cfg.items == reports.default_templates().items,
+        ).mark("report-templates-reset")
         unsaved.cancel_button()
         ui.button(_("Save"), icon="save", on_click=save).mark("report-templates-save")
 

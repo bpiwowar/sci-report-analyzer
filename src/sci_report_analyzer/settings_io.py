@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_serializer, model_validator
 from sqlalchemy import delete, select
 from sqlalchemy.orm import object_session, selectinload
 
@@ -33,7 +33,7 @@ from .ranking.service import (
 )
 
 FORMAT = "sci-report-analyzer-settings"
-VERSION = 7
+VERSION = 8  # (7: the defaults in full in ``matching``)
 MIN_VERSION = 6  # (older files had flags, tracks without name rules; 6: a single level)
 
 
@@ -105,6 +105,10 @@ class SettingsFile(BaseModel):
     matching: MatchSettings = Field(default_factory=MatchSettings)
     venues: list[VenueIO] = Field(default_factory=list)
     jcr: list[dict[str, Any]] | None = None
+
+    @field_serializer("matching")
+    def _matching(self, m: MatchSettings) -> dict[str, Any]:
+        return m.stored()  # (what is not there: the defaults, on import too)
 
 
 def export_settings(*, include_jcr: bool = False) -> SettingsFile:

@@ -30,6 +30,7 @@ from .. import (
 from ..i18n import N_, _, ngettext
 from ..ranking import datasets, detection, tracks
 from ..ranking.badge import SOURCE_LABELS, TOGGLABLE_SOURCES
+from ..ranking.defaults import all_default
 from ..ranking.kinds import KINDS, WORKSHOP_RE, KindEvidence, detect_kind, host_text
 from ..ranking.normalize import (
     DEFAULT_NORM_RULES,
@@ -377,7 +378,10 @@ def contribution_tab() -> None:
         ui.button(_("Add a rule"), icon="add", on_click=add_rule).props("flat").mark(
             "contribution-add-rule"
         )
-        ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat")
+        unsaved.reset_button(
+            ui.button(_("Defaults"), icon="restart_alt", on_click=reset).props("flat"),
+            lambda: contribution.is_default(cfg),
+        ).mark("contribution-reset")
         unsaved.cancel_button()
         ui.button(_("Save"), icon="save", on_click=save).mark("contribution-save")
 
@@ -695,12 +699,13 @@ def _origin_marker(
     tip: str | None = None,
     origins: dict = ORIGINS,
 ) -> None:
-    """A rule's (or track's) origin marker, and a reset (``tip``, ``mark``) when edited."""
+    """A rule's (or track's) origin marker, and its reset (``tip``, ``mark``) if built in:
+    enabled when edited."""
     _show_origin(card, origin, origins)
-    if origin == "edited":
+    if origin != "added":
         ui.button(icon="restart_alt", on_click=reset).props("flat round dense size=sm").tooltip(
             tip or _("Reset to the default")
-        ).mark(mark)
+        ).mark(mark).set_enabled(origin == "edited")
 
 
 def _next_id(prefix: str, ids: set[str], suffix: str = "", start: int = 1) -> int:
@@ -854,7 +859,10 @@ def rules_tab() -> None:
         preview()
 
     listing()
-    ui.button(_("Reset to the defaults"), icon="restart_alt", on_click=reset).props("flat")
+    unsaved.reset_button(
+        ui.button(_("Reset to the defaults"), icon="restart_alt", on_click=reset).props("flat"),
+        lambda: all_default(rules, _NORM_DEFAULTS),
+    ).mark("norm-reset")
 
     # Live preview with the rules as edited (saved or not).
     with ui.row().classes("items-center gap-2 w-full"):
@@ -1149,14 +1157,15 @@ def _data_dir_section(refresh) -> None:
         ui.button(_("Change location…"), icon="folder_open", on_click=change).mark(
             "data-dir-change"
         )
-        if config.saved_data_dir():
 
-            def reset() -> None:
-                config.save_data_dir(None)
-                ui.notify(_("From the next start: {path}").format(path=config.DEFAULT_DATA_DIR))
-                refresh()
+        def reset() -> None:
+            config.save_data_dir(None)
+            ui.notify(_("From the next start: {path}").format(path=config.DEFAULT_DATA_DIR))
+            refresh()
 
-            ui.button(_("Back to the default"), on_click=reset).props("flat")
+        ui.button(_("Back to the default"), on_click=reset).props("flat").mark(
+            "data-dir-reset"
+        ).set_enabled(bool(config.saved_data_dir()))
 
 
 def _pdfs_section() -> None:
@@ -1404,13 +1413,26 @@ def career_words_section() -> Callable[[], dict[str, dict[str, list[str]]]]:
             for g, area in by_group.items():
                 area.set_value("\n".join(career_words.DEFAULTS[lang][g]))
 
-    ui.button(_("Default words"), icon="restart_alt", on_click=reset).props("flat dense").mark(
-        "career-words-reset"
+    def values() -> dict[str, dict[str, list[str]]]:
+        return {
+            lang: {g: (a.value or "").splitlines() for g, a in by_group.items()}
+            for lang, by_group in areas.items()
+        }
+
+    button = (
+        ui.button(_("Default words"), icon="restart_alt", on_click=reset)
+        .props("flat dense")
+        .mark("career-words-reset")
     )
-    return lambda: {
-        lang: {g: (a.value or "").splitlines() for g, a in by_group.items()}
-        for lang, by_group in areas.items()
-    }
+
+    def changed(_e=None) -> None:
+        button.set_enabled(not career_words.is_default(values()))
+
+    changed()
+    for by_group in areas.values():
+        for area in by_group.values():
+            area.on_value_change(changed)
+    return values
 
 
 def suggested(key: str) -> str:
@@ -1791,11 +1813,16 @@ def prompt_section(task: str, current: str, default: str, label: str) -> ui.text
         .classes("w-full max-w-[48rem] font-mono")
         .mark(f"{task}-prompt")
     )
-    ui.button(
-        _("Default instructions"),
-        icon="restart_alt",
-        on_click=lambda: area.set_value(default),
-    ).props("flat dense no-caps").mark(f"{task}-prompt-default")
+    button = (
+        ui.button(
+            _("Default instructions"),
+            icon="restart_alt",
+            on_click=lambda: area.set_value(default),
+        )
+        .props("flat dense no-caps")
+        .mark(f"{task}-prompt-default")
+    )
+    unsaved.text_reset_button(button, area, default)
     return area
 
 
@@ -2124,6 +2151,7 @@ def detection_tab() -> None:
 
     def card(d: detection.DetectionDefault) -> None:
         r = rules[d.id]
+        reset_button: ui.button
         box = ui.column().classes("w-full gap-1 border rounded p-2").mark(f"detect-rule-{d.id}")
 
         def edited() -> bool:
@@ -2133,9 +2161,11 @@ def detection_tab() -> None:
             status.refresh()
             shown.refresh()
             preview()
+            reset_button.set_enabled(edited())
 
         @ui.refreshable
         def body() -> None:
+            nonlocal reset_button
             with ui.row().classes("items-center gap-2 w-full no-wrap"):
                 with ui.column().classes("gap-1 w-48 shrink-0"):
                     ui.label(_(d.name)).classes("font-bold")
@@ -2152,9 +2182,13 @@ def detection_tab() -> None:
                 ui.checkbox(_("ignore case"), value=r.ignore_case, on_change=changed).bind_value(
                     r, "ignore_case"
                 )
-                ui.button(icon="restart_alt", on_click=reset).props("flat round dense").tooltip(
-                    _("Reset to the default")
-                ).mark(f"detect-reset-{d.id}")
+                reset_button = (
+                    ui.button(icon="restart_alt", on_click=reset)
+                    .props("flat round dense")
+                    .tooltip(_("Reset to the default"))
+                    .mark(f"detect-reset-{d.id}")
+                )
+                reset_button.set_enabled(edited())
             shown()
 
         @ui.refreshable
@@ -2245,8 +2279,11 @@ def tracks_tab() -> None:
 
     save = unsaved.track(lambda: editor.defs, editor.save)
     with ui.row().classes("gap-2 mt-2"):
-        ui.button(_("Reset the built-in tracks"), icon="restart_alt", on_click=reset).props(
-            "flat"
+        unsaved.reset_button(
+            ui.button(_("Reset the built-in tracks"), icon="restart_alt", on_click=reset).props(
+                "flat"
+            ),
+            lambda: all_default(editor.defs[: len(tracks.DEFAULTS)], tracks.DEFAULTS),
         ).mark("tracks-reset")
         unsaved.cancel_button()
         ui.button(_("Save the tracks"), icon="save", on_click=save).mark("tracks-save")

@@ -57,6 +57,17 @@ async def note_status(user, mark: str, text: str = "Saved") -> None:
     raise AssertionError(f"{mark}: not {text!r}")
 
 
+async def enabled(user, mark: str, want: bool = True) -> None:
+    """Wait until ``mark``'s button is enabled (``want``), or disabled."""
+    import asyncio
+
+    for _ in range(20):
+        if user.find(mark).elements.pop().enabled == want:
+            return
+        await asyncio.sleep(0.1)
+    raise AssertionError(f"{mark}: enabled is not {want}")
+
+
 # ---- venue decisions by venue text, folder settings, citations (the app's are by id) ----------
 
 
