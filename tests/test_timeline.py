@@ -220,7 +220,9 @@ def test_supervised_and_papers() -> None:
 
 async def test_timeline_tab_career_and_theses(user: User) -> None:
     pid, period, cats, _paper = _seed()
-    lead = career.save(pid, Entry("position", "Lecturer", "2015"))
+    # (a past position: renamed, the current one in the header unchanged, so no reload of
+    # the page, which could land after the next click)
+    lead = career.save(pid, Entry("position", "Lecturer", "2015", "2019"))
     career.save(pid, Entry("position", "Mentor"))  # (no date: listed apart)
     done = replace(thesis("t1", "director", "On things"), defence_date="2016-06-01")
     add_source(pid, "thesesfr", "1", theses=[done])
