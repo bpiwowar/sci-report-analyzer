@@ -13,12 +13,18 @@ window.vrDock = {
     return f && f.contentWindow;
   },
   emit(name, args) { emitEvent(name, args); },
-  // The PDF of a URL of this site (/doc/3, /pdf/12?page=4), opened here: whether it is one.
+  // The PDF of a URL of this site (/doc/3, /pdf/12?page=4; /pdf/12?fetch=1, downloaded
+  // first), opened here: whether it is one.
   openUrl(href) {
     const u = new URL(href, location.href);
     const m = u.origin === location.origin && u.pathname.match(/^\/(doc|pdf)\/(\d+)$/);
-    if (!m || u.searchParams.get('fetch') || u.searchParams.get('pane')) return false;
+    if (!m || u.searchParams.get('pane')) return false;
     const key = (m[1] === 'doc' ? 'd' : 'p') + m[2], page = parseInt(u.searchParams.get('page'));
+    const fetch = m[1] === 'pdf' && !!u.searchParams.get('fetch');
+    if (fetch) {
+      emitEvent('vr-dock-open', {key, page: null, fetch: true});
+      return true;
+    }
     if (key === this.shown && page) {
       const w = this.win();
       if (w && w.vrPdf) { w.vrPdf.go(page, null); return true; }

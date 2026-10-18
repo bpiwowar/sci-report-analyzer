@@ -761,9 +761,13 @@ def no_confirm() -> bool:
 
 
 def _open_js(pub_id: int, period: int | None) -> str:
-    # Opened from the click itself (a window opened later would be blocked as a pop-up).
+    # Beside a person's page (see pdf_dock); elsewhere, a new window opened from the click
+    # itself (one opened later would be blocked as a pop-up).
     url = json.dumps(page_url(pub_id, period, fetch=True))
-    return f"() => {{ window.open({url}, '_blank'); emit(); }}"
+    return (
+        f"() => {{ if (!(window.vrDock && vrDock.openUrl({url}))) window.open({url}, '_blank'); "
+        "emit(); }"
+    )
 
 
 def confirm_download(panel: PublicationsPanel, s: PubStat) -> None:
@@ -783,8 +787,8 @@ def confirm_download(panel: PublicationsPanel, s: PubStat) -> None:
                 ).classes("text-grey")
         ui.label(
             _(
-                "It is stored in the data directory, and opens in a new window where you can "
-                "highlight and annotate it."
+                "It is stored in the data directory, and opens beside the page (elsewhere, in a "
+                "new window) where you can highlight and annotate it."
             )
         ).classes("text-sm text-grey")
         again = ui.checkbox(_("Don't ask again")).mark("pdf-no-confirm")

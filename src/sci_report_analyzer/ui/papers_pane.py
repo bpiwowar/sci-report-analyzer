@@ -278,7 +278,7 @@ class PapersPane:
                             new_tab=True,
                         ).mark(f"{self.mark}-get-pdf-{s.id}"):
                             ui.icon("picture_as_pdf", size="xs", color="grey-6").tooltip(
-                                _("Download the PDF (open access) and view it (a new window)")
+                                _("Download the PDF (open access) and view it (beside the page)")
                             )
                 about = " · ".join(x for x in (s.venue, str(s.year or "")) if x)
                 ui.label(f"@{p.key} · {about}").classes("w-full text-xs text-grey ellipsis")

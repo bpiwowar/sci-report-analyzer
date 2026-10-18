@@ -237,6 +237,22 @@ async def test_pdf_buttons(user: User, monkeypatch):
     await user.should_see(marker=f"view-pdf-{a}")
 
 
+async def test_download_beside_the_page(user: User):
+    """A PDF to download, from a person's page: beside it (its frame downloads it), not in a
+    new window."""
+    pid, _, ids = _person()
+    a = ids["Deep ranking for search"]
+    assert "vrDock.openUrl" in pdf_viewer._open_js(a, None)
+    await user.open(f"/person/{pid}")
+    await user.should_see(marker=f"get-pdf-{a}")
+    layout = user.client.layout
+    [listener] = [i for i, ls in layout._event_listeners.items() if ls.type == "vrDockOpen"]
+    layout._handle_event({"listener_id": listener, "args": {"key": f"p{a}", "fetch": True}})
+    await user.should_see(marker=f"dock-frame-p{a}")
+    [frame] = user.find(marker=f"dock-frame-p{a}").elements
+    assert "fetch=1" in frame.props["src"] and "embed=1" in frame.props["src"]
+
+
 async def test_settings_cleanup(user: User):
     _, link, ids = _person()
     b = ids["Neural retrieval models for long documents"]

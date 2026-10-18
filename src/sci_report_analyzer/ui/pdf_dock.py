@@ -113,7 +113,12 @@ class PdfDock:
             f"if ({files}) {{ e.preventDefault(); getElement({self.picker.id})"
             ".$refs.qRef.addFiles(e.dataTransfer.files); } }",
         )
-        ui.on("vr-dock-open", lambda e: self.open(str(e.args.get("key")), e.args.get("page")))
+        ui.on(
+            "vr-dock-open",
+            lambda e: self.open(
+                str(e.args.get("key")), e.args.get("page"), fetch=bool(e.args.get("fetch"))
+            ),
+        )
         ui.on("vr-dock-width", lambda e: self._width(int(e.args)))
         # (a document renamed from its title above its PDF: its tab too)
         ui.on("vr-dock-renamed", lambda e: self._renamed(str(e.args["key"]), str(e.args["name"])))
@@ -193,9 +198,12 @@ class PdfDock:
         shown = self.shown or self.aside  # (set aside: shown again, the page reloaded)
         return {"pdfs": ",".join(self.keys), **({"pdf": shown} if shown else {})}
 
-    def open(self, key: str, page: int | None = None) -> None:
-        """Show the PDF ``key`` (opened first, if need be), at ``page``."""
+    def open(self, key: str, page: int | None = None, *, fetch: bool = False) -> None:
+        """Show the PDF ``key`` (opened first, if need be), at ``page``; ``fetch``: a paper's,
+        downloaded first (its frame loaded again)."""
         self.aside = None
+        if fetch and (frame := self.frames.pop(key, None)) is not None:
+            frame.delete()
         if key not in self.keys:
             if not self._known(key):
                 ui.notify(_("No such PDF"), type="warning")
@@ -207,7 +215,7 @@ class PdfDock:
                 f"?.contentWindow?.vrPdf?.go({int(page)}, null)"
             )
         self.shown = key
-        self._update(page=page)
+        self._update(page=page, fetch=fetch)
 
     def toggle(self, key: str) -> None:
         """Its tab clicked: shown, or (shown already) minimized."""
@@ -249,12 +257,12 @@ class PdfDock:
             self.shown = None
         self._update()
 
-    def _frame(self, key: str, page: int | None) -> None:
+    def _frame(self, key: str, page: int | None, fetch: bool = False) -> None:
         kind, i = key[0], int(key[1:])
         if kind == "d":
             url = page_url_of(i, embed=True) + (f"&page={int(page)}" if page else "")
         else:
-            url = page_url(i, self._period(), page=page, embed=True)
+            url = page_url(i, self._period(), fetch=fetch, page=page, embed=True)
         with self.area:
             self.frames[key] = (
                 ui.element("iframe")
@@ -264,13 +272,15 @@ class PdfDock:
                 .mark(f"dock-frame-{key}")
             )
 
-    def _update(self, *, page: int | None = None, changed: bool = True) -> None:
+    def _update(
+        self, *, page: int | None = None, fetch: bool = False, changed: bool = True
+    ) -> None:
         """The frames, the drawer, the strip, the address and the state as left, after a
         change."""
         if self.shown is not None:
             self.last = self.shown
             if self.shown not in self.frames:
-                self._frame(self.shown, page)
+                self._frame(self.shown, page, fetch)
         for key, frame in self.frames.items():
             frame.set_visibility(key == self.shown)
         self.drawer.value = self.shown is not None
