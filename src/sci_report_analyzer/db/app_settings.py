@@ -23,3 +23,21 @@ def delete_setting(key: str) -> None:
     with session_scope() as s:
         if row := s.get(AppSetting, key):
             s.delete(row)
+
+
+def get_unless_default(key: str, default: Any) -> Any:
+    """A setting changed from its default, else None (a copy of ``default``, saved by a
+    former version: dropped, the setting then following the default, a newer one too)."""
+    value = get_setting(key)
+    if value is not None and value == default:
+        delete_setting(key)
+        return None
+    return value
+
+
+def set_unless_default(key: str, value: Any, default: Any) -> None:
+    """Save a setting; as its default: none saved (it follows the default)."""
+    if value == default:
+        delete_setting(key)
+    else:
+        set_setting(key, value)

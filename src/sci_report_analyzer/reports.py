@@ -46,7 +46,7 @@ from lark.exceptions import LarkError
 
 from . import i18n
 from .authors import surname
-from .db.app_settings import get_setting, set_setting
+from .db.app_settings import get_unless_default, set_unless_default
 from .db.models import Period
 from .db.session import session_scope
 from .i18n import _
@@ -1076,7 +1076,7 @@ def check_templates(items: list[Template], over: dict[str, str] | None = None) -
 
 
 def _general() -> Templates:
-    saved = dict(get_setting(TEMPLATES_KEY) or {})
+    saved = dict(get_unless_default(TEMPLATES_KEY, asdict(default_templates())) or {})
     if not saved.get("items"):
         return default_templates()
     items = [
@@ -1111,7 +1111,7 @@ def save_templates(t: Templates) -> None:
         x.name = x.name.strip().removeprefix(".")
     if err := check_templates(t.items):
         raise ValueError(err)
-    set_setting(TEMPLATES_KEY, asdict(t))
+    set_unless_default(TEMPLATES_KEY, asdict(t), asdict(default_templates()))
 
 
 def save_folder_templates(folder_id: int, items: list[Template]) -> None:

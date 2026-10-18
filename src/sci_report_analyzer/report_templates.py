@@ -58,6 +58,8 @@ def load(folder_id: int | None) -> list[ReportTemplate]:
         with session_scope() as s:
             if (x := folders.used_settings(s, folder_id)) is not None:
                 saved = x.report_templates
+                if saved == _dump(default_templates()):
+                    x.report_templates = saved = None  # (a copy of the defaults: those)
     if saved is None:
         return default_templates()
     return [ReportTemplate(t.get("name") or "", t.get("text") or "") for t in saved]
@@ -76,7 +78,11 @@ def save(folder_id: int, items: list[ReportTemplate]) -> None:
         raise ValueError(_("Two report templates have the same name"))
     with session_scope() as s:
         if (x := folders.used_settings(s, folder_id)) is not None:
-            x.report_templates = [asdict(t) for t in items]
+            x.report_templates = None if items == default_templates() else _dump(items)
+
+
+def _dump(items: list[ReportTemplate]) -> list[dict]:
+    return [asdict(t) for t in items]
 
 
 def text_of(folder_id: int, name: str) -> str | None:
