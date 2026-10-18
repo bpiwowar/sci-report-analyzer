@@ -144,6 +144,7 @@ DEFAULT_INTERNATIONAL_KEYWORDS = [
     "Springer",
 ]
 
+SHARED_TASK_RE = Rule("shared_task")
 _CONFERENCE_RE = Rule("conference")
 _JOURNAL_RE = Rule("journal")
 # Document types (DBLP / HAL / OpenAlex / ORCID) that are neither papers in a conference
@@ -289,6 +290,10 @@ def detect_kind(
     # Books and chapters (unless a ranking lists the venue, e.g. LNCS proceedings).
     if doc_types & _BOOK_DOC_TYPES and not (badge and (badge.coreRank or badge.quartile)):
         return "chapter" if doc_types & _CHAPTER_DOC_TYPES else "book"
+
+    # Shared tasks (their proceedings often a workshop's).
+    if SHARED_TASK_RE.search(venue):
+        return "shared_task"
 
     # Workshops (unless a journal ranking lists the venue).
     journal_ranked = badge is not None and badge.source in ("scimago", "jcr") and badge.quartile

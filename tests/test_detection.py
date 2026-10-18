@@ -137,3 +137,17 @@ def test_export_import():
     assert next(r for r in load_settings().detection_rules if r.id == "joint").pattern == (
         r"\bjoint\b"
     )
+
+
+def test_shared_task():
+    from sci_report_analyzer.ranking.kinds import KindEvidence, detect_kind
+
+    def kind(venue: str) -> str:
+        return detect_kind(
+            None, KindEvidence(venue), national_keywords=[], international_keywords=[]
+        )
+
+    # (before the workshops: a shared task's proceedings are often a workshop's)
+    assert kind("Proceedings of the Foo Workshop: Shared Task on Bar") == "shared_task"
+    assert kind("Baz 2023 shared-task") == "shared_task"
+    assert kind("Workshop on Foo") == "intl_workshop"

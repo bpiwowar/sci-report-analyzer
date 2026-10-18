@@ -1,5 +1,5 @@
-"""Detection rules: the regexes classifying venues (workshops and their main conference,
-conferences vs journals, joint conferences); those of the tracks are the tracks' own
+"""Detection rules: the regexes classifying venues (shared tasks, workshops and their main
+conference, conferences vs journals, joint conferences); those of the tracks are the tracks' own
 (``ranking.tracks``).
 
 Their defaults are here; the patterns in force are the settings' (``MatchSettings.
@@ -64,6 +64,7 @@ class DetectionDefault:
 DETECTION_GROUPS = Labels(
     {
         "workshop": N_("Workshops"),
+        "shared_task": N_("Shared tasks"),
         "form": N_("Conference or journal"),
         "joint": N_("Joint conferences"),
         "ranking": N_("Matching the rankings"),
@@ -124,6 +125,19 @@ DEFAULT_DETECTION_RULES: tuple[DetectionDefault, ...] = (
         pattern=r"(?-i:(?<=[\w)\]])\s*@\s*)(?P<a>[^,:;()]+)",
         part_of="workshop_host",
         examples=("Trustworthy AI @ ACM Multimedia",),
+    ),
+    # A shared task's paper (before the workshops: its proceedings are often a workshop's).
+    DetectionDefault(
+        id="shared_task",
+        group="shared_task",
+        name=N_("Shared task"),
+        description=N_(
+            "A venue text naming a shared task (an evaluation campaign; never ranked): "
+            "“… Shared Task …”."
+        ),
+        pattern=r"\bshared[- ]tasks?\b",
+        language="en",
+        examples=("Proceedings of the Foo Shared Task", "Bar 2023 Shared Task on Baz"),
     ),
     # Used only when neither a ranking nor the sources tell.
     DetectionDefault(
