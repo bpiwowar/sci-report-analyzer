@@ -16,6 +16,7 @@ from ..i18n import N_, _, ngettext
 from ..sources import ADAPTERS
 from .categories_editor import HELP as CATEGORIES_HELP
 from .categories_editor import categories_editor
+from .classification import classification_dialog
 from .dialogs import actions, confirm, transient_dialog
 from .settings_search import searched
 
@@ -299,7 +300,15 @@ def settings_fields(settings_id: int, section: str = "categories") -> Callable[[
 
     with panel("categories"):
         categories_editor(ref)
-        ui.label(_("Changed at once (not on Save)")).classes("text-xs text-grey")
+        with ui.row().classes("w-full items-center gap-2"):
+            ui.label(_("Changed at once (not on Save)")).classes("text-xs text-grey grow")
+            ui.button(
+                _("Classification"),
+                icon="fact_check",
+                on_click=lambda: classification_dialog(settings_id),
+            ).props("flat dense no-caps size=sm color=purple").tooltip(
+                _("How well the suggested categories match those the excerpts are filed in")
+            ).mark("settings-classification")
     with panel("report"):
         report_save = report_section(ref)
         subtitle(_("Language"))
@@ -548,6 +557,12 @@ def settings_tab() -> None:
                     _("Their categories"),
                     f"settings-categories-{x.id}",
                     lambda x=x: settings_dialog(x.id, listing.refresh, "categories"),
+                )
+                button(
+                    "fact_check",
+                    _("Classification: the suggested categories against those filed in"),
+                    f"settings-classification-{x.id}",
+                    lambda x=x: classification_dialog(x.id),
                 )
                 button(
                     "article",

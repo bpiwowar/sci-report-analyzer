@@ -235,3 +235,76 @@ async def test_cluster_settings(user: User, monkeypatch) -> None:
         assert (st.cluster_max, st.cluster_min, st.embed_model) == (4, 3, "bge-m3")
     finally:
         llm.save_settings(llm.OllamaSettings())
+
+
+def test_evaluate_and_keep(embeddings) -> None:
+    """Each excerpt hidden, then suggested: the rates (overall, by category); one filed in
+    the wrong category suggested in the right one; kept, no longer listed
+    (moved: no longer kept)."""
+    folder, period, cats = _folder()
+    wrong = categories.add_excerpt(cats["Research"], period, "A course for students", 1, [])
+    ev = asyncio.run(classifier.evaluate(folder))
+    assert len(ev.excerpts) == 6
+    assert {e.excerpt_id: e for e in ev.excerpts}[wrong].suggested == cats["Teaching"]
+    assert ev.rates()[cats["Teaching"]] == (0, 2)  # (closer to the wrong one)
+    assert ev.rates()[cats["Research"]] == (2, 3)
+    assert wrong in [e.excerpt_id for e in ev.wrong]
+    classifier.keep(folder, wrong)
+    assert classifier.kept(folder) == {wrong: cats["Research"]}
+    ev = asyncio.run(classifier.evaluate(folder))
+    assert wrong not in [e.excerpt_id for e in ev.wrong]
+    assert ev.rates()[cats["Research"]] == (2, 3)  # (still missed by the suggestions)
+    # Moved: no longer kept (where it was kept).
+    categories.move_excerpt(wrong, cats["Teaching"])
+    ev = asyncio.run(classifier.evaluate(folder))
+    assert ev.rates()[cats["Teaching"]] == (2, 3) and ev.rates()[cats["Research"]] == (2, 2)
+    assert not {e.excerpt_id: e for e in ev.excerpts}[wrong].kept
+
+
+def test_evaluate_without_model_or_excerpt(embeddings) -> None:
+    folder = folders.save_folder(None, "Empty")
+    with pytest.raises(ValueError):
+        asyncio.run(classifier.evaluate(folder))
+    llm.save_settings(llm.OllamaSettings())
+    with pytest.raises(RuntimeError):
+        asyncio.run(classifier.evaluate(folder))
+
+
+async def test_classification_dialog(user: User, embeddings) -> None:
+    """Parameters → Folders: a settings' classification (the rates, those suggested
+    elsewhere); one moved where suggested, another kept: no longer listed, the rates
+    updated; trained on them."""
+    folder, period, cats = _folder()
+    wrong = categories.add_excerpt(cats["Research"], period, "A course for students", 1, [])
+    award = next(e.id for e in categories.excerpts(period) if e.text == "Best paper award")
+    sid = folders.settings_of(folder)
+    await user.open("/settings?tab=folders")
+    user.find(marker=f"settings-classification-{sid}").click()
+    await user.should_see(marker="classification-rate")
+    await user.should_see(marker=f"classification-category-{cats['Research']}")
+    await user.should_see(marker=f"reclassify-excerpt-{wrong}")
+    await user.should_see("Move to Teaching")
+    user.find(marker=f"reclassify-move-{wrong}").click()
+    await user.should_not_see(marker=f"reclassify-excerpt-{wrong}")
+    filed = {e.id: e.category_id for e in categories.excerpts(period)}
+    assert filed[wrong] == cats["Teaching"]
+    await user.should_see(marker=f"reclassify-excerpt-{award}")
+    user.find(marker=f"reclassify-keep-{award}").click()
+    await user.should_not_see(marker=f"reclassify-excerpt-{award}")
+    await user.should_see(marker="classification-kept-count")
+    assert classifier.kept(folder) == {award: cats["Awards"]}
+    user.find(marker="classification-train").click()
+    await user.should_see("Learnt from 6 excerpts")
+    assert classifier.trained(folder).count == 6
+
+
+async def test_classification_dialog_off(user: User, monkeypatch) -> None:
+    """Without an embedding model (or a category, or an excerpt): said, and where to set
+    it."""
+    monkeypatch.delenv(llm.EMBED_MODEL_ENV, raising=False)
+    folder = folders.save_folder(None, "Hiring 2026")
+    sid = folders.settings_of(folder)
+    await user.open("/settings?tab=folders")
+    user.find(marker=f"settings-classification-{sid}").click()
+    await user.should_see(marker="classification-off")
+    await user.should_see("choose an embedding model", retries=20)

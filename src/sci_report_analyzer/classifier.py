@@ -20,7 +20,7 @@ import numpy as np
 from sqlalchemy import select
 
 from . import folders, llm
-from .db.models import Category, Embedding, Excerpt, ExcerptClassifier, utcnow
+from .db.models import AppSetting, Category, Embedding, Excerpt, ExcerptClassifier, utcnow
 from .db.session import session_scope
 
 BATCH = 32  # (texts embedded per request)
@@ -80,9 +80,9 @@ async def embeddings(texts: list[str], folder_id: int | None) -> list[list[float
     return [known[d] for d in digests]
 
 
-def _training_set(settings_id: int) -> list[tuple[int, str]]:
-    """The excerpts filed in the settings' categories: (category id, text); merged ones,
-    in that of the group (its lead's)."""
+def _training_rows(settings_id: int) -> list[tuple[int, int, str]]:
+    """The excerpts filed in the settings' categories: (excerpt id, category id, text);
+    merged ones, in that of the group (its lead's)."""
     with session_scope() as s:
         rows = list(
             s.execute(
@@ -93,7 +93,9 @@ def _training_set(settings_id: int) -> list[tuple[int, str]]:
             )
         )
     category = {i: c for i, c, _g, _t in rows}
-    return [(category.get(g, c) if g else c, t.strip()) for _i, c, g, t in rows if t and t.strip()]
+    return [
+        (i, category.get(g, c) if g else c, t.strip()) for i, c, g, t in rows if t and t.strip()
+    ]
 
 
 def _refit(x: np.ndarray, centres: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -137,6 +139,8 @@ class _Fit:
     prototypes: dict[int, np.ndarray]  # (a category's, normalised, one per row)
     top1: float
     top3: float
+    # The category suggested first for each excerpt, hidden as below (-1: none).
+    first: np.ndarray | None = None
 
 
 def _fit(x: np.ndarray, labels: np.ndarray, threshold: float | None, least: int, most: int) -> _Fit:
@@ -165,11 +169,13 @@ def _fit(x: np.ndarray, labels: np.ndarray, threshold: float | None, least: int,
     truth = scores[every, np.searchsorted(cats, labels)]
     better = (scores > truth[:, None]).sum(1)
     found = np.isfinite(truth)
+    first = np.where(np.isfinite(scores.max(1)), cats[scores.argmax(1)], -1)
     return _Fit(
         threshold,
         {int(c): _unit(total[owners == c]) for c in cats},
         float((found & (better == 0)).mean()),
         float((found & (better < 3)).mean()),
+        first,
     )
 
 
@@ -197,6 +203,19 @@ def _prototypes(stored: dict[str, Any]) -> dict[int, np.ndarray]:
     return {int(c): np.array([v], dtype=float) for c, v in stored.items()}
 
 
+async def _fitted(folder_id: int, rows: list[tuple[int, int, str]]) -> _Fit:
+    """The best prototypes for excerpts (see _training_rows), with the settings' bounds of
+    the clusters."""
+    vectors = await embeddings([t for _i, _c, t in rows], folder_id)
+    st = llm.settings()
+    return fit(
+        _unit(np.array(vectors, dtype=float)),
+        np.array([c for _i, c, _t in rows]),
+        st.cluster_min,
+        st.cluster_max,
+    )
+
+
 async def train(folder_id: int) -> Trained:
     """Learn from the excerpts filed in the folder's categories (raises if there is none, or
     no embedding model)."""
@@ -204,17 +223,10 @@ async def train(folder_id: int) -> Trained:
     if not model:
         raise RuntimeError("No embedding model (Settings → Local LLM)")
     settings_id = _settings(folder_id)
-    rows = _training_set(settings_id)
+    rows = _training_rows(settings_id)
     if not rows:
         raise ValueError("No excerpt filed yet")
-    vectors = await embeddings([t for _, t in rows], folder_id)
-    st = llm.settings()
-    best = fit(
-        _unit(np.array(vectors, dtype=float)),
-        np.array([c for c, _t in rows]),
-        st.cluster_min,
-        st.cluster_max,
-    )
+    best = await _fitted(folder_id, rows)
     stored = {
         "prototypes": {str(c): np.round(p, 6).tolist() for c, p in best.prototypes.items()},
         "threshold": best.threshold,
@@ -263,3 +275,105 @@ async def suggest(folder_id: int, text: str, k: int = 3) -> list[tuple[int, floa
     v = _unit(np.array(v, dtype=float))
     scores = [(c, float((p @ v).max())) for c, p in prototypes.items() if c in existing and len(p)]
     return sorted(scores, key=lambda x: -x[1])[:k]
+
+
+# ---- How well it does, excerpt by excerpt ----------------------------------------------------
+
+KEPT_KEY = "classifier.kept.{}"  # AppSetting: {"excerpts": {excerpt id: the category kept}}
+
+
+@dataclass
+class Evaluated:
+    excerpt_id: int
+    lead_id: int  # (the excerpt leading its group, moved with it; else itself)
+    category_id: int
+    suggested: int | None  # (the category suggested first, it hidden; none: no other one)
+    text: str
+    kept: bool = False  # (in its category though suggested elsewhere, as said)
+
+    @property
+    def right(self) -> bool:
+        return self.suggested == self.category_id
+
+
+@dataclass
+class Evaluation:
+    excerpts: list[Evaluated]
+
+    @property
+    def rate(self) -> float:
+        return sum(e.right for e in self.excerpts) / max(len(self.excerpts), 1)
+
+    def rates(self) -> dict[int, tuple[int, int]]:
+        """Each category's excerpts: (those suggested in it, all)."""
+        out: dict[int, tuple[int, int]] = {}
+        for e in self.excerpts:
+            right, n = out.get(e.category_id, (0, 0))
+            out[e.category_id] = (right + e.right, n + 1)
+        return out
+
+    @property
+    def wrong(self) -> list[Evaluated]:
+        """Those suggested elsewhere, unless kept."""
+        return [e for e in self.excerpts if not e.right and not e.kept]
+
+
+def kept(folder_id: int) -> dict[int, int]:
+    """The excerpts kept in their category though suggested elsewhere (in the folder's
+    settings): {excerpt id: that category} (moved since: no longer kept)."""
+    with session_scope() as s:
+        row = s.get(AppSetting, KEPT_KEY.format(folders.settings_id(s, folder_id)))
+        return {int(k): v for k, v in (row.value.get("excerpts", {}) if row else {}).items()}
+
+
+def keep(folder_id: int, excerpt_id: int) -> None:
+    """An excerpt right in its category, though suggested elsewhere: no longer said."""
+    with session_scope() as s:
+        key = KEPT_KEY.format(folders.settings_id(s, folder_id))
+        row = s.get(AppSetting, key)
+        value = dict(row.value.get("excerpts", {})) if row else {}
+        if e := s.get(Excerpt, excerpt_id):
+            value[str(excerpt_id)] = e.category_id
+        # (those gone, or moved since, forgotten)
+        now = dict(
+            s.execute(
+                select(Excerpt.id, Excerpt.category_id).where(
+                    Excerpt.id.in_([int(k) for k in value])
+                )
+            ).all()
+        )
+        value = {k: c for k, c in value.items() if now.get(int(k)) == c}
+        s.merge(AppSetting(key=key, value={"excerpts": value}))
+
+
+async def evaluate(folder_id: int) -> Evaluation:
+    """The category suggested first for each excerpt filed in the folder's categories, it
+    hidden (raises as train). Trained as train does (not kept), each excerpt is then taken
+    out of its cluster's mean (leave-one-out, the clusters and their threshold kept: a bit
+    optimistic, but the clustering is done once rather than once per excerpt)."""
+    if not llm.embed_model(folder_id):
+        raise RuntimeError("No embedding model (Settings → Local LLM)")
+    rows = _training_rows(_settings(folder_id))
+    if not rows:
+        raise ValueError("No excerpt filed yet")
+    best = await _fitted(folder_id, rows)
+    with session_scope() as s:
+        leads = dict(
+            s.execute(
+                select(Excerpt.id, Excerpt.group_id).where(Excerpt.id.in_([i for i, *_ in rows]))
+            ).all()
+        )
+    held = kept(folder_id)
+    return Evaluation(
+        [
+            Evaluated(
+                i,
+                leads.get(i) or i,
+                c,
+                int(f) if f >= 0 else None,
+                t,
+                held.get(i) == c,
+            )
+            for (i, c, t), f in zip(rows, best.first, strict=True)
+        ]
+    )
