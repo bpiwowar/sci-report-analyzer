@@ -3,6 +3,7 @@ each time, the directories of what was renamed or moved moved at once."""
 
 import asyncio
 import json
+import shlex
 import subprocess
 from datetime import UTC, datetime, timedelta
 
@@ -156,6 +157,10 @@ async def test_settings_and_button(user: User, tmp_path) -> None:
     user.find(marker="backup-save").click()
     await user.should_see("Backed up every 15 minutes", marker="backup-status")
     assert git_backup.load_config().interval == 15
+    # Its history: a command to paste in a shell (the path quoted as one), never translated.
+    [history] = user.find(marker="backup-history").elements
+    directory = str(git_backup.load_config().directory)
+    assert history.text == f"git -C {shlex.quote(directory)} log --stat"
     user.find(marker="backup-now").click()  # (the header's)
     for _i in range(200):
         if git_backup.load_config().last_at:

@@ -3,6 +3,7 @@ Settings → Backup (where, how often, the last one)."""
 
 from __future__ import annotations
 
+import shlex
 from datetime import datetime
 
 from nicegui import ui
@@ -140,9 +141,17 @@ def backup_tab() -> None:
                 "text-sm text-negative"
             ).mark("backup-error")
         if c.directory is not None:
-            ui.label(_("Its history: git -C “{path}” log --stat").format(path=c.directory)).classes(
-                "text-xs text-grey font-mono"
-            )
+            # (the command as typed in a shell: never translated)
+            command = f"git -C {shlex.quote(str(c.directory))} log --stat"
+            with ui.row().classes("items-center gap-1 no-wrap"):
+                ui.label(_("Its history:")).classes("text-xs text-grey")
+                ui.label(command).classes("text-xs text-grey font-mono select-all").mark(
+                    "backup-history"
+                )
+                ui.button(
+                    icon="content_copy",
+                    on_click=lambda: (ui.clipboard.write(command), ui.notify(_("Copied"))),
+                ).props("flat dense round size=sm").tooltip(_("Copy the command"))
 
     async def run() -> None:
         save()
